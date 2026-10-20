@@ -58,7 +58,6 @@ Alternate `--cuda-path` if versioned SDK: `/usr/local/corex-3.2.3`
 ```
 Python: 3.10
 torch:  /usr/local/corex/lib64/python3/dist-packages/torch/
-vllm:   /usr/local/corex/lib64/python3/dist-packages/vllm/
 ```
 
 ### ixformer SDK
