@@ -425,12 +425,21 @@ void session_graphs_free(SessionGraphs& gr) {
         }
     }
     if (gr.preA) {
-        // preA/preB are single graphs, not arrays
-        cudaGraphExecDestroy(gr.preA);
+        for (int64_t j = 0; j < gr.n; ++j) {
+            if (gr.preA[j]) {
+                cudaGraphExecDestroy(gr.preA[j]);
+            }
+        }
+        delete[] gr.preA;
         gr.preA = nullptr;
     }
     if (gr.preB) {
-        cudaGraphExecDestroy(gr.preB);
+        for (int64_t j = 0; j < gr.n; ++j) {
+            if (gr.preB[j]) {
+                cudaGraphExecDestroy(gr.preB[j]);
+            }
+        }
+        delete[] gr.preB;
         gr.preB = nullptr;
     }
     gr.n = 0;
