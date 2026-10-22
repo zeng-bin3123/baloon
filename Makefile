@@ -10,97 +10,125 @@ CXXFLAGS  := -x cuda --cuda-gpu-arch=$(ARCH) --cuda-path=$(CUDAPATH) \
              -fPIC
 LDFLAGS   := -L$(CUDAPATH)/lib64 -lcudart -lpthread
 
-# Sources
-SRCS := src/strata/core/graph.cpp \
-        src/strata/core/pinned.cpp \
-        src/strata/core/weights.cpp \
-        src/strata/core/verify.cpp \
-        src/strata/core/mtp.cpp \
-        src/strata/core/expert_cache.cpp \
-        src/strata/core/expert_source.cpp \
-        src/strata/core/layer.cpp \
-        src/strata/core/session.cpp
+# .so compile flags (optimized)
+SOFLAGS   := -x cuda --cuda-gpu-arch=$(ARCH) --cuda-path=$(CUDAPATH) \
+             -std=c++17 -O3 \
+             -D__ILUVATAR__ -D__ILUVATAR_WORKAROUND__ -D__ILUVATAR_DIAG__ \
+             -cl-single-precision-constant -fPIC -mllvm --bonus-inst-threshold=0 \
+             -I$(CUDAPATH)/include -Iinclude \
+             -L$(CUDAPATH)/lib64 -lcudart
 
-OBJS := $(SRCS:.cpp=.o)
+# ─── Core library sources ──────────────────────────────────────────
+CORE_SRCS := src/strata/core/graph.cpp \
+             src/strata/core/pinned.cpp \
+             src/strata/core/weights.cpp \
+             src/strata/core/verify.cpp \
+             src/strata/core/mtp.cpp \
+             src/strata/core/expert_cache.cpp \
+             src/strata/core/expert_source.cpp \
+             src/strata/core/layer.cpp \
+             src/strata/core/session.cpp
 
-# Shared library
-LIBNAME := libstrata_core.so
+# ─── Host-side kernel dispatchers ──────────────────────────────────
+KERN_SRCS := src/strata/kernels/elementwise.cpp \
+             src/strata/kernels/gdn.cpp \
+             src/strata/kernels/gr.cpp \
+             src/strata/kernels/ngram.cpp \
+             src/strata/kernels/ple.cpp \
+             src/strata/kernels/qsa.cpp \
+             src/strata/kernels/s_gemv.cpp \
+             src/strata/kernels/shared_expert.cpp
 
-# Test binaries
-TEST1_SRC := tests/test_unit1.cpp
-TEST1_BIN := tests/test_unit1
-TEST2_SRC := tests/test_unit2.cpp
-TEST2_BIN := tests/test_unit2
-TEST3_SRC := tests/test_unit3.cpp
-TEST3_BIN := tests/test_unit3
-TEST4_SRC := tests/test_unit4.cpp
-TEST4_BIN := tests/test_unit4
+# ─── Spec (suffix drafter) ────────────────────────────────────────
+SPEC_SRCS := src/strata/spec/suffix_drafter.cpp
 
-TEST5_SRC := tests/test_unit5.cpp
-TEST5_BIN := tests/test_unit5
+# ─── CUDA kernel sources (.cu) ────────────────────────────────────
+CUDA_SRCS := src/strata/kernels/cuda/ix_infccl_allreduce.cu \
+             src/strata/kernels/cuda/ix_native_mmvq.cu \
+             src/strata/kernels/cuda/ix_native_router.cu \
+             src/strata/kernels/cuda/ix_moe_elementwise.cu \
+             src/strata/kernels/cuda/ix_bf16_gemv.cu \
+             src/strata/kernels/cuda/ix_gdn.cu
 
-TEST6_SRC := tests/test_unit6.cpp
-TEST6_BIN := tests/test_unit6
+ALL_SRCS  := $(CORE_SRCS) $(KERN_SRCS) $(SPEC_SRCS)
+OBJS      := $(ALL_SRCS:.cpp=.o)
+CUDA_OBJS := $(CUDA_SRCS:.cu=.o)
 
-.PHONY: all clean test test1 test2 test3 test4 test5 test6 lib
+# ─── Output libraries ─────────────────────────────────────────────
+CORE_LIB   := libstrata_core.so
+KERNEL_LIB := libix_kernels.so
 
-all: lib
+# ─── Build targets ─────────────────────────────────────────────────
+.PHONY: all clean test lib kernels test1 test2 test3 test4 test5 test6 test7
 
-lib: $(LIBNAME)
+all: lib kernels
 
-$(LIBNAME): $(OBJS)
+lib: $(CORE_LIB)
+kernels: $(KERNEL_LIB)
+
+# Core library (host-side)
+$(CORE_LIB): $(OBJS)
 	$(CXX) -shared -o $@ $^ $(LDFLAGS)
 
+# CUDA kernel library (GPU-side, optimized)
+$(KERNEL_LIB): $(CUDA_OBJS)
+	$(CXX) $(SOFLAGS) -shared -o $@ $^
+
+# Compile rules
 %.o: %.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(TEST1_BIN): $(TEST1_SRC) $(LIBNAME)
+# CUDA kernel compile (use SOFLAGS for optimization)
+src/strata/kernels/cuda/%.o: src/strata/kernels/cuda/%.cu
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $< -o $@ -L. -lstrata_core $(LDFLAGS) \
+	$(CXX) $(SOFLAGS) -c $< -o $@
+
+# ─── Tests ─────────────────────────────────────────────────────────
+define TEST_RULE
+$(1): tests/$(1).cpp $$(CORE_LIB)
+	@mkdir -p tests
+	$$(CXX) $$(CXXFLAGS) $$< -o tests/$$@ -L. -lstrata_core $$(LDFLAGS) \
+		-Wl,-rpath,'$$$$ORIGIN/..' -Wl,-rpath,$$(CUDAPATH)/lib64
+endef
+
+$(eval $(call TEST_RULE,test_unit1))
+$(eval $(call TEST_RULE,test_unit2))
+$(eval $(call TEST_RULE,test_unit3))
+$(eval $(call TEST_RULE,test_unit4))
+$(eval $(call TEST_RULE,test_unit5))
+$(eval $(call TEST_RULE,test_unit6))
+
+# Unit 7: CUDA kernel integration test
+tests/test_unit7: tests/test_unit7.cu $(CORE_LIB) $(KERNEL_LIB)
+	@mkdir -p tests
+	$(CXX) $(SOFLAGS) $< -o $@ -L. -lstrata_core -lix_kernels $(LDFLAGS) \
 		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
 
-$(TEST2_BIN): $(TEST2_SRC) $(LIBNAME)
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $< -o $@ -L. -lstrata_core $(LDFLAGS) \
-		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
+test1: tests/test_unit1
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit1
 
-$(TEST3_BIN): $(TEST3_SRC) $(LIBNAME)
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $< -o $@ -L. -lstrata_core $(LDFLAGS) \
-		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
+test2: tests/test_unit2
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit2
 
-test1: $(TEST1_BIN)
-	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./$(TEST1_BIN)
+test3: tests/test_unit3
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit3
 
-test2: $(TEST2_BIN)
-	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./$(TEST2_BIN)
+test4: tests/test_unit4
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit4
 
-test3: $(TEST3_BIN)
-	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./$(TEST3_BIN)
+test5: tests/test_unit5
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit5
 
-$(TEST4_BIN): $(TEST4_SRC) $(LIBNAME)
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $< -o $@ -L. -lstrata_core $(LDFLAGS) 		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
+test6: tests/test_unit6
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit6
 
-test4: $(TEST4_BIN)
-	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./$(TEST4_BIN)
+test7: tests/test_unit7
+	CUDA_VISIBLE_DEVICES=0,1,2,3 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit7
 
-$(TEST5_BIN): $(TEST5_SRC) $(LIBNAME)
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $< -o $@ -L. -lstrata_core $(LDFLAGS) 		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
-
-test5: $(TEST5_BIN)
-	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./$(TEST5_BIN)
-
-$(TEST6_BIN): $(TEST6_SRC) $(LIBNAME)
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $< -o $@ -L. -lstrata_core $(LDFLAGS) 		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
-
-test6: $(TEST6_BIN)
-	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./$(TEST6_BIN)
-
-test: test1 test2 test3 test4 test5 test6
+test: test1 test2 test3 test4 test5 test6 test7
 
 clean:
-	rm -f $(OBJS) $(LIBNAME) $(TEST1_BIN) $(TEST2_BIN) $(TEST3_BIN) $(TEST4_BIN) $(TEST5_BIN) $(TEST6_BIN)
+	rm -f $(OBJS) $(CUDA_OBJS) $(CORE_LIB) $(KERNEL_LIB)
+	rm -f tests/test_unit1 tests/test_unit2 tests/test_unit3
+	rm -f tests/test_unit4 tests/test_unit5 tests/test_unit6 tests/test_unit7
