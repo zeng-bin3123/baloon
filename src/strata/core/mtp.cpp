@@ -1,5 +1,6 @@
 // strata/core/mtp.cpp — MTP drafter (skeleton, GPU kernels in later units)
 #include "strata/core/mtp.hpp"
+#include "strata/core/weights.hpp"
 
 namespace strata {
 
