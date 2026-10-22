@@ -58,5 +58,5 @@ test2: $(TEST2_BIN)
 test: test1 test2
 
 clean:
-	rm -f $(OBJS) $(LIBNAME) $(TEST_BIN)
+	rm -f $(OBJS) $(LIBNAME) $(TEST1_BIN) $(TEST2_BIN)
 

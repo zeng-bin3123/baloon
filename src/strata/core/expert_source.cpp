@@ -4,6 +4,7 @@
 #include "strata/core/pinned.hpp"
 
 #include <algorithm>
+#include <cerrno>
 #include <cstdio>
 #include <cstring>
 

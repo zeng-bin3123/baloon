@@ -2,22 +2,39 @@
 #include "strata/core/expert_cache.hpp"
 
 #include <algorithm>
+#include <cerrno>
 #include <cstdio>
 #include <cstring>
-#include <fstream>
 #include <numeric>
+
+#if !defined(_WIN32)
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 
 namespace strata {
 
 // ─── Profile magic ───────────────────────────────────────────────────
 static constexpr uint32_t kProfileMagic = 0x50525453;  // 'STRP' little-endian
 
+// Helper: read exactly n bytes from fd, returns false on short/error.
+static bool read_exact(int fd, void* buf, size_t n) {
+    auto* p = static_cast<uint8_t*>(buf);
+    size_t done = 0;
+    while (done < n) {
+        ssize_t got = ::read(fd, p + done, n - done);
+        if (got <= 0) return false;
+        done += static_cast<size_t>(got);
+    }
+    return true;
+}
+
 bool read_expert_profile(const std::string& path, int64_t n_layers, int64_t n_expert,
                          std::vector<std::pair<int32_t, int32_t>>& ranked,
                          int64_t& slots, std::string& err) {
-    std::ifstream f(path, std::ios::binary);
-    if (!f.is_open()) {
-        err = "cannot open profile: " + path;
+    int fd = ::open(path.c_str(), O_RDONLY);
+    if (fd < 0) {
+        err = "cannot open profile: " + path + ": " + strerror(errno);
         return false;
     }
 
@@ -26,23 +43,26 @@ bool read_expert_profile(const std::string& path, int64_t n_layers, int64_t n_ex
     int32_t version = 0;
     int32_t hdr_layers = 0, hdr_expert = 0, hdr_slots = 0, hdr_ranked = 0;
 
-    f.read(reinterpret_cast<char*>(&magic), 4);
-    f.read(reinterpret_cast<char*>(&version), 4);
-    f.read(reinterpret_cast<char*>(&hdr_layers), 4);
-    f.read(reinterpret_cast<char*>(&hdr_expert), 4);
-    f.read(reinterpret_cast<char*>(&hdr_slots), 4);
-    f.read(reinterpret_cast<char*>(&hdr_ranked), 4);
+    bool ok = read_exact(fd, &magic, 4) &&
+              read_exact(fd, &version, 4) &&
+              read_exact(fd, &hdr_layers, 4) &&
+              read_exact(fd, &hdr_expert, 4) &&
+              read_exact(fd, &hdr_slots, 4) &&
+              read_exact(fd, &hdr_ranked, 4);
 
-    if (!f.good()) {
+    if (!ok) {
         err = "profile header read failed: " + path;
+        ::close(fd);
         return false;
     }
     if (magic != kProfileMagic) {
         err = "bad profile magic";
+        ::close(fd);
         return false;
     }
     if (hdr_layers <= 0 || hdr_expert <= 0 || hdr_ranked < 0) {
         err = "invalid profile dimensions";
+        ::close(fd);
         return false;
     }
 
@@ -51,20 +71,21 @@ bool read_expert_profile(const std::string& path, int64_t n_layers, int64_t n_ex
     ranked.resize(static_cast<size_t>(hdr_ranked));
     for (int32_t i = 0; i < hdr_ranked; ++i) {
         int32_t l = 0, e = 0;
-        f.read(reinterpret_cast<char*>(&l), 4);
-        f.read(reinterpret_cast<char*>(&e), 4);
-        if (!f.good()) {
+        if (!read_exact(fd, &l, 4) || !read_exact(fd, &e, 4)) {
             err = "profile truncated at entry " + std::to_string(i);
+            ::close(fd);
             return false;
         }
         if (l < 0 || l >= n_layers || e < 0 || e >= n_expert) {
             err = "profile entry out of range: (" + std::to_string(l) +
                   ", " + std::to_string(e) + ")";
+            ::close(fd);
             return false;
         }
         ranked[i] = {l, e};
     }
 
+    ::close(fd);
     return true;
 }
 
