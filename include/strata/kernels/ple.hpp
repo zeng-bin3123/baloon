@@ -28,7 +28,29 @@ namespace kernels {
 
 // PLE constants
 constexpr int PLE_CONV_KERNEL = 4;   // conv1d kernel width
-constexpr int PLE_NG_HIST = 3;       // conv history rows (d_conv - 1)
+
+// ─── PleShapes ─────────────────────────────────────────────────────
+// Dimensions for PLE block.  Configured before session capture via
+// ple_set_shapes(); captured graphs retain the configured values.
+// The GPU kernel reads from shared config; host reference uses the global.
+struct PleShapes {
+    int64_t n_embd  = 0;    // embedding dimension
+    int64_t hc      = 0;    // number of channel groups
+    int64_t hc_dim  = 0;    // total channels = hc * group_size
+    int64_t ng_hist = 0;    // history rows (from session NG_HIST)
+
+    int64_t group_size() const { return hc > 0 ? hc_dim / hc : 0; }
+    bool valid() const {
+        return n_embd > 0 && hc > 0 && hc_dim > 0 && ng_hist > 0
+               && (hc_dim % hc == 0);
+    }
+};
+
+// Configure PLE dimensions.  Must be called before capture.
+void ple_set_shapes(const PleShapes& shapes);
+
+// Get current PLE shapes (for query / debug).
+const PleShapes& ple_get_shapes();
 
 // ─── PleWeights ────────────────────────────────────────────────────
 // Weight references for one PLE block.
@@ -74,7 +96,7 @@ struct PleOut {
 // Given:
 //   emb ∈ R^{n_embd} (n-gram embedding)
 //   hidden ∈ R^{hc_dim} (residual input)
-//   hist_rows ∈ R^{NG_HIST × hc_dim} (row-fastest, oldest first)
+//   hist_rows ∈ R^{ng_hist × hc_dim} (row-fastest, oldest first)
 //
 // Steps:
 //   1. key = grouped_norm(W_key · emb, gamma_key)
@@ -88,9 +110,10 @@ struct PleOut {
 //      CRITICAL: conv input is `normalized`, NOT gated itself.
 //   9. result = hidden + gated + silu(conv)
 //
+// Dimensions from ple_get_shapes().
 // emb: [n_embd] float
 // hidden: [hc_dim] float
-// hist_rows: [NG_HIST × hc_dim] float, ROW-FASTEST layout
+// hist_rows: [ng_hist × hc_dim] float, ROW-FASTEST layout
 // w: PLE weights
 // out: PLE outputs (any pointer may be null)
 // scratch: device scratch buffer (from ple_block_scratch_bytes)
@@ -102,9 +125,10 @@ void ple_block(const float* emb, const float* hidden,
 
 // ─── ple_history_advance ───────────────────────────────────────────
 // FIFO shift in row-fastest layout:
-//   hist[r, c] ← hist[r+1, c]  for r in [0, NG_HIST-2], c in [0, hc_dim)
-//   hist[NG_HIST-1, c] ← normalized[c]   for all c
+//   hist[r, c] ← hist[r+1, c]  for r in [0, ng_hist-2], c in [0, hc_dim)
+//   hist[ng_hist-1, c] ← normalized[c]   for all c
 //
+// Dimensions from ple_get_shapes().
 // One thread per channel; in-place, allocation-free, capture-safe.
 // Precondition: hist and normalized are nonnull, disjoint device regions.
 void ple_history_advance(float* hist, const float* normalized,
@@ -127,4 +151,3 @@ bool ple_block_available();
 
 }  // namespace kernels
 }  // namespace strata
-

@@ -391,7 +391,43 @@ int main() {
     // ── PLE constants ──────────────────────────────────────────────
     {
         CHECK(strata::kernels::PLE_CONV_KERNEL == 4, "PLE_CONV_KERNEL == 4");
-        CHECK(strata::kernels::PLE_NG_HIST == 3, "PLE_NG_HIST == 3 (d_conv - 1)");
+    }
+
+    // ── PleShapes ──────────────────────────────────────────────────
+    {
+        strata::kernels::PleShapes s;
+        CHECK(!s.valid(), "PleShapes default invalid");
+
+        s.n_embd = 8;
+        s.hc = 2;
+        s.hc_dim = 4;
+        s.ng_hist = 16;
+        CHECK(s.valid(), "PleShapes valid after config");
+        CHECK(s.group_size() == 2, "PleShapes group_size == hc_dim/hc");
+
+        // Test with real model dims
+        strata::kernels::PleShapes real;
+        real.n_embd = 2560;
+        real.hc = 4;
+        real.hc_dim = 10240;
+        real.ng_hist = 16;
+        CHECK(real.valid(), "PleShapes valid with real dims");
+        CHECK(real.group_size() == 2560, "PleShapes real group_size");
+    }
+
+    // ── ple_set_shapes / ple_get_shapes ────────────────────────────
+    {
+        strata::kernels::PleShapes s;
+        s.n_embd = 4;
+        s.hc = 2;
+        s.hc_dim = 4;
+        s.ng_hist = 4;
+        strata::kernels::ple_set_shapes(s);
+        const auto& got = strata::kernels::ple_get_shapes();
+        CHECK(got.n_embd == 4, "ple_get_shapes n_embd");
+        CHECK(got.hc == 2, "ple_get_shapes hc");
+        CHECK(got.hc_dim == 4, "ple_get_shapes hc_dim");
+        CHECK(got.ng_hist == 4, "ple_get_shapes ng_hist");
     }
 
     // ── PleWeights default-constructed ─────────────────────────────
@@ -418,12 +454,21 @@ int main() {
         CHECK(scratch > 0, "ple_block_scratch_bytes > 0");
     }
 
-    // ── ple_block callable ─────────────────────────────────────────
+    // ── ple_block: result = hidden + gated + silu(conv) ────────────
     {
+        // Configure shapes: n_embd=4, hc=2, hc_dim=4, ng_hist=4
+        strata::kernels::PleShapes s;
+        s.n_embd = 4;
+        s.hc = 2;
+        s.hc_dim = 4;
+        s.ng_hist = 4;
+        strata::kernels::ple_set_shapes(s);
+
         float emb[4] = {1.0f, 2.0f, 3.0f, 4.0f};
         float hidden[4] = {0.1f, 0.2f, 0.3f, 0.4f};
-        float hist[12] = {};  // PLE_NG_HIST * 4
-        strata::kernels::PleWeights w;
+        // hist: ng_hist * hc_dim = 4 * 4 = 16 floats (row-fastest)
+        float hist[16] = {};
+        strata::kernels::PleWeights w;  // null weights → zero key, passthrough value
         strata::kernels::PleOut out;
         float result[4] = {};
         out.result = result;
@@ -432,17 +477,67 @@ int main() {
         std::vector<uint8_t> scratch(scratch_sz, 0);
 
         strata::kernels::ple_block(emb, hidden, hist, w, out, scratch.data(), nullptr);
-        // Just verify it's callable and doesn't crash
-        CHECK(true, "ple_block callable without crash");
+        // With null weights: key=0, value=emb passthrough, gate based on zero dot
+        // The result should include hidden + gated + silu(conv)
+        // At minimum, hidden contributes 0.1, 0.2, 0.3, 0.4
+        CHECK(std::isfinite(result[0]), "ple_block result[0] finite");
+        CHECK(std::isfinite(result[3]), "ple_block result[3] finite");
     }
 
-    // ── ple_history_advance callable ───────────────────────────────
+    // ── ple_history_advance: FIFO shift ────────────────────────────
     {
-        float hist[12] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
-        float normalized[4] = {99, 98, 97, 96};
+        // Config: hc_dim=2, ng_hist=3
+        strata::kernels::PleShapes s;
+        s.n_embd = 2;
+        s.hc = 1;
+        s.hc_dim = 2;
+        s.ng_hist = 3;
+        strata::kernels::ple_set_shapes(s);
+
+        // ROW-FASTEST layout: hist[row + ng_hist * channel]
+        // channel 0: rows at indices 0, 1, 2
+        // channel 1: rows at indices 3, 4, 5
+        float hist[6] = {
+            10.0f, 20.0f, 30.0f,   // channel 0: rows 0,1,2
+            40.0f, 50.0f, 60.0f    // channel 1: rows 0,1,2
+        };
+        float normalized[2] = {99.0f, 88.0f};
+
         strata::kernels::ple_history_advance(hist, normalized, nullptr);
-        // Just verify callable
-        CHECK(true, "ple_history_advance callable");
+
+        // After advance:
+        // channel 0: [20, 30, 99]  (shifted left, 99 appended)
+        // channel 1: [50, 60, 88]
+        CHECK_NEAR(hist[0], 20.0f, 0.001f, "ple_history ch0 row0 after shift");
+        CHECK_NEAR(hist[1], 30.0f, 0.001f, "ple_history ch0 row1 after shift");
+        CHECK_NEAR(hist[2], 99.0f, 0.001f, "ple_history ch0 row2 = normalized[0]");
+        CHECK_NEAR(hist[3], 50.0f, 0.001f, "ple_history ch1 row0 after shift");
+        CHECK_NEAR(hist[4], 60.0f, 0.001f, "ple_history ch1 row1 after shift");
+        CHECK_NEAR(hist[5], 88.0f, 0.001f, "ple_history ch1 row2 = normalized[1]");
+    }
+
+    // ── ple_history_advance: oldest row dropped ────────────────────
+    {
+        strata::kernels::PleShapes s;
+        s.n_embd = 1;
+        s.hc = 1;
+        s.hc_dim = 1;
+        s.ng_hist = 4;
+        strata::kernels::ple_set_shapes(s);
+
+        // Single channel, 4 history rows
+        float hist[4] = {1.0f, 2.0f, 3.0f, 4.0f};
+        float normalized[1] = {5.0f};
+
+        strata::kernels::ple_history_advance(hist, normalized, nullptr);
+        CHECK_NEAR(hist[0], 2.0f, 0.001f, "ple_history oldest dropped");
+        CHECK_NEAR(hist[3], 5.0f, 0.001f, "ple_history newest = normalized");
+
+        // Advance again
+        float normalized2[1] = {6.0f};
+        strata::kernels::ple_history_advance(hist, normalized2, nullptr);
+        CHECK_NEAR(hist[0], 3.0f, 0.001f, "ple_history second shift oldest");
+        CHECK_NEAR(hist[3], 6.0f, 0.001f, "ple_history second shift newest");
     }
 
     // ── ple configuration flags ────────────────────────────────────
