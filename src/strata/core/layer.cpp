@@ -160,7 +160,7 @@ uint64_t gdn_buffers_init(const Geometry& g, void* base, GdnBuffers& b) {
     return static_cast<uint64_t>(p - start);
 }
 
-void gdn_buffers_zero_state(const GdnBuffers& b, const Geometry& g, void* stream) {
+void gdn_buffers_zero_state(const GdnBuffers& b, const Geometry& /*g*/, void* stream) {
     auto cs = static_cast<cudaStream_t>(stream);
     // state: S × h_v × S floats
     size_t state_bytes = GDN_S * GDN_HV * GDN_S * sizeof(float);

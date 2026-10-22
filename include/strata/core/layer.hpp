@@ -118,7 +118,7 @@ struct MoEBuffers {
     uint16_t* x_bf16 = nullptr;
     uint16_t* x_f16 = nullptr;
     float* logits = nullptr;
-    int* ids = nullptr;
+    int32_t* ids = nullptr;
     float* weights = nullptr;
     float* shared = nullptr;
     float* sh_scratch = nullptr;

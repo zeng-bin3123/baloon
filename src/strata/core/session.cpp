@@ -27,13 +27,6 @@ static inline bool is_qsa_layer(int64_t l) {
     return (l >= 3) && ((l - 3) % 4 == 0) && (l < N_LAYERS);
 }
 
-static int64_t count_qsa_up_to(int64_t l) {
-    int64_t count = 0;
-    for (int64_t i = 0; i <= l && i < N_LAYERS; ++i)
-        if (is_qsa_layer(i)) ++count;
-    return count;
-}
-
 // ─── GDN state bytes per layer ───────────────────────────────────
 // GDN state = S × h_v × S floats (from gdn_buffers)
 static constexpr int64_t GDN_S = 128;
@@ -68,7 +61,7 @@ uint64_t session_bytes(const Geometry& g, int64_t max_cells, int64_t k) {
     total += align16(g.n_embd * 2);                             // x_bf16
     total += align16(g.n_embd * 2);                             // x_f16
     total += align16(g.n_experts * sizeof(float));              // logits
-    total += align16(k * sizeof(int));                          // ids
+    total += align16(k * sizeof(int32_t));                       // ids
     total += align16(k * sizeof(float));                        // weights
     total += align16(g.n_embd * sizeof(float));                 // shared
     total += align16(g.n_embd * sizeof(float));                 // sh_scratch
@@ -148,8 +141,8 @@ uint64_t session_init(const Geometry& g, int64_t max_cells, int64_t k,
     p += align16(g.n_embd * 2);
     s.moe.logits = reinterpret_cast<float*>(p);
     p += align16(g.n_experts * sizeof(float));
-    s.moe.ids = reinterpret_cast<int*>(p);
-    p += align16(k * sizeof(int));
+    s.moe.ids = reinterpret_cast<int32_t*>(p);
+    p += align16(k * sizeof(int32_t));
     s.moe.weights = reinterpret_cast<float*>(p);
     p += align16(k * sizeof(float));
     s.moe.shared = reinterpret_cast<float*>(p);
@@ -256,8 +249,9 @@ bool session_token(const WeightTable& tables, const Geometry& g,
     // Each is either a GDN layer or a QSA layer (is_qsa_layer).
     // Full kernel dispatch deferred to later unit.
     for (int64_t l = 0; l < N_LAYERS; ++l) {
-        // block_layer(l) dispatches to gdn_layer or qsa_layer
-        // based on is_qsa_layer(l)
+        // block_layer dispatches GDN vs QSA based on is_qsa_layer(l).
+        // GDN layers use gdn + moe; QSA layers use qsa_bufs + moe.
+        // Both read from WeightTable by layer index.
 
         if (sync_every_layer) {
             cudaError_t rc = cudaStreamSynchronize(static_cast<cudaStream_t>(stream));
@@ -269,7 +263,7 @@ bool session_token(const WeightTable& tables, const Geometry& g,
         }
     }
 
-    (void)tables; (void)pos_base; (void)parts;
+    (void)tables; (void)g; (void)pos_base; (void)parts;
     return true;
 }
 
@@ -544,7 +538,7 @@ bool session_capture_token(const WeightTable& tables, const Geometry& g,
     // Full capture requires all kernel implementations.
     tg.captured = true;
 
-    (void)tables; (void)g; (void)s; (void)parts_dev; (void)hits;
+    (void)tables; (void)g; (void)s; (void)parts_dev; (void)hits; (void)err;
     return true;
 }
 
