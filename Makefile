@@ -33,8 +33,10 @@ TEST2_SRC := tests/test_unit2.cpp
 TEST2_BIN := tests/test_unit2
 TEST3_SRC := tests/test_unit3.cpp
 TEST3_BIN := tests/test_unit3
+TEST4_SRC := tests/test_unit4.cpp
+TEST4_BIN := tests/test_unit4
 
-.PHONY: all clean test test1 test2 test3 lib
+.PHONY: all clean test test1 test2 test3 test4 lib
 
 all: lib
 
@@ -71,7 +73,14 @@ test2: $(TEST2_BIN)
 test3: $(TEST3_BIN)
 	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./$(TEST3_BIN)
 
-test: test1 test2 test3
+$(TEST4_BIN): $(TEST4_SRC) $(LIBNAME)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $< -o $@ -L. -lstrata_core $(LDFLAGS) 		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
+
+test4: $(TEST4_BIN)
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./$(TEST4_BIN)
+
+test: test1 test2 test3 test4
 
 clean:
-	rm -f $(OBJS) $(LIBNAME) $(TEST1_BIN) $(TEST2_BIN) $(TEST3_BIN)
+	rm -f $(OBJS) $(LIBNAME) $(TEST1_BIN) $(TEST2_BIN) $(TEST3_BIN) $(TEST4_BIN)
