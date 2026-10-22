@@ -8,9 +8,9 @@
 
 #include <cmath>
 #include <cstring>
+#include <cstdio>
 #include <algorithm>
 #include <vector>
-#include <sstream>
 
 namespace strata {
 namespace kernels {
@@ -304,12 +304,12 @@ uint64_t PleTable::bytes_read() const {
 
 std::string PleTable::io_report() const {
     if (!impl_) return "table not initialized";
-    std::ostringstream ss;
-    ss << "PleTable: mode="
-       << (impl_->io_mode == PleIo::Direct ? "Direct" : "Mmap")
-       << " bytes_read=" << impl_->total_bytes_read
-       << " open=" << (impl_->is_open ? "yes" : "no");
-    return ss.str();
+    char buf[256];
+    std::snprintf(buf, sizeof(buf), "PleTable: mode=%s bytes_read=%llu open=%s",
+                  impl_->io_mode == PleIo::Direct ? "Direct" : "Mmap",
+                  static_cast<unsigned long long>(impl_->total_bytes_read),
+                  impl_->is_open ? "yes" : "no");
+    return std::string(buf);
 }
 
 PleIo PleTable::mode() const {

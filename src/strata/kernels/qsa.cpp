@@ -95,7 +95,7 @@ void kv_gather(const uint16_t* k_pool, const uint16_t* v_pool,
 }
 
 // ─── RoPE NeoX helper ───────────────────────────────────────────
-static void rope_neox(float* vec, int64_t dim, int64_t n_rot,
+static void rope_neox(float* vec, int64_t /*dim*/, int64_t n_rot,
                       const float* cos_tab, const float* sin_tab,
                       int64_t pos) {
     // NeoX-style RoPE: first half and second half interleave

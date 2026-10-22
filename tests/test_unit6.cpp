@@ -646,8 +646,7 @@ int main() {
         // qs[1..15] = 0
         for (int i = 3; i < 18; ++i) block[i] = 0;
 
-        float out[32] = {};
-        // Dequant only 1 block (32 elems), build 5 blocks for full row
+        // Build 5 blocks for full row (160 elements)
         uint8_t row[90] = {};
         std::memcpy(row, block, 18);
         // Fill remaining 4 blocks with zeros (scale=0 → output=0)

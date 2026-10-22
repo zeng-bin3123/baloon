@@ -93,7 +93,7 @@ static void gemv_sform_f32(const float* x, const uint8_t* codes,
 }
 
 // ─── shared_expert ──────────────────────────────────────────────
-void shared_expert(const uint8_t* x_q8_0, const uint8_t* x_q8k,
+void shared_expert(const uint8_t* /*x_q8_0*/, const uint8_t* /*x_q8k*/,
                    const uint16_t* x_bf16,
                    const SForm& gate_form,
                    const uint8_t* gate_codes, const float* gate_scales,
@@ -179,10 +179,10 @@ void shared_expert(const uint8_t* x_q8_0, const uint8_t* x_q8k,
 
 // ─── shared_expert_multi ────────────────────────────────────────
 void shared_expert_multi(int n_tok, const float* x,
-                         const uint16_t* x_bf16,
+                         const uint16_t* /*x_bf16*/,
                          const NativeSharedWeights& /*nw*/,
                          const uint16_t* gate_inp_bf16,
-                         float* gate, float* up, float* g,
+                         float* /*gate*/, float* /*up*/, float* g,
                          float* out, int64_t n_embd, int64_t n_ff,
                          cudaStream_t /*stream*/) {
     if (!x || !out) return;
