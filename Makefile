@@ -22,11 +22,13 @@ OBJS := $(SRCS:.cpp=.o)
 # Shared library
 LIBNAME := libstrata_core.so
 
-# Test binary
-TEST_SRC := tests/test_unit1.cpp
-TEST_BIN := tests/test_unit1
+# Test binaries
+TEST1_SRC := tests/test_unit1.cpp
+TEST1_BIN := tests/test_unit1
+TEST2_SRC := tests/test_unit2.cpp
+TEST2_BIN := tests/test_unit2
 
-.PHONY: all clean test lib
+.PHONY: all clean test test1 test2 lib
 
 all: lib
 
@@ -39,12 +41,21 @@ $(LIBNAME): $(OBJS)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(TEST_BIN): $(TEST_SRC) $(LIBNAME)
+$(TEST1_BIN): $(TEST1_SRC) $(LIBNAME)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $< -o $@ -L. -lstrata_core $(LDFLAGS) 		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
 
-test: $(TEST_BIN)
-	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./$(TEST_BIN)
+$(TEST2_BIN): $(TEST2_SRC) $(LIBNAME)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $< -o $@ -L. -lstrata_core $(LDFLAGS) 		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
+
+test1: $(TEST1_BIN)
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./$(TEST1_BIN)
+
+test2: $(TEST2_BIN)
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./$(TEST2_BIN)
+
+test: test1 test2
 
 clean:
 	rm -f $(OBJS) $(LIBNAME) $(TEST_BIN)
