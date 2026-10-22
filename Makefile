@@ -1,0 +1,51 @@
+# strata — Makefile for Iluvatar BI-V100 (ivcore10)
+CUDAPATH  := /usr/local/corex
+CXX       := $(CUDAPATH)/bin/clang++
+ARCH      := ivcore10
+
+CXXFLAGS  := -x cuda --cuda-gpu-arch=$(ARCH) --cuda-path=$(CUDAPATH) \
+             -std=c++17 -O2 \
+             -D__ILUVATAR__ -D__ILUVATAR_WORKAROUND__ \
+             -I$(CUDAPATH)/include -Iinclude \
+             -fPIC
+LDFLAGS   := -L$(CUDAPATH)/lib64 -lcudart -lpthread
+
+# Sources
+SRCS := src/strata/core/graph.cpp \
+        src/strata/core/pinned.cpp \
+        src/strata/core/weights.cpp \
+        src/strata/core/verify.cpp \
+        src/strata/core/mtp.cpp
+
+OBJS := $(SRCS:.cpp=.o)
+
+# Shared library
+LIBNAME := libstrata_core.so
+
+# Test binary
+TEST_SRC := tests/test_unit1.cpp
+TEST_BIN := tests/test_unit1
+
+.PHONY: all clean test lib
+
+all: lib
+
+lib: $(LIBNAME)
+
+$(LIBNAME): $(OBJS)
+	$(CXX) -shared -o $@ $^ $(LDFLAGS)
+
+%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(TEST_BIN): $(TEST_SRC) $(LIBNAME)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $< -o $@ -Lbuild -L. -lstrata_core $(LDFLAGS) -Wl,-rpath,'$$ORIGIN/..'
+
+test: $(TEST_BIN)
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=.:$(CUDAPATH)/lib64 ./$(TEST_BIN)
+
+clean:
+	rm -f $(OBJS) $(LIBNAME) $(TEST_BIN)
+
