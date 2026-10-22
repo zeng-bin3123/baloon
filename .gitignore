@@ -1,4 +1,3 @@
-stubs/
 *.o
 *.so
 tests/test_unit1

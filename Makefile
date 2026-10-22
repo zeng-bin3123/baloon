@@ -41,10 +41,10 @@ $(LIBNAME): $(OBJS)
 
 $(TEST_BIN): $(TEST_SRC) $(LIBNAME)
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) $< -o $@ -Lbuild -L. -lstrata_core $(LDFLAGS) -Wl,-rpath,'$$ORIGIN/..'
+	$(CXX) $(CXXFLAGS) $< -o $@ -L. -lstrata_core $(LDFLAGS) 		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
 
 test: $(TEST_BIN)
-	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=.:$(CUDAPATH)/lib64 ./$(TEST_BIN)
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./$(TEST_BIN)
 
 clean:
 	rm -f $(OBJS) $(LIBNAME) $(TEST_BIN)
