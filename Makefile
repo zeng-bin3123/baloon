@@ -27,7 +27,9 @@ CORE_SRCS := src/strata/core/graph.cpp \
              src/strata/core/expert_cache.cpp \
              src/strata/core/expert_source.cpp \
              src/strata/core/layer.cpp \
-             src/strata/core/session.cpp
+             src/strata/core/session.cpp \
+             src/strata/core/cpu_features.cpp \
+             src/strata/core/layout.cpp
 
 # ─── Host-side kernel dispatchers ──────────────────────────────────
 KERN_SRCS := src/strata/kernels/elementwise.cpp \
