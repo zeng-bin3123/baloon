@@ -71,6 +71,8 @@ CUDA_SRCS := src/strata/kernels/cuda/ix_infccl_allreduce.cu \
 
 ALL_SRCS  := $(CORE_SRCS) $(KERN_SRCS) $(SPEC_SRCS)
 OBJS      := $(ALL_SRCS:.cpp=.o)
+CORE_CU   := src/strata/core/device.cu
+CORE_CU_OBJS := $(CORE_CU:.cu=.o)
 CUDA_OBJS := $(CUDA_SRCS:.cu=.o)
 
 # ─── Output libraries ─────────────────────────────────────────────
@@ -86,7 +88,7 @@ lib: $(CORE_LIB)
 kernels: $(KERNEL_LIB)
 
 # Core library (host-side, compiled with -x cuda so needs --cuda-path for linking)
-$(CORE_LIB): $(OBJS)
+$(CORE_LIB): $(OBJS) $(CORE_CU_OBJS)
 	$(CXX) --cuda-path=$(CUDAPATH) -shared -o $@ $^ $(LDFLAGS)
 
 # CUDA kernel library (GPU-side, optimized)
@@ -99,6 +101,11 @@ $(KERNEL_LIB): $(CUDA_OBJS)
 %.o: %.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# Core CUDA compile (same flags as kernel compile)
+src/strata/core/%.o: src/strata/core/%.cu
+	@mkdir -p $(dir $@)
+	$(CXX) $(SOFLAGS) -c $< -o $@
 
 # CUDA kernel compile (use SOFLAGS for optimization)
 src/strata/kernels/cuda/%.o: src/strata/kernels/cuda/%.cu
@@ -164,7 +171,19 @@ tests/test_unit8: tests/test_unit8.cu $(CORE_LIB) $(KERNEL_LIB)
 test8: tests/test_unit8
 	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit8
 
-test: test1 test2 test3 test4 test5 test6 test7 test8
+# Device report tool
+device_report: src/strata/core/device_main.cpp $(CORE_LIB)
+	$(CXX) $(CXXFLAGS) $< -o $@ -L. -lstrata_core $(LDFLAGS) 		-Wl,-rpath,'$$ORIGIN' -Wl,-rpath,$(CUDAPATH)/lib64
+
+# Unit 1 device/layout test
+tests/test_unit1_device: tests/test_unit1_device.cpp $(CORE_LIB)
+	@mkdir -p tests
+	$(CXX) $(CXXFLAGS) $< -o $@ -L. -lstrata_core $(LDFLAGS) 		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
+
+test1d: tests/test_unit1_device
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit1_device
+
+test: test1 test1d test2 test3 test4 test5 test6 test7 test8
 
 clean:
 	rm -f $(OBJS) $(CUDA_OBJS) $(CORE_LIB) $(KERNEL_LIB)
