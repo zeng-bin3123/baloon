@@ -52,7 +52,22 @@ CUDA_SRCS := src/strata/kernels/cuda/ix_infccl_allreduce.cu \
              src/strata/kernels/cuda/ix_gdn.cu \
              src/strata/kernels/cuda/ix_f16_conversions.cu \
              src/strata/kernels/cuda/ix_activation_quantizer.cu \
-             src/strata/kernels/cuda/ix_elementwise.cu
+             src/strata/kernels/cuda/ix_elementwise.cu \
+             src/strata/kernels/cuda/ix_bf16_gemv_ext.cu \
+             src/strata/kernels/cuda/ix_s_family_gemv.cu \
+             src/strata/kernels/cuda/ix_s2_gemv_q8.cu \
+             src/strata/kernels/cuda/ix_s2_gemv_quads.cu \
+             src/strata/kernels/cuda/ix_gguf_mmvq.cu \
+             src/strata/kernels/cuda/ix_fused_gdn.cu \
+             src/strata/kernels/cuda/ix_fused_gr.cu \
+             src/strata/kernels/cuda/ix_quantize_act.cu \
+             src/strata/kernels/cuda/ix_qsa_decode_attn.cu \
+             src/strata/kernels/cuda/ix_iq_kernels.cu \
+             src/strata/kernels/cuda/ix_rope.cu \
+             src/strata/kernels/cuda/ix_kv_q8.cu \
+             src/strata/kernels/cuda/ix_router_top10.cu \
+             src/strata/kernels/cuda/ix_qsa_select.cu \
+             src/strata/kernels/cuda/ix_sampler.cu
 
 ALL_SRCS  := $(CORE_SRCS) $(KERN_SRCS) $(SPEC_SRCS)
 OBJS      := $(ALL_SRCS:.cpp=.o)
