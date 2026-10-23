@@ -116,9 +116,9 @@ src/strata/kernels/cuda/%.o: src/strata/kernels/cuda/%.cu
 
 # ─── Tests ─────────────────────────────────────────────────────────
 define TEST_RULE
-$(1): tests/$(1).cpp $$(CORE_LIB)
+tests/$(1): tests/$(1).cpp $$(CORE_LIB)
 	@mkdir -p tests
-	$$(CXX) $$(CXXFLAGS) $$< -o tests/$$@ -L. -lstrata_core $$(LDFLAGS) \
+	$$(CXX) $$(CXXFLAGS) $$< -o $$@ -L. -lstrata_core $$(LDFLAGS) \
 		-Wl,-rpath,'$$$$ORIGIN/..' -Wl,-rpath,$$(CUDAPATH)/lib64
 endef
 
