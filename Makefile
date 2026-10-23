@@ -155,3 +155,12 @@ clean:
 	rm -f $(OBJS) $(CUDA_OBJS) $(CORE_LIB) $(KERNEL_LIB)
 	rm -f tests/test_unit1 tests/test_unit2 tests/test_unit3
 	rm -f tests/test_unit4 tests/test_unit5 tests/test_unit6 tests/test_unit7 tests/test_unit8
+
+# Unit 4: Fused GDN, fused GR, quantize_act, QSA decode attn, IQ kernels
+tests/test_unit4_cuda: tests/test_unit4_cuda.cu $(CORE_LIB) $(KERNEL_LIB)
+	@mkdir -p tests
+	$(CXX) $(SOFLAGS) $< -o $@ -L. -lstrata_core -lix_kernels $(LDFLAGS) \
+		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
+
+test4g: tests/test_unit4_cuda
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit4_cuda
