@@ -70,9 +70,9 @@ all: lib kernels
 lib: $(CORE_LIB)
 kernels: $(KERNEL_LIB)
 
-# Core library (host-side)
+# Core library (host-side, compiled with -x cuda so needs --cuda-path for linking)
 $(CORE_LIB): $(OBJS)
-	$(CXX) -shared -o $@ $^ $(LDFLAGS)
+	$(CXX) --cuda-path=$(CUDAPATH) -shared -o $@ $^ $(LDFLAGS)
 
 # CUDA kernel library (GPU-side, optimized)
 # NOTE: link step must NOT use -x cuda (SOFLAGS) — that makes clang

@@ -61,40 +61,26 @@ __global__ void ix_quantize_f32_to_q8_1_kernel(
     const int block_id = blockIdx.x * (blockDim.x / Q8_BLOCK_SIZE) +
                          threadIdx.x / Q8_BLOCK_SIZE;
     const int lane = threadIdx.x % Q8_BLOCK_SIZE;
-
-    if ((int64_t)block_id * Q8_BLOCK_SIZE + lane >= n) return;
-
-    const int64_t elem_idx = (int64_t)block_id * Q8_BLOCK_SIZE + lane;
-    const float val = input[elem_idx];
-
-    // Step 1: Find per-block absolute max via warp reduction
-    // We use only 32 lanes of the warp, but ix_warp_max works on 64
-    // So we pass 0 for inactive lanes
-    float abs_val = fabsf(val);
-
-    // Reduce within the 32-lane half-warp using shared memory
-    __shared__ float s_amax[8];  // max 8 Q8_1 blocks per threadblock
-    __shared__ float s_sum[8];
-
     const int local_block = threadIdx.x / Q8_BLOCK_SIZE;
 
-    // Each half-warp finds its max. Use atomicMax pattern with shared mem.
-    if (lane == 0) {
-        s_amax[local_block] = 0.0f;
-        s_sum[local_block] = 0.0f;
-    }
-    __syncthreads();
+    // Check if this thread's Q8_1 block is within bounds.
+    // Do NOT early-return — all threads must participate in __syncthreads().
+    const bool active = ((int64_t)block_id * Q8_BLOCK_SIZE + lane < n);
 
-    // Parallel max via atomicMax emulation (for float, use CAS loop)
-    // Simpler: use sequential reduction in shared memory
+    const int64_t elem_idx = active ? (int64_t)block_id * Q8_BLOCK_SIZE + lane : 0;
+    const float val = active ? input[elem_idx] : 0.0f;
+    const float abs_val = fabsf(val);
+
+    // Step 1: Find per-block absolute max via shared memory reduction
+    __shared__ float s_amax[8];  // max 8 Q8_1 blocks per threadblock
     __shared__ float s_vals[256];  // enough for QUANT_THREADS
+
     s_vals[threadIdx.x] = abs_val;
     __syncthreads();
 
-    // Reduction within the 32-element group
-    float amax = 0.0f;
-    float fsum = 0.0f;
+    // Lane 0 of each 32-element group reduces to find max
     if (lane == 0) {
+        float amax = 0.0f;
         const int base = local_block * Q8_BLOCK_SIZE;
         for (int i = 0; i < Q8_BLOCK_SIZE; i++) {
             float a = s_vals[base + i];
@@ -104,12 +90,12 @@ __global__ void ix_quantize_f32_to_q8_1_kernel(
     }
     __syncthreads();
 
-    amax = s_amax[local_block];
+    const float amax = s_amax[local_block];
     const float d = ix_q8_1_finite(amax / 127.0f);
     const float id = (amax == 0.0f) ? 0.0f : 1.0f / d;
 
     // Step 2: Quantize
-    int8_t q = (int8_t)__float2int_rn(val * id);
+    const int8_t q = (int8_t)__float2int_rn(val * id);
 
     // Step 3: Compute block sum for s component
     s_vals[threadIdx.x] = val;
@@ -129,8 +115,10 @@ __global__ void ix_quantize_f32_to_q8_1_kernel(
     }
     __syncthreads();
 
-    // Write quantized value
-    output[block_id].qs[lane] = q;
+    // Write quantized value (only active threads)
+    if (active) {
+        output[block_id].qs[lane] = q;
+    }
 }
 
 // ─── Q8_0 → FP32 dequantization kernel ──────────────────────────────
@@ -182,30 +170,33 @@ __global__ void ix_silu_quantize_q8_1_kernel(
     Q8_1_Block* __restrict__ output,    // [n/32] Q8_1 blocks
     int64_t n
 ) {
-    // Similar structure to q8_1 quantization but with SiLU fusion
     const int block_id = blockIdx.x * (blockDim.x / Q8_BLOCK_SIZE) +
                          threadIdx.x / Q8_BLOCK_SIZE;
     const int lane = threadIdx.x % Q8_BLOCK_SIZE;
+    const int local_block = threadIdx.x / Q8_BLOCK_SIZE;
 
-    if ((int64_t)block_id * Q8_BLOCK_SIZE + lane >= n) return;
+    // Do NOT early-return — all threads must participate in __syncthreads().
+    const bool active = ((int64_t)block_id * Q8_BLOCK_SIZE + lane < n);
 
-    const int64_t elem_idx = (int64_t)block_id * Q8_BLOCK_SIZE + lane;
+    // Fused SiLU * up (inactive threads produce 0.0)
+    float val = 0.0f;
+    if (active) {
+        const int64_t elem_idx = (int64_t)block_id * Q8_BLOCK_SIZE + lane;
+        float g = gate[elem_idx];
+        float silu_g = g / (1.0f + expf(-g));
+        val = silu_g * up[elem_idx];
+    }
 
-    // Fused SiLU * up
-    float g = gate[elem_idx];
-    float silu_g = g / (1.0f + expf(-g));
-    float val = silu_g * up[elem_idx];
-
-    // Find per-block max and quantize (same pattern as q8_1)
+    // Find per-block max and quantize
     __shared__ float s_vals[256];
+    __shared__ float s_amax[8];
+
     s_vals[threadIdx.x] = val;
     __syncthreads();
 
-    const int local_block = threadIdx.x / Q8_BLOCK_SIZE;
-
-    float amax = 0.0f;
     float block_sum = 0.0f;
     if (lane == 0) {
+        float amax = 0.0f;
         const int base = local_block * Q8_BLOCK_SIZE;
         for (int i = 0; i < Q8_BLOCK_SIZE; i++) {
             float v = s_vals[base + i];
@@ -213,18 +204,15 @@ __global__ void ix_silu_quantize_q8_1_kernel(
             if (a > amax) amax = a;
             block_sum += v;
         }
+        s_amax[local_block] = amax;
     }
-
-    // Broadcast amax via shared memory
-    __shared__ float s_amax[8];
-    if (lane == 0) s_amax[local_block] = amax;
     __syncthreads();
 
-    amax = s_amax[local_block];
-    float d = ix_q8_1_finite(amax / 127.0f);
-    float id = (amax == 0.0f) ? 0.0f : 1.0f / d;
+    const float amax = s_amax[local_block];
+    const float d = ix_q8_1_finite(amax / 127.0f);
+    const float id = (amax == 0.0f) ? 0.0f : 1.0f / d;
 
-    int8_t q = (int8_t)__float2int_rn(val * id);
+    const int8_t q = (int8_t)__float2int_rn(val * id);
 
     if (lane == 0) {
         half d_half = __float2half(d);
@@ -233,7 +221,9 @@ __global__ void ix_silu_quantize_q8_1_kernel(
     }
     __syncthreads();
 
-    output[block_id].qs[lane] = q;
+    if (active) {
+        output[block_id].qs[lane] = q;
+    }
 }
 
 }  // anonymous namespace
