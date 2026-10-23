@@ -63,7 +63,7 @@ CORE_LIB   := libstrata_core.so
 KERNEL_LIB := libix_kernels.so
 
 # ─── Build targets ─────────────────────────────────────────────────
-.PHONY: all clean test lib kernels test1 test2 test3 test4 test5 test6 test7 test8
+.PHONY: all clean test lib kernels test1 test2 test2g test3 test4 test5 test6 test7 test8
 
 all: lib kernels
 
@@ -116,6 +116,14 @@ test1: tests/test_unit1
 
 test2: tests/test_unit2
 	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit2
+
+# Unit 2 GEMV: CUDA kernel integration test
+tests/test_unit2_gemv: tests/test_unit2_gemv.cu $(CORE_LIB) $(KERNEL_LIB)
+	@mkdir -p tests
+	$(CXX) $(SOFLAGS) $< -o $@ -L. -lstrata_core -lix_kernels $(LDFLAGS) 		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
+
+test2g: tests/test_unit2_gemv
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit2_gemv
 
 test3: tests/test_unit3
 	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit3
