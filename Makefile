@@ -31,6 +31,7 @@ CORE_SRCS := src/strata/core/graph.cpp \
 
 # ─── Host-side kernel dispatchers ──────────────────────────────────
 KERN_SRCS := src/strata/kernels/elementwise.cpp \
+             src/strata/kernels/elementwise_ops.cpp \
              src/strata/kernels/gdn.cpp \
              src/strata/kernels/gr.cpp \
              src/strata/kernels/ngram.cpp \
@@ -134,7 +135,8 @@ test7: tests/test_unit7
 # Unit 8: native CUDA ops integration test
 tests/test_unit8: tests/test_unit8.cu $(CORE_LIB) $(KERNEL_LIB)
 	@mkdir -p tests
-	$(CXX) $(SOFLAGS) $< -o $@ -L. -lstrata_core -lix_kernels $(LDFLAGS) 		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
+	$(CXX) $(SOFLAGS) $< -o $@ -L. -lstrata_core -lix_kernels $(LDFLAGS) \
+		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
 
 test8: tests/test_unit8
 	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit8

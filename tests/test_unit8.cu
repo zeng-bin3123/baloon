@@ -612,7 +612,7 @@ int main() {
         cudaGetDeviceProperties(&prop, 0);
         printf("  GPU 0: %s (SM %d.%d, %.1f GB)\n\n",
                prop.name, prop.major, prop.minor,
-               prop.totalGlobalMem / 1e9);
+               (double)prop.totalGlobalMem / 1e9);
     }
 
     cudaSetDevice(0);
