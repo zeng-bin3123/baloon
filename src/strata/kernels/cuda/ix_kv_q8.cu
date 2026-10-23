@@ -60,7 +60,7 @@ __global__ void ix_kv_gather_q8_kernel(
     float ksc=__half2float(__ushort_as_half(ks[row*ng+grp])), vsc=__half2float(__ushort_as_half(vs[row*ng+grp]));
     const int64_t db=row*hd+bd, ob=((int64_t)sel*kvh+head)*hd+bd;
     int cnt=hd-bd; if(cnt>4) cnt=4;
-    for(int i=0;i<cnt;i++){ko[ob+i]=__half_as_ushort(__float2half((float))kq[db+i]*ksc);vo[ob+i]=__half_as_ushort(__float2half((float))vq[db+i]*vsc);}
+    for(int i=0;i<cnt;i++){ko[ob+i]=__half_as_ushort(__float2half((float)kq[db+i]*ksc));vo[ob+i]=__half_as_ushort(__float2half((float)vq[db+i]*vsc));}
 }
 } // anon
 extern "C" {
