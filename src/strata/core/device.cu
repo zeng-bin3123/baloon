@@ -8,11 +8,14 @@ namespace strata {
 
 namespace {
 
-// Check a CUDA call, throw CudaError on failure.
-void cuda_check(cudaError_t result, const char* context) {
-    if (result != cudaSuccess) {
-        throw CudaError(std::string(context) + ": " + cudaGetErrorString(result),
-                        static_cast<int>(result));
+// Quiet NaN in IEEE 754 single-precision: exponent all-1s, mantissa bit 22 set.
+static constexpr uint32_t kNaNPattern = 0x7FC00000u;
+
+// Kernel: fill every 4-byte word with the NaN bit pattern.
+__global__ void fill_nan_kernel(uint32_t* data, size_t n_words) {
+    size_t idx = blockIdx.x * (size_t)blockDim.x + threadIdx.x;
+    if (idx < n_words) {
+        data[idx] = kNaNPattern;
     }
 }
 
@@ -63,15 +66,36 @@ void* arena_alloc(size_t bytes, std::string& err) {
         return nullptr;
     }
 
-    // NaN fill: 0x7F repeated gives 0x7F7F7F7F per u32 word,
-    // which is a quiet NaN in IEEE 754 single-precision.
-    // This ensures uninitialized reads produce NaN, not zero.
-    rc = cudaMemset(ptr, 0x7F, bytes);
-    if (rc != cudaSuccess) {
-        cudaFree(ptr);
-        err = std::string("arena_alloc: cudaMemset(NaN): ") +
-              cudaGetErrorString(rc);
-        return nullptr;
+    // NaN fill: write 0x7FC00000 (IEEE 754 quiet NaN) to every 4-byte word.
+    // cudaMemset only sets per-byte, so we use a small kernel instead.
+    // Any trailing bytes (if bytes % 4 != 0) get the first bytes of NaN.
+    {
+        size_t n_words = bytes / 4;
+        size_t tail = bytes % 4;
+        if (n_words > 0) {
+            int threads = 256;
+            int blocks = static_cast<int>((n_words + threads - 1) / threads);
+            fill_nan_kernel<<<blocks, threads>>>(static_cast<uint32_t*>(ptr), n_words);
+            rc = cudaGetLastError();
+            if (rc != cudaSuccess) {
+                cudaFree(ptr);
+                err = std::string("arena_alloc: fill_nan_kernel: ") +
+                      cudaGetErrorString(rc);
+                return nullptr;
+            }
+        }
+        // Fill any trailing bytes with 0x7F (partial NaN word)
+        if (tail > 0) {
+            cudaMemset(static_cast<uint8_t*>(ptr) + n_words * 4, 0x7F, tail);
+        }
+        // Synchronize to ensure fill is complete before returning
+        rc = cudaDeviceSynchronize();
+        if (rc != cudaSuccess) {
+            cudaFree(ptr);
+            err = std::string("arena_alloc: cudaDeviceSynchronize: ") +
+                  cudaGetErrorString(rc);
+            return nullptr;
+        }
     }
 
     return ptr;
