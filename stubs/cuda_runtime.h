@@ -4,6 +4,22 @@
 #include <cstdlib>
 #include <cstring>
 
+// Host-only stubs for CUDA qualifiers (g++ builds without actual CUDA)
+#ifndef __CUDACC__
+#ifndef __host__
+#define __host__
+#endif
+#ifndef __device__
+#define __device__
+#endif
+#ifndef __global__
+#define __global__
+#endif
+#ifndef __forceinline__
+#define __forceinline__ inline
+#endif
+#endif
+
 typedef void* cudaStream_t;
 typedef void* cudaGraph_t;
 typedef void* cudaGraphExec_t;

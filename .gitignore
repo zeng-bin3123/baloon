@@ -1,3 +1,4 @@
 *.o
 *.so
-tests/test_unit1
+*.bc
+tests/test_unit*
