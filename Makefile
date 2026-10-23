@@ -84,7 +84,7 @@ CORE_LIB   := libstrata_core.so
 KERNEL_LIB := libix_kernels.so
 
 # ─── Build targets ─────────────────────────────────────────────────
-.PHONY: all clean test lib kernels test1 test2 test2g test3 test4 test5 test6 test7 test8
+.PHONY: all clean test lib kernels test1 test2 test2g test3 test4 test5 test5e test6 test7 test8
 
 all: lib kernels
 
@@ -163,6 +163,14 @@ test4: tests/test_unit4
 
 test5: tests/test_unit5
 	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit5
+
+# Unit 5 expert source/dispatch test (host-only)
+tests/test_unit5_expert: tests/test_unit5_expert.cpp $(CORE_LIB)
+	@mkdir -p tests
+	$(CXX) $(CXXFLAGS) $< -o $@ -L. -lstrata_core $(LDFLAGS) 		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
+
+test5e: tests/test_unit5_expert
+	LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit5_expert
 
 test6: tests/test_unit6
 	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit6
