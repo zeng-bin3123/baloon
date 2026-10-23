@@ -39,7 +39,7 @@ __global__ void ix_qsa_decode_attn_kernel(
         for (int d = tid; d < head_dim; d += (int)blockDim.x) {
             float q_val = q[(int64_t)h * head_dim + d];
             uint16_t k_bits = k_sel[((int64_t)j * n_kv_heads + kv_h) * head_dim + d];
-            float k_val = ix_f16_to_f32_bits(k_bits);
+            float k_val = __half2float(__ushort_as_half(k_bits));
             dot += q_val * k_val;
         }
         // Warp reduce
@@ -78,7 +78,7 @@ __global__ void ix_qsa_decode_attn_kernel(
         float acc = 0.0f;
         for (int j = 0; j < n_sel; j++) {
             uint16_t v_bits = v_sel[((int64_t)j * n_kv_heads + kv_h) * head_dim + d];
-            float v_val = ix_f16_to_f32_bits(v_bits);
+            float v_val = __half2float(__ushort_as_half(v_bits));
             acc += s_scores[j] * v_val;
         }
         out[(int64_t)h * head_dim + d] = acc;

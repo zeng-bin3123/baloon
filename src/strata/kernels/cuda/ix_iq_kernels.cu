@@ -39,7 +39,7 @@ __global__ void ix_iq4nl_dequant_kernel(
 
     const uint8_t* blk = data + block_id * block_bytes;
     uint16_t scale_bits = (uint16_t)blk[0] | ((uint16_t)blk[1] << 8);
-    float scale = ix_f16_to_f32_bits(scale_bits);
+    float scale = __half2float(__ushort_as_half(scale_bits));
 
     uint8_t byte = blk[2 + byte_in_block];
     int lo = byte & 0x0F;

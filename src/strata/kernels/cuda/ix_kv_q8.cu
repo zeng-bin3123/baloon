@@ -30,8 +30,8 @@ __global__ void ix_kv_append_q8_kernel(
     int wid=tid/IX_WARP_SIZE,lane=tid%IX_WARP_SIZE;
     if(lane==0)sh[wid]=am; __syncthreads();
     if(tid==0){float m=sh[0];for(int w=1;w<2;w++)if(sh[w]>m)m=sh[w];sh[0]=m;} __syncthreads();
-    am=sh[0]; float sc=am/127.0f; uint16_t s16=ix_f32_to_f16_bits(sc);
-    float sst=ix_f16_to_f32_bits(s16); float inv=(sst>0)?1.0f/sst:0.0f;
+    am=sh[0]; float sc=am/127.0f; uint16_t s16=__half_as_ushort(__float2half(sc));
+    float sst=__half2float(__ushort_as_half(s16)); float inv=(sst>0)?1.0f/sst:0.0f;
     for(int i=tid;i<gsz;i+=(int)blockDim.x){float v=kc[head*hd+gs+i];int q=(int)roundf(v*inv);q=q<-127?-127:(q>127?127:q);kq[row*hd+gs+i]=(int8_t)q;}
     if(tid==0) ks[row*ng+grp]=s16;
     // V amax
@@ -39,8 +39,8 @@ __global__ void ix_kv_append_q8_kernel(
     for(int o=IX_WARP_SIZE/2;o>0;o>>=1){float t=ix_shfl_xor(am,o);if(t>am)am=t;}
     if(lane==0)sh[wid]=am; __syncthreads();
     if(tid==0){float m=sh[0];for(int w=1;w<2;w++)if(sh[w]>m)m=sh[w];sh[0]=m;} __syncthreads();
-    am=sh[0]; sc=am/127.0f; s16=ix_f32_to_f16_bits(sc);
-    sst=ix_f16_to_f32_bits(s16); inv=(sst>0)?1.0f/sst:0.0f;
+    am=sh[0]; sc=am/127.0f; s16=__half_as_ushort(__float2half(sc));
+    sst=__half2float(__ushort_as_half(s16)); inv=(sst>0)?1.0f/sst:0.0f;
     for(int i=tid;i<gsz;i+=(int)blockDim.x){float v=vc[head*hd+gs+i];int q=(int)roundf(v*inv);q=q<-127?-127:(q>127?127:q);vq[row*hd+gs+i]=(int8_t)q;}
     if(tid==0) vs[row*ng+grp]=s16;
 }
@@ -57,10 +57,10 @@ __global__ void ix_kv_gather_q8_kernel(
     const int pos=ids[sel], page=tab[pos/ps];
     const int64_t row=(int64_t)page*kvh*ps+(int64_t)head*ps+(pos%ps);
     const int ng=(hd+KVG-1)/KVG, grp=bd/KVG;
-    float ksc=ix_f16_to_f32_bits(ks[row*ng+grp]), vsc=ix_f16_to_f32_bits(vs[row*ng+grp]);
+    float ksc=__half2float(__ushort_as_half(ks[row*ng+grp])), vsc=__half2float(__ushort_as_half(vs[row*ng+grp]));
     const int64_t db=row*hd+bd, ob=((int64_t)sel*kvh+head)*hd+bd;
     int cnt=hd-bd; if(cnt>4) cnt=4;
-    for(int i=0;i<cnt;i++){ko[ob+i]=ix_f32_to_f16_bits((float)kq[db+i]*ksc);vo[ob+i]=ix_f32_to_f16_bits((float)vq[db+i]*vsc);}
+    for(int i=0;i<cnt;i++){ko[ob+i]=__half_as_ushort(__float2half((float))kq[db+i]*ksc);vo[ob+i]=__half_as_ushort(__float2half((float))vq[db+i]*vsc);}
 }
 } // anon
 extern "C" {

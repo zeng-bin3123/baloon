@@ -41,7 +41,7 @@ __global__ void ix_quantize_q8_0_kernel(
     amax = ix_shfl(amax, 0);  // broadcast
 
     float d32 = amax / 127.0f;
-    uint16_t d16 = ix_f32_to_f16_bits(d32);
+    uint16_t d16 = __half_as_ushort(__float2half(d32));
 
     // Quantize: rint(double(val) / double(d32))
     int8_t q = 0;
@@ -76,7 +76,7 @@ __global__ void ix_dequant_q8_0_kernel(
 
     const uint8_t* blk = blocks + block_id * Q8_0_BYTES;
     uint16_t d16 = (uint16_t)blk[0] | ((uint16_t)blk[1] << 8);
-    float d = ix_f16_to_f32_bits(d16);
+    float d = __half2float(__ushort_as_half(d16));
     int8_t q = (int8_t)blk[2 + lane];
 
     if (base + lane < n_elements) {
