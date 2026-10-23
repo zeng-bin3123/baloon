@@ -48,7 +48,10 @@ CUDA_SRCS := src/strata/kernels/cuda/ix_infccl_allreduce.cu \
              src/strata/kernels/cuda/ix_native_router.cu \
              src/strata/kernels/cuda/ix_moe_elementwise.cu \
              src/strata/kernels/cuda/ix_bf16_gemv.cu \
-             src/strata/kernels/cuda/ix_gdn.cu
+             src/strata/kernels/cuda/ix_gdn.cu \
+             src/strata/kernels/cuda/ix_f16_conversions.cu \
+             src/strata/kernels/cuda/ix_activation_quantizer.cu \
+             src/strata/kernels/cuda/ix_elementwise.cu
 
 ALL_SRCS  := $(CORE_SRCS) $(KERN_SRCS) $(SPEC_SRCS)
 OBJS      := $(ALL_SRCS:.cpp=.o)
@@ -141,4 +144,4 @@ test: test1 test2 test3 test4 test5 test6 test7 test8
 clean:
 	rm -f $(OBJS) $(CUDA_OBJS) $(CORE_LIB) $(KERNEL_LIB)
 	rm -f tests/test_unit1 tests/test_unit2 tests/test_unit3
-	rm -f tests/test_unit4 tests/test_unit5 tests/test_unit6 tests/test_unit7
+	rm -f tests/test_unit4 tests/test_unit5 tests/test_unit6 tests/test_unit7 tests/test_unit8
