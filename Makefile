@@ -71,8 +71,10 @@ $(CORE_LIB): $(OBJS)
 	$(CXX) -shared -o $@ $^ $(LDFLAGS)
 
 # CUDA kernel library (GPU-side, optimized)
+# NOTE: link step must NOT use -x cuda (SOFLAGS) — that makes clang
+# try to compile .o files as CUDA source. Use plain linker flags.
 $(KERNEL_LIB): $(CUDA_OBJS)
-	$(CXX) $(SOFLAGS) -shared -o $@ $^
+	$(CXX) --cuda-path=$(CUDAPATH) -shared -fPIC -o $@ $^ -L$(CUDAPATH)/lib64 -lcudart
 
 # Compile rules
 %.o: %.cpp
