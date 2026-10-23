@@ -399,10 +399,11 @@ static void test_mmvq_q6k() {
     std::vector<float> h_y(n_out);
     cudaMemcpy(h_y.data(), d_y, n_out * sizeof(float), cudaMemcpyDeviceToHost);
 
-    // Just check the output is finite
+    // Just check the output is finite (avoid isfinite — CUDA host compat)
     bool finite = true;
     for (int i = 0; i < n_out; i++) {
-        if (!isfinite(h_y[i])) { finite = false; break; }
+        float v = h_y[i];
+        if (v != v || (v > 1e30f) || (v < -1e30f)) { finite = false; break; }
     }
     CHECK(finite, "ix_mmvq_q6k output is finite");
 
