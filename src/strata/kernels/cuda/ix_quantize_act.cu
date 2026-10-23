@@ -46,9 +46,9 @@ __global__ void ix_quantize_q8_0_kernel(
     // Quantize: rint(double(val) / double(d32))
     int8_t q = 0;
     if (d32 > 0.0f) {
-        double dval = (double)val;
-        double dd32 = (double)d32;
-        int qi = (int)rint(dval / dd32);
+        // float-precision rounding (matching ix_activation_quantizer)
+        
+        int qi = __float2int_rn(val / d32);
         qi = qi < -128 ? -128 : (qi > 127 ? 127 : qi);
         q = (int8_t)qi;
     }

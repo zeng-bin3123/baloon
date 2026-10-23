@@ -68,18 +68,16 @@ __global__ void ix_vec_dot_q8k_kernel(
     const uint8_t* b = b_blocks + bid * Q8K_BLOCK;
 
     // Global scale (d)
-    float d_a, d_b;
-    memcpy(&d_a, a, 4);
-    memcpy(&d_b, b, 4);
+    float d_a = *reinterpret_cast<const float*>(a);
+    float d_b = *reinterpret_cast<const float*>(b);
 
     float dot = 0.0f;
     for (int g = 0; g < 8; g++) {
         const uint8_t* ga = a + 4 + g * 36;
         const uint8_t* gb = b + 4 + g * 36;
 
-        float sa, sb;
-        memcpy(&sa, ga, 4);
-        memcpy(&sb, gb, 4);
+        float sa = *reinterpret_cast<const float*>(ga);
+        float sb = *reinterpret_cast<const float*>(gb);
 
         int32_t isum = 0;
         for (int i = 0; i < 32; i++) {
