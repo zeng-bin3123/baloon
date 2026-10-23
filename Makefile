@@ -120,7 +120,7 @@ test2: tests/test_unit2
 # Unit 2 GEMV: CUDA kernel integration test
 tests/test_unit2_gemv: tests/test_unit2_gemv.cu $(CORE_LIB) $(KERNEL_LIB)
 	@mkdir -p tests
-	$(CXX) $(SOFLAGS) $< -o $@ -L. -lstrata_core -lix_kernels $(LDFLAGS) 		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
+	$(CXX) $(SOFLAGS) $< -o $@ -L. -lstrata_core -lix_kernels $(LDFLAGS) -Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
 
 test2g: tests/test_unit2_gemv
 	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit2_gemv
