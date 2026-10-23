@@ -12,7 +12,7 @@
 
 namespace strata { namespace kernels { namespace {
 
-// ─── gr_norm: per-stream RMSNorm ─────────────────────────────────
+// --- gr_norm: per-stream RMSNorm ---------------------------------
 // One block per stream. blockDim.x threads split n_embd elements.
 __global__ void ix_gr_norm_kernel(
     const float* __restrict__ R,      // [hc, n_embd]
@@ -47,7 +47,7 @@ __global__ void ix_gr_norm_kernel(
     }
 }
 
-// ─── gr_mean: mixed[d] = (1/hc) * sum_c gated[c*N+d] ────────────
+// --- gr_mean: mixed[d] = (1/hc) * sum_c gated[c*N+d] ------------
 __global__ void ix_gr_mean_kernel(
     const float* __restrict__ gated, // [hc, n_embd]
     int n_embd, int hc,
@@ -62,7 +62,7 @@ __global__ void ix_gr_mean_kernel(
     mixed[d] = sum / (float)hc;
 }
 
-// ─── gr_write: R'[c,d] = R[c,d] + block_out[d] * w[c] ──────────
+// --- gr_write: R'[c,d] = R[c,d] + block_out[d] * w[c] ----------
 // w[c] = 2 * sigmoid(inject[c] / hc)
 __global__ void ix_gr_write_kernel(
     const float* __restrict__ R,         // [hc, n_embd]

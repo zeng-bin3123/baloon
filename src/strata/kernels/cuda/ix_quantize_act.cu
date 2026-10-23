@@ -15,7 +15,7 @@ constexpr int Q8_0_BLOCK = 32;
 // Q8_0 block layout: 2 bytes (fp16 scale) + 32 bytes (int8 quants) = 34 bytes
 constexpr int Q8_0_BYTES = 34;
 
-// ─── Q8_0 quantize kernel ───────────────────────────────────────
+// --- Q8_0 quantize kernel ---------------------------------------
 // One warp per Q8_0 block (32 elements, one per thread in warp64 first 32 lanes).
 __global__ void ix_quantize_q8_0_kernel(
     const float* __restrict__ x,
@@ -62,7 +62,7 @@ __global__ void ix_quantize_q8_0_kernel(
     block_out[2 + lane] = (uint8_t)q;
 }
 
-// ─── Q8_0 dequantize kernel ─────────────────────────────────────
+// --- Q8_0 dequantize kernel -------------------------------------
 __global__ void ix_dequant_q8_0_kernel(
     const uint8_t* __restrict__ blocks,
     float* __restrict__ out,
@@ -84,7 +84,7 @@ __global__ void ix_dequant_q8_0_kernel(
     }
 }
 
-// ─── Q8_0_scaled: same quant but fp32 scale for hit path ─────────
+// --- Q8_0_scaled: same quant but fp32 scale for hit path ---------
 // Layout: 4 bytes (fp32 scale) + 32 bytes (int8 quants) = 36 bytes
 constexpr int Q8_0S_BYTES = 36;
 

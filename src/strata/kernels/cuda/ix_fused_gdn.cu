@@ -14,7 +14,7 @@ namespace strata { namespace kernels { namespace {
 // Per-head fused kernel. One block per head.
 // blockDim.x = S (state dimension, e.g. 160), handles one column each.
 __global__ void ix_fused_gdn_step_norm_kernel(
-    float* __restrict__ state,        // [n_head, S, S] — transposed layout
+    float* __restrict__ state,        // [n_head, S, S] -- transposed layout
     const float* __restrict__ q,      // [n_head * S]
     const float* __restrict__ k,      // [n_head * S]
     const float* __restrict__ v,      // [n_head * S]
