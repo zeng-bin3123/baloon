@@ -186,7 +186,7 @@ test1d: tests/test_unit1_device
 test: test1 test1d test2 test3 test4 test5 test6 test7 test8
 
 clean:
-	rm -f $(OBJS) $(CUDA_OBJS) $(CORE_LIB) $(KERNEL_LIB)
+	rm -f $(OBJS) $(CORE_CU_OBJS) $(CUDA_OBJS) $(CORE_LIB) $(KERNEL_LIB)
 	rm -f tests/test_unit1 tests/test_unit2 tests/test_unit3
 	rm -f tests/test_unit4 tests/test_unit5 tests/test_unit6 tests/test_unit7 tests/test_unit8
 
