@@ -29,7 +29,9 @@ CORE_SRCS := src/strata/core/graph.cpp \
              src/strata/core/layer.cpp \
              src/strata/core/session.cpp \
              src/strata/core/cpu_features.cpp \
-             src/strata/core/layout.cpp
+             src/strata/core/layout.cpp \
+             src/strata/core/pinned_host_arena.cpp \
+             src/strata/core/memory_planner.cpp
 
 # ─── Host-side kernel dispatchers ──────────────────────────────────
 KERN_SRCS := src/strata/kernels/elementwise.cpp \
@@ -73,7 +75,7 @@ CUDA_SRCS := src/strata/kernels/cuda/ix_infccl_allreduce.cu \
 
 ALL_SRCS  := $(CORE_SRCS) $(KERN_SRCS) $(SPEC_SRCS)
 OBJS      := $(ALL_SRCS:.cpp=.o)
-CORE_CU   := src/strata/core/device.cu
+CORE_CU   := src/strata/core/device.cu              src/strata/core/device_arena.cu
 CORE_CU_OBJS := $(CORE_CU:.cu=.o)
 CUDA_OBJS := $(CUDA_SRCS:.cu=.o)
 
@@ -128,6 +130,7 @@ $(eval $(call TEST_RULE,test_unit3))
 $(eval $(call TEST_RULE,test_unit4))
 $(eval $(call TEST_RULE,test_unit5))
 $(eval $(call TEST_RULE,test_unit6))
+$(eval $(call TEST_RULE,test_unit2_mem))
 
 # Unit 7: CUDA kernel integration test
 tests/test_unit7: tests/test_unit7.cu $(CORE_LIB) $(KERNEL_LIB)
@@ -148,6 +151,9 @@ tests/test_unit2_gemv: tests/test_unit2_gemv.cu $(CORE_LIB) $(KERNEL_LIB)
 
 test2g: tests/test_unit2_gemv
 	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit2_gemv
+
+test2m: tests/test_unit2_mem
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit2_mem
 
 test3: tests/test_unit3
 	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit3
