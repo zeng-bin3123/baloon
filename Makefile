@@ -31,7 +31,7 @@ CORE_SRCS := src/strata/core/graph.cpp \
              src/strata/core/cpu_features.cpp \
              src/strata/core/layout.cpp \
              src/strata/core/pinned_host_arena.cpp \
-             src/strata/core/memory_planner.cpp
+             src/strata/core/memory_planner.cpp              src/strata/core/hit_miss_hook.cpp
 
 # ─── Host-side kernel dispatchers ──────────────────────────────────
 KERN_SRCS := src/strata/kernels/elementwise.cpp \
@@ -206,3 +206,12 @@ tests/test_unit4_cuda: tests/test_unit4_cuda.cu $(CORE_LIB) $(KERNEL_LIB)
 
 test4g: tests/test_unit4_cuda
 	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit4_cuda
+
+# Unit 4 expert cache test (host-only, no GPU needed)
+tests/test_unit4_expert: tests/test_unit4_expert.cpp $(CORE_LIB)
+	@mkdir -p tests
+	$(CXX) $(CXXFLAGS) $< -o $@ -L. -lstrata_core $(LDFLAGS) \
+		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
+
+test4e: tests/test_unit4_expert
+	LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit4_expert

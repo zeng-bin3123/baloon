@@ -184,6 +184,8 @@ void ExpertCache::close() {
     n_expert_ = 0;
     next_free_ = 0;
     per_layer_ = false;
+    fills_ = 0;
+    admits_ = 0;
     residency_.clear();
     off_.clear();
     layer_next_free_.clear();
@@ -231,6 +233,7 @@ int32_t ExpertCache::admit(int64_t layer, int64_t expert) {
         int32_t slot = static_cast<int32_t>(nf);
         ++nf;
         residency_[idx] = slot;
+        ++admits_;
         return slot;
     } else {
         // Global mode
@@ -241,6 +244,7 @@ int32_t ExpertCache::admit(int64_t layer, int64_t expert) {
         int32_t slot = static_cast<int32_t>(next_free_);
         ++next_free_;
         residency_[idx] = slot;
+        ++admits_;
         return slot;
     }
 }
@@ -295,6 +299,7 @@ bool ExpertCache::fill_slot(int32_t slot, const uint8_t* host_blob,
         err = std::string("fill_slot cudaMemcpyAsync: ") + cudaGetErrorString(rc);
         return false;
     }
+    ++fills_;
     return true;
 }
 
@@ -319,6 +324,7 @@ bool ExpertCache::fill_slot_blocking(int32_t slot, const uint8_t* host_blob,
         err = std::string("fill_slot_blocking cudaMemcpy: ") + cudaGetErrorString(rc);
         return false;
     }
+    ++fills_;
     return true;
 }
 
@@ -349,6 +355,87 @@ bool ExpertCache::verify_slot(int32_t slot, const uint8_t* host_blob,
         err = "verify_slot: data mismatch at slot " + std::to_string(slot);
         return false;
     }
+    return true;
+}
+
+int32_t ExpertCache::batch_lookup(int64_t layer, const int32_t* ids,
+                                   int32_t* slots_out, int32_t k) const {
+    int32_t hits = 0;
+    for (int32_t i = 0; i < k; ++i) {
+        int32_t s = slot_of(layer, ids[i]);
+        slots_out[i] = s;
+        if (s != kNotResident) ++hits;
+    }
+    return hits;
+}
+
+bool ExpertCache::adaptive_swap_layer(int64_t layer,
+                                       const int32_t* route_counts,
+                                       const uint8_t* (*blob_source)(int64_t, int64_t, void*),
+                                       void* ctx,
+                                       void* stream,
+                                       std::string& err) {
+    if (layer < 0 || layer >= n_layers_ || n_expert_ <= 0) return false;
+    if (!base_ || !per_layer_) return false;
+
+    int64_t lo = 0, hi = 0;
+    layer_slot_range(layer, lo, hi);
+
+    // Find the most-routed missing expert for this layer
+    int32_t best_miss_expert = -1;
+    int32_t best_miss_count = -1;
+    for (int64_t e = 0; e < n_expert_; ++e) {
+        size_t idx = static_cast<size_t>(layer * n_expert_ + e);
+        if (residency_[idx] == kNotResident) {
+            int32_t c = route_counts[idx];
+            if (c > best_miss_count) {
+                best_miss_count = c;
+                best_miss_expert = static_cast<int32_t>(e);
+            }
+        }
+    }
+    if (best_miss_expert < 0 || best_miss_count <= 0) return false;
+
+    // Find the least-routed resident expert in this layer's slot range
+    int32_t worst_res_expert = -1;
+    int32_t worst_res_slot = -1;
+    int32_t worst_res_count = INT32_MAX;
+    for (int64_t e = 0; e < n_expert_; ++e) {
+        size_t idx = static_cast<size_t>(layer * n_expert_ + e);
+        int32_t s = residency_[idx];
+        if (s != kNotResident && s >= static_cast<int32_t>(lo) && s < static_cast<int32_t>(hi)) {
+            int32_t c = route_counts[idx];
+            if (c < worst_res_count) {
+                worst_res_count = c;
+                worst_res_expert = static_cast<int32_t>(e);
+                worst_res_slot = s;
+            }
+        }
+    }
+    if (worst_res_expert < 0) return false;
+
+    // Only swap if the miss is more frequently routed
+    if (best_miss_count <= worst_res_count) return false;
+
+    // Get the blob for the new expert
+    const uint8_t* blob = blob_source(layer, best_miss_expert, ctx);
+    if (!blob) {
+        err = "adaptive_swap: blob_source returned null for (" +
+              std::to_string(layer) + ", " + std::to_string(best_miss_expert) + ")";
+        return false;
+    }
+
+    // Copy into the evicted slot
+    if (!fill_slot(worst_res_slot, blob, stream, err)) {
+        return false;
+    }
+
+    // Update residency
+    size_t old_idx = static_cast<size_t>(layer * n_expert_ + worst_res_expert);
+    size_t new_idx = static_cast<size_t>(layer * n_expert_ + best_miss_expert);
+    residency_[old_idx] = kNotResident;
+    residency_[new_idx] = worst_res_slot;
+
     return true;
 }
 

@@ -120,6 +120,30 @@ public:
     bool verify_slot(int32_t slot, const uint8_t* host_blob,
                      std::string& err, int64_t bytes = 0);
 
+    // ── Batch lookup ─────────────────────────────────────────────
+    // Look up k expert ids for a layer; write slot indices into slots_out.
+    // Returns number of hits (slot != kNotResident).
+    int32_t batch_lookup(int64_t layer, const int32_t* ids,
+                         int32_t* slots_out, int32_t k) const;
+
+    // ── Adaptive swap ────────────────────────────────────────────
+    // Swap the most-routed missing expert into the slot of the
+    // least-routed resident expert for a given layer.
+    // route_counts: [n_layers * n_expert] routing frequency counters.
+    // blob_source: callback to get the host blob for a (layer, expert).
+    // stream: CUDA stream for the async copy.
+    // Returns true if a swap was performed.
+    bool adaptive_swap_layer(int64_t layer,
+                             const int32_t* route_counts,
+                             const uint8_t* (*blob_source)(int64_t layer, int64_t expert, void* ctx),
+                             void* ctx,
+                             void* stream,
+                             std::string& err);
+
+    // ── Statistics ────────────────────────────────────────────────
+    int64_t total_fills() const { return fills_; }
+    int64_t total_admits() const { return admits_; }
+
 private:
     uint8_t* base_ = nullptr;          // device memory base
     int64_t total_bytes_ = 0;          // total device allocation
@@ -129,6 +153,9 @@ private:
     int64_t n_expert_ = 0;
     int64_t next_free_ = 0;            // global free pointer
     bool per_layer_ = false;           // per-layer partitioning mode
+
+    int64_t fills_ = 0;               // total fill_slot calls
+    int64_t admits_ = 0;              // total successful admissions
 
     std::vector<int32_t> residency_;   // size = n_layers * n_expert
     std::vector<uint64_t> off_;        // size = slots + 1 (sized mode)
