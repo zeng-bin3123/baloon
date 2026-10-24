@@ -9,6 +9,8 @@
 // GpuPlanSink: per-layer GPU dispatch plan (VRAM hits + PCIe share).
 // ExpertDispatch: per-session adapter state for expert routing.
 
+#include "strata/kernels/cpu/expert_kernel.hpp"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -42,14 +44,7 @@ struct ExpertJobMulti {
     float** out_ptrs = nullptr;
 };
 
-// Activation quantization state.
-struct ActQ {
-    const uint8_t* data = nullptr;
-    const float* scale = nullptr;
-    int64_t n_elements = 0;
-};
-
-// Expert pool (CPU-side compute).  Defined in a later unit.
+// Expert pool (CPU-side compute).  Defined in expert_thread_pool.hpp.
 class ExpertPool;
 
 }}  // namespace kernels::cpu

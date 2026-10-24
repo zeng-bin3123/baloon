@@ -44,6 +44,12 @@ KERN_SRCS := src/strata/kernels/elementwise.cpp \
              src/strata/kernels/s_gemv.cpp \
              src/strata/kernels/shared_expert.cpp
 
+# ─── CPU expert kernel sources ────────────────────────────────────
+CPU_SRCS  := src/strata/kernels/cpu/expert_kernel.cpp \
+             src/strata/kernels/cpu/expert_thread_pool.cpp \
+             src/strata/kernels/cpu/expert_layout.cpp \
+             src/strata/kernels/cpu/native_expert.cpp
+
 # ─── Spec (suffix drafter) ────────────────────────────────────────
 SPEC_SRCS := src/strata/spec/suffix_drafter.cpp
 
@@ -73,7 +79,7 @@ CUDA_SRCS := src/strata/kernels/cuda/ix_infccl_allreduce.cu \
              src/strata/kernels/cuda/ix_qsa_select.cu \
              src/strata/kernels/cuda/ix_sampler.cu
 
-ALL_SRCS  := $(CORE_SRCS) $(KERN_SRCS) $(SPEC_SRCS)
+ALL_SRCS  := $(CORE_SRCS) $(KERN_SRCS) $(CPU_SRCS) $(SPEC_SRCS)
 OBJS      := $(ALL_SRCS:.cpp=.o)
 CORE_CU   := src/strata/core/device.cu              src/strata/core/device_arena.cu
 CORE_CU_OBJS := $(CORE_CU:.cu=.o)
