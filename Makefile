@@ -78,7 +78,7 @@ CORE_LIB   := libstrata_core.so
 KERNEL_LIB := libix_kernels.so
 
 # ─── Build targets ─────────────────────────────────────────────────
-.PHONY: all clean test lib kernels test1 test2 test2g test3 test4 test5 test6 test7 test8 test9
+.PHONY: all clean test lib kernels test1 test2 test2g test2s test3 test4 test5 test6 test7 test8 test9
 
 all: lib kernels
 
@@ -139,6 +139,14 @@ tests/test_unit2_gemv: tests/test_unit2_gemv.cu $(CORE_LIB) $(KERNEL_LIB)
 
 test2g: tests/test_unit2_gemv
 	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit2_gemv
+
+# Unit 2 session: graph_registry + session_orchestrator (CUDA test)
+tests/test_unit2_session: tests/test_unit2_session.cu $(CORE_LIB)
+	@mkdir -p tests
+	$(CXX) $(SOFLAGS) $< -o $@ -L. -lstrata_core $(LDFLAGS) 		-Wl,-rpath,'$$ORIGIN/..' -Wl,-rpath,$(CUDAPATH)/lib64
+
+test2s: tests/test_unit2_session
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit2_session
 
 test3: tests/test_unit3
 	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit3
