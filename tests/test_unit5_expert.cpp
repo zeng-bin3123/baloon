@@ -77,8 +77,8 @@ int main() {
     {
         strata::kernels::cpu::ActQ act;
         CHECK(act.nchunks == 0, "ActQ nchunks default 0");
-        // ActQ has inline arrays q[], scale[], sum[], hx[] — all zero-initialized
-        CHECK(act.scale[0] == 0.0f, "ActQ scale[0] default 0");
+        CHECK(act.q[0] == 0, "ActQ q default zero");
+        CHECK(act.scale[0] == 0.0f, "ActQ scale default zero");
     }
 
     // ════════════════════════════════════════════════════════════════

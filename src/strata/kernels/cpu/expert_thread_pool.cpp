@@ -149,10 +149,7 @@ void ExpertPool::drain(int id, ExpertScratch& ws) {
         case 0: {
             // Whole expert: single-token
             auto& job = jobs_[job_idx];
-            if (job.blob) {
-                ActQ local_act;
-                act_quant_q8_1(job.act ? nullptr : nullptr, 0, local_act);
-                // Use the pre-quantized activation from the job
+            if (job.blob && job.act) {
                 expert_kernel(job.blob, *job.act, job.out, ws);
             }
             break;
