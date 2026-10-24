@@ -117,8 +117,12 @@ public:
                             std::string& err, int64_t bytes = 0);
 
     // Verify: read back device slot and compare with host_blob.
+    // Synchronous D2H copy then memcmp; reports first differing byte.
     bool verify_slot(int32_t slot, const uint8_t* host_blob,
                      std::string& err, int64_t bytes = 0);
+
+    // Number of fill_slot / fill_slot_blocking calls completed.
+    int64_t fills() const { return fills_; }
 
 private:
     uint8_t* base_ = nullptr;          // device memory base
@@ -129,6 +133,7 @@ private:
     int64_t n_expert_ = 0;
     int64_t next_free_ = 0;            // global free pointer
     bool per_layer_ = false;           // per-layer partitioning mode
+    int64_t fills_ = 0;                // fill_slot call counter
 
     std::vector<int32_t> residency_;   // size = n_layers * n_expert
     std::vector<uint64_t> off_;        // size = slots + 1 (sized mode)

@@ -2,6 +2,7 @@
 #include "strata/core/pinned.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <chrono>
 #include <cstdio>
@@ -36,6 +37,8 @@ PinnedArena::PinnedArena(uint64_t bytes, uint64_t slice) : slice_size(slice) {
             // Last resort: cudaMallocHost
             cudaError_t rc = cudaMallocHost(&base, bytes);
             if (rc != cudaSuccess) {
+                // Clear sticky error
+                (void)cudaGetLastError();
                 base = nullptr;
                 note = std::string("cudaMallocHost failed: ") + cudaGetErrorString(rc);
                 return;
@@ -51,7 +54,12 @@ PinnedArena::PinnedArena(uint64_t bytes, uint64_t slice) : slice_size(slice) {
         note = "normal pages";
     }
 
-    // Register with CUDA (slice-by-slice fallback)
+    // Register with CUDA BEFORE touching pages.
+    // cudaHostRegister pins what is RESIDENT, so a pre-faulted region is expensive.
+    //
+    // Critical: cudaGetLastError() MUST be called after a failed registration
+    // to clear the sticky error. Without clearing, the next cudaGetLastError()
+    // (e.g. in gr_read) reports "out of memory" for an unrelated kernel.
     if (slice_size == 0 || slice_size >= bytes) {
         // Try whole arena
         cudaError_t rc = cudaHostRegister(base, bytes, cudaHostRegisterDefault);
@@ -60,16 +68,23 @@ PinnedArena::PinnedArena(uint64_t bytes, uint64_t slice) : slice_size(slice) {
             locked_bytes = bytes;
             slice_count = 1;
         } else {
+            // Clear the sticky CUDA error state
+            (void)cudaGetLastError();
             note += " (cudaHostRegister whole failed, unregistered)";
         }
     } else {
-        // Slice-by-slice
+        // Slice-by-slice registration
         uint64_t off = 0;
         while (off < bytes) {
             uint64_t chunk = std::min(slice_size, bytes - off);
             cudaError_t rc = cudaHostRegister(
                 static_cast<uint8_t*>(base) + off, chunk, cudaHostRegisterDefault);
-            if (rc != cudaSuccess) break;
+            if (rc != cudaSuccess) {
+                // Clear sticky error so subsequent unrelated CUDA calls
+                // don't see "out of memory" from this registration failure
+                (void)cudaGetLastError();
+                break;
+            }
             slice_starts.push_back(off);
             registered_bytes = off + chunk;
             ++slice_count;
@@ -123,28 +138,41 @@ uint64_t fnv1a64(const uint8_t* data, uint64_t n, uint64_t seed) {
 
 // ─── Parallel file loading ───────────────────────────────────────────
 
-// Thread worker: opens its own fd, reads assigned range with pread.
-static void load_thread(const std::string& path, uint8_t* dst,
-                        uint64_t file_offset, uint64_t nbytes,
-                        uint64_t chunk_size, uint64_t* checksum) {
+// Thread worker: opens its OWN file handle (no shared seek lock), claims
+// layers via atomic counter — one layer per claim, no contention.
+static void load_worker(const std::string& path, uint8_t* base_dst,
+                        uint64_t layer_bytes, uint64_t n_layers,
+                        uint64_t chunk_size, std::atomic<uint64_t>& next_layer,
+                        uint64_t* checksums) {
     int fd = open(path.c_str(), O_RDONLY);
     if (fd < 0) return;
 
-    uint64_t done = 0;
-    uint64_t h = 14695981039346656037ull;
-    while (done < nbytes) {
-        uint64_t want = std::min(chunk_size, nbytes - done);
-        ssize_t got = pread(fd, dst + done, want, file_offset + done);
-        if (got <= 0) break;
-        // Accumulate checksum over what we just read
-        for (ssize_t j = 0; j < got; ++j) {
-            h ^= dst[done + j];
-            h *= 1099511628211ull;
+    for (;;) {
+        uint64_t layer = next_layer.fetch_add(1);
+        if (layer >= n_layers) break;
+
+        uint8_t* dst = base_dst + layer * layer_bytes;
+        uint64_t file_offset = layer * layer_bytes;
+        uint64_t done = 0;
+        uint64_t h = 14695981039346656037ull;  // FNV-1a offset basis
+
+        while (done < layer_bytes) {
+            uint64_t want = std::min(chunk_size, layer_bytes - done);
+            ssize_t got = pread(fd, dst + done, want,
+                                static_cast<off_t>(file_offset + done));
+            if (got <= 0) break;
+            // Per-layer FNV-1a checksum so a corrupt read names WHICH layer
+            for (ssize_t j = 0; j < got; ++j) {
+                h ^= dst[done + j];
+                h *= 1099511628211ull;
+            }
+            done += static_cast<uint64_t>(got);
         }
-        done += static_cast<uint64_t>(got);
+
+        checksums[layer] = h;
     }
+
     close(fd);
-    if (checksum) *checksum = h;
 }
 
 LoadStats load_experts(const std::string& path, uint8_t* dst,
@@ -157,18 +185,18 @@ LoadStats load_experts(const std::string& path, uint8_t* dst,
 
     auto t0 = std::chrono::steady_clock::now();
 
-    // One thread per layer (up to n_threads in flight)
+    // T threads, each with its own file handle.
+    // Layer assignment: next_layer.fetch_add(1) — one layer per claim, no contention.
+    std::atomic<uint64_t> next_layer{0};
+    int effective_threads = std::min(n_threads, static_cast<int>(n_layers));
+    if (effective_threads < 1) effective_threads = 1;
+
     std::vector<std::thread> threads;
-    for (uint64_t layer = 0; layer < n_layers; ++layer) {
-        while ((int)threads.size() >= n_threads) {
-            // Join the oldest
-            threads.front().join();
-            threads.erase(threads.begin());
-        }
-        uint64_t off = layer * layer_bytes;
-        threads.emplace_back(load_thread, std::cref(path), dst + off,
-                             off, layer_bytes, chunk_size,
-                             &stats.checksums[layer]);
+    threads.reserve(effective_threads);
+    for (int t = 0; t < effective_threads; ++t) {
+        threads.emplace_back(load_worker, std::cref(path), dst,
+                             layer_bytes, n_layers, chunk_size,
+                             std::ref(next_layer), stats.checksums.data());
     }
     for (auto& t : threads) t.join();
 
@@ -179,6 +207,45 @@ LoadStats load_experts(const std::string& path, uint8_t* dst,
     return stats;
 }
 
+// Worker for range-based loading: each thread claims ranges via atomic counter.
+static void load_ranges_worker(const std::string& path, uint8_t* base_dst,
+                                const uint64_t* file_offsets,
+                                const uint64_t* range_sizes,
+                                const uint64_t* dst_offsets,
+                                uint64_t n_ranges, uint64_t chunk_size,
+                                std::atomic<uint64_t>& next_range,
+                                uint64_t* checksums) {
+    int fd = open(path.c_str(), O_RDONLY);
+    if (fd < 0) return;
+
+    for (;;) {
+        uint64_t idx = next_range.fetch_add(1);
+        if (idx >= n_ranges) break;
+
+        uint8_t* dst = base_dst + dst_offsets[idx];
+        uint64_t file_offset = file_offsets[idx];
+        uint64_t nbytes = range_sizes[idx];
+        uint64_t done = 0;
+        uint64_t h = 14695981039346656037ull;
+
+        while (done < nbytes) {
+            uint64_t want = std::min(chunk_size, nbytes - done);
+            ssize_t got = pread(fd, dst + done, want,
+                                static_cast<off_t>(file_offset + done));
+            if (got <= 0) break;
+            for (ssize_t j = 0; j < got; ++j) {
+                h ^= dst[done + j];
+                h *= 1099511628211ull;
+            }
+            done += static_cast<uint64_t>(got);
+        }
+
+        checksums[idx] = h;
+    }
+
+    close(fd);
+}
+
 LoadStats load_experts_ranges(const std::string& path, uint8_t* dst,
                               const std::vector<uint64_t>& offsets,
                               const std::vector<uint64_t>& sizes,
@@ -187,20 +254,28 @@ LoadStats load_experts_ranges(const std::string& path, uint8_t* dst,
     size_t n = std::min(offsets.size(), sizes.size());
     stats.checksums.resize(n, 0);
 
+    // Precompute destination offsets (contiguous layout)
+    std::vector<uint64_t> dst_offs(n);
+    uint64_t acc = 0;
+    for (size_t i = 0; i < n; ++i) {
+        dst_offs[i] = acc;
+        acc += sizes[i];
+        stats.bytes_read += sizes[i];
+    }
+
     auto t0 = std::chrono::steady_clock::now();
 
-    uint64_t dst_off = 0;
+    std::atomic<uint64_t> next_range{0};
+    int effective_threads = std::min(n_threads, static_cast<int>(n));
+    if (effective_threads < 1) effective_threads = 1;
+
     std::vector<std::thread> threads;
-    for (size_t i = 0; i < n; ++i) {
-        while ((int)threads.size() >= n_threads) {
-            threads.front().join();
-            threads.erase(threads.begin());
-        }
-        threads.emplace_back(load_thread, std::cref(path), dst + dst_off,
-                             offsets[i], sizes[i], chunk_size,
-                             &stats.checksums[i]);
-        stats.bytes_read += sizes[i];
-        dst_off += sizes[i];
+    threads.reserve(effective_threads);
+    for (int t = 0; t < effective_threads; ++t) {
+        threads.emplace_back(load_ranges_worker, std::cref(path), dst,
+                             offsets.data(), sizes.data(), dst_offs.data(),
+                             static_cast<uint64_t>(n), chunk_size,
+                             std::ref(next_range), stats.checksums.data());
     }
     for (auto& t : threads) t.join();
 

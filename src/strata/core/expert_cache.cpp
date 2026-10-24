@@ -105,12 +105,30 @@ bool ExpertCache::open(int64_t n_slots, int64_t n_layers, int64_t n_expert,
     close();
 
     int64_t total = n_slots * blob_bytes;
+
+    // Pre-allocation check: verify device has enough free memory BEFORE
+    // cudaMalloc — silent overcommit reports the requested size while
+    // device_slot walks off the end.
+    {
+        size_t free_bytes = 0, total_dev = 0;
+        cudaError_t qrc = cudaMemGetInfo(&free_bytes, &total_dev);
+        if (qrc == cudaSuccess && static_cast<int64_t>(free_bytes) < total) {
+            err = "ExpertCache::open: want " + std::to_string(total) +
+                  " bytes but device has only " + std::to_string(free_bytes) + " free";
+            return false;
+        }
+    }
+
     cudaError_t rc = cudaMalloc(reinterpret_cast<void**>(&base_), static_cast<size_t>(total));
     if (rc != cudaSuccess) {
         err = std::string("ExpertCache::open cudaMalloc failed: ") + cudaGetErrorString(rc);
         base_ = nullptr;
         return false;
     }
+
+    // Zero the arena to ensure deterministic wrong answers (not stale memory
+    // from another process) if a slot is read before being filled.
+    cudaMemset(base_, 0, static_cast<size_t>(total));
 
     total_bytes_ = total;
     slots_ = n_slots;
@@ -119,11 +137,18 @@ bool ExpertCache::open(int64_t n_slots, int64_t n_layers, int64_t n_expert,
     n_expert_ = n_expert;
     next_free_ = 0;
     per_layer_ = false;
+    fills_ = 0;
 
     // Initialize residency: all kNotResident
     residency_.assign(static_cast<size_t>(n_layers * n_expert), kNotResident);
     off_.clear();
-    layer_next_free_.clear();
+
+    // Initialize per-layer free counters
+    layer_next_free_.resize(static_cast<size_t>(n_layers));
+    for (int64_t l = 0; l < n_layers; ++l) {
+        int64_t q = n_slots / n_layers;
+        layer_next_free_[l] = l * q;
+    }
 
     return true;
 }
@@ -150,6 +175,19 @@ bool ExpertCache::open_sized(const std::vector<int64_t>& slot_bytes,
     }
 
     int64_t total = static_cast<int64_t>(off_[n_slots]);
+
+    // Pre-allocation VRAM free check
+    {
+        size_t free_bytes = 0, total_dev = 0;
+        cudaError_t qrc = cudaMemGetInfo(&free_bytes, &total_dev);
+        if (qrc == cudaSuccess && static_cast<int64_t>(free_bytes) < total) {
+            err = "ExpertCache::open_sized: want " + std::to_string(total) +
+                  " bytes but device has only " + std::to_string(free_bytes) + " free";
+            off_.clear();
+            return false;
+        }
+    }
+
     cudaError_t rc = cudaMalloc(reinterpret_cast<void**>(&base_), static_cast<size_t>(total));
     if (rc != cudaSuccess) {
         err = std::string("ExpertCache::open_sized cudaMalloc failed: ") + cudaGetErrorString(rc);
@@ -158,6 +196,9 @@ bool ExpertCache::open_sized(const std::vector<int64_t>& slot_bytes,
         return false;
     }
 
+    // Zero the arena for deterministic behavior on unfilled slots
+    cudaMemset(base_, 0, static_cast<size_t>(total));
+
     total_bytes_ = total;
     slots_ = n_slots;
     blob_ = 0;  // variable sizes
@@ -165,9 +206,16 @@ bool ExpertCache::open_sized(const std::vector<int64_t>& slot_bytes,
     n_expert_ = n_expert;
     next_free_ = 0;
     per_layer_ = false;
+    fills_ = 0;
 
     residency_.assign(static_cast<size_t>(n_layers * n_expert), kNotResident);
-    layer_next_free_.clear();
+
+    // Initialize per-layer free counters
+    layer_next_free_.resize(static_cast<size_t>(n_layers));
+    for (int64_t l = 0; l < n_layers; ++l) {
+        int64_t q = n_slots / n_layers;
+        layer_next_free_[l] = l * q;
+    }
 
     return true;
 }
@@ -184,6 +232,7 @@ void ExpertCache::close() {
     n_expert_ = 0;
     next_free_ = 0;
     per_layer_ = false;
+    fills_ = 0;
     residency_.clear();
     off_.clear();
     layer_next_free_.clear();
@@ -213,14 +262,8 @@ int32_t ExpertCache::admit(int64_t layer, int64_t expert) {
         int64_t lo = 0, hi = 0;
         layer_slot_range(layer, lo, hi);
 
-        // Initialize per-layer free counters on first use.
-        if (layer_next_free_.empty()) {
-            layer_next_free_.resize(static_cast<size_t>(n_layers_), 0);
-            for (int64_t l = 0; l < n_layers_; ++l) {
-                int64_t llo = 0, lhi = 0;
-                layer_slot_range(l, llo, lhi);
-                layer_next_free_[l] = llo;
-            }
+        if (layer_next_free_.empty() || static_cast<size_t>(layer) >= layer_next_free_.size()) {
+            return kNotResident;
         }
 
         int64_t& nf = layer_next_free_[static_cast<size_t>(layer)];
@@ -295,6 +338,7 @@ bool ExpertCache::fill_slot(int32_t slot, const uint8_t* host_blob,
         err = std::string("fill_slot cudaMemcpyAsync: ") + cudaGetErrorString(rc);
         return false;
     }
+    ++fills_;
     return true;
 }
 
@@ -319,6 +363,7 @@ bool ExpertCache::fill_slot_blocking(int32_t slot, const uint8_t* host_blob,
         err = std::string("fill_slot_blocking cudaMemcpy: ") + cudaGetErrorString(rc);
         return false;
     }
+    ++fills_;
     return true;
 }
 
@@ -345,9 +390,16 @@ bool ExpertCache::verify_slot(int32_t slot, const uint8_t* host_blob,
         return false;
     }
 
-    if (std::memcmp(readback.data(), host_blob, static_cast<size_t>(nbytes)) != 0) {
-        err = "verify_slot: data mismatch at slot " + std::to_string(slot);
-        return false;
+    // "A check that can be read before it has happened is not a check"
+    // — always synchronous, reports first differing byte position.
+    for (int64_t i = 0; i < nbytes; ++i) {
+        if (readback[i] != host_blob[i]) {
+            err = "verify_slot: mismatch at slot " + std::to_string(slot) +
+                  " byte " + std::to_string(i) +
+                  " (got " + std::to_string(readback[i]) +
+                  " expected " + std::to_string(host_blob[i]) + ")";
+            return false;
+        }
     }
     return true;
 }

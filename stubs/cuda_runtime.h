@@ -55,6 +55,7 @@ inline cudaError_t cudaStreamBeginCapture(cudaStream_t, int) { return cudaSucces
 inline cudaError_t cudaStreamEndCapture(cudaStream_t, cudaGraph_t*) { return cudaSuccess; }
 inline cudaError_t cudaGraphInstantiate(cudaGraphExec_t*, cudaGraph_t, void*, char*, size_t) { return cudaSuccess; }
 inline cudaError_t cudaGraphGetNodes(cudaGraph_t, void*, size_t*) { return cudaSuccess; }
+inline cudaError_t cudaMemGetInfo(size_t* free, size_t* total) { if(free) *free=32ULL*1024*1024*1024; if(total) *total=32ULL*1024*1024*1024; return cudaSuccess; }
 inline cudaError_t cudaGetLastError() { return cudaSuccess; }
 inline cudaError_t cudaPeekAtLastError() { return cudaSuccess; }
 inline cudaError_t cudaHostRegister(void*, size_t, unsigned int) { return cudaSuccess; }

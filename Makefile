@@ -78,7 +78,7 @@ CORE_LIB   := libstrata_core.so
 KERNEL_LIB := libix_kernels.so
 
 # ─── Build targets ─────────────────────────────────────────────────
-.PHONY: all clean test lib kernels test1 test2 test2g test3 test4 test5 test6 test7 test8
+.PHONY: all clean test lib kernels test1 test2 test2g test3 test4 test5 test6 test7 test8 test9
 
 all: lib kernels
 
@@ -164,7 +164,12 @@ tests/test_unit8: tests/test_unit8.cu $(CORE_LIB) $(KERNEL_LIB)
 test8: tests/test_unit8
 	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit8
 
-test: test1 test2 test3 test4 test5 test6 test7 test8
+$(eval $(call TEST_RULE,test_unit9))
+
+test9: tests/test_unit9
+	CUDA_VISIBLE_DEVICES=0 LD_LIBRARY_PATH=$(CURDIR):$(CUDAPATH)/lib64 ./tests/test_unit9
+
+test: test1 test2 test3 test4 test5 test6 test7 test8 test9
 
 clean:
 	rm -f $(OBJS) $(CUDA_OBJS) $(CORE_LIB) $(KERNEL_LIB)
