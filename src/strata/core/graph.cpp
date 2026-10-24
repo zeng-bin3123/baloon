@@ -1,5 +1,6 @@
 // strata/core/graph.cpp — CUDA graph capture and registry implementation
 #include "strata/core/graph.hpp"
+#include <chrono>
 #include <cstdio>
 #include <ctime>
 
@@ -88,15 +89,21 @@ bool CapturedGraph::launch(cudaStream_t stream, std::string& err) const {
 
 bool CapturedGraph::wait_ms(int timeout_ms) const {
     if (!done_) return false;
-    for (int i = 0; i < timeout_ms; ++i) {
+    // Bounded poll using REAL TIME (steady_clock), not pause counts.
+    // _mm_pause is a few cycles, so counting pauses as µs would make
+    // the timeout 10-100× longer than requested.  cudaEventQuery gives
+    // the driver the poll call WDDM needs to flush command batches.
+    auto deadline = std::chrono::steady_clock::now()
+                  + std::chrono::milliseconds(timeout_ms);
+    for (;;) {
         cudaError_t rc = cudaEventQuery(done_);
         if (rc == cudaSuccess) return true;
         if (rc != cudaErrorNotReady) return false;
-        // Sleep 1 ms (busy-ish poll with yield)
-        struct timespec ts = {0, 1000000};
+        if (std::chrono::steady_clock::now() >= deadline) return false;
+        // Brief yield between polls — avoids burning 100% of a core
+        struct timespec ts = {0, 100000};  // 100 µs
         nanosleep(&ts, nullptr);
     }
-    return false;  // timeout
 }
 
 // ─── GraphRegistry ───────────────────────────────────────────────────
@@ -110,6 +117,21 @@ bool GraphRegistry::record(LayerType layer, int n_tokens,
     if (!cg.begin(stream_, err)) return false;
 
     body();  // execute the body under stream capture
+
+    // Body-error detection: a silent error from any kernel in the body
+    // would produce a broken graph.  Check BEFORE EndCapture so the
+    // error is reported here, not as a mysterious replay failure.
+    {
+        cudaError_t body_err = cudaGetLastError();
+        if (body_err != cudaSuccess) {
+            // Must still end capture to leave the stream in a valid state
+            cudaGraph_t discard = nullptr;
+            cudaStreamEndCapture(stream_, &discard);
+            if (discard) cudaGraphDestroy(discard);
+            err = std::string("body error during capture: ") + cudaGetErrorString(body_err);
+            return false;
+        }
+    }
 
     if (!cg.end(stream_, err)) return false;
 
