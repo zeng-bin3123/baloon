@@ -3,8 +3,6 @@
 #include "strata/core/expert_source.hpp"
 #include "strata/core/expert_cache.hpp"
 #include "strata/core/pinned.hpp"
-#include "strata/artifact/gguf_reader.hpp"
-
 #include <algorithm>
 #include <atomic>
 #include <cerrno>
@@ -549,12 +547,15 @@ void expert_hit_run(void* user, void* stream, HitPhase phase,
 
 // ─── Expert Arena Loader (GGUF-to-arena) ─────────────────────────────
 //
-// Loads expert weight data from a GGUF file into a pre-allocated arena.
-// Each layer has three tensor regions (gate, up, down) with E experts
-// stored contiguously per region. The loader reads in chunks of 16 experts
-// and scatters each expert's slice to its position in the blob layout.
+// Loads expert weight data from a binary file into a pre-allocated arena.
+// Each layer has n_expert blobs of BLOB_BYTES laid out contiguously in
+// layer-major order: blob(l, e) at offset (l * n_expert + e) * BLOB_BYTES.
+//
+// The loader reads in chunks of 16 experts and scatters each expert's
+// slice to its position in the blob layout.
 //
 // Multithreaded: each thread claims layers atomically via fetch_add.
+// Each thread opens its own file handle for portable parallel pread.
 
 struct ArenaLoadStats {
     uint64_t layers_loaded = 0;
@@ -563,7 +564,7 @@ struct ArenaLoadStats {
     bool ok = true;
 };
 
-ArenaLoadStats load_experts_gguf(const std::string& gguf_path,
+ArenaLoadStats load_experts_gguf(const std::string& experts_path,
                                  uint8_t* dst,
                                  int64_t n_layers,
                                  int64_t n_expert,
@@ -574,82 +575,63 @@ ArenaLoadStats load_experts_gguf(const std::string& gguf_path,
     auto t0 = std::chrono::steady_clock::now();
     std::atomic<int64_t> next_layer{0};
     std::atomic<bool> failed{false};
+    std::atomic<uint64_t> total_bytes{0};
 
-    // Each expert blob is laid out: gate_codes|gate_scales|up_codes|up_scales|down_codes|down_scales
-    // Total BLOB_BYTES per expert per layer
+    static constexpr int CHUNK_EXPERTS = 16;
 
     auto worker = [&]() {
-        artifact::GgufReader reader(gguf_path);
-        if (!reader.ok()) {
+        std::ifstream ifs(experts_path, std::ios::binary);
+        if (!ifs) {
             failed = true;
             return;
         }
+
+        // Buffer for one chunk of experts (CHUNK_EXPERTS * BLOB_BYTES)
+        const size_t chunk_bytes = static_cast<size_t>(CHUNK_EXPERTS) * BLOB_BYTES;
+        std::vector<uint8_t> buf(chunk_bytes);
 
         for (;;) {
             const int64_t layer = next_layer.fetch_add(1);
             if (layer >= n_layers || failed.load()) break;
 
-            // Read each expert's blob for this layer from the GGUF tensor data
-            // The tensors are named like "blk.{layer}.ffn_gate_exps.weight" etc.
-            // containing n_expert concatenated expert slices
-            const std::string prefix = "blk." + std::to_string(layer) + ".";
+            // Read all experts for this layer in chunks of CHUNK_EXPERTS
+            for (int64_t e0 = 0; e0 < n_expert; e0 += CHUNK_EXPERTS) {
+                const int64_t chunk_count = std::min(static_cast<int64_t>(CHUNK_EXPERTS),
+                                                     n_expert - e0);
+                const size_t read_bytes = static_cast<size_t>(chunk_count) * BLOB_BYTES;
 
-            static const char* region_names[] = {
-                "ffn_gate_exps.weight",
-                "ffn_up_exps.weight",
-                "ffn_down_exps.weight"
-            };
+                // Seek to the right position in the file
+                const uint64_t file_off = static_cast<uint64_t>(layer * n_expert + e0) * BLOB_BYTES;
+                ifs.seekg(static_cast<std::streamoff>(file_off));
+                if (!ifs) { failed = true; return; }
 
-            for (int r = 0; r < 3; ++r) {
-                std::string tname = prefix + region_names[r];
-                const artifact::GgufTensor* t = reader.find(tname);
-                if (!t) {
-                    // Tensor not found — try alternate naming
-                    continue;
+                ifs.read(reinterpret_cast<char*>(buf.data()),
+                         static_cast<std::streamsize>(read_bytes));
+                if (!ifs) { failed = true; return; }
+
+                // Scatter each expert's blob to its destination position
+                for (int64_t ei = 0; ei < chunk_count; ++ei) {
+                    const size_t dst_off = static_cast<size_t>(layer * n_expert + e0 + ei) * BLOB_BYTES;
+                    const size_t src_off = static_cast<size_t>(ei) * BLOB_BYTES;
+                    std::memcpy(dst + dst_off, buf.data() + src_off, BLOB_BYTES);
                 }
 
-                // Read full tensor and scatter to per-expert blob positions
-                uint64_t region_bytes = t->nbytes;
-                if (region_bytes == 0) continue;
-
-                uint64_t per_expert = region_bytes / static_cast<uint64_t>(n_expert);
-                if (per_expert == 0) continue;
-
-                std::vector<uint8_t> buf(static_cast<size_t>(region_bytes));
-                if (!reader.read_tensor(tname, buf.data(), region_bytes)) {
-                    failed = true;
-                    return;
-                }
-
-                // Scatter: for each expert, copy its slice to the blob layout position
-                // Blob offset for (layer, expert) = (layer * n_expert + expert) * BLOB_BYTES
-                // Within the blob, region r occupies a fixed offset
-                for (int64_t e = 0; e < n_expert; ++e) {
-                    size_t blob_base = static_cast<size_t>(layer * n_expert + e) * BLOB_BYTES;
-                    // Region offset within a blob (approximate: depends on actual layout)
-                    size_t region_off = static_cast<size_t>(r) * (BLOB_BYTES / 3);
-                    size_t src_off = static_cast<size_t>(e) * static_cast<size_t>(per_expert);
-
-                    std::memcpy(dst + blob_base + region_off,
-                                buf.data() + src_off,
-                                static_cast<size_t>(per_expert));
-
-                    stats.bytes_loaded += per_expert;
-                }
+                total_bytes.fetch_add(read_bytes);
             }
         }
     };
 
-    // Launch threads
+    // Launch threads (main thread also participates)
     std::vector<std::thread> threads_vec;
     for (int i = 1; i < n_threads; ++i) {
         threads_vec.emplace_back(worker);
     }
-    worker();  // main thread also works
+    worker();
 
     for (auto& t : threads_vec) t.join();
 
     stats.ok = !failed.load();
+    stats.bytes_loaded = total_bytes.load();
     stats.seconds = std::chrono::duration<double>(
         std::chrono::steady_clock::now() - t0).count();
 
