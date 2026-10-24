@@ -38,16 +38,18 @@ bool read_expert_profile(const std::string& path, int64_t n_layers, int64_t n_ex
         return false;
     }
 
-    // Header: magic, version, n_layers, n_expert, slots, n_ranked
+    // STRP binary profile format (24 bytes header):
+    //   magic[4] = "STRP", version:u32, nl:u32, ne:u32, want:u32, n_ranked:u32
+    // Body: n_ranked × (layer:u16, expert:u16)
     uint32_t magic = 0;
-    int32_t version = 0;
-    int32_t hdr_layers = 0, hdr_expert = 0, hdr_slots = 0, hdr_ranked = 0;
+    uint32_t version = 0;
+    uint32_t hdr_nl = 0, hdr_ne = 0, hdr_want = 0, hdr_ranked = 0;
 
     bool ok = read_exact(fd, &magic, 4) &&
               read_exact(fd, &version, 4) &&
-              read_exact(fd, &hdr_layers, 4) &&
-              read_exact(fd, &hdr_expert, 4) &&
-              read_exact(fd, &hdr_slots, 4) &&
+              read_exact(fd, &hdr_nl, 4) &&
+              read_exact(fd, &hdr_ne, 4) &&
+              read_exact(fd, &hdr_want, 4) &&
               read_exact(fd, &hdr_ranked, 4);
 
     if (!ok) {
@@ -60,29 +62,35 @@ bool read_expert_profile(const std::string& path, int64_t n_layers, int64_t n_ex
         ::close(fd);
         return false;
     }
-    if (hdr_layers <= 0 || hdr_expert <= 0 || hdr_ranked < 0) {
-        err = "invalid profile dimensions";
+    // Profile must match model dimensions
+    if (static_cast<int64_t>(hdr_nl) != n_layers ||
+        static_cast<int64_t>(hdr_ne) != n_expert) {
+        err = "profile dimensions mismatch: profile has (" +
+              std::to_string(hdr_nl) + "," + std::to_string(hdr_ne) +
+              ") but model has (" + std::to_string(n_layers) + "," +
+              std::to_string(n_expert) + ")";
         ::close(fd);
         return false;
     }
 
-    slots = hdr_slots;
+    slots = static_cast<int64_t>(hdr_want);
 
+    // Body: n_ranked entries, each a (layer:uint16, expert:uint16) pair
     ranked.resize(static_cast<size_t>(hdr_ranked));
-    for (int32_t i = 0; i < hdr_ranked; ++i) {
-        int32_t l = 0, e = 0;
-        if (!read_exact(fd, &l, 4) || !read_exact(fd, &e, 4)) {
+    for (uint32_t i = 0; i < hdr_ranked; ++i) {
+        uint16_t l = 0, e = 0;
+        if (!read_exact(fd, &l, 2) || !read_exact(fd, &e, 2)) {
             err = "profile truncated at entry " + std::to_string(i);
             ::close(fd);
             return false;
         }
-        if (l < 0 || l >= n_layers || e < 0 || e >= n_expert) {
+        if (l >= static_cast<uint16_t>(n_layers) || e >= static_cast<uint16_t>(n_expert)) {
             err = "profile entry out of range: (" + std::to_string(l) +
                   ", " + std::to_string(e) + ")";
             ::close(fd);
             return false;
         }
-        ranked[i] = {l, e};
+        ranked[i] = {static_cast<int32_t>(l), static_cast<int32_t>(e)};
     }
 
     ::close(fd);
@@ -323,7 +331,14 @@ bool ExpertCache::fill_slot(int32_t slot, const uint8_t* host_blob,
         return false;
     }
 
-    int64_t nbytes = bytes > 0 ? bytes : blob_;
+    int64_t nbytes = bytes;
+    if (nbytes <= 0) {
+        if (blob_ > 0) {
+            nbytes = blob_;
+        } else if (!off_.empty() && static_cast<size_t>(slot + 1) < off_.size()) {
+            nbytes = static_cast<int64_t>(off_[slot + 1] - off_[slot]);
+        }
+    }
     if (nbytes <= 0) {
         err = "fill_slot: zero byte count";
         return false;
@@ -349,7 +364,14 @@ bool ExpertCache::fill_slot_blocking(int32_t slot, const uint8_t* host_blob,
         return false;
     }
 
-    int64_t nbytes = bytes > 0 ? bytes : blob_;
+    int64_t nbytes = bytes;
+    if (nbytes <= 0) {
+        if (blob_ > 0) {
+            nbytes = blob_;
+        } else if (!off_.empty() && static_cast<size_t>(slot + 1) < off_.size()) {
+            nbytes = static_cast<int64_t>(off_[slot + 1] - off_[slot]);
+        }
+    }
     if (nbytes <= 0) {
         err = "fill_slot_blocking: zero byte count";
         return false;
@@ -374,7 +396,15 @@ bool ExpertCache::verify_slot(int32_t slot, const uint8_t* host_blob,
         return false;
     }
 
-    int64_t nbytes = bytes > 0 ? bytes : blob_;
+    int64_t nbytes = bytes;
+    if (nbytes <= 0) {
+        // Use blob_ (uniform mode) or offset table (sized mode)
+        if (blob_ > 0) {
+            nbytes = blob_;
+        } else if (!off_.empty() && static_cast<size_t>(slot + 1) < off_.size()) {
+            nbytes = static_cast<int64_t>(off_[slot + 1] - off_[slot]);
+        }
+    }
     if (nbytes <= 0) {
         err = "verify_slot: zero byte count";
         return false;

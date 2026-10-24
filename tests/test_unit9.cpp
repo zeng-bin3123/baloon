@@ -159,7 +159,59 @@ int main() {
         const uint8_t* d1 = cache.device_slot(1);
         CHECK(d1 - d0 == 256, "slot 1 offset from slot 0 is 256");
 
+        // Sized-mode fill and verify (bytes=0 auto-detects from offset table)
+        int32_t s = cache.admit(0, 0);
+        CHECK(s >= 0, "sized admit succeeds");
+        std::vector<uint8_t> blob256(256, 0xDD);
+        ok = cache.fill_slot_blocking(s, blob256.data(), err);
+        CHECK(ok, "sized fill_slot_blocking succeeds");
+        ok = cache.verify_slot(s, blob256.data(), err);
+        CHECK(ok, "sized verify_slot matches");
+
         cache.close();
+    }
+
+    // ──── ExpertCache: read_expert_profile with STRP binary ──────
+    {
+        // Write a minimal STRP profile to a temp file
+        // Header: magic='STRP', version=1, nl=2, ne=4, want=3, n_ranked=2
+        // Body: 2 entries, each (layer:u16, expert:u16)
+        const char* tmpfile = "/tmp/test_profile.strp";
+        FILE* fp = fopen(tmpfile, "wb");
+        CHECK(fp != nullptr, "profile tmpfile opens");
+        if (fp) {
+            uint32_t magic = 0x50525453;  // 'STRP' little-endian
+            uint32_t version = 1, nl = 2, ne = 4, want = 3, n_ranked = 2;
+            fwrite(&magic, 4, 1, fp);
+            fwrite(&version, 4, 1, fp);
+            fwrite(&nl, 4, 1, fp);
+            fwrite(&ne, 4, 1, fp);
+            fwrite(&want, 4, 1, fp);
+            fwrite(&n_ranked, 4, 1, fp);
+            // Body: (layer:u16, expert:u16) pairs
+            uint16_t e0_l = 0, e0_e = 2;
+            uint16_t e1_l = 1, e1_e = 3;
+            fwrite(&e0_l, 2, 1, fp);
+            fwrite(&e0_e, 2, 1, fp);
+            fwrite(&e1_l, 2, 1, fp);
+            fwrite(&e1_e, 2, 1, fp);
+            fclose(fp);
+
+            std::vector<std::pair<int32_t, int32_t>> ranked;
+            int64_t slots = 0;
+            std::string err;
+            bool ok = strata::read_expert_profile(tmpfile, 2, 4, ranked, slots, err);
+            CHECK(ok, "read_expert_profile succeeds");
+            CHECK(slots == 3, "profile slots == 3 (want field)");
+            CHECK(ranked.size() == 2, "profile has 2 ranked entries");
+            if (ranked.size() >= 2) {
+                CHECK(ranked[0].first == 0 && ranked[0].second == 2,
+                      "profile entry 0 = (0,2)");
+                CHECK(ranked[1].first == 1 && ranked[1].second == 3,
+                      "profile entry 1 = (1,3)");
+            }
+            remove(tmpfile);
+        }
     }
 
     // ──── ExpertCache: invalid params ────────────────────────────
