@@ -1560,3 +1560,298 @@ All host-side dispatch functions follow the same pattern: validate geometry and 
 ---
 
 *End of Chunk 10 theory — 8 files covered.*
+
+---
+
+## MODULE: grouped_moe_expert_s2 — ADDENDUM (truncated functions from full 785-line file)
+
+The assignment showed 541 of 785 lines. The remaining ~244 lines contain the grouped-execution path (Plan v0.3 P6) and the CPU-order parity variant. Theory for these follows.
+
+---
+
+### `chunk_dot` (device inline helper)
+
+**[LAYER 1a — MATH (LaTeX)]**
+
+A single activation chunk's Q2_0 × Q8_0 contribution, factored out of `row_dot_s2_q8`:
+
+$$
+\text{chunk\_dot}(\mathbf{cb}, \mathbf{xw}, d_w, d_x) = d_w \cdot d_x \cdot \left(\sum_{j=0}^{7} \text{dp4a}(\text{expand}(\text{cb}_j), \mathbf{xw}_j, 0) - \sum_{j=0}^{7} \text{dp4a}(\mathbf{1}, \mathbf{xw}_j, 0)\right)
+$$
+
+where $\text{expand}$ extracts four 2-bit codes from each byte into a packed int32, and $\mathbf{1} = \text{0x01010101}$. Same `dp4a` sequence as `row_dot_s2_q8` so result is bitwise identical.
+
+**[LAYER 1b — VERIFY (Lean 4)]**
+
+```lean
+-- axle_verify: formal_statement
+theorem chunk_dot_eq_row_dot_one_chunk (cb : UInt64) (xw : Fin 8 → Int32) (dw dx : Float) :
+    chunk_dot cb xw dw dx = dw * dx * (dp4a_sum cb xw - ones_sum xw) := by sorry
+-- proof_needed: dp4a expansion identity
+```
+
+**[LAYER 2 — FORM TEMPLATE]**
+
+```cuda
+__device__ __forceinline__ float chunk_dot(uint2 cb, const int* xw, float dw, float dx) {
+    const uint8_t* cbytes = (const uint8_t*) &cb;
+    int s = 0, hx = 0;
+    const int ones = 0x01010101;
+#pragma unroll
+    for (int j = 0; j < 8; ++j) {
+        const unsigned cbyte = cbytes[j];
+        const int cw = (int) ((cbyte & 3u) | (((cbyte >> 2) & 3u) << 8) |
+                              (((cbyte >> 4) & 3u) << 16) | (((cbyte >> 6) & 3u) << 24));
+        s = __dp4a(cw, xw[j], s);
+        hx = __dp4a(ones, xw[j], hx);
+    }
+    return dw * dx * (float) (s - hx);
+}
+```
+
+---
+
+### `gu_grouped_kernel` / `down_grouped_kernel` (grouped projection)
+
+**[LAYER 1a — MATH (LaTeX)]**
+
+Plan v0.3 P6: experts grouped so each blob row is read ONCE for all entries routed to that expert. For group $g$ with entries $[e_0, e_0 + n_e)$ (up to GMAX=8 entries):
+
+**Phase 1 — Stage activations:** For each entry $k$, load its token's Q8_0 activation into shared memory as aligned int32 words $\text{xs\_q}[k]$ and fp32 scales $\text{xs\_d}[k]$.
+
+**Phase 2 — Row-wise dot:** For gate/up row $i$ (GU\_ROWS=32 rows per block), read weight codes and scales once, then for each entry $k$:
+
+$$
+\text{val}_{k,i} = \text{warp\_sum}\!\left(\sum_{q=0}^{\text{GU\_CHUNKS}-1} \text{chunk\_dot}(\text{cb}[q], \text{xs\_q}[k][\cdot], d_w[q], \text{xs\_d}[k][\cdot])\right)
+$$
+
+Output in gate-major layout as per `gu_kernel`. Down variant (`down_grouped_kernel`) is identical with D\_ROWS=64, reading from quantized intermediate.
+
+**Key invariant:** Per-entry result is bitwise identical to the per-entry kernel because `chunk_dot` is the same expression, applied to the same bytes, in the same lane order.
+
+**[LAYER 1b — VERIFY (Lean 4)]**
+
+```lean
+-- axle_verify: formal_statement
+theorem grouped_bitwise_per_entry (blob : ByteArray) (entries : Fin GMAX → Activation)
+    (row : Nat) (k : Fin GMAX) :
+    grouped_kernel_output blob entries row k = per_entry_kernel_output blob (entries k) row := by sorry
+-- proof_needed: requires showing shared-memory staging preserves exact bytes
+```
+
+**[LAYER 2 — FORM TEMPLATE]**
+
+```cuda
+__global__ void __launch_bounds__(256) gu_grouped_kernel(const unsigned long long* __restrict__ grp_ptr,
+                                                         const int32_t* __restrict__ grp_start,
+                                                         const int32_t* __restrict__ n_groups,
+                                                         const int32_t* __restrict__ ent_tok,
+                                                         const uint8_t* __restrict__ x_q8_0,
+                                                         const float* __restrict__ x_scales,
+                                                         float* __restrict__ gate_up, int cap_entries) {
+    __shared__ int xs_q[GMAX][H / 4];
+    __shared__ float xs_d[GMAX][H / 32];
+    const int g = blockIdx.y;
+    if (g >= *n_groups) return;
+    const int e0 = grp_start[g], ne = min(grp_start[g + 1] - e0, GMAX);
+    // ... stage activations into shared, then per-row: load codes once, dot with each entry ...
+}
+```
+
+---
+
+### `group_resident_kernel` (device-side group building)
+
+**[LAYER 1a — MATH (LaTeX)]**
+
+For $n \le 128$ routed expert IDs where every expert is resident at $\text{base} + e \cdot \text{blob\_bytes}$:
+
+**Step 1:** Each thread $i$ finds its expert's first occurrence $f_i$ and rank within that group.
+
+**Step 2:** Thread 0 serial pass assigns group indices in first-appearance order, fills `grp_ptr[g]` with the blob address and `grp_start[g]` with the cumulative entry offset.
+
+**Step 3:** Each thread writes `ent_dst[pos] = i` and `ent_tok[pos] = i / k\_\text{per\_tok}` at its computed position.
+
+$$
+\text{groups}: \; g_0, g_1, \ldots \text{ in first-appearance order of expert IDs}
+$$
+$$
+\text{entries within each group}: \text{ in routing order (ascending } i \text{)}
+$$
+
+**[LAYER 1b — VERIFY (Lean 4)]**
+
+```lean
+-- axle_verify: formal_statement
+theorem group_entries_partition (ids : Fin n → Nat) (groups : List (List (Fin n))) :
+    (∀ g ∈ groups, ∀ i ∈ g, ∀ j ∈ g, ids i = ids j) →
+    groups.join.toFinset = Finset.univ →
+    True := by sorry
+-- proof_needed: partition correctness
+```
+
+**[LAYER 2 — FORM TEMPLATE]**
+
+```cuda
+__global__ void group_resident_kernel(const int32_t* __restrict__ ids, int n, int k_per_tok,
+                                      const uint8_t* base, long long blob,
+                                      unsigned long long* __restrict__ grp_ptr,
+                                      int32_t* __restrict__ grp_start, int32_t* __restrict__ counts,
+                                      int32_t* __restrict__ ent_dst, int32_t* __restrict__ ent_tok) {
+    __shared__ int e_s[128], first_s[128], size_s[128], gidx_s[128], gstart_s[129];
+    const int i = threadIdx.x;
+    const int e = i < n ? ids[i] : -1;
+    e_s[i] = e;
+    __syncthreads();
+    // ... find first occurrence, rank, then thread 0 assigns groups ...
+}
+```
+
+---
+
+### `row_dot_cpu_order` (CPU-order parity dot product)
+
+**[LAYER 1a — MATH (LaTeX)]**
+
+8 CUDA lanes reproduce the CPU's VNNI accumulator shape. Lane $L$ ($0 \le L < 8$) handles 4-element sub-chunks at offsets $L$ and $L+8$ within each 64-element weight block:
+
+$$
+\text{acc}_L = \sum_{b=0}^{\text{blocks}-1} d_w[b] \cdot \left(d_x[2b] \cdot \text{dot4}(\text{codes}[b \cdot 16 + L], \text{xq}[2b]) + d_x[2b+1] \cdot \text{dot4}(\text{codes}[b \cdot 16 + 8 + L], \text{xq}[2b+1])\right)
+$$
+
+$$
+\text{corr} = \sum_{b} d_w[b] \cdot (hx[2b] + hx[2b+1]) \quad (\text{lane 0 only})
+$$
+
+Reduction uses the CPU's `_mm_hadd_ps` order: shuffle-down by 4, then 1, then 2 (not the standard 4, 2, 1), with `__fadd_rn` to prevent FMA contraction.
+
+$$
+\text{result} = \text{reduce}(\text{acc}) - \text{corr}
+$$
+
+**[LAYER 1b — VERIFY (Lean 4)]**
+
+```lean
+-- axle_verify: formal_statement
+theorem hadd_order_matters (a b c d : Float) :
+    fadd_rn (fadd_rn a (shfl_down a 4)) (shfl_down (fadd_rn a (shfl_down a 4)) 1) ≠
+    fadd_rn (fadd_rn a (shfl_down a 4)) (shfl_down (fadd_rn a (shfl_down a 4)) 2) := by sorry
+-- proof_needed: floating-point non-associativity demonstration
+```
+
+**[LAYER 2 — FORM TEMPLATE]**
+
+```cuda
+__device__ __forceinline__ float row_dot_cpu_order(const uint8_t* codes, const uint8_t* scales,
+                                                   const uint8_t* xq, const float* xs,
+                                                   const float* hx, int blocks, int lane) {
+    float acc = 0.0f;
+    float corr = 0.0f;
+    for (int b = 0; b < blocks; ++b) {
+        const float d = f16_at(scales + 2 * b);
+        const int lo = dot4(codes + b * 16 + lane,
+                           (const int8_t*) (xq + (size_t) (2 * b) * 34 + 2) + lane * 4);
+        const int hi = dot4(codes + b * 16 + 8 + lane,
+                           (const int8_t*) (xq + (size_t) (2 * b + 1) * 34 + 2) + lane * 4);
+        acc = __fmaf_rn(__fmul_rn(d, xs[2 * b]), (float) lo, acc);
+        acc = __fmaf_rn(__fmul_rn(d, xs[2 * b + 1]), (float) hi, acc);
+        if (lane == 0)
+            corr = __fadd_rn(corr, __fmul_rn(d, __fadd_rn(hx[2 * b], hx[2 * b + 1])));
+    }
+    constexpr unsigned mask = 0xffffffffu;
+    acc = __fadd_rn(acc, __shfl_down_sync(mask, acc, 4, 8));
+    acc = __fadd_rn(acc, __shfl_down_sync(mask, acc, 1, 8));
+    acc = __fadd_rn(acc, __shfl_down_sync(mask, acc, 2, 8));
+    return __fsub_rn(acc, corr);
+}
+```
+
+---
+
+### `moe_hit_add` / `add_hits_kernel`
+
+**[LAYER 1a — MATH (LaTeX)]**
+
+$$
+\text{parts}[\text{dst}[h] \cdot n_e + i] \mathrel{+}= \text{hit\_out}[\text{dst}[h] \cdot n_e + i], \quad \forall h < \text{count}, \; i \in [0, n_e)
+$$
+
+Adds each hit's output row into the shared parts buffer at the router's destination slot.
+
+**[LAYER 1b — VERIFY (Lean 4)]**
+
+```lean
+-- axle_verify: formal_statement
+theorem add_hits_idempotent_on_zero (parts hit_out : Array Float) (dst : Nat) (n : Nat)
+    (h : ∀ i < n, hit_out[dst * n + i]! = 0) :
+    ∀ i < n, add_hit parts hit_out dst n i = parts[dst * n + i]! := by sorry
+-- proof_needed: zero addition identity
+```
+
+**[LAYER 2 — FORM TEMPLATE]**
+
+```cuda
+__global__ void add_hits_kernel(float* __restrict__ parts, const float* __restrict__ hit_out,
+                                const int32_t* __restrict__ dst, const int32_t* __restrict__ count, int n_embd) {
+    const int h = blockIdx.y;
+    if (h >= *count) return;
+    const size_t row = (size_t) dst[h] * (size_t) n_embd;
+    for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < n_embd; i += gridDim.x * blockDim.x)
+        parts[row + i] += hit_out[row + i];
+}
+```
+
+---
+
+### `cpu_order_projection_kernel<DOWN>` / `cpu_order_swiglu_kernel` / `cpu_order_quantize_kernel`
+
+**[LAYER 1a — MATH (LaTeX)]**
+
+**`cpu_order_projection_kernel<false>`** (gate/up): 8 lanes per row via `row_dot_cpu_order`, same gate-major output layout.
+
+**`cpu_order_projection_kernel<true>`** (down): 8 lanes per row, writes to `out[dst[h] * H + r]`.
+
+**`cpu_order_swiglu_kernel`**: $g_i \leftarrow g_i / (1 + \exp_f(-g_i)) \cdot u_i$ using accurate `expf` (not `__expf`), with `__fmul_rn` and `__fdiv_rn` to prevent contraction.
+
+**`cpu_order_quantize_kernel`**: Same contract as `quantize_q8_0_scaled_kernel` but uses `__fdiv_rn`, `__fmul_rn`, `__fadd_rn` throughout and also computes `hx[c] = s * sum(q)` for the correction term `row_dot_cpu_order` reads.
+
+**[LAYER 1b — VERIFY (Lean 4)]**
+
+```lean
+-- axle_verify: formal_statement
+theorem cpu_order_silu_accurate (g : Float) :
+    let eg := Float.exp (-g)
+    fdiv_rn g (fadd_rn 1.0 eg) = silu_accurate g := by sorry
+-- proof_needed: definition unfolding with rn-mode arithmetic
+```
+
+**[LAYER 2 — FORM TEMPLATE]**
+
+```cuda
+template <bool DOWN>
+__global__ void cpu_order_projection_kernel(const uint8_t* blob_base, const int32_t* slots,
+                                              const int32_t* destinations, long long blob_bytes,
+                                              const uint8_t* xq, const float* xs, const float* hx,
+                                              float* out, int n_hits) {
+    constexpr int rows_per_hit = DOWN ? H : 2 * FF;
+    const int row = blockIdx.x * (blockDim.x / 8) + threadIdx.x / 8;
+    if (row >= n_hits * rows_per_hit) return;
+    const int h = row / rows_per_hit, r = row % rows_per_hit, lane = threadIdx.x & 7;
+    // ... row_dot_cpu_order with blob codes/scales ...
+}
+
+__global__ void cpu_order_swiglu_kernel(float* gu, int pairs) {
+    const int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= pairs) return;
+    const float g = gu[i];
+    const float eg = expf(-g);
+    gu[i] = __fmul_rn(__fdiv_rn(g, __fadd_rn(1.0f, eg)), gu[pairs + i]);
+}
+
+__global__ void cpu_order_quantize_kernel(const float* x, uint8_t* blocks, float* scales,
+                                           float* hx, int chunks) {
+    const int c = blockIdx.x * blockDim.x + threadIdx.x;
+    if (c >= chunks) return;
+    // ... quantize with __fdiv_rn/__fmul_rn/__fadd_rn, compute hx[c] = s * sum(q) ...
+}
+```
