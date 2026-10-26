@@ -1613,7 +1613,7 @@ bool read_at(std::FILE* argfile, uint64_t argoff, void* argdst, size_t argn, std
 
 ---
 
-### Enum: `Conv` (weight conversion modes)
+### Function: `Conv` enum (weight conversion modes)
 
 **[LAYER 1a — MATH (LaTeX)]**
 
@@ -1972,7 +1972,7 @@ void token_graph_free(typenameTokenGraph& argtg) {
 
 ## MODULE: weight_table_loader (continued — conversion pipeline detail)
 
-### Conversion pipeline (inner loop of `WeightTable::load`)
+### Function: `weight_conversion_pipeline` (inner loop of WeightTable::load)
 
 **[LAYER 1a — MATH (LaTeX)]**
 
