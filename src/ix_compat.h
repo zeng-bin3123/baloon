@@ -6,6 +6,8 @@
 #endif
 
 #include <cstdint>
+#include <cstring>   // memcpy (ix_bf16_to_f32)
+#include <cmath>     // fmaxf, exp
 
 #define IX_WARP_SIZE 64
 
