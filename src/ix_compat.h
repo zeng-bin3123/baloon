@@ -45,6 +45,26 @@ __device__ __forceinline__ double ix_warp_sum_d(double v) {
     return __shfl(v, 0, 64);
 }
 
+// ========== Half-wave (32-lane) helpers ==========
+// Strata's CUDA kernels written for 32-lane warps (fused_gr.cu: lane=t&31, warp=t>>5, xor tree o=16..1) stay correct on
+// wave64 ONLY if every shuffle is confined to the aligned 32-lane half. Always pass width=32 explicitly: an xor offset <32
+// never leaves the half by itself, but an ABSOLUTE source lane (__shfl(v, src)) with the default width would read the lower
+// half from the upper one. See FUSED_GR_WAVE64_AUDIT.md.
+#define ix_shfl_xor32(v, off)     __shfl_xor(v, off, 32)
+#define ix_shfl32(v, lane)        __shfl(v, lane, 32)
+template<typename T>
+__device__ __forceinline__ T ix_halfwave_reduce_sum(T v) {
+    #pragma unroll
+    for (int off = 16; off > 0; off >>= 1) v += __shfl_xor(v, off, 32);
+    return v;
+}
+template<typename T>
+__device__ __forceinline__ T ix_halfwave_reduce_max(T v) {
+    #pragma unroll
+    for (int off = 16; off > 0; off >>= 1) v = fmaxf(v, __shfl_xor(v, off, 32));
+    return v;
+}
+
 // ========== Threadfence — NEVER use __threadfence_system() ==========
 #define ix_threadfence()          __threadfence()
 
