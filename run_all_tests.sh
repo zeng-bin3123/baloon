@@ -8,7 +8,7 @@ LOG=phase1_results_$(date +%Y%m%d_%H%M%S).log
   ls -l /usr/local/corex/bin/clang++ 2>&1
   /usr/local/corex/bin/clang++ --version 2>&1 | head -2
   ixsmi 2>&1 | head -20
-  for s in build_probe.sh build_probe_halfwave.sh build_shared_expert_test.sh build_moe_combine_test.sh build_bf16_gemv_test.sh build_gdn_test.sh build_router_test.sh build_router_debug.sh; do
+  for s in build_probe.sh build_probe_halfwave.sh build_shared_expert_test.sh build_mmvq_wave_test.sh build_moe_combine_test.sh build_bf16_gemv_test.sh build_gdn_test.sh build_router_test.sh build_router_debug.sh; do
     echo; echo "================ $s"; [ -x "./$s" ] || { echo "MISSING $s (git pull?)"; continue; }
     ./$s 2>&1 | tail -60; echo "exit=${PIPESTATUS[0]}"
   done
