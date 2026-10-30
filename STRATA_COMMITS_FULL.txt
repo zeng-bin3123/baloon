@@ -1,3 +1,73 @@
+870aedd9e1ebe1c91f94da93b59af17729f6c5c0|2026-10-29|Niko1221|[Engine] SYCL: the prompt attention batch is budgeted where it is allocated, and stays 32 by default
+36f6663c25e60abdfc626abe48e0e8fa3a9fe762|2026-10-29|Niko1221|Version 0.2.8: Terminal and app 0.2.8, engine and Control 0.1.54 (every Qwen and DeepSeek package, Metal and SYCL included)
+1bf946eafa1a251a10a7599f0012d9e4863b46b9|2026-10-29|Niko1221|Merge f-028-monitor: the Monitor keeps the app's own GPU readings where the engine has none (AMD on Windows), reads Windows AMD temperature, and drops non-GPU display chips on Linux (#3727)
+5e8f47cfff4b5916de726ce03fd94800ed51040a|2026-10-29|Niko1221|Monitor: AMD cards keep their readings while an engine runs, Windows AMD temperature, no remote-console chip as a GPU (#3727)
+18200cffafd0223cebe246ce0733d50041717c4a|2026-10-29|Niko1221|Merge f-028-arcb65-pipe: pipelined B-series (two Battlemage stages) is the default
+cf059188ca44888e4cfebbb24ee0ca86cc439ede|2026-10-29|Niko1221|Merge f-028-arcb65: SYCL lane-cell prompt attention for Battlemage only, and the Arc B-series work
+b119f40f089aeee402eaa3d31cb2f8ca7a4dcb01|2026-10-29|Niko1221|window_limits_test: setenv/unsetenv for MSVC (the Windows test build stopped on it)
+8d5be82566660abf44bdbc8f1f42817ebae6b7e9|2026-10-29|Niko1221|docs: two Arc B-series cards decode with the pipelined windows by default
+74e1f86442421466909ff440c2a0ca924c0fcc4e|2026-10-29|Niko1221|Setup and the launcher write --spec 2 for exactly two Arc B-series cards
+a6fd788567a9ad7669f4443c77836a896a20d393|2026-10-29|Niko1221|[Engine] SYCL: --pipeline-windows 2 is the default on exactly two Arc Battlemage cards
+32f0c44f0802bbccaf6c5d32b2fe3d8fb0889191|2026-10-29|Niko1221|Merge f-028-par
+93dd9b421dccdffdfd787af1d244ce0dd58e3403|2026-10-29|Niko1221|Merge f-028-macturns
+92a867be178d8b7ef6233f14d56db36841fc6eaf|2026-10-29|Niko1221|Merge f-arc-cpumsg
+a3d62982975a3398539867e3bdfbe86f154ae17b|2026-10-29|Niko1221|Merge f-pr4366
+b82d1d4567b5e31aeef244f00e77bea66255b8eb|2026-10-29|Niko1221|Merge f-028-tools-p1
+3b8dc8fa351e5b57650372772e1686ea1fa9f3b0|2026-10-29|Niko1221|Merge f-028-app-p1
+d76b50681a7b086f4a43e0a2b98a6d3a81bea10f|2026-10-29|Niko1221|Merge f-028-nerazim: DeepSeek stop ids (test_dsv41 stop-id assertion follows the fix; the arch_from_tokenizer cherry-pick is eng-p1's)
+77287f13ecaceb1f1974e690c83e94b37305b33a|2026-10-29|Niko1221|Merge f-028-eng-p1: engine P1 fixes
+95563ff292527c70b3e4e9c7685cf2de681bcd36|2026-10-29|Niko1221|Merge f-028-defaults2: route prior off by default, tool_call_recovery on
+5c8bcf43077d31002ed121d886c7843ad08a52c7|2026-10-29|Niko1221|docs: windows of 16 rows and the four-card AMD profile (BATCHING.md)
+4fdb563a347519939cb1178308c9c72a16478ddb|2026-10-29|Niko1221|Four-card AMD serving profile: 32 slots in 4 groups, split 13,26,39, chunk 2048 (setup and launcher)
+9d3c8c3664f130f3ea4dc79cab4574b493c3bdba|2026-10-29|Niko1221|Verify and batch windows of up to 16 rows: HIP builds default to 16, narrow builds unchanged
+061c54201016a94c6775689a9fb38ebd91689e09|2026-10-29|Niko1221|Metal DeepSeek: stop leaking Metal buffers and command buffers (16 -> 3 tok/s after a few requests)
+f2bf7a3ce3cc062567e4b433202696511eb18e92|2026-10-29|Niko1221|[Engine] SYCL: the lane-cell prompt attention default is for Battlemage (Xe2) cards only
+6124c35e39e65aa73740821eeeebbe4871a80ed3|2026-10-28|Niko1221|[Engine] SYCL: native_expert_bench reports microseconds, not milliseconds
+8475011ac1e37760bde91135ff23c3c6584d4c9e|2026-10-28|Niko1221|[Engine] SYCL: native_expert_bench refuses to time a launch that wrote nothing
+89253935db3262e8322a565062ed175e7dc15e60|2026-10-28|Niko1221|[Engine] SYCL: refuse a --mtp-q4 draft head when the Q6_K head is stored as planes
+e318f71e75a6019a9912edc8b639cec47c604b42|2026-10-28|Niko1221|[Engine] SYCL: copy the prompt path's grouping tables instead of reading them from mapped memory
+bf8d88b9dd717067c4c779471ecfbd33818d0e93|2026-10-28|Niko1221|[Engine] SYCL: a pipelined window never self-commits, so --pipeline-windows 2 is token-exact
+7356aa1404795b236a96b0e1768795d5f1e62874|2026-10-28|Niko1221|[Engine] SYCL: print the pipelined commit's count when a state dump is requested
+11d337537cea68983750372a109a829b31a2ab98|2026-10-28|Niko1221|[Engine] SYCL: the pipelined commit skips the graph for a one-token window
+478964ecaa780f4d6259906f62b074ad100ddd42|2026-10-28|Niko1221|[Engine] SYCL: a state dump for the pipelined windows, and the two defects it already shows
+09524eb479e0747844de0e6886ab2dc057ccf4dc|2026-10-28|Niko1221|[Engine] SYCL: the prompt attention's query batch is 128 by default
+949f77c0a80bc50669b4e1af5cee5f83fa5ebd16|2026-10-27|Niko1221|[Engine] SYCL: prompt attention takes the lane-cell score phase, +5% on a prompt read
+7e0f7199031d4179a895d38cf95b86d32c9d73c0|2026-10-27|Niko1221|[Engine] SYCL: a layer-split stage must be a GPU of the primary device's backend
+f7570e23e29b22c915b7fa930b83364fabb7c1e1|2026-10-27|Niko1221|[Engine] SYCL: make the prompt attention's query batch a switch, and measure it
+d56565ce39dbe034109d6cd5a2a88215df867660|2026-10-27|Niko1221|[Engine] SYCL: the grouped-expert bench reports a device-side launch failure instead of silently timing nothing
+da3df90eb871a7a19e1def77dfdf65f03d82e3fd|2026-10-27|Niko1221|[Engine] SYCL: build the grouped-expert bench, and port it to SYCL
+16ccaf61505dabe2a8757c9b3bba2a662a42071c|2026-10-27|Niko1221|[Engine] SYCL: the verifier's stage profile reads its stamps on its own stream
+11a72289d2b1e081c2bdfaec7b06d14422c72d45|2026-10-27|Niko1221|[Engine] SYCL: --pipeline-windows runs again (three DPCT migration defects)
+43f32b30462881c6f39d09b3316613e6e430464e|2026-10-29|Niko1221|Server: only a one-token end marker is a stop id; pieces of <|im_end|> no longer end a DeepSeek reply ("Nerazim" came out as "Neraz", #4576)
+3fcb2106d00d9b7d5fcb7ad4218c4a616b7732e5|2026-10-29|Niko1221|serve: tool_call_recovery is on by default; "tool_call_recovery": false is the off switch
+20a63cf0f0c9b0d028f0037eafe26d367db14383|2026-10-29|Niko1221|Residency-biased routing (STRATA_ROUTE_PRIOR) is off by default again on 12 GB NVIDIA cards (#4402)
+72a2b7705765a2774f1f9b91f18b06888135a953|2026-10-28|Niko1221|Server: a config that names no "arch" but ships DeepSeek's tokenizer is served as deepseek41 (#4137)
+cfa197e21a323ea552ac4d6a18f7fb19023d26ed|2026-10-29|Niko1221|Qwen: the automatic expert cache leaves the reserve it was asked to keep - the ~245 MiB the load allocates after it are priced (#4474)
+22fb183cf6de15d2b35f52080732d94edb341fde|2026-10-29|WenyuanXu|DeepSeek engine: a layer split's chunked prompt no longer deadlocks - the host waits for another group's flag before it queues the device-side wait (2x H100, IST-DAS-2.25bpw)
+01d6f7b995649240b87b5be38b5d0be26cb6fc8d|2026-10-29|Niko1221|serve: an engine left behind by an earlier run is waited for until it has given its memory back (#4051)
+07d5ecfacb4c90cfaf06ba23aa3f96733247c088|2026-10-29|Niko1221|engine: wait up to 20 s for the RAM the expert arena needs, then load with a plainer warning (#4051)
+b18292d702e8ee3b8705263c83951c514ac972b5|2026-10-28|Niko1221|Server: a config that names no "arch" but ships DeepSeek's tokenizer is served as deepseek41 (#4137)
+d71132738e615aef47ff22989673036bd04db63b|2026-10-28|Niko1221|serve: damaged tool-call arguments, a stray closing think tag and a missing </function> no longer cost the call (#4427 #4077)
+84c7f43358ac927d39c5233cfce0cb97de0d15de|2026-10-28|Niko1221|CUDA 12 driver floor: setup takes it from the engine package, not from a constant (#4247, #4188)
+012bea51f86f056f46ea09541a39402aa1e09000|2026-10-28|Niko1221|Packaged Terminal: setup.py without CMakeLists.txt, and strata install hands its options to setup (#4188)
+5596cb2c5bca70147ae6d66a0909664cc9aa8428|2026-10-28|Niko1221|launch: do not point at an engine log that was never written (#3714)
+587a47443328ee4a289b4dfad842d88a4b1453f3|2026-10-28|Niko1221|Qwen: the PLE residency policy gives its lock back when the lock is what leaves the automatic conversation cache too little RAM (#4518)
+35c0c9a8ae19f7f697dcd0eb92d2eb7001af45cc|2026-10-28|Niko1221|DeepSeek engine: slot_load() writes each tensor-parallel member's window ring and compressor group under its own device (#4350)
+c7a0cef13a7b22569369f5e423bafa34b746c19c|2026-10-28|Niko1221|Conversation cache: parking an idle --batch slot no longer drops the main session's copy with the shared-prefix checkpoint (#4420)
+ea73eab442589493cef140db1997587f7383618b|2026-10-28|Niko1221|DeepSeek engine: the auto RAM store no longer reads a discrete GPU's pinned buffers as unified memory (#4147)
+5ef90cb96b66f2c7241bf593b8593fe95ea4622b|2026-10-28|Niko1221|App host: DeepSeek launch arguments are built from what strata-dsv41 takes (#4358 #4359 #4505 #4507 #4504)
+3e1141edf06199a7bb5bf5251bde0954f96e1d3f|2026-10-28|Mike|GUI: ask for the longer wait only when all three of a Control's ceilings agree (#3459 #4191)
+293044e5611c2630caa5ff9572902bfead35dfb8|2026-10-28|Mike|control: the operation record takes a long start wait too, and the tests walk the whole CLI path (#3459 #4191)
+5af539691dce952aadbc8c5cff7f44ada878531f|2026-10-27|Mike|GUI: ask the installed Control for the start wait it actually takes, and let the CLI take the runtime's ceiling (#3459 #4191)
+0e72aff563dbdeb05ed19b533a5b71aef954af3b|2026-10-27|Mike|GUI: the start wait follows the model's size, as `strata launch` does, and never asks an older Control for more than it takes (#3459 #4191)
+b72f56e02ae5d4beea4d1e569a4015b0ca9c7af0|2026-10-28|Tsury|serve: only a whole quoted <function=NAME> opener keeps a parameter value open (#4078)
+77794e34003d4f56330521c9363618d4dbb55439|2026-10-25|Tsury|serve: a string argument that quotes a tool call or reopens its parameter stays exact (#4078)
+b5aa1d94e0dc2215f2cd29a9fcfaae7c3e377e1d|2026-10-26|Günter|Update test start: skip DeepSeek models when choosing the model to test with
+2f9c6fc35cdc4738a92cbd26e333fd7ea53246cf|2026-10-27|吴佳浩Alben|Fix #4209: a saved preset's lower-case model tag reaches setup as its key
+c3326979fccc20fcf35c28c85a89e482086e3686|2026-10-28|Niko1221|docs/INTEL_ARC.md: the CPU and model-folder paragraph in plain words
+7a80b3a96bf0dbb28d0548054c6cacef761d8022|2026-10-28|Niko1221|Say plainly why a CPU without AVX-512 stops the engine: the pack folder without native_experts.txt, not the CPU, is the cause; doctor warns before the start, the launcher gives the next step, the SYCL engine names the folder like the CUDA one does
+d52b73dc657333e855c914e63c363c3f2ced1a52|2026-10-28|Niko1221|DS4_FAT_ROWS follow-up to the port: launches through strata_ds4_launch (the Mac build), off on Metal, only for the types f16_rows decodes (no trellis, no Q5_K / Q6_K down: a request would have stopped on 'not decoded'), at least 17 rows (the light kernels own the small experts)
+0c5b157fbd9bdf036f7dba584e7f5fbdbcce76d1|2026-10-25|Lyes SBAHI|DeepSeek engine opt-in: the busy experts of a prompt take FP16 GEMMs, not the tiles (DS4_FAT_ROWS=N, default 0: byte-identical path, the packed tiles run exactly as before).  An expert of N rows or more has its weights decoded to FP16 once (iq::f16_rows, the values the tiles multiply), the rows gathered (gather_f16), cublasGemmEx, clamped SwiGLU in FP16 (swiglu_f16); SetArgs skip_ge leaves those experts out of the tiles.  The tiles decode an expert's weights again for every 64 of its rows; a popular expert of a long chunk has hundreds.  Measured on the RTX 5090 with the IST-DAS 2.25 bpw pack, v0.2.7 base, DS4_FAT_ROWS=64: a 13K-token prompt 1,400 -> 1,950 tok/s, a 5.4K prompt 1,065 -> 1,181, decode unchanged (28-33 short, 47-49 warm).  3x V100, Maya-XS: +6-8% on 8K and 32K prompts.  The same products, the sums' order differs: greedy output can diverge after the first rounding (wording equivalent); KL vs the reference 0.276, the stock path 0.285 (the same band, measured on Maya-XS; not yet re-measured on this base).
 46c152a1310f77cd2f0ce2c7cd213962df14fe83|2026-10-28|Niko1221|Merge f-0271-macds: the Mac signing kit signs and notarises the DeepSeek engine folder (--engine)
 78b99a6605915ea63ad1f18b89f6d9ccf7bf658c|2026-10-28|Niko1221|packaging/mac: sign-and-notarize.sh --engine signs and notarises the Mac DeepSeek engine folder (Developer ID, hardened runtime, manifest updated, signed folder tar)
 55a557bb6d77facc73d291c3f9894289496c770c|2026-10-28|Niko1221|Merge f-0271-macds: the Mac reads DeepSeek's Engram rows with two threads (identical words run to run); DEEPSEEK_MAC.md numbers from that build
@@ -54,77 +124,6 @@ f262b81b28974cfac1fd21e176d6fda2790efac5|2026-10-27|Niko1221|Engine for the DGX 
 756380301beb58ac0908fa5444a2d0c8d0bc1b33|2026-10-27|Niko1221|DeepSeek on Metal: compile fixes on the 0.2.7 tree (huge pages, wmma include, DeviceProp.integrated, iq256x stubs)
 314a6ecf69f42b2597611c8a2d40879db2eb4584|2026-10-27|Niko1221|metal: the host sources no longer list iq256_portable.cpp (portable.cpp answers for non-x86 hosts)
 8477811197d9b26ba78e8d0b58721c20e4ac347d|2026-10-27|Niko1221|Merge f-dsv41-mac (DeepSeek on Metal) into v0.2.7
-1b667c7abbe09618596f392fec70576e6c56ab4b|2026-10-25|Niko1221|WIP not-default: DS4_NO_WAIT_SPLIT (no commit at the routing wait; A/B unfinished) and DS4_PHASES (decode host phase timers)
-4acede655a4256741ec8ac78cb0f41b86591ba66|2026-10-25|Niko1221|DS4_PLACE_HASH: one hash of which experts hold a VRAM slot (the placement changes with the saved profile)
-1ece7efd5c24531474b854eba84fd89be89662bd|2026-10-25|Niko1221|metal: no command-buffer split after the fp8-rounding finishes (decode +22%: code 11.9 -> 14.6, agent 9.7 -> 12.0 tok/s); DS4_FINISH_SPLIT=1 restores it
-2a207dbfcca81dbd9763a0682f7effb06a74387d|2026-10-25|Niko1221|metal: sparse attention on simdgroup matrices is the default for 8-head groups (32K prompt 269 -> 293 tok/s, KL equal to the scalar kernel); DS4_ATTN_MX=0 for the old one
-b6dcb23ec609d6bb71e37d6db365592484e5c66f|2026-10-25|Niko1221|WIP metal: ds4_sparse_attn_mx (sparse attention on simdgroup matrices, DS4_ATTN_MX=1; =2 compares with the scalar kernel: rms rel 1.8e-6); timing and KL gate pending
-100a2374fbe2fbe35338e5c0ad0ec530fad471fa|2026-10-25|Niko1221|metal: Q5_K dequant four values a step (bit-identical); DS4_SKIP_K and the timeline's overlap count as debug tools
-8810e00c09f60dc921cf47fe75b2c793a18b82be|2026-10-25|Niko1221|metal: prompt hc_mix reads each token's row once for four mixes (bit-identical, +4.5% on the 3K prompt)
-050752f5b9a241899992f5c39917127cfcddb9e5|2026-10-25|Niko1221|DeepSeek Metal: head matvec back to 4 columns a pass (8 moved the KL by +0.002)
-97c091c5be7fc4c7a4fe5b6a7987d927e70b2f91|2026-10-25|Niko1221|DeepSeek Metal: prompt flow reads experts straight into the ring (unified memory: no staging, no DMA), head matvec 8 columns a pass
-6b2a530393d200b6cc3f92899518a4f75d14af87|2026-10-25|Niko1221|DeepSeek Metal: cached compute pipelines (the prompt path created one per expert copy), F_NOCACHE for the unbuffered expert reads, dispatch-seq log
-e527bfefc11417f42c2c90f5b58fe723fc0713b0|2026-10-25|Niko1221|DeepSeek Metal: GPU stale-router lookahead prefetch (opt-in DS4_LOOKAHEAD; measured slower), recall counters
-9e3fe0461cde6dfc4c99d50f5b6d113d20ad073c|2026-10-25|Niko1221|DeepSeek Metal: CPU-lane page prefetch in parallel across the call's matrices (the cold reads were 78% of the lane), CPU-lane phase log
-90359513e3b123584b205cf22e75fa2fa58eedde|2026-10-24|Niko1221|DeepSeek Metal: DS4_BUSY_ALL experiment (off), progress lines
-8d3c976166b949f6f67540309533942fbfa592d9|2026-10-24|Niko1221|DeepSeek Metal: keep the GPU busy (flag-released spin kernel) while the CPU lane runs: decode +25-35%
-dde3250cdb2af365ff988cc1d2bf71ca2b4ae4c6|2026-10-24|Niko1221|DeepSeek Metal: --dspark-depth, dispatch counts in the round times
-958774b4ceb6ab73e71ff3a8bf6a1bbab53b5ca3|2026-10-24|Niko1221|DeepSeek Metal: sampler statistics harness, round time breakdown
-f29ff5a59a10c0781fb16f7dfffdbf44821dff9d|2026-10-24|Niko1221|DeepSeek Metal: drafter bring-up (ring restore, host sampler for temperature and speculative sampling), per-dispatch GPU timeline
-34810a3bb3bfab593883da7b81b8252c80c74a28|2026-10-24|Niko1221|DeepSeek Metal: automatic VRAM-expert share from the anonymous-memory cap (explicit --vram-experts wins)
-5dce2f63e90407f322edf0823b89bd29152a594e|2026-10-24|Niko1221|DeepSeek Metal: batched q8 quantiser, zero-copy expert mapping (DS4_ZC), spin-wait, GPU-busy and timing switches
-c2675c60d11e41439914a1b4d0a24f85cfe246a3|2026-10-24|Niko1221|DeepSeek Metal: chunk path mixes through the fused hc_mix kernel
-700def65a2a41e6b502c18ea808dd4a4d0a57340|2026-10-24|Niko1221|DeepSeek Metal: chunked prompt path correct (sgemm on the one Context, KEEP dump syncs, debug switches); 2988-token prompt 251-277 tok/s vs 32 in windows
-58e5d7851e0e4dfb6aed0d0a7559ef05de2a5e1a|2026-10-24|Niko1221|DeepSeek Metal: chunked prompt path (MPP expert tile GEMMs, dense gemm/dq, rows_f16), NC-column matvecs, dangling buffer and null-arg offset fixes (WIP, chunk output not yet matching window path)
-7c77f388dd8fa474b0979fdf8708afcddb20ef6a|2026-10-24|Niko1221|metal: commit the queued GPU work before the CPU lane runs (they overlap)
-42a982e03323d81914f225865371f73f87ea5baa|2026-10-24|Niko1221|metal: copies and fills ride the context's command buffer, events mark it, buffers chained by a shared event, decode matvecs for IQ2_XS/IQ2_S/IQ3_XXS
-3e51b1c18a325e106a6e7b7650803b7568cae8eb|2026-10-24|Niko1221|metal: decode matvecs for Q5_K and IQ2_XXS (every lane busy, 16-byte loads), lane-parallel hc_split for hc 4, DS4_PROF per-kernel GPU table
-9dbb13ee89a17280343213be3e4e57bb1cd23de6|2026-10-24|Niko1221|metal: the IQ2_XXS matvec read its sub-blocks 4 bytes apart (8), IQ2_XS signs, IQ3_XXS matvec added; more dumps and checks
-860e384db78e3a6775c79a403c3bbd436fbbfccc|2026-10-24|Niko1221|metal: the ring backup flag, decode takes the host-routed path, split commits sync the streams first, sparse_attn sizes its binding without a host read of device data
-193529239cec95f828c38050e1fb2d10e1dfb88d|2026-10-24|Niko1221|metal: finish dst stride, BF16 ring pack, residency on the context queue, split the command buffer after fp8 finishes; ds4_launch.h makes the CUDA build work again; more DS4_DUMP_S points
-9f45341966bcc20c226bd7b7eeb3a50bcbb6360b|2026-10-24|Niko1221|metal: bind the allocation's own MTLBuffer instead of a no-copy alias per call (the alias read stale data), deferred frees, matvec jobs cut at 8 activations, Q8/quant debug checks
-da9cf6354fa27a630e59417721a1a4e30c611c0b|2026-10-24|Niko1221|ds4: DS4_DUMP_S sub-step dump inside the layers (same records on CUDA and Metal), DS4_FLUSH_EACH, per-layer debug prints
-0c34a7de3c2ddca490473795120cc6c1aff36e04|2026-10-24|Niko1221|metal: both queues drain at every sync, engram dequant wraps the strided extent, the ggml CPU lane is in strata_ds4
-97637e2a14d71b9e7ba9865822b99ef4e8f79ab7|2026-10-24|Niko1221|metal: init_pre no longer wraps a whole page to reach 32 bytes
-782a8381de353eeef1492cc4becb945f8496f230|2026-10-24|Niko1221|metal: probes that establish what is NOT wrong, and the honest state of the targets
-c763c12ac56c41131219db03c0c833dcd54ce506|2026-10-24|Niko1221|metal: the layer reads a different h buffer than embed fills - measured with addresses
-00e762677163cf1ca79619f6bf24555fa9b5ff69|2026-10-24|Niko1221|metal: embed verified correct at the kernel; the value is lost before layer 0
-ba9e818c42c638982153d109d5ef5b9d566a7e91|2026-10-24|Niko1221|metal: drafter path ported, token-boundary commits, and the embedding blocker measured end to end
-1a80ccc9813313f94ac7521abadf61c1750c8fc7|2026-10-24|Niko1221|metal: histogram off the hot path, dedupe and host_view experiments reverted, chunk sweep recorded
-0b2201ce441884de1f47913416e1d749ee4c3a81|2026-10-24|Niko1221|metal: the 20k flush cap was the 256+ prompt failure; 4K now runs at 171 tok/s, and the launch histogram names the decode cost
-c486f17251e54d81a048d96b31f07b8ac16e5172|2026-10-24|Niko1221|metal: sparse attention + prompt matvec columns + exact wrap extents - prefill measured at 556 tok/s
-611530d9929bf4ca040c9b518661762c9421c87d|2026-10-24|Niko1221|metal: dispatches BATCH into one command buffer - decode 0.16 -> 48.7 tok/s (300x)
-33bf441cd4dc403559f593d6d06402318f6e5ca4|2026-10-24|Niko1221|metal: THE ENGINE GENERATES TOKENS ON THE MAC - 17 more kernels, the whole path runs
-154c2990edb2a2c3c2a1f8fc9be1686e71ec5582|2026-10-23|Niko1221|metal: the routing trio ported ahead of its turn - moe_sort counts, bounds scan, fill
-4735e381ad10875a9219b83226bb2dbe5858c5fe|2026-10-23|Niko1221|metal: hc_split ported - the hyper-connection family is complete on the Mac
-7022bd25d8028a232f56510248c80316afa27682|2026-10-23|Niko1221|metal: the hyper-connection family on the Mac - hc_post, hc_mix_scale, hc_mix ported
-5d969adde95dbac29994c21dc8a05c3c101ec3bb|2026-10-23|Niko1221|metal: finish_kernel<false> wired - the engine passes it and names item five
-cb931e701082102e0be573d5107428633559effe|2026-10-23|Niko1221|metal: finish_kernel<false> in MSL, verified by the AOT compiler
-b5b4a97c0a9b0c2c5f5e2d96529c126cc8aec899|2026-10-23|Niko1221|metal: the mHC dense product wired - cublasSgemm dispatches an MSL kernel instead of aborting
-45cbb451e70f7354c73644943ba061dc70ba0fb3|2026-10-23|Niko1221|metal: the engine runs on Metal and names its kernel queue; two kernels ported
-15f1fe0548c2b6f5234564da66ae6395283aab89|2026-10-23|Niko1221|metal: a one-Context allocator for the dsv41 engine, opt-in so the default path is untouched
-5f6d49e9598a8cf5477157f235d158ae20d12c19|2026-10-23|Niko1221|metal: the first dsv41 host wrapper - compile, wrap, dispatch (and the one-Context invariant it exposed)
-2cc55f61657d719e92a16d2c6e448136fcd2301e|2026-10-23|Niko1221|metal: the IQ2_S expert kernel, tiled - 515.7 GB/s effective, 89 % of the streaming ceiling
-446a45f75016b6b1dc79d4b21f150d4002eaed1e|2026-10-23|Niko1221|metal: the IQ2_XS expert kernel, tiled - 467.8 GB/s effective at 97 MB
-1d21a0f60af6343a5b6664299fb5aae6cf9f8bd3|2026-10-23|Niko1221|metal: the tiled IQ2_XXS kernel - 437 GB/s effective in the engine's 8-token window, 5x the one-token form
-9c1e61a6f37fd2ba944f95c7a8fdfb64c1195dba|2026-10-23|Niko1221|metal: the IQ2_XXS expert GEMV ported - 87.7 GB/s, and why it cannot go faster as a warp-per-row kernel
-45faf57702a42ad700620cf4a5e4b841c7f1b02f|2026-10-23|Niko1221|metal: ggml's i-quant grid tables in MSL, generated from the pinned header
-680724b87a7a15a96f4afcdda9922164566ca516|2026-10-23|Niko1221|metal: the Q8_0 weight GEMV ported - 173 GB/s, and the reference has to use the file's half-rounded scale
-a445418e5e62484e006477da4bc238ea02b14a37|2026-10-23|Niko1221|metal: the BF16 GEMV ported and measured - 83 GB/s warp-per-row, and why the expert path cannot stop there
-baf261decad67e5d3cd319c38e4c2e268a61cb2a|2026-10-23|Niko1221|metal: the verified dsv41 activation quantiser, in the engine's kernel tree
-6bfcfa777f1e7ea7d6f1a6ae04064265605242de|2026-10-23|Niko1221|metal: the first dsv41 kernel ported and bit-exact - the Q8 activation quantiser
-ca903c124a8e5ca9d0bcbaf129ed274fe98754b0|2026-10-23|Niko1221|metal: a launch with no Metal dispatch names its own file and line
-883d0000a7c8edde617dcbf86a100493fb096c3f|2026-10-23|Niko1221|metal: the dsv41 engine links and runs on the Mac
-d6928391770f5775b1322146b83fc33a3582cae1|2026-10-23|Niko1221|metal: a strata_ds4 target, and what it proves
-aaf3aa3a7c02bdf31706dc98d51e49c6e7e08feb|2026-10-23|Niko1221|metal: the last twelve CUDA names (dim3, funnel shift, transcendentals, ldg/ldcv, shfl_up) - no undeclared name left
-dc61a065e3fc0152f0e308daae1cad9882a2b221|2026-10-23|Niko1221|metal: finish the CUDA API surface the token path names, enumerated by the compiler
-e46b149ae558323548576facae15dfb91d2ee703|2026-10-23|Niko1221|metal: fp8 conversion modes, the round-to-nearest float helpers, and an mma.h placeholder
-18c6075562cf2d50d899ce982dc4e2ab0f041afa|2026-10-23|Niko1221|metal: the half-precision and vector-type surface (cuda_fp16.h, vector_types.h, cuda_fp8.h)
-a798d03858b74609c4382cf1fa7b9b59bedff621|2026-10-23|Niko1221|metal: the dsv41 host side compiles - ds4_model.cu goes from 20 errors to 0
-bb60de0e8ebd658703ef09c98499ad41733a660a|2026-10-23|Niko1221|metal: ds4_os.hpp takes the macOS shim at the top of the file, not inside the Windows block
-910af91838058d624bdd3fbbc549f3d74647a758|2026-10-23|Niko1221|metal: a macOS stand-in for the Linux OS surface ds4_os.hpp uses (half done - not yet effective)
-bcb2133a28102b3870cb9f720561cd03d63c43be|2026-10-23|Niko1221|metal: the dsv41 core's CUDA surface, part one (bf16/fp8 conversions, the cuBLAS names, the compile audit)
-f0f056b9bb3463b5b7cf7174bff13eadb022f2d2|2026-10-23|Niko1221|dsv41 mac: the CPU-only build works on arm64 (x86 kernels guarded, the AVX2 row entry points answer no)
 5e8a4cca7d690ac60ca37eb09e7d0e010099ad6d|2026-10-27|Niko1221|Release notes 0.2.7: update, tray and speed lines confirmed on the release packages; Strix Halo guide names the prompt used for the 4K row
 a42cc3d7df70d1940de82cd0882f03e1f5dfc741|2026-10-26|Niko1221|Version 0.2.7: Terminal and app 0.2.7, engine and Control 0.1.52 (every Qwen and DeepSeek package, Metal included; both engines changed since 0.2.6)
 5a843fd841175ce120fd5ed76b6ab01f7bb2121e|2026-10-27|Niko1221|docs: release notes 0.2.7 - two-card pipelined default (owner choice a), DeepSeek pictures by default, the shard 1 setup fix
@@ -492,7 +491,9 @@ a6543d6a7f13120c249b1c2aac6071f299e1ed2a|2026-10-25|Niko1221|setup: accept --fee
 3b34b6c7b29cd34ffe59f318364e10be5ad4163e|2026-10-25|Niko1221|Engine: keep the PLE table resident in RAM when the PC can afford it (opt-out STRATA_PLE_AUTO_RAM=0); measured on p620 R9700 IQ3_S: 8K prompt PLE 845 -> 132 ms, 2125 -> 2611 tok/s, answer md5 identical
 6c70d4bc5d599479ad269f7113982f79824a9f5e|2026-10-25|Niko1221|Strix Halo (gfx1151) on Windows: DeepSeek V4.1-Flash support and the 0.2.6 shared-memory fix
 4b9e05a2a806a3fe24f7b2560d98626c37dade35|2026-10-25|Niko1221|Windows uninstaller: remove the app's own folders (control, host, node, harness) recursively; files the app wrote there while it ran (Python bytecode caches under control) are not in the installer's file list, so those folders and the program folder stayed behind after use (found on strix with a standard user after the process fix); test
+1b667c7abbe09618596f392fec70576e6c56ab4b|2026-10-25|Niko1221|WIP not-default: DS4_NO_WAIT_SPLIT (no commit at the routing wait; A/B unfinished) and DS4_PHASES (decode host phase timers)
 af197f96db5dcb29aa890e64fe3e7e9e1d977c1c|2026-10-25|Niko1221|Windows uninstaller: find Strata's own running processes with the 64-bit PowerShell (the installer is 32-bit, whose Get-Process cannot read a 64-bit process's path) and with Get-Process first, WMI only as a second source: a standard user's WMI query was denied, so the host kept the folder open and it stayed behind (found on strix with a standard user)
+4acede655a4256741ec8ac78cb0f41b86591ba66|2026-10-25|Niko1221|DS4_PLACE_HASH: one hash of which experts hold a VRAM slot (the placement changes with the saved profile)
 dfaae03b009e7001e745ebcefb11d3ce15c6c7f4|2026-10-25|Niko1221|DeepSeek engine: the RAM store no longer misses the experts the VRAM cache gives back to the CPU lane: the preload fills the slots the lane leaves over (and the 256 reserved ones, evictable first) with the VRAM experts the profile counts least and the lane experts it never saw (DS4_STORE_SPARE=0 off), and an expert leaving VRAM is copied into a store slot from its VRAM blob (put_begin/put_done, DS4_STORE_PUT=0 off) instead of being read from the SSD while the lane waits. r9700 1 card 2.00, store forced (--ssd-cache 140): decode code 23.7 -> 26.2, agent 20.7 -> 24.6 tok/s, misses 1.5/2.6 -> 0.5/0.6 a token; P2003 RTX 3060: no loss, ids identical
 53548c8af4610be8b29282dde3a5f66dbf0b8aee|2026-10-25|Niko1221|Merge main (41cf05a06: README model order, docs only) into f-026-rel
 41cf05a06a25dd29103b7b27a2279a3f60c21876|2026-10-25|Niko1221|README (all 7 languages): models in the order Qwen3.8-Flash-Next, Qwen3.6-35B-A3B, DeepSeek V4.1-Flash
@@ -512,6 +513,7 @@ e9e22db6a7116b3ce1f81e5a0367e29d0d17a70b|2026-10-25|Niko1221|Setup: the DeepSeek
 4a6a5fb6996034aee10f5690dfe8cdb48e0b6f81|2026-10-25|Niko1221|Merge f-026-copyall (DeepSeek copy-all CPU-lane experts) into f-026-rel
 d51d71e7c0fc7a731efbdbf6dfbbcc71fce1f423|2026-10-25|Niko1221|Merge f-025-fix (6 owner-QA fixes) into f-026-rel
 fa663fabc5c2c568d6035b3ae853b38e1762865a|2026-10-25|Niko1221|Merge f-0243-rel (721c6f7ff) into f-025-readme
+1ece7efd5c24531474b854eba84fd89be89662bd|2026-10-25|Niko1221|metal: no command-buffer split after the fp8-rounding finishes (decode +22%: code 11.9 -> 14.6, agent 9.7 -> 12.0 tok/s); DS4_FINISH_SPLIT=1 restores it
 721c6f7ff513f5b3a65db3dd6d845eb1c21534d6|2026-10-25|Niko1221|Mac: the engine bundle inside a signed .app is not removed after the first start (deleting it broke the app's signature); outside an .app and on other systems the cleanup is unchanged; test
 025cf7d95455fc85d5818bf369e1fa86c8fabca5|2026-10-25|Niko1221|DeepSeek engine: the copy-all fit check is one tested rule (copy_all_fits) and also needs the Windows commit room (RAM + page file beside its margin), not only the free RAM, so a 64 GB PC with a 12 GB card, or a big-RAM PC with a small page file, never copies the lane in by itself; the auto store says (verbose) when it holds less than the CPU lane
 5d5c26d5bc0872ef427745fc16f389880e91af88|2026-10-25|Niko1221|Monitor/serve: a one-token reply has no decode span, so no tok/s is shown for it (a 1-token probe read 1,250 tok/s); test
@@ -521,18 +523,29 @@ dd9b9f746db0e7fef97412ac90e1b8321a776577|2026-10-25|Niko1221|About/Updates: neve
 4d6721822aec2de73ef130ed46ebdc144088b611|2026-10-25|Niko1221|Storage and Manage models: a model whose files are all gone (old config, 0.0 GB, not ready) is no longer listed as a download
 ad66a758a7bdcf680179c9bef23513376ce306ed|2026-10-25|Niko1221|Models screen: DeepSeek is installed and shown at its one 8K context (as the guided setup), not the 32K default
 59599f69f8240a8684b3275c7e5382972ed8b2f4|2026-10-25|Niko1221|Monitor: All GPUs leaves out a small integrated Radeon/Intel chip beside a real card (totals and count); the hardware report gives each card a stable id since each make numbers from 0; tests with the RTX 5070 + Radeon iGPU pair
+2a207dbfcca81dbd9763a0682f7effb06a74387d|2026-10-25|Niko1221|metal: sparse attention on simdgroup matrices is the default for 8-head groups (32K prompt 269 -> 293 tok/s, KL equal to the scalar kernel); DS4_ATTN_MX=0 for the old one
+b6dcb23ec609d6bb71e37d6db365592484e5c66f|2026-10-25|Niko1221|WIP metal: ds4_sparse_attn_mx (sparse attention on simdgroup matrices, DS4_ATTN_MX=1; =2 compares with the scalar kernel: rms rel 1.8e-6); timing and KL gate pending
+100a2374fbe2fbe35338e5c0ad0ec530fad471fa|2026-10-25|Niko1221|metal: Q5_K dequant four values a step (bit-identical); DS4_SKIP_K and the timeline's overlap count as debug tools
 a04f5505aac14152d536315d25eb1deb49d4b815|2026-10-25|Niko1221|Merge f-0243-rel (ad638b93e) into f-025-readme
 36f580a5c33c50504dc1a2250108ca8e99732623|2026-10-25|Niko1221|UPDATES.md: the Mac dmg keeps its Metal engine; only the Windows and Linux installers are engine-less
+8810e00c09f60dc921cf47fe75b2c793a18b82be|2026-10-25|Niko1221|metal: prompt hc_mix reads each token's row once for four mixes (bit-identical, +4.5% on the 3K prompt)
+050752f5b9a241899992f5c39917127cfcddb9e5|2026-10-25|Niko1221|DeepSeek Metal: head matvec back to 4 columns a pass (8 moved the KL by +0.002)
+97c091c5be7fc4c7a4fe5b6a7987d927e70b2f91|2026-10-25|Niko1221|DeepSeek Metal: prompt flow reads experts straight into the ring (unified memory: no staging, no DMA), head matvec 8 columns a pass
+6b2a530393d200b6cc3f92899518a4f75d14af87|2026-10-25|Niko1221|DeepSeek Metal: cached compute pipelines (the prompt path created one per expert copy), F_NOCACHE for the unbuffered expert reads, dispatch-seq log
 ad638b93e59e13f06b1989574d69027718413bb3|2026-10-25|Niko1221|Merge f-0243-dsimport (the app's model-folder preview recognises official DeepSeek sets) into f-0243-rel
 32ad109816a290465ea1c5fb6f5ac55f9d16d9ed|2026-10-25|Niko1221|Model preview: recognise official DeepSeek-V4.1-Flash IST-DAS sets (1.75/2.00/2.25 bpw, official and first-release names, with or without the Engram) as family deepseek41
+e527bfefc11417f42c2c90f5b58fe723fc0713b0|2026-10-25|Niko1221|DeepSeek Metal: GPU stale-router lookahead prefetch (opt-in DS4_LOOKAHEAD; measured slower), recall counters
+9e3fe0461cde6dfc4c99d50f5b6d113d20ad073c|2026-10-25|Niko1221|DeepSeek Metal: CPU-lane page prefetch in parallel across the call's matrices (the cold reads were 78% of the lane), CPU-lane phase log
 6270e2d9d6bfffc23716bac4c99d1fca271dbb23|2026-10-24|Niko1221|collect_libs: a library an earlier binary's pass already put in --out is not copied onto itself (SameFileError stopped the AMD packages' second pass)
 ce27d135395c55a31b4c991c568dabeb9eeb0e56|2026-10-24|Niko1221|Merge f-0250-tui-uma (Faster is the default Speed on shared-RAM GPUs) into f-0243-rel
+90359513e3b123584b205cf22e75fa2fa58eedde|2026-10-24|Niko1221|DeepSeek Metal: DS4_BUSY_ALL experiment (off), progress lines
 2dbdea2a7761035eb02201841f1ad211d001b9f0|2026-10-24|Niko1221|Merge f-0243-strixspeed into f-0243-rel
 da1eb6bc69b9d4508f2cff5cee30bdcbaf9295fd|2026-10-24|Niko1221|Merge f-0243-copyfix into f-0243-rel
 2cea5afbc5214c7774a6703388f7319e5dc158fb|2026-10-24|Niko1221|Merge f-0243-locales into f-0243-rel
 0b9539877fa7740e46a451f1dd4033a6875ed8f0|2026-10-24|Niko1221|README and docs for the single installer: three download buttons (Windows, Linux, Mac) with the 0.2.5 file names, one plain line instead of the per-GPU sentence (7 languages); docs/AMD_HIP.md and packaging/UPDATES.md name the single installers
 9551b4168d266409ea49c1e489b98380030d883d|2026-10-24|Niko1221|Metal and SYCL builds: the Metal engine gets stubs for the 512-bit i-quant rows native_expert.cpp now references (x86-only file), and SYCL compiles iq_avx512.cpp with -mbmi2 and -mavx512vpopcntdq like the root CMakeLists.txt
 1aff6d14117b88171fcfcec8f2b55fdc47f2b165|2026-10-24|Niko1221|Version 0.2.5: Terminal and app 0.2.5, engine and Control 0.1.50 (every Qwen and DeepSeek package, Metal included)
+8d3c976166b949f6f67540309533942fbfa592d9|2026-10-24|Niko1221|DeepSeek Metal: keep the GPU busy (flag-released spin kernel) while the CPU lane runs: decode +25-35%
 3f8f9aeaa6facca03ba2384414baca2b8a8e7e4a|2026-10-24|Niko1221|Translations (de, zh, ja, es, ru, pt, ko) for the 26 new fix-catalog keys: first-run card, DeepSeek note, Speed labels
 684881246dc37df0dbb830024a00f63fbb695a24|2026-10-24|Niko1221|DeepSeek Speed label: the default is named by the engine's own rule, integrated / unified-memory GPU (Strix Halo) or cards totalling 16 GiB or less; '(default on this PC)' on the matching choice; test
 d44144d7bb089d8f3b47f8415b7927200ab3eb03|2026-10-24|Niko1221|English catalog keys for the first-run card, the DeepSeek note and the Speed labels (the locale-gaps test failed on the merged branch); the other seven fix catalogs carry the English text until translated
@@ -541,29 +554,37 @@ df7d40774240262daed24157c1c36d3f424219b0|2026-10-24|Niko1221|Merge f-025-fast (F
 c4ce40bf5e2388b96eca9ea8e4f4cdc2b5f2f021|2026-10-24|Niko1221|DeepSeek engine: faster mode (5 experts a word) is the default on a GPU that shares the PC's RAM (Strix Halo: decode +11..13%, prompts +5..7% against 6); the 16 GiB rule is unchanged, --experts N wins; rule test rows
 add4362139705147bafbe786fa2f356eb193dbe6|2026-10-24|Niko1221|Merge branch 'f-025-strix' into f-025-fast
 ff91bc3729b697d383735932e00d7f80cf1d801e|2026-10-24|Niko1221|DeepSeek engine: DS4_STORE_ZC=1 on a GPU that shares the PC's RAM, whose budget the weights already fill, prints one plain line that it will likely fail with a GPU fault and gains nothing (no cap)
+dde3250cdb2af365ff988cc1d2bf71ca2b4ae4c6|2026-10-24|Niko1221|DeepSeek Metal: --dspark-depth, dispatch counts in the round times
 67996022cdc3fefec4e4bd3eaf8fa43c06faa33a|2026-10-24|Niko1221|build_dsv41_windows.bat: configure every time so the build id is the current commit
 79888371836bcb17b859c30967aff02779ac4fe2|2026-10-24|Niko1221|release build scripts: a failed step is a non-zero exit (build_hip_linux.sh), a stale binary or an old configure cannot pass, and strata-dsv41 must carry the release commit (BUILD_ID for a tarball, checked in the binary)
 77b1a50541bfa94389428a27fa0bb495ba3c5f52|2026-10-24|Niko1221|launch: flow_for reads the settings only when the context has them (a context with only a computer, as test_mixed_vendors passes, raised AttributeError after the Speed step)
+958774b4ceb6ab73e71ff3a8bf6a1bbab53b5ca3|2026-10-24|Niko1221|DeepSeek Metal: sampler statistics harness, round time breakdown
 902239e7f76e27b185671f6c9b733f699b5d2063|2026-10-24|Niko1221|ds4_gg_bench --k512: the two printf strings end in a newline escape (they held literal line breaks)
+f29ff5a59a10c0781fb16f7dfffdbf44821dff9d|2026-10-24|Niko1221|DeepSeek Metal: drafter bring-up (ring restore, host sampler for temperature and speculative sampling), per-dispatch GPU timeline
 c1c3eab5401b1fbead3836bbb428f28cfbd2c0a8|2026-10-24|Niko1221|Merge f-026-5070 (in-place chunk 4096 on non-HIP cards under 16 GiB) into f-0243-rel
 1fac68d6f28808fae897af85b9220232e2de9a75|2026-10-24|Niko1221|DeepSeek engine: the experts-read-in-place default prompt chunk is 4096 on non-HIP cards under 16 GiB (was 8192): decode +2% agent / +0.4..9% code (5 pairs on RTX 5070 and RTX 3060, 120 more experts resident), an agent turn of 3K new tokens on 16K takes the same time, a cold 8K prompt 9% slower; DS4_FEEDLOG prints each feed's time; test rows for 12 GB, 15.9 / 16 / 24 GiB, 8 GB, unknown VRAM and HIP
 aa4b225237003856726b480a805ec28876414483|2026-10-24|Niko1221|Merge f-025-strix (gfx11 WMMA expert kernels, iq test) into f-0243-rel
 bd71ea81b9a15fc5290d173546ff76e4e36abe5f|2026-10-24|Niko1221|Merge f-0243-pick (prompt-path rule, post-ready warm-up) into f-0243-rel
 4d8ff9646f828cd92c93b0b2add389b8921d95e2|2026-10-24|Niko1221|DeepSeek engine tests: the gfx11 / gfx12 matrix-core prompt tiles are forced on and off in ds4_iq_test (launch counted, both against the CPU reference and each other); umaprobe m1/ver probes; test knobs DS4_ZC_COARSE and DS4_STORE_CHUNK_SLOTS for the zero-copy registration
+34810a3bb3bfab593883da7b81b8252c80c74a28|2026-10-24|Niko1221|DeepSeek Metal: automatic VRAM-expert share from the anonymous-memory cap (explicit --vram-experts wins)
 536460c3d83b3e1f2bd4cc8c977da7612f47283e|2026-10-24|Niko1221|Copy feedback: one helper (lib/clipboard.ts copyText with a toast); Markdown and Serving use it, lib/copy-text.ts is gone (the toast store is loaded only when a code block is copied)
 061a285832fe4bd7c87aaea8cfb4a89f9f53ce3e|2026-10-24|Niko1221|Merge f-0243-gui into f-0243-rel (Chat.tsx and DropZone.tsx: the guifix clipboard helpers kept at the conflicts, copyAndTell stays for Markdown and Serving)
+5dce2f63e90407f322edf0823b89bd29152a594e|2026-10-24|Niko1221|DeepSeek Metal: batched q8 quantiser, zero-copy expert mapping (DS4_ZC), spin-wait, GPU-busy and timing switches
 e752c65455e7f67531b2a92633a92295e9d1efcb|2026-10-24|Niko1221|ds4_gg_bench: --k512 calls the AVX-512 rows (iq512x_rows) directly against ggml-cpu's dot, bit for bit, and says whether the CPU and type allow them
 dfd1b0f2914bf828c280c04e4f28d203da842bc2|2026-10-24|Niko1221|DeepSeek engine: the prompt path is chosen from the prompt's length alone (96 tokens and more through the chunked pass, windows of 16 below), one number for every box - the same prompt always takes the same path and gives the same bits (the old per-request timing prediction flipped the logits between runs and took 7 s on a 28-token prompt); the chunked pass is warmed up after the model is ready, on a thread, so the BLAS library's ~3.6 s start is not paid by the first prompt a person types; startup line; DS4_PICK=adaptive, DS4_PICK_MIN=N, DS4_WARM=0 as switches; rule test
 8b8f8a10ee47ede140886b95e43a020546ee5213|2026-10-24|Niko1221|Merge f-026-5070 final chunk rule (7bf6e4d3b) into f-0243-rel
 7bf6e4d3b7643e541488de97aa4cd6375b3d34c3|2026-10-24|Niko1221|DeepSeek engine: one default prompt chunk rule, prefill_chunk_default(): 1024 only for a single-card default run where the GPUs hold at least half of the routed experts (4 x R9700; the R9700 worker's gpu_expert_share() from 4cde62a35), 4096 when a GGUF pack's experts are copied into RAM (--mmap-experts off) on a non-HIP card with 10 GiB or more, 8192 for the experts read in place (5070, 3060, 1 x R9700: what a launch on one card already ran), 2048 for a pack that is not a GGUF; real launch logs on the RTX 5070 and the RTX 3060 show no --tp / --threads and 'prompts in chunks of 8192'; one unit test with the 5070, 3060, 5090-class, 1 x and 4 x R9700 cases
+c2675c60d11e41439914a1b4d0a24f85cfe246a3|2026-10-24|Niko1221|DeepSeek Metal: chunk path mixes through the fused hc_mix kernel
 56ac21a2178e1c663c1ed2e3bb0f8550f657bbf8|2026-10-24|Niko1221|Merge f-026-5070 (prefill chunk default rule) into f-0243-rel
 829913ea59427405be5a81da2e13e04e9e2fff58|2026-10-24|Niko1221|DeepSeek engine: 4096 chunk rule applies to a GGUF pack only when it is copied into RAM (--mmap-experts off) and to an explicit --tp 1 single card; the experts-read-in-place default stays 8192; other packs keep 2048
+700def65a2a41e6b502c18ea808dd4a4d0a57340|2026-10-24|Niko1221|DeepSeek Metal: chunked prompt path correct (sgemm on the one Context, KEEP dump syncs, debug switches); 2988-token prompt 251-277 tok/s vs 32 in windows
 dba7d0e0ab77cb56db8fd1bb4702daa60a7749af|2026-10-24|Niko1221|DeepSeek engine: the prompt chunk of the experts-copied-into-RAM case (2048) and of an explicit --tp 1 single card (1024) becomes 4096 on cards with 10 GiB or more (HIP builds and smaller cards keep theirs; the in-place 8192 is unchanged); startup line; rule test incl. 12/16/24/32 GB, short-VRAM, HIP and max-context cases
 535cacb05212a09f4f60e2985bafa4603f5bb399|2026-10-24|Niko1221|Tests never write the owner's real Strata profile: pytest gets scratch LOCALAPPDATA/XDG state and data folders; the host test runner and the native-control test files get a scratch settings file, components folder and app data
 67a6ee76f4065bb523fe134b06f4401b22198d54|2026-10-24|Niko1221|Engine bundle cleanup: one function (cleanupAfterInstall) writes the removed and kept lines to the host output, with a test that both reach it
 a2641683906c7a61917b4b090f74cadd0a16d05b|2026-10-24|Niko1221|One size figure: engine sizes are decimal MB, rounded half up, in the Terminal (strata update) and the app; both tested on the same numbers
 e6c59970919fe7212718abe3f98899411ea8485d|2026-10-24|Niko1221|DeepSeek engine: gfx11 WMMA expert kernels for the prompt sets, on by default on gfx1151 (Strix Halo: prompts +22..29% at the same KL), opt-in on other gfx11 parts; STRATA_DS4_HIPK=0 turns them off
 7063f3adca75c6c730a0e41d1965ab4bb38a2935|2026-10-24|Niko1221|Sizes in decimal MB on the first-run card and the update check (one helper); the engine bundle of a per-GPU install is removed after an update only when the same engine is complete in the store (size and SHA-256), else kept with one log line
+58e5d7851e0e4dfb6aed0d0a7559ef05de2a5e1a|2026-10-24|Niko1221|DeepSeek Metal: chunked prompt path (MPP expert tile GEMMs, dense gemm/dq, rows_f16), NC-column matvecs, dangling buffer and null-arg offset fixes (WIP, chunk output not yet matching window path)
 1c69e23658345f01b96ca6e49667e13daa4bc5c7|2026-10-24|Niko1221|Merge f-0243-guifix final head into f-0243-rel
 f613637cbdd7fa7548ac4dbb610243b5dd173e55|2026-10-24|Niko1221|Merge f-026-5070 (experts N|auto, IQ1_M row) into f-0243-rel
 4f47009d08a3e0fdcf34a36bef02b82b04f8cfa0|2026-10-24|Niko1221|Merge f-0243-fuse into f-0243-rel
@@ -583,18 +604,23 @@ c4413c0b544b7aca89ecee812a3bc36a7b2e7688|2026-10-24|Niko1221|launch: one rule fo
 bc1a3ba2ed14715330cc24de02f26ed9d5ce553c|2026-10-24|Niko1221|launch: DeepSeek Speed choice, Faster (--experts 5, the default on a PC with 16 GB of graphics memory or less) or Full quality (--experts 6): a Speed step in the guided screens, --speed and --full-quality, plain words in --plan and the summary, the quality note; tests, docs
 3dd11c6dc1f094fb42de0e33c6fb4a3104e02b57|2026-10-24|Niko1221|DeepSeek engine: --experts N (the router's top N, weights renormalised); default 5 where the cards hold 16 GiB or less in all, the model's 6 elsewhere; startup line 'experts per word: 5 (faster mode; full quality: --experts 6)'; DS4_TOPK=N stays as a test override; rule test; DS4_PROF prints the CPU lane's stage split
 eb4736c45eb306bbf73602513c9753c8c79fe6c5|2026-10-24|Niko1221|DeepSeek engine: on a Windows integrated GPU the experts leave room for the context's later GPU allocations
+7c77f388dd8fa474b0979fdf8708afcddb20ef6a|2026-10-24|Niko1221|metal: commit the queued GPU work before the CPU lane runs (they overlap)
 66b43d4a7fb9057447f35a650e144812cce48a2a|2026-10-24|Niko1221|Monitor: with All GPUs, a card that cannot report a value is left out and the card that does report is named (35 C . RTX 5070) instead of blanking the figure
 91eb05a228a27edf84bccd8cc9cf59539312a12f|2026-10-24|Niko1221|App update: a job an older host left running is finished when the app's program file is newer than the job
 4228e6ee1139c6ee1fc81c6104412ff1d759dbf4|2026-10-24|Niko1221|chat model picker: a downloaded model that is not loaded uses the same two-line row as the API models
+42a982e03323d81914f225865371f73f87ea5baa|2026-10-24|Niko1221|metal: copies and fills ride the context's command buffer, events mark it, buffers chained by a shared event, decode matvecs for IQ2_XS/IQ2_S/IQ3_XXS
+3e51b1c18a325e106a6e7b7650803b7568cae8eb|2026-10-24|Niko1221|metal: decode matvecs for Q5_K and IQ2_XXS (every lane busy, 16-byte loads), lane-parallel hc_split for hc 4, DS4_PROF per-kernel GPU table
 9caf39495c70974b540432399daae3f85e26b69d|2026-10-24|Niko1221|Merge f-0243-guifix into f-0243-rel
 0c53372a0ea32bbb20d366c95f5bdac8329cb72f|2026-10-24|Niko1221|Merge f-0250-tui into f-0243-rel
 a3e4cb64fd1ffaede89a9006dedc0424a5397472|2026-10-24|Niko1221|test: serving never reaches the DeepSeek engine check (only launch and setup import it), and 'serve --plan runs no program' means no installer or fetch: a PC's read-only hardware probes (nvidia-smi, Get-CimInstance) no longer fail it
 dc2c4229e95c2e5ea1e726998c8b6c601bed8cfd|2026-10-24|Niko1221|test: launch_engine_first gives the runner a Qwen catalog (a bare Mock answered 'DeepSeek' to the 0.2.4 multi-file question and skipped the engine step); the launch code was right
+9dbb13ee89a17280343213be3e4e57bb1cd23de6|2026-10-24|Niko1221|metal: the IQ2_XXS matvec read its sub-blocks 4 bytes apart (8), IQ2_XS signs, IQ3_XXS matvec added; more dumps and checks
 60d856a18eddbbc27d95a1aec066fecbd73b7f3b|2026-10-24|Niko1221|DeepSeek decode: fewer launches a layer - the int8 roundings of one GEMV call in one launch (identical inputs once) and hc_mix + hc_split in one launch (the token's last mix block runs the split); same arithmetic
 abab458d743b87b2d37bbbfc2aae9b54bb8d27e2|2026-10-24|Niko1221|Feed reads: one more try when the first times out or the connection fails (the first wait is 12 s, the second the full 30 s); about one github.com request in 25 hung for 30 s and the first-run card said offline
 9cf91f355528e29a42baf3a866e68494d64871f6|2026-10-24|Niko1221|Load of DeepSeek: the start wait is at most the 600 s Control allows
 f30d191d54f59451678487e2f8564cdc14175242|2026-10-24|Niko1221|Load of DeepSeek: the app adds no Flash-Next options (request slots, RAM budget, output clamp, resource profile, memory retry) to the DeepSeek engine and waits as long as its config says
 75ee28fd3da5478da302b47626b93258829d6919|2026-10-24|Niko1221|Host: the per-model settings routes accept a dotted id; a test walks a dotted model id through list, load and unload
+860e384db78e3a6775c79a403c3bbd436fbbfccc|2026-10-24|Niko1221|metal: the ring backup flag, decode takes the host-routed path, split commits sync the streams first, sparse_attn sizes its binding without a host read of device data
 fe2b9f40941a7527c5e4099afc8c2e4656e30ac8|2026-10-24|Niko1221|Host: run config file names with a dot (DeepSeek) pass the app's own checks, so the model can be loaded
 54768d25b12fddc4fbddf92deac504a9cd7eaf62|2026-10-24|Niko1221|test: the own-GGUF check finds tests.terminal when tools/ is run on its own
 4499c69681ab0ff4cdb5a1c37a14a674a9e04eb5|2026-10-24|Niko1221|Installed models: an id with a dot (deepseek-v4.1-flash-ist-das-2.00bpw) is listed; the install finished but the app never showed the model
@@ -650,11 +676,15 @@ d924beffe5ae2dcc6c981f4fea10dc1d00233f50|2026-10-24|Niko1221|setup: a Mac with a
 bdaa93edf07ab180ae0558f0f12797709b652fb9|2026-10-24|Niko1221|launch: a setup option error ('setup.py: error: argument --kv: invalid choice') is the cause shown, not only 'could not be installed'; setup accepts --kv fp16 as DOCKER.md says (#3785); tests
 1736b558bd042af8df4d1cc56f97fc9f83d74e84|2026-10-24|Niko1221|setup: a NVIDIA driver older than CUDA 13 needs (528 to 579) runs the CUDA 12 engine by itself and says so in one line instead of stopping and naming a flag strata launch does not have (#3843); tests
 0cd44323e4b1cb3f02993c754b315888d32f92f3|2026-10-24|Niko1221|Windows: a card taken out of the PC no longer decides the engine; only the display adapters Windows reports as present count when two makes are in the registry (#3892); test
+193529239cec95f828c38050e1fb2d10e1dfb88d|2026-10-24|Niko1221|metal: finish dst stride, BF16 ring pack, residency on the context queue, split the command buffer after fp8 finishes; ds4_launch.h makes the CUDA build work again; more DS4_DUMP_S points
 e3eeb93972a5020c765cff0c0b887758ec7d4808|2026-10-24|Niko1221|DeepSeek engine: the RAM store's background fill is opt-in (DS4_STORE_BG=1): ready 9 s sooner but the first prompt waits for the same SSD and decode measured 3.7% lower
 58f2acc05b3b9c3e742055829ef4f93381f4ca9f|2026-10-24|Niko1221|DeepSeek engine: the RAM store's fill beyond the first 48 GB is read in the background after the model is ready (hottest first, behind the model's own reads); DS4_STORE_BG=0 reads it all first
 6fcde7e305d839b617c5fd1940db033b3d1497ae|2026-10-24|Niko1221|DeepSeek CPU lane: compute the store hits while the misses are read, each missed expert as its read lands (DS4_MISS_SPLIT=0 restores the wait-for-all order); ExpertStore::ensure split into begin / wait_slots
 b3c86c783fd7c4b9722889631db2bf318a1ec06a|2026-10-24|Niko1221|DeepSeek engine: the automatic RAM store may take every routed expert, not 48 GB at most, where the free RAM holds them (1 R9700 + 251 GB, 2.00 set: 12.6 -> 21.4 tokens/s); free - 12 GB and the explicit sizes unchanged
+9f45341966bcc20c226bd7b7eeb3a50bcbb6360b|2026-10-24|Niko1221|metal: bind the allocation's own MTLBuffer instead of a no-copy alias per call (the alias read stale data), deferred frees, matvec jobs cut at 8 activations, Q8/quant debug checks
 f1e41cdee2c83dec7d1e0df5961a0e43242a1d79|2026-10-24|Niko1221|DeepSeek engine: the automatic RAM store is sized again after the weights are on the GPU, and keeps room for the context's buffers, so a unified-memory PC (Strix Halo) keeps 12 GB free; explicit sizes unchanged
+da9cf6354fa27a630e59417721a1a4e30c611c0b|2026-10-24|Niko1221|ds4: DS4_DUMP_S sub-step dump inside the layers (same records on CUDA and Metal), DS4_FLUSH_EACH, per-layer debug prints
+0c34a7de3c2ddca490473795120cc6c1aff36e04|2026-10-24|Niko1221|metal: both queues drain at every sync, engram dequant wraps the strided extent, the ggml CPU lane is in strata_ds4
 7dd5cf18e68c639a8773e096c5c79f971ea2a9f5|2026-10-24|Niko1221|release notes 0.2.4.2: the picture-file and already-have-files fixes (#3927, #3917, #3914); no environment variable in the conversations line
 8aacdbc7a0938f5621b633041c7f85ed8927644c|2026-10-24|Niko1221|release notes 0.2.4.2: the list of new files
 3eabee6049b32a2c90739760a786cd4d25c18dbc|2026-10-24|Niko1221|test: the restyled READMEs state the app version through their download buttons (Strata-0.2.3-...), not the old '0.2.3 · ' header line
@@ -677,11 +707,19 @@ f53664c15955e733a2800952a4e51972438cf7f9|2026-10-24|Niko1221|launch: a setup mes
 44f8c334dead741543b3ed0d3bd4049e67b6d599|2026-10-24|Niko1221|model list: the DeepSeek disk check counts only what is still to be downloaded (files already in the models folder, also under the first release's names, are done), plus the room for the pack; tests
 a22d557eee4a5238d4d8ef30dda3f6e50309de8a|2026-10-24|Niko1221|launch --plan: a DeepSeek plan no longer promises a Strata engine download; test
 51d23fdd1e32afd0e26c3ef304a339278cd6d652|2026-10-24|Niko1221|P2003 findings: DeepSeek setup says in one line when GitHub cannot be reached (a 10 s check before any download, not minutes of retries) and no longer fetches or test-starts the Strata engine, llama.cpp source or CUDA libraries it does not use; install.sh is one function called on the last line (a half-downloaded file runs nothing) and every documented one-liner is 'curl ... -o install.sh && sh install.sh' so a failed curl cannot look like success; tests
+97637e2a14d71b9e7ba9865822b99ef4e8f79ab7|2026-10-24|Niko1221|metal: init_pre no longer wraps a whole page to reach 32 bytes
+782a8381de353eeef1492cc4becb945f8496f230|2026-10-24|Niko1221|metal: probes that establish what is NOT wrong, and the honest state of the targets
+c763c12ac56c41131219db03c0c833dcd54ce506|2026-10-24|Niko1221|metal: the layer reads a different h buffer than embed fills - measured with addresses
+00e762677163cf1ca79619f6bf24555fa9b5ff69|2026-10-24|Niko1221|metal: embed verified correct at the kernel; the value is lost before layer 0
 a62ca064a3e96e0ba2a7b71dd5c7cdb325051b69|2026-10-24|Niko1221|launch: the DeepSeek engine package that runs is the newest of the running Terminal's own install (STRATA_INSTALL_DIR, else its own folder) and the install the model's settings came from (the first remembered install, which can be an older Terminal folder or another checkout); the running Terminal's own on a tie; the choice is logged; versions compare as numbers; tests
+ba9e818c42c638982153d109d5ef5b9d566a7e91|2026-10-24|Niko1221|metal: drafter path ported, token-boundary commits, and the embedding blocker measured end to end
 8183c6b67162340c09b67360860177c577a65f2e|2026-10-24|Niko1221|docs: RTX 3060 speed with the release defaults (8 to 10 tokens/s, 149 tokens/s at 8K); DSpark stays off on 12 GB cards and adds 2-13% when turned on; README x7, DEEPSEEK41.md, release notes
 c33fa7ba6d0d5b104983736b50c4e1d61f207b1b|2026-10-24|Niko1221|Terminal 0.2.4.1 / Control 0.1.49.1: version bump for the DeepSeek-setup hotfix (app stays 0.2.3, engine packages unchanged); release notes
 b7958c044fcdada3f889086234055714b568e39a|2026-10-24|Niko1221|Packaged Terminal: tools/dsv41/pack_gguf.py, smoke.py, tune.py (and strata_inspect, strata_bench, nvfp4_local_pack) are in the bundle; a test reads every tools/*.py that setup.py, strata_cli and strata_control run by path and fails when one is missing from the bundle, and starts the DeepSeek scripts from the bundle alone
 06e51dfaef7003f01f23b85e63c800b10efe4066|2026-10-24|Niko1221|test: the failed-update reason is capitalised where it joins the sentence (follows 00a2cfa07)
+1a80ccc9813313f94ac7521abadf61c1750c8fc7|2026-10-24|Niko1221|metal: histogram off the hot path, dedupe and host_view experiments reverted, chunk sweep recorded
+0b2201ce441884de1f47913416e1d749ee4c3a81|2026-10-24|Niko1221|metal: the 20k flush cap was the 256+ prompt failure; 4K now runs at 171 tok/s, and the launch histogram names the decode cost
+c486f17251e54d81a048d96b31f07b8ac16e5172|2026-10-24|Niko1221|metal: sparse attention + prompt matvec columns + exact wrap extents - prefill measured at 556 tok/s
 96ca4383c7b05a8a3e6064c65d9e9977d4b3bb59|2026-10-24|Niko1221|Merge branch 'f-dsv41-tune' into f-024-rel
 2ecdc2e5111879b7b0ca8a613e9c557c89e0ca54|2026-10-24|Niko1221|launch: an installed DeepSeek model whose config names a gone engine, with no package in this install, is not 'already installed': setup runs (feed download, or one plain line with the next step) instead of the start failing on a missing file; tests
 5353097c9093abc24af08cb8a97ce23e5e17dd6e|2026-10-24|Niko1221|DeepSeek quality numbers from the final-tip scores (H100, 4,995 positions): 2.00 KL 0.170 ppl +15.5% (code +8.6%, agent +5.3%), 2.25 KL 0.107 ppl +7.3% (code +3.2%, agent +2.2%); README x7, DEEPSEEK41.md, release notes, setup and fit text
@@ -704,11 +742,13 @@ c5e0e1482378c70ecc71194c22a74b45f4dc9d9d|2026-10-24|Niko1221|DeepSeek: IST-DAS 1
 f4e7685ccfc9fc2ed113d1b28e61719e58eb26ce|2026-10-24|Niko1221|Merge f-024-rel into f-024-tui
 267a2f446299e248ec5c04f751ac7edbd5d56725|2026-10-24|Niko1221|launch: a Runner that cannot be built is shown on the run screen as a plain failure instead of crashing the screens; tests: launch TUI walk (every screen, every key, Qwen and DeepSeek, 80x24 and wide, run paths, error paths)
 eec705cc98949fb1eb1cea13433ba5f6617889ae|2026-10-24|Niko1221|release notes: the prompt-skip agreement at the final tip, 99.5% of 799 positions
+611530d9929bf4ca040c9b518661762c9421c87d|2026-10-24|Niko1221|metal: dispatches BATCH into one command buffer - decode 0.16 -> 48.7 tok/s (300x)
 b0d5f6e57cd6e8cadfe9924349ee8e925776426e|2026-10-24|Niko1221|Merge branch 'f-024-slots' into f-024-rel
 f2413d77e9992124379819d7371d8057ee3e552f|2026-10-24|Niko1221|Merge branch 'f-dsv41-tune' into f-024-rel
 4f8770d13ea210279d73cc57ada14d6497da099d|2026-10-24|Niko1221|release notes: R9700 prompt numbers with the new kernels (4 cards 8K about 320, 32K about 750)
 984f52c827baa8076332734cfcc959250049cc66|2026-10-24|Niko1221|Merge branch 'f-024-rel' into f-dsv41-tune
 aebdc298f9c2ff2fcc129068654ebea750cee996|2026-10-24|Niko1221|Merge f-024-hipk (cdf8b98f5) into f-024-rel: gfx12 WMMA i-quant prompt tiles for DeepSeek V4.1 (HIP only, default on for gfx12, STRATA_DS4_HIPK=0 off)
+33bf441cd4dc403559f593d6d06402318f6e5ca4|2026-10-24|Niko1221|metal: THE ENGINE GENERATES TOKENS ON THE MAC - 17 more kernels, the whole path runs
 fd5823ab83b5ec90c37594f0c7724454347d87f7|2026-10-24|Niko1221|Merge branch 'f-dsv41-cuk-zcfix' into f-024-rel
 d50da4e3a146b509f40bfcc39efde606e7981ec7|2026-10-24|Niko1221|release notes: the run-to-run difference is near-tied words, not only expert placement
 624a226d13e78e708a0946b899767b326546fa87|2026-10-24|Niko1221|dsv41 store zero-copy: clear the device's zc_tab entry when VRAM takes an expert over (a stale pointer into a reused slot made zc_stage copy another expert's blob into the plan: garbage, NaN routing, illegal access)
@@ -798,18 +838,25 @@ c35710e388bdfbf3498587ec326836c5d37dd81a|2026-10-23|Niko1221|dsv41: store arena 
 fb321d62cb59ab19897c1083a55a0751cec4fe8a|2026-10-23|Niko1221|dsv41: the layer-major (chunked) prompt is the default on every run: chunks of 1024 for the single-card default run, staging ring 16 MB where the cards hold most of the experts
 f7d70728412484827507bdd6ec7715d9b7d2e077|2026-10-23|Niko1221|dsv41: DS4_STORE_PREGROW=1 (map the whole store arena before the first kernel; cuMemHostRegister mid-decode hangs on Linux)
 1c1005952ab0819752aec9a698783ab112032229|2026-10-23|Niko1221|Merge f-dsv41-cuk 86bdfbd0d (HIP keeps the release grids and kernels). One conflict: the identical IQ1_M code-table HIP guard (9c46ab821 vs cuk); took cuk's wording.
+154c2990edb2a2c3c2a1f8fc9be1686e71ec5582|2026-10-23|Niko1221|metal: the routing trio ported ahead of its turn - moe_sort counts, bounds scan, fill
+4735e381ad10875a9219b83226bb2dbe5858c5fe|2026-10-23|Niko1221|metal: hc_split ported - the hyper-connection family is complete on the Mac
 41856f659443940eafb92984c11ba865d0b9f5bb|2026-10-23|Niko1221|dsv41: staging ring 64 MB when the experts are within 30% of fitting the cards (R9700 x4 plain 2.00: ratio 1.16)
 0beae0bca6b500c0a147aea3071f24644de25d8b|2026-10-23|Niko1221|dsv41: the store fill after a chunked prompt reaches the store's whole capacity, not only its allocated slots
 9469412db20a05944c45f293dbdc746eb8e3e653|2026-10-23|Niko1221|setup: DeepSeek official sets start with --prefill-chunk 1024 (layer-major prompt path, measured 231 tok/s at 8K on a 12 GB PC)
 a345d9f8cf7b0f323c3a04ff5c25fc47006b20c4|2026-10-23|Niko1221|Merge branch 'f-dsv41-rel' into f-dsv41-setup
+7022bd25d8028a232f56510248c80316afa27682|2026-10-23|Niko1221|metal: the hyper-connection family on the Mac - hc_post, hc_mix_scale, hc_mix ported
 a82477069b811cca8c18f3dd9a011fd08ac3bbf9|2026-10-23|Niko1221|Merge branch 'f-dsv41-pkg' into f-dsv41-setup
 81dd215de936f08c62890b3a9bd0f14140d3b828|2026-10-23|Niko1221|setup: the two official IST-DAS DeepSeek-V4.1-Flash sets (2.00 / 2.25 bpw) as sizes: pinned files, shared Engram + DSpark, plain pack recipe, shipped profiles, pack-info and a 16-token text check, --dspark auto; fit words from the measured numbers
+5d969adde95dbac29994c21dc8a05c3c101ec3bb|2026-10-23|Niko1221|metal: finish_kernel<false> wired - the engine passes it and names item five
 4b5f8d89f24d10a6a44fcd878990a227ee53daf7|2026-10-23|Niko1221|tests + ENGINE-COMPONENT.md: strata-dsv41 in the engine package and the --require-dsv41 refusal
+cb931e701082102e0be573d5107428633559effe|2026-10-23|Niko1221|metal: finish_kernel<false> in MSL, verified by the AOT compiler
 dc352b839b04ac617a2fcbf9dab1979a7a05941b|2026-10-23|Niko1221|dsv41: say how the chunk staging ring was sized
 e838e2beca07c2512a378007de0716f4ac3b0b20|2026-10-23|Niko1221|Merge f-dsv41-cpul 02b07b686 into f-dsv41-rel (exact multi-row CPU-lane rows for IQ types, bit-identical to ggml-cpu, self-check per type, DS4_GG_IQ256=0 switch)
 6053a4384140e69a9542947ca07997100dc5b9f3|2026-10-23|Niko1221|packaging: build_dsv41_windows.bat and build_dsv41_cuda.sh build strata-dsv41 for the NVIDIA release packages (sm_86 + sm_120 fat)
 faaf82acd71612e5b71d7298ea11bb33cef31568|2026-10-23|Niko1221|build_hip_linux.sh: build strata-dsv41 (own build tree) and ship it in the rx9070 package; DSV41=1|0 overrides, --require-dsv41 on the package
+b5b4a97c0a9b0c2c5f5e2d96529c126cc8aec899|2026-10-23|Niko1221|metal: the mHC dense product wired - cublasSgemm dispatches an MSL kernel instead of aborting
 8fee63f4f0a89797cf9b9e2284468eeeb1ac0430|2026-10-23|Niko1221|package_engine: ship strata-dsv41 beside the engine (picked up like the picture readers); --require-dsv41 refuses a package or a --verify without it
+45cbb451e70f7354c73644943ba061dc70ba0fb3|2026-10-23|Niko1221|metal: the engine runs on Metal and names its kernel queue; two kernels ported
 7519b1c75c583844669efc18de877c3a3cca43f7|2026-10-23|Niko1221|pack_gguf: warn loudly when --skip-tensors / --dense-override are used on an official IST-DAS set (engram_k/q/wkv present): the rebuilt pack loads but gives garbage text; the plain recipe is right
 dbf3bb2e643c769df89c96c891787afda3cba22c|2026-10-23|Niko1221|dsv41: the layer-major run's RAM is given back before the cache catch-up and the store fill
 86bdfbd0dafe2c167a3917e12acb322ae35a7927|2026-10-23|Niko1221|dsv41 iq: HIP keeps the release grids and kernels (no persistent work-item grid there)
@@ -819,23 +866,46 @@ dbf3bb2e643c769df89c96c891787afda3cba22c|2026-10-23|Niko1221|dsv41: the layer-ma
 12595032e7c7564ccc4120aeecffde4f1c7b2b25|2026-10-23|Niko1221|Merge f-dsv41-cuk a3d955201 into f-dsv41-rel (persistent grids only for codebooks >= 8 KiB: fixes 2.5x slowdown with 1 active expert)
 a3d95520155c6346f5370e78abf9b5c0e4fa0857|2026-10-23|Niko1221|dsv41 iq test: golden compare also covers dynamic-count window groups (5/1/3 entries, ne_max 5; 9 groups with 4 live)
 01220edb671bd937e84df9e775eb1e369d8c68f2|2026-10-23|Niko1221|dsv41 iq test: DS4_BENCH_WIN (window path / DSpark verify bench: n entries a group)
+15f1fe0548c2b6f5234564da66ae6395283aab89|2026-10-23|Niko1221|metal: a one-Context allocator for the dsv41 engine, opt-in so the default path is untouched
+5f6d49e9598a8cf5477157f235d158ae20d12c19|2026-10-23|Niko1221|metal: the first dsv41 host wrapper - compile, wrap, dispatch (and the one-Context invariant it exposed)
 02b07b686a9da1ff9a1a7e10fca04ac2ab1715c7|2026-10-23|Niko1221|dsv41 cpu lane: AVX-512 rows chosen by the detected CPU (Zen 5 family 0x1A: IQ2_XXS and IQ3_XXS; Zen 4 0x19: IQ2_XXS; others none), prompt chunks of 7+ tokens only
+2cc55f61657d719e92a16d2c6e448136fcd2301e|2026-10-23|Niko1221|metal: the IQ2_S expert kernel, tiled - 515.7 GB/s effective, 89 % of the streaming ceiling
+446a45f75016b6b1dc79d4b21f150d4002eaed1e|2026-10-23|Niko1221|metal: the IQ2_XS expert kernel, tiled - 467.8 GB/s effective at 97 MB
 a70b006929b13b52db1a356ab3c9e3fb3c7d21ec|2026-10-23|Niko1221|dsv41 iq (CUDA): persistent work-item grids only for codebooks of 8 KiB+ (IQ1_M/IQ1_S/IQ2_S), lazy codebook load, small-codebook types keep the release grids and kernels (no regression with few active experts)
+1d21a0f60af6343a5b6664299fb5aae6cf9f8bd3|2026-10-23|Niko1221|metal: the tiled IQ2_XXS kernel - 437 GB/s effective in the engine's 8-token window, 5x the one-token form
+9c1e61a6f37fd2ba944f95c7a8fdfb64c1195dba|2026-10-23|Niko1221|metal: the IQ2_XXS expert GEMV ported - 87.7 GB/s, and why it cannot go faster as a warp-per-row kernel
+45faf57702a42ad700620cf4a5e4b841c7f1b02f|2026-10-23|Niko1221|metal: ggml's i-quant grid tables in MSL, generated from the pinned header
+680724b87a7a15a96f4afcdda9922164566ca516|2026-10-23|Niko1221|metal: the Q8_0 weight GEMV ported - 173 GB/s, and the reference has to use the file's half-rounded scale
 4cca3fac20a64e46c002610b6bfb23f8cb4737d7|2026-10-23|Niko1221|dsv41: --spec-eval honours --dspark off
 995ff61f3c69cc1852b517e0f0e8d94d28615381|2026-10-23|Niko1221|dsv41 cpu lane: AVX-512 rows by default for IQ2_XXS prompt chunks (7+ tokens), measured on Zen 4
+a445418e5e62484e006477da4bc238ea02b14a37|2026-10-23|Niko1221|metal: the BF16 GEMV ported and measured - 83 GB/s warp-per-row, and why the expert path cannot stop there
 f5fc88c59934c4abd10226399a131d8e2fd96a60|2026-10-23|Niko1221|dsv41 iq (CUDA): token and light kernels take work items (group, row tile) round a persistent grid (any number of active groups shares all blocks), IQ1_M codes from a generated table (ds4_iq1m_codes.inc), persistence only for codebooks of 8 KiB+; many-row light sets keep the release kernel; test: --bench-tiles, DS4_BENCH_ACTIVE
+baf261decad67e5d3cd319c38e4c2e268a61cb2a|2026-10-23|Niko1221|metal: the verified dsv41 activation quantiser, in the engine's kernel tree
+6bfcfa777f1e7ea7d6f1a6ae04064265605242de|2026-10-23|Niko1221|metal: the first dsv41 kernel ported and bit-exact - the Q8 activation quantiser
+ca903c124a8e5ca9d0bcbaf129ed274fe98754b0|2026-10-23|Niko1221|metal: a launch with no Metal dispatch names its own file and line
 428950b96ce0bd3fc09ee1d9bba1232c2dd101b8|2026-10-23|Niko1221|Merge catch-up: f-dsv41-win fd19f9d6b, f-dsv41-h100 c0f944e12, f-dsv41-cuk
+883d0000a7c8edde617dcbf86a100493fb096c3f|2026-10-23|Niko1221|metal: the dsv41 engine links and runs on the Mac
+d6928391770f5775b1322146b83fc33a3582cae1|2026-10-23|Niko1221|metal: a strata_ds4 target, and what it proves
 0553ba6c3fb684965bb2966b3838d816f1c0487d|2026-10-23|Niko1221|dsv41 iq (CUDA): light sets (DSpark verify, short prompts) take the persistent grid and the IQ1_M code table for experts of <= 4 rows, 4-block occupancy kept for 8+ rows; test: --bench-light
+aaf3aa3a7c02bdf31706dc98d51e49c6e7e08feb|2026-10-23|Niko1221|metal: the last twelve CUDA names (dim3, funnel shift, transcendentals, ldg/ldcv, shfl_up) - no undeclared name left
+dc61a065e3fc0152f0e308daae1cad9882a2b221|2026-10-23|Niko1221|metal: finish the CUDA API surface the token path names, enumerated by the compiler
+e46b149ae558323548576facae15dfb91d2ee703|2026-10-23|Niko1221|metal: fp8 conversion modes, the round-to-nearest float helpers, and an mma.h placeholder
 fd19f9d6bf2430bfe7b56de77616dcc8ceafd7c4|2026-10-23|Niko1221|dsv41 win: store off the lookahead by default
+18c6075562cf2d50d899ce982dc4e2ab0f041afa|2026-10-23|Niko1221|metal: the half-precision and vector-type surface (cuda_fp16.h, vector_types.h, cuda_fp8.h)
+a798d03858b74609c4382cf1fa7b9b59bedff621|2026-10-23|Niko1221|metal: the dsv41 host side compiles - ds4_model.cu goes from 20 errors to 0
 b43b0bb518cd2baa80898a74567a0d09a48175c0|2026-10-23|Niko1221|dsv41: kEntMax declared before Ent
+bb60de0e8ebd658703ef09c98499ad41733a660a|2026-10-23|Niko1221|metal: ds4_os.hpp takes the macOS shim at the top of the file, not inside the Windows block
+910af91838058d624bdd3fbbc549f3d74647a758|2026-10-23|Niko1221|metal: a macOS stand-in for the Linux OS surface ds4_os.hpp uses (half done - not yet effective)
 d2411af9fdbdfb28f169b2c10ee7bd4f36d9d762|2026-10-23|Niko1221|dsv41: i-quant CPU-lane entries take a whole window's tokens of an expert (cap 16, was 8) for the exact multi-token rows; the chunk staging ring is 64 MB where the cards hold 90% of the experts (decode after a chunked prompt back to the windowed path's speed)
 49e35e8bb7356a0f42f115de12c8702342065c8a|2026-10-23|Niko1221|dsv41 cpu lane: exact AVX-512 rows (iq512x_rows, 1-6 tokens and prompt tiles), opt-in DS4_GG_IQ512=1 until measured on Zen 4
+bcb2133a28102b3870cb9f720561cd03d63c43be|2026-10-23|Niko1221|metal: the dsv41 core's CUDA surface, part one (bf16/fp8 conversions, the cuBLAS names, the compile audit)
 c25724a22272f7aba818a0786ca3f2d3f085aecb|2026-10-23|Niko1221|Merge branch 'f-dsv41-cpul' into f-dsv41-r97
 d689e6080d73a7bae3be2a426713cb84bbad8bce|2026-10-23|Niko1221|Merge f-dsv41-cuk into f-dsv41-rel (per-device light-set scratch and tensor-core check, faster IQ1_M/IQ2_S/IQ3_XXS token kernels)
 cf4f8befe7c49fd35cc8e4294f49b8f1db846a95|2026-10-23|Niko1221|dsv41 cpu lane: take the AVX2 rows by ggml-cpu's own AVX2/FMA/F16C answer (MSVC builds have no __builtin_cpu_supports)
 1cace5c864b210e4050d160fe30ee87501ebe806|2026-10-23|Niko1221|dsv41 iq (CUDA): per-device light-set scratch and tensor-core check (stream 0 is one handle on every device: the scratch of the first GPU was reused on the second), block/sub-block loop form in the token kernels; test: --devices (in-process multi-GPU, bit-compared)
 7e9b0dcc258487226e5a1534c751e3cece29f3ad|2026-10-23|Niko1221|dsv41 cpu lane: exact AVX2 rows for 7..64+ tokens an expert (the prompt path): decode once, u8 activations, no per-token sign; IQ1_M too
 0b48e23fa5675f0bbcf5030c05436d63ddb46d08|2026-10-23|Niko1221|dsv41 win: --dspark auto (not loaded when the experts do not fit the GPU), --ids @file, h100sim
+f0f056b9bb3463b5b7cf7174bff13eadb022f2d2|2026-10-23|Niko1221|dsv41 mac: the CPU-only build works on arm64 (x86 kernels guarded, the AVX2 row entry points answer no)
 f6e4cd689964f9526bc12f8395c425c5253d0225|2026-10-23|Niko1221|dsv41: chunked prompt for a single card (--prefill-chunk N), the expert cache learns from chunks and catches up after a prompt, chunk buffers fall back by halving, CLI feeds a whole prompt
 c0f944e12756c385e17b20052011502d259b14b8|2026-10-23|Niko1221|dsv41: DS4_PRED_DUMP / DS4_XIN_DUMP (router logits + projected router input; router inputs for the expert-similarity scan)
 6aba354c1641302e87180ea17f25c1e7f368ec3c|2026-10-23|Niko1221|dsv41 cpu lane: the exact AVX2 rows on by default from 2 tokens (1 on IQ3_S, 3 on IQ1_M), 5-6 tokens in one pass, IQ1_M rows rewritten
