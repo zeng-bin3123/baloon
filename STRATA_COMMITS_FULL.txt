@@ -1,3 +1,172 @@
+c62d5e3a15b40ea51c96aae9e8d36928965f53ab|2026-10-31|Niko1221|DeepSeek plan: the NVIDIA cards it counts are the ones setup runs (a card of 8 GB or less starts Off beside a bigger one), and the plan says which card is not used
+7aa9a584aac0f30d443cb60a8596f25b4953a6a3|2026-10-31|Niko1221|Setup: say which card is not used when a card under 8 GB sits beside a bigger NVIDIA card (a line only, no change to the cards used)
+987ebd442fe2e02fc5ccd01a573a5723f3fde3fd|2026-10-31|Niko1221|Launch: list the Arc Pro B65 (0xe222) and the other discrete Battlemage/Alchemist ids, so two cards are both named for a launch that names none
+e4031fc4d01f232568023fbc250d9bfc8c3f8265|2026-10-31|Niko1221|AMD cards fix, review round: setup's pinned one-card pick is still written (with gpus_by), only DeepSeek on AMD is judged when a copy adopts an earlier card, the launcher uses the plan's card rule and remembers a named card, Windows uses setup's amd_rank and no Linux arch list, message names strata launch --gpu
+dec8f1366c89ab4385b22a7b5688d24dd8dcb88d|2026-10-31|Niko1221|Tests for the AMD card rules (4 cards, APU, mixed architectures, Windows, --gpu, --gpus, old configs, Intel, NVIDIA unchanged); stale-stamp test stubs setup.gpus
+6f7f763ce580a798e24094ee0fe9c8b6afa76a05|2026-10-31|Niko1221|DeepSeek on several AMD cards uses every card when none was named: setup's own pick is no longer 'asked'; old configs of that pick move to every card at the start; the launcher and the app stop keeping it
+f93ec8a9241fc12c3b088c4c9a1281d0d44cd014|2026-10-31|Niko1221|DeepSeek card rule shared by the plan, the options and setup: every card that counts, one AMD card on Windows, only cards the engine package has code for, an APU beside a discrete card left out
+5322f1c2bd8e8de4279038c2366ad1e2aec3dd06|2026-10-31|Niko1221|NOTICE for libstrix (asf0, MIT): the gfx1151 fused-expert barrier follows its barrier()
+4cf0d8cd3809b5a3f220ea4e1abf024ac7365de9|2026-10-30|Niko1221|Merge f-039-mac-dsu-rel (33bbbca44)
+33bbbca44241d54f32d40dfd92b4420e117cf98d|2026-10-30|Niko1221|Offer UD-IQ1_M on a Mac too: not run there, said plainly in its plan (the Mac gate stays as an empty mechanism)
+38f56619cc27aa35e5642d61988d50162d643773|2026-10-30|Niko1221|Both Unsloth DeepSeek sets are offered on a DGX Spark: both passed a real Spark run (AARCH64_NOT_YET is empty); tests keep the mechanism
+1a26492064e11389bae484de12d01e3bcefc7a3c|2026-10-30|Niko1221|Merge f-039-mac-dsu-rel (6a7d75057)
+bee469c46211fcc0049dce8f03334cbad52de9a2|2026-10-30|Niko1221|serve: the qualified GDN speedups are on from the server (Linux CUDA: GDN_TC + GDN_CONVL2=2; Linux HIP gfx12 only: GDN_CHUNKED), Qwen3.8 only, explicit env wins
+6a7d75057829b3fee64660b33bd00020ecf190ba|2026-10-30|Niko1221|UD-IQ1_S on a Mac: the measured line from the M5 Max run (alone: 15-18 tok/s, 3K prompt 230-310, 14K 520)
+417765b8d8b7b48be4dc9eae4ea3f576c12a6253|2026-10-30|Niko1221|tests: the Spark gate still holds both Unsloth sets
+5c25767fcd37cad35fc67caf5a8ebd7c9927027b|2026-10-30|Niko1221|Offer Unsloth UD-IQ1_S on a Mac (run on an M5 Max); UD-IQ1_M stays off until it has run
+ea5dbffa7f968e80802e861e121f78236de3b039|2026-10-30|Niko1221|Metal: Q6_K multi-column dense matvec (ds4_q6k_mvn)
+a3a1103c13f85c436ca4cb2094578d47ede553f5|2026-10-30|Niko1221|dsu_parity: --bench and the ds4_mm pipelines
+ba3d28b7e3655b5b054cff0cebcf31b17e254796|2026-10-30|Niko1221|Q6_K matvec: packed loads via uchar4
+0dba618d344ba8ad38785ed91edba72a4439724e|2026-10-30|Niko1221|Metal Q6_K dense matvec: unaligned block loads (210-byte blocks), found by dsu_parity; test fix
+5ff7da4a700a45291ea121b2660ee80fe114f76f|2026-10-30|Niko1221|Metal tests for the Unsloth set kernels: IQ1_S matvec and tile loader, Q6_K dequant and matvec, reference checked against ggml
+1b6c67122a2c7b423a7cc5cd3a56152a302ddf1e|2026-10-30|Niko1221|Metal DeepSeek engine: IQ1_S expert kernels (decode GEMV, window, prompt tile) and a Q6_K dense dequant for the Unsloth sets
+7851a8dab6cc2d17aacc67d607a076377eed800c|2026-10-30|Niko1221|Merge f-038-ds-unsloth (final 4148c5125)
+4148c51257417e23ab4e0e2a7f784d4880f6e659|2026-10-30|Niko1221|launch: ask dsv41_fit.not_here directly (the launch tests stub the setup object)
+bd3c5cd4cb28a685a6a7a85f1ad7f92c13089eb3|2026-10-30|Niko1221|Keep Unsloth's 1-bit DeepSeek sets off a DGX Spark until a Spark run passes (AARCH64_NOT_YET, one rule beside the Mac one)
+99866a47a2b8a21b131aad162a584ee9da92f8f0|2026-10-30|Niko1221|Merge f-029-urgent (bc694233b)
+73e0a3b6ed04e0b0d4b0dee0a8d64d2fec3fd0bc|2026-10-30|Niko1221|Merge f-038-ds-unsloth (final 9144da7b1)
+9144da7b1ae4753304aa70b72e9228c59c5a6fd1|2026-10-30|Niko1221|tests: the launch list's download sizes include the two Unsloth sets
+a833fb46f3c27fb164dc10085d5d4023381349de|2026-10-30|Niko1221|Merge f-038-ds-unsloth (macOS gate 32806f82a)
+32806f82aa7322c59231a174d6b29064eb62b63c|2026-10-30|Niko1221|Keep Unsloth's 1-bit DeepSeek sets off the Mac until the Metal engine has an IQ1_S kernel (lists, --model, --model-path, app check, setup)
+bc694233bf1e7e35662fadc0e481868633fca1a3|2026-10-30|Niko1221|Hardware list: AMD cards are counted from the kernel's KFD files when there is no setup module and no rocm-smi (ROCm from a Python venv), instead of not at all
+dd3f9ec82f570ed7e80a10a3c7ae3127729b3f84|2026-10-30|Niko1221|tests: the catalog download sizes cover the two Unsloth DeepSeek sets (241.0 and 258.4 GB)
+47cbb76690e285592f0607c421f5cc00714e6b6d|2026-10-30|Niko1221|Merge f-038-ds-unsloth (current head)
+ab083a693f6b4eb6c6f37c0102d76d6af24567d2|2026-10-30|Niko1221|Chat: streamed text is applied about ten times a second instead of once per token, so a long answer no longer saturates the page (main-thread time 15.7 s to 9.0 s, peak heap 114 MB to 62-75 MB for a 40,000-token answer; Mio's Out of Memory report)
+ad4755c249b1ff5521163736fecbac338e4bcc34|2026-10-30|Niko1221|Say plainly that the 1-bit UD-IQ1 sets are weaker on long or careful work
+b60fbb54f7d4b05c9dfa797d3eca34d38ce7f327|2026-10-30|Niko1221|serve: the parallel stack default is Linux CUDA only (HIP and Windows get nothing: no measurement outside the replica config)
+8f13b8c4add7f09218d5cb9eb84665719cc370b5|2026-10-30|Niko1221|Server: one plain line at start when a graphics card in use is of an architecture the compiled engine was not built for (#4662)
+0b1808f072b6d2faeabccda060eb70dcf3a9f5bc|2026-10-30|Niko1221|Update: a failed test start of the new engine names the kept log file to report (#4692)
+cfa7f737cca11b1eec840e8fa3c3dc5db9ca118e|2026-10-30|Niko1221|Setup: a compiled engine gets code for every usable NVIDIA card in the PC, not only the card setup picked (a TITAN RTX + RTX 3080 build for sm_75 only failed every long prompt with unspecified launch failure) (#4662)
+b3de587e03fdc6292744072032a62ebd650225cc|2026-10-30|Niko1221|Merge f-036-strix-u (7f6bc3308): the Windows gfx1151 default set holds both STRATA_SELECT_WMMA and STRATA_PF_F16 (seven switches); test counts updated
+7f6bc33081bfaeb143c01e9999eab2d3f78cf2d4|2026-10-30|Niko1221|gfx1151 on Windows: the prompt experts run on the F16 matrix-core kernels by default (STRATA_PF_F16)
+1ead7097903bb9e8d4d8b78541124ddd3e5fa536|2026-10-30|Niko1221|Control: the time-skip check and tune engine reads also tolerate non-UTF-8 output (#4675)
+dd63f88fdd84a6121b8a1f4f0e46e80bb3c03234|2026-10-30|Niko1221|Qwen3.6 engine: the warm-up reads only cells that exist and starts its small probes in a fresh sequence, so a prompt chunk equal to the context no longer writes past the KV cache (#4708)
+2a9ccfe3ea684256b788fda140a2bc6263e16b6e|2026-10-30|Niko1221|serve: the parallel stack default only where it was run (Linux CUDA nine switches, Linux HIP seven, nothing on Windows or macOS)
+dd471d31407329d917ff416690da67cef6056dbe|2026-10-30|Niko1221|serve: the exact parallel stack is the default with batch slots (explicit env still wins)
+4a75fa2b628c8bc0d9d537d29ebca6c941dad839|2026-10-30|Niko1221|API gateway: a client that hangs up right after data: [DONE] no longer turns a finished request into "Request cancelled." (#4690)
+3282c61343401cda19afda4a426770760e1209bd|2026-10-30|Niko1221|Server: a tool the conversation already called counts as declared, so a call to it comes back as a tool call, not raw text (#4663)
+209dcadb3f56e16832cfa7cbeedcdfed18b72c8d|2026-10-30|Niko1221|Parser: a fence is closed only by one as long as it opened with, and an indented code block is a quote, so calls shown in them are not run (#4702 #4703)
+e66a445892b1aaad08df6920f2e8c35b3399e4ef|2026-10-30|Niko1221|Server: a picture reader written into an older engine folder follows the engine in use after an update (#4658)
+68718c33facd9beee5eb06c3c10f9ed83f5a1bd6|2026-10-30|Niko1221|Monitor: the drive-temperature reader (every physical drive, from the first second) runs only while the Monitor is open, not at app start (#4661)
+ea52e55cd7301f4f1c916f4ab9dc94247e77bf4e|2026-10-30|Niko1221|Chat: only the streaming message renders again on each token, so a long chat no longer redoes its whole history per token (Out of Memory report from Mio; heap and main-thread time measured)
+08e8770c6e9e908c726d078ce35fd3aa2a09689d|2026-10-30|Niko1221|Prefill (layer-major): an expert with no mapped blob is copied by its source instead of ending the request (#4695)
+7146d6983f2d3dc8d0c3ba55af20ab2a37187d79|2026-10-30|Niko1221|Setup, Control and Terminal: a child's non-UTF-8 output (GBK adapter names) no longer kills Step 1 or launch (#4675)
+01ab6b51bbafe70b735a987a28543c4d42c2873b|2026-10-30|Niko1221|Merge f-036-strix-ds (957038a1c)
+957038a1cda669f63811c11faef982c3832137ef|2026-10-30|Niko1221|dsv41 (Windows HIP, integrated GPU): the shards' views are dropped after the load by default (DS4_NO_VIEW=0 turns it off, =1 forces it elsewhere)
+d340dc8dd10d7460806eb59e3cb816d7980a4aac|2026-10-30|Niko1221|apps/host test: planning a whole-drive models folder no longer deletes <drive>\Strata (#4689)
+ffaa6ad78c2ebaba081d099451b96cc1684bfab4|2026-10-30|Niko1221|tests: the app preview and launch list know the two Unsloth sets
+4006305476ab99f5dcb77e690d9dccb558695201|2026-10-30|Niko1221|tests: the lockfile versions are 0.2.9
+97e6f1fe1991ff9f4cccc788b9f9bf940cb00ab1|2026-10-30|Niko1221|Version 0.2.9: Terminal and app 0.2.9, engine and Control 0.1.55 (every Qwen and DeepSeek package, Metal and SYCL included)
+33bd74182be9378f08893c8a3347b1d349a49e84|2026-10-30|Niko1221|Merge f-038-ds-unsloth
+4d12701181b01c0f1b20577f48b4799780e049ff|2026-10-30|Niko1221|Merge f-0281-ds
+aed382885e929b2d71c62f928a7219d0fde3ae2a|2026-10-30|Niko1221|Merge f-036-strix-ds
+274257630b6c96ca131ab4abe2d9000caf7236f4|2026-10-30|Niko1221|Merge f-036-strix-u
+d96873fc56cc5c921d3d505b494a1b7194bfbd17|2026-10-30|Niko1221|Merge f-036-strix-q
+86bed1c92f9fd98d670b64b3bc255e9b0ed1ba5b|2026-10-30|Niko1221|Merge f-037-arc (5eaee81a4)
+203df526f16e954d2b0f91fd87158cd291f993c2|2026-10-30|Niko1221|serve/test_admit_order: the engine stand-in sets the arrivals deque the coalescing code reads
+b6fc410ee5da8d12e37761ff50b9d8afeac29d20|2026-10-30|Niko1221|Metal window.cpp: qualify NG_HC_DIM / NG_HIST in finish_rows (the --batch rows code did not compile in the host build)
+0a76d62e68c2eb0279a7c5a1c072ba8d09c0467b|2026-10-30|Niko1221|pinned.cu: the shared-arena tmpfs check is Linux-only (sys/vfs.h and statfs f_type), so the Metal host build compiles again
+c0e245c8be93a118c96897ae50b76e5623898368|2026-10-30|Niko1221|Merge f-029-par-metal (766b54afb)
+16e08b50cd7e9b2dc18e08bb6ea083e38e7d19e2|2026-10-30|Niko1221|Merge f-029-par-amd (4772f0cd9)
+1fb3e9a326b25ca3dfc0c3182442c2fbf7cc033b|2026-10-30|Niko1221|Merge f-029-par-harness
+1f8f2fa8adef856e2849e990c3fec7745f7281e8|2026-10-30|Niko1221|Merge f-029-par-big
+3a76d5eaf69f5e22e3d412cad89402ec6d6b388b|2026-10-30|Niko1221|Merge f-029-gdn-mx
+01ef87656296f96bb20699779cf7f488c83be81b|2026-10-30|Niko1221|Merge f-029-gdn-amd
+4746bfb1652e19c2124f34d9c445d4f02498d566|2026-10-30|Niko1221|Merge f-029-gdn-cuda
+0b1fbf40129678911b41ad6a15a0c21166d7c01c|2026-10-30|Niko1221|gfx1151 on Windows: STRATA_SELECT_WMMA joins the default prompt set (x1.008 at 8K, x1.037 at 32K, x1.077 at 64K; about 10 of 2,051 selected cells flip at the cutoff for queries past ~5K tokens)
+6923421a61f6c11db1afe6eb89bac37194c65415|2026-10-30|Niko1221|Accept Unsloth's DeepSeek UD-IQ1_S and UD-IQ1_M sets (pins, models, app file check, fit numbers; opt-in names)
+09dc5c52b33baa1e4a359581a6ce141ddc82a055|2026-10-30|Niko1221|gfx11 gr_upmix: 256 tokens a block (16 waves) halves the w_up staging per token; prefill timing splits the QSA projection stage
+5eaee81a434f93b0dfcf52d3258fdd24b91c7b8b|2026-10-30|Niko1221|[SYCL] kprof: profiling-tag sections time stretches without events of their own (the oneMKL GEMMs)
+d936db65474d3d918c3e69c70ed127bdc05cc935|2026-10-30|Niko1221|gfx1151: a Q8_0 down expert layer takes the F16 matrix-core prompt kernel by default
+ac3e0e17b590acd945973985ad0bf9db5247c3f0|2026-10-30|Niko1221|GDN gfx12: the chunked path from 64 tokens, as on gfx11 (owner: every gain counts; final gate at 64: +1.7% to +6.1%, KL 0.0025/0.038, 55/61 tasks, soak clean)
+b3bc47751212a58baa2a5d0e83bee1e334554656|2026-10-30|Niko1221|diagnostics: STRATA_QSA_STAT (overlap of consecutive queries' selections), hip_pa_bench target and PA_BENCH_REF (compare two variants of the prompt attention on a recorded selection)
+db729163ce0fc30d27898c4523a13a774ee9be0c|2026-10-30|Niko1221|Revert "setup: a Strix Halo's BIOS carve-out holds expert slots of the Unsloth RAM-budget plans"
+19b5f873f2d391b7b318210d9444ac02c2e1e72d|2026-10-30|Niko1221|dsv41 (Windows): DS4_NO_VIEW=1 drops every view of the shards and the load's buffered handles after the load, reads go unbuffered
+0122eceb4c14ce79007e8060120f9dc662d732b2|2026-10-30|Niko1221|[SYCL] --batch-groups: 'auto' is understood, and two Arc B-series cards with 8 or more slots default to 2 pipelined groups (INFO batch_groups); STRATA_BATCH_GROUPS_AUTO=0 / --batch-groups 1 turn it off
+8401c21f9dd377bcaf14619991b5b41a17e49ecb|2026-10-30|Niko1221|[SYCL] prompt attention on the int8 DPAS (ESIMD, Battlemage): hi/lo int8 Q and P, 2D block loads for the four-cell selection blocks; default on for Battlemage, STRATA_PROMPT_ATTN_ESIMD=0 off
+9c2121cf5c38e4837eee04325284a679a65aae14|2026-10-30|Niko1221|dsv41: the CPU lane's service thread spins through a decode token (DS4_LANE_SPIN_MS, 250) and naps on a high-resolution timer; DS4_PROF_SYNC decode stage profile; DS4_LANE_SKIP timing oracle
+1cfffa2ede69236eb08442620d110e8d4216d641|2026-10-30|Niko1221|gfx1151 fused experts: one barrier per stage (explicit LDS wait, after libstrix's barrier(), asf0/libstrix MIT) and 3 blocks per WGP for IQ2_S/IQ2_XS gate/up on gfx11
+a83252a7b722f8aa42474e1395ff5ca355617632|2026-10-30|Niko1221|gfx1151: the VGPR cap of the occupancy expert kernels applies on clang 24 as on clang 23 (IQ3_S/IQ4_NL layer 79.7 -> 69.9 ms at 16K tokens, parity unchanged)
+d8056fbe00e611380e6364b1dddad0ddbfde6066|2026-10-30|Niko1221|[SYCL] STRATA_KPROF=1: per-kernel GPU timer (event-profiled queues, kp() launch wrapper, decode/prompt tables); tools/arc A/B harness
+6fb110e557af17c4abc0e4038de9d86fe01901c6|2026-10-30|Niko1221|Opt-in research switches: STRATA_PAR_COUNTERS, STRATA_PIPED_CONCURRENT_MIN, multi-prompt layer-major read (Prefill::run_multi, BCO co-reads, server STRATA_COALESCE_PREFILL), STRATA_CRASH_BT
+28c4543e48d4c95dbf14cbeef1f1d0fe94e6ab0a|2026-10-30|Niko1221|tools: parallelism load harness (par_load, par_analyze, par_run, sweep, recon), E00 capability probe, batch_test --co/--seq/--pad and the phase-1/2 variant lists
+e1e7e326809f7f8a84757cfc73e95268b8dbe5c1|2026-10-30|Niko1221|prefill timing: STRATA_PREFILL_TIMING also splits the hyper-connection read into down, up, inject and mix
+94fc01c6fde4ee4d0286c3345640751f22939a92|2026-10-30|Niko1221|setup: a Strix Halo's BIOS carve-out holds expert slots of the Unsloth RAM-budget plans
+b0ba459514535019bd1f67c1eb5b20e1949aa443|2026-10-30|Niko1221|Merge f-029-par-sycl (SYCL batch windows, GDN/attn rows kernels)
+2fef4302022163488310dfd68291923f15dedee8|2026-10-30|Niko1221|Merge f-034-cand (0.2.9 candidate) into f-036-strix
+7a9245b6c014b91eb3120cb502e4b402d83a59cd|2026-10-30|Niko1221|[SYCL] batch window: port the one-launch-for-all-rows kernels (GDN groups, block scores rows, decode attention rows; opt-in STRATA_BATCH_GDN_GROUPS / STRATA_BATCH_ATTN_ROWS) and the batch-window stage profile; no speed gain on 2x Arc B65
+368bcb7a26439a6681d59236b16b9738d08db180|2026-10-30|Niko1221|serve/test_admit_order: the engine stand-in sets the arrivals deque the coalescing code reads
+5ad0135c00a6233f59aa892176207ade72613610|2026-10-30|Niko1221|Metal window.cpp: qualify NG_HC_DIM / NG_HIST in finish_rows (the --batch rows code did not compile in the host build)
+cdb5470c704af9b4e6ce9a6aecb7a466f3732578|2026-10-30|Niko1221|pinned.cu: the shared-arena tmpfs check is Linux-only (sys/vfs.h and statfs f_type), so the Metal host build compiles again
+87970c8ae0c8aa6e4cd0f6e6fad0a77649b9716f|2026-10-30|Niko1221|Merge f-029-par-metal (766b54afb)
+777d11f8a3873d2b3fbb0aafba949f28bfdeb64b|2026-10-30|Niko1221|Merge f-029-par-amd (4772f0cd9)
+dcc79c52308a6360633ffdf0c4414f7b847b8976|2026-10-30|Niko1221|Merge f-029-par-harness (9b5965c3c)
+db0606b4f83fe4003f6382dcae4bd0e435ba262a|2026-10-30|Niko1221|Merge f-029-par-big (714438ec1)
+4bfd66686e29333cd22983a0f9843f38e4ee925b|2026-10-30|Niko1221|Merge f-029-gdn-mx (348457223)
+5c00af8a1ff05c5ce6c4d6d922343b2afb83722a|2026-10-30|Niko1221|Merge f-029-gdn-amd (f0a34fa9b)
+78859bbcb1bfadabe5ebe10166e31e9ed633683e|2026-10-30|Niko1221|Merge f-029-gdn-cuda (51567de1a)
+9b5965c3c14535bee1466502640e8dc4faef414a|2026-10-30|Niko1221|z_ctx
+836dd2d86ef95ef71fee858aae0395eaf4f34a33|2026-10-30|Niko1221|sweep: server flags column; stacked-candidate variant lists
+6d7255f205389b2418bb6a0035979cc0d4d209c0|2026-10-30|Niko1221|z_pool
+97bbd76c9297d4c4f07e8a7880d1b039c9b5f42e|2026-10-30|Niko1221|tools/par/overhead.sh (counters overhead A/B)
+36e798f4c5c368c5d1e80077df31e060c33b7ac1|2026-10-30|Niko1221|Opt-in research switches: STRATA_PAR_COUNTERS, STRATA_PIPED_CONCURRENT_MIN, multi-prompt layer-major read (Prefill::run_multi, BCO co-reads, server STRATA_COALESCE_PREFILL), STRATA_CRASH_BT
+1510e6d6d20516b5916a4c40f97d5c9661cbfec0|2026-10-30|Niko1221|tools: parallelism load harness (par_load, par_analyze, par_run, sweep), E00 capability probe and the phase-1/2 variant lists
+4772f0cd9acd81bb2958a9ebd3c9a8a7a326ec6b|2026-10-30|Niko1221|co-read adaptive: look 10 ms for the burst's other arrivals before deciding
+7aafac422c0c73af8d0cffb4421b33e55de597e1|2026-10-30|Niko1221|shared arena on Windows: a named pagefile-backed section (CreateFileMapping/MapViewOfFile) with the same header and load state word, pid election on both OSes, server option enabled, pinned_shared_win_test
+62b042e8436806c0cb3b0d5397748b9a9a056a92|2026-10-30|Niko1221|co-read: adaptive - the leader waits and the read is shared only when the engine has seen at least 3 requests arrive together (STRATA_COALESCE_MIN_REQS, STRATA_COALESCE_BURST_MS)
+9d8337844eee741cd6525d14affc271b2b1beec8|2026-10-30|Niko1221|replicas: the memfd arena warns when the RAM will not hold all the engines
+714438ec19f688d4d35c4cb98d2bd9c8f16f0200|2026-10-30|Niko1221|GDN TC: two value tiles per head on cards with >= 96 SMs (STRATA_GDN_TC_TILES), harness --tiles
+d3af2d42ad55baee27073c2fa4e8af97bafe862c|2026-10-30|Niko1221|GDN: single-pass conv+SiLU+L2 (STRATA_GDN_CONVL2=2), output-only reduced-precision experiment mode (STRATA_GDN_TC_NP=2)
+1a865fb3dbf22e22a7f62ca9d892e75e7ba20883|2026-10-30|Niko1221|GDN TC: fused output norm for the split scan, NP experiment variants (STRATA_GDN_TC_NP), STRATA_GDN_TC_FUSE
+a0e7f5160d0a826b048f4a3a29002f1e08011f1f|2026-10-30|Niko1221|GDN harness: tc any_sms bypass for multi-wave tests, output hash
+dc149ef0031ac41cca183a2f1c18f71c6b980d37|2026-10-30|Niko1221|GDN: production-linked parity/bench harness, dispatch probe, FP64 fixtures, contract doc; opt-in STRATA_GDN_TC on 99-KB cards (split v/T/P buffering)
+9f1d0ad0418e88f819bd57cc194eb5556c73d399|2026-10-30|Niko1221|replicas: a replica that fails to start beside a living one is started again on the same shared arena before the sharing is given up
+1064ff7783112140c44ff7cbecd3b280906412b1|2026-10-30|Niko1221|STRATA_COALESCE_WAIT_MS
+301a09f10035185ab25701b5be2d4af954947520|2026-10-30|Niko1221|STRATA_PREFILL_LM_FORCE (research reference for the multi-prompt read)
+4f88a2fa8bbc455150f47b9f71968027ac06e7d4|2026-10-30|Niko1221|multi-prompt read: relaxed stage-chunk rule, sub-chunks at the smallest stage chunk; gated identity variants
+1f05fdc283e6d6f5420d4def35094debb9ea7aa8|2026-10-30|Niko1221|[Engine] CUDA hyper-connection read (v3): the transposed warp sums also for 5..7-token launches
+a8fba1f5b7cd8f535b835cc62a506b650570ed19|2026-10-30|Niko1221|multi-prompt PLE: tables, constants and weights from the main session, the history of the prompt's own
+2f0d6a1c15167e8d320dd319fb6d042c1d1fcc82|2026-10-30|Niko1221|replica profile (opt-in): setup --replica-profile picks one engine per card + shared expert arena + the host stack when the RAM and VRAM check passes
+42aee7a349c071d71f5384acdf9c4cd73c46d03e|2026-10-30|Niko1221|[Engine] CUDA hyper-connection read (v3), 8-token launches: the eight warp sums in one transposed butterfly (same additions, same bits; decode c=8 +2%)
+3782008944a5648a15242ded95fc20128a3fcf8e|2026-10-30|Niko1221|shared arena: memfd backing (not limited by the /dev/shm size), one engine reads the experts and the others skip the read, RAM check before the pages are taken
+05cd12e7a27b97b37429f6b0d3dcf8b24ed53b6b|2026-10-30|Niko1221|[Engine] batch window: STRATA_BATCH_GDN_GROUPS now also works with STRATA_BATCH_SELF_COMMIT (the grouped GDN launch keeps its one-row groups itself)
+0c94851835de3577c23d8a070ef4d2ec8a3602db|2026-10-30|Niko1221|shared arena: the header is written before any engine reserves pages, an importer waits for a header still being written, and every engine reserves the tmpfs pages
+21f950b4b477a0006ddbae71faa6073a8e4000a9|2026-10-30|Niko1221|[Engine] CUDA hyper-connection read (v3): exact 5..8-token down kernels with two rows per warp (same dots, same bits; decode c=8 +5%)
+3ccfd5aed3f51fe64875c7a1594ea9be7676177a|2026-10-30|Niko1221|replicas: opt-in shared expert arena (one /dev/shm file for all replicas, stale-file sweep, private fallback); the engine reserves a tmpfs arena up front
+51567de1a676df36461eb48b46551aab13d8fa9e|2026-10-30|Niko1221|GDN TC: two value tiles per head on cards with >= 96 SMs (STRATA_GDN_TC_TILES), harness --tiles
+f0a34fa9bfa27483d6607f37ebf6b53e0bfbfa86|2026-10-30|Niko1221|kGdnW12MinT comment: the 8K figure
+84aa2d7d57d56616b989ac52a802f20bfae5158b|2026-10-30|Niko1221|GDN gfx12: chunked path only from calls of 12000 tokens (measured crossover for the +5% bar); p2006/KL scripts
+1d9b4c48e9f0385eae651b63f922412b9ab12e8b|2026-10-30|Niko1221|prefill: STRATA_LM_HIP=1 opts the layer-major (and multi-prompt) read in on HIP builds
+2072510a479662a615336178bb430c6a67ef6009|2026-10-30|Niko1221|[Engine] --batch on one GPU: opt-in concurrent prompt read beside the decoding slots (STRATA_BATCH_CONCURRENT_READ)
+0ea3e455fdab47a0358eae0d0615b35f8f5cc92c|2026-10-30|Niko1221|GDN: single-pass conv+SiLU+L2 (STRATA_GDN_CONVL2=2), output-only reduced-precision experiment mode (STRATA_GDN_TC_NP=2)
+a9f154e82b2a4c321ef6e9ccd27b3eeff547f020|2026-10-30|Niko1221|run_multi: layer-major even for a short total
+766b54afb18bfbaed8c621c16e49468f9f444915|2026-10-30|Niko1221|[Engine] Metal: --batch N / "parallel": N runs, and the slot rows share one window
+faa1be268ceb91a3f760ef7ad9711a192d59b744|2026-10-30|Niko1221|co-read: server side (STRATA_COALESCE_PREFILL), par_load --keep-text, cmp_texts
+47a1047750cae87d9e50d6cfa2c40e13a5fa7154|2026-10-30|Niko1221|WIP multi-prompt layer-major prefill (Prefill::run_multi) and BCO co-reads in the batch admission
+ee05114846e783aabbe717e3972a95386b8172f9|2026-10-30|Niko1221|GDN TC: fused output norm for the split scan, NP experiment variants (STRATA_GDN_TC_NP), STRATA_GDN_TC_FUSE
+d8c94b45c873c32d78892a7a8c361567bba5f798|2026-10-30|Niko1221|[Engine] CUDA prompt path: opt-in FP16 cache of dequantized dense weights (STRATA_PF_W16_CACHE_MIB)
+236adb39877157b061fe61a2365f77cf86302a34|2026-10-30|Niko1221|GDN gfx12: conv + SiLU + q/k norm written as FP16 and read by the chunked kernels (one entry, STRATA_GDN_FUSE=0 off); ablation hooks removed
+3484572236b0c73ecae5bf2dda7cae8559ec0d37|2026-10-30|Niko1221|Metal: tensor-op chunk-state probe, layer bench with before/after, A/B driver
+e0cc4e859e4047f6586f28ace5dea99186e2f3e2|2026-10-30|Niko1221|GDN harness: tc any_sms bypass for multi-wave tests, output hash
+cea3057e2c1392142e9c49a73852e22c145e34b9|2026-10-30|Niko1221|Metal: GDN chunked v2 (measured, slower), M5 GEMM tiles + fused GDN input projections (bit-identical), layer bench
+5e9995d296070c3d86462069be5bd8119c97e10e|2026-10-30|Niko1221|GDN gfx12: LDS-only barrier in the chunked scan; conv + SiLU + q/k norm folded into the chunked kernels (opt-in STRATA_GDN_CHUNKED=1, STRATA_GDN_FUSE=0 off), bench check mode
+095464152cde9e41d9ae07649e2b3055ff56257a|2026-10-30|Niko1221|Metal: GDN prompt scan chosen per chip (M4 scanr_4_8, M5 Max scanr_4_4 from T 4096), bit-identical
+2cf3fd181f197caa84f4c3b19907dd1bb106957d|2026-10-30|Niko1221|Metal: gdn_scan_f (scan + gdn_post fused, bit-identical, slower: kept as a measured negative), bench
+06f212aefe6971cfcd2af2a1f1ee7bdce1347944|2026-10-30|Niko1221|GDN: production-linked parity/bench harness, dispatch probe, FP64 fixtures, contract doc; opt-in STRATA_GDN_TC on 99-KB cards (split v/T/P buffering)
+4d9d9cefd303ea7113eec5ef29a978f12706ab5e|2026-10-29|Niko1221|GDN: the chunked WMMA recurrence on gfx12 (opt-in STRATA_GDN_CHUNKED=1), gfx12 fragment layout
+f34ab1c8f51f2562069bafbee79181f5499064c0|2026-10-29|Niko1221|GDN gfx11 WMMA: compile the device pass for gfx1103 too (the runtime gate lists it; the pass trapped there)
+280885fda0f7af37289bcb4251a64cad63d5175e|2026-10-29|Niko1221|Metal: GDN prompt scan benchmark (sequential vs chunked), extra gdn_scanr TB instantiations, opt-in STRATA_METAL_GDN_SCAN
+ae2657a19d947c5ab0a213be61cbf34d7707f6e3|2026-10-29|Niko1221|gdn_stage_bench: fix auto deduction
+d4f15adf873b5a1901f2e5c55a2fe2c3400aa2fa|2026-10-29|Niko1221|tests/hip: gdn_stage_bench, the GDN prompt stage (gates, conv, recurrence) per piece with output and state hashes
+dbdec0bb9eb3e518f1e6864adb9ef34e4905bb59|2026-10-29|Niko1221|Control 0.1.55 and Terminal 0.2.8.1 (Control-only release: the app stays 0.2.8, the engine packages 0.1.54)
+d7cb41ba87eafc6e01f778cdf8e23d5e8dad4ced|2026-10-29|Niko1221|DeepSeek local GGUF: accept both layouts of the IST-DAS sets, the pinned four-shard one and ISTA-DASLab's six-shard one (owner decision, option B)
+c4e975cc7a72a357cd8c268a79cec5896c59b747|2026-10-29|StackArc3|Accept ISTA-DASLab's six-shard DeepSeek V4.1 Flash GGUF layout
+c15a90b28c9755d12e5094d0bfa253b38a1c258a|2026-10-27|lu123bing|gguf reader: size the integer tensors, so a complete DeepSeek first shard is accepted and a cut one refused
+b2dbd9420d7860b79d553afd977ba2e70cff9d52|2026-10-28|Niko1221|dsv41 serve: the cache settle runs in the idle between requests (WP-8's option 1)
+c697e859e94318ca24adf2656dcc30ca49420df5|2026-10-28|Niko1221|dsv41: the matrix-core prompt attention (DS4_FAST_ATTN) on by default for gfx1151 on Windows
+2ea46ded73ef490e586b29de400fd8e50139b355|2026-10-28|Niko1221|dsv41: the post-prompt cache settle's budget 6,000 -> 800 ms on every platform
+20bba22af7e94b3a3648b53b7380e8e0b017e843|2026-10-28|Niko1221|gfx1151 on Windows: a 16,384-token prompt chunk, and the docs for the two new prompt defaults
+1493781e91d6ed1cc6172bf06bbd40ccc7256a8a|2026-10-28|Niko1221|gfx1151 on Windows: the matrix-core prompt set by default, and the prompt keeps its own buffers
 870aedd9e1ebe1c91f94da93b59af17729f6c5c0|2026-10-29|Niko1221|[Engine] SYCL: the prompt attention batch is budgeted where it is allocated, and stays 32 by default
 36f6663c25e60abdfc626abe48e0e8fa3a9fe762|2026-10-29|Niko1221|Version 0.2.8: Terminal and app 0.2.8, engine and Control 0.1.54 (every Qwen and DeepSeek package, Metal and SYCL included)
 1bf946eafa1a251a10a7599f0012d9e4863b46b9|2026-10-29|Niko1221|Merge f-028-monitor: the Monitor keeps the app's own GPU readings where the engine has none (AMD on Windows), reads Windows AMD temperature, and drops non-GPU display chips on Linux (#3727)
