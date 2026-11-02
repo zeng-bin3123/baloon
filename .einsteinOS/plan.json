@@ -257,7 +257,7 @@
         "IqQuantMatVec.lean"
       ],
       "reason": "initial plan",
-      "conv": "60298ecb-5a70-4965-bca5-ca918f99b312"
+      "conv": "5fb70cfd-b82e-4181-8310-0f00e891d6e4"
     },
     {
       "id": "u12e951f10f",
@@ -319,6 +319,11 @@
       "pass": true,
       "unit_id": "u1d650a56bd"
     },
+    "ExpertPoolProtocol.lean": {
+      "hash": "82c09327a7a9",
+      "pass": true,
+      "unit_id": "u1c981cdd76"
+    },
     "ExpertVramCache.lean": {
       "hash": "d67e16b5b621",
       "pass": true,
@@ -329,15 +334,55 @@
       "pass": true,
       "unit_id": "u1d650a56bd"
     },
+    "FusedGatedResidualRead.lean": {
+      "hash": "d5957f32837f",
+      "pass": true,
+      "unit_id": "u1c981cdd76"
+    },
+    "FusedGdnDecodeStep.lean": {
+      "hash": "40a02e2e95bb",
+      "pass": true,
+      "unit_id": "u1c981cdd76"
+    },
+    "GatedResidualReadWrite.lean": {
+      "hash": "14d401f4bb53",
+      "pass": true,
+      "unit_id": "u1c981cdd76"
+    },
     "GdnQsaLayerLayout.lean": {
       "hash": "9bc27ac120aa",
       "pass": true,
       "unit_id": "u1d650a56bd"
     },
+    "GdnReferenceKernels.lean": {
+      "hash": "a2c39b5b14ef",
+      "pass": true,
+      "unit_id": "u1c981cdd76"
+    },
+    "IqQuantMatVec.lean": {
+      "hash": "762355b1153d",
+      "pass": true,
+      "unit_id": "u1c981cdd76"
+    },
+    "IquantAvx512Rows.lean": {
+      "hash": "4da06a332274",
+      "pass": true,
+      "unit_id": "u1c981cdd76"
+    },
     "MtpDraftRows.lean": {
       "hash": "5da89e7ed808",
       "pass": true,
       "unit_id": "u1d650a56bd"
+    },
+    "Q2Avx2Fallback.lean": {
+      "hash": "d86df51da875",
+      "pass": true,
+      "unit_id": "u1c981cdd76"
+    },
+    "Q2ExpertVnniKernel.lean": {
+      "hash": "5032960fb416",
+      "pass": true,
+      "unit_id": "u1c981cdd76"
     },
     "SessionLoopIndexing.lean": {
       "hash": "f452e5eefc38",
@@ -355,15 +400,7 @@
       "unit_id": "u1d650a56bd"
     }
   },
-  "fix_attempts": {
-    "u1c981cdd76": 2
-  },
-  "last_failure": {
-    "u1c981cdd76": {
-      "kind": "nothing_written",
-      "text": "the conversation wrote no file (the mirror is identical to the branch tip)",
-      "base_ref": "einsteinOS/dev-6"
-    }
-  },
+  "fix_attempts": {},
+  "last_failure": {},
   "infra_fails": 0
 }
