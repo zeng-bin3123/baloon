@@ -259,6 +259,10 @@
         "Q2Avx2Fallback.lean",
         "FusedGdnDecode.lean"
       ],
+      "children": [
+        "udc8aa35c6d",
+        "uf8111d20aa"
+      ],
       "reason": "initial plan",
       "conv": "bfddc6eb-2f5a-49eb-bf89-e5fee824b03b"
     },
@@ -313,6 +317,30 @@
         "ByteLevelBpeTokenizer.lean"
       ],
       "reason": "initial plan"
+    },
+    {
+      "id": "udc8aa35c6d",
+      "parent": "u7efed2c9f3",
+      "modules": [
+        "LayerBufferLayout.lean",
+        "MtpWindowing.lean",
+        "SessionLayerState.lean",
+        "VerifierSplitWindow.lean",
+        "WeightPackLoader.lean",
+        "Q2ExpertKernel.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "uf8111d20aa",
+      "parent": "u7efed2c9f3",
+      "modules": [
+        "IquantAvx512Rows.lean",
+        "ExpertPoolScheduling.lean",
+        "Q2Avx2Fallback.lean",
+        "FusedGdnDecode.lean"
+      ],
+      "reason": "3 fix attempts used"
     }
   ],
   "state": {
@@ -352,15 +380,7 @@
       "unit_id": "u8d07db6355"
     }
   },
-  "fix_attempts": {
-    "u7efed2c9f3": 3
-  },
-  "last_failure": {
-    "u7efed2c9f3": {
-      "kind": "nothing_written",
-      "text": "the conversation wrote no file (the mirror is identical to the branch tip)",
-      "base_ref": "einsteinOS/dev-4"
-    }
-  },
+  "fix_attempts": {},
+  "last_failure": {},
   "infra_fails": 0
 }
