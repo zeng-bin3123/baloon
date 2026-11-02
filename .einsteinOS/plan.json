@@ -1,0 +1,308 @@
+{
+  "version": 1,
+  "ref": "Niko1221/Strata",
+  "ref_sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+  "theory_hash": "af07b13c7c7d",
+  "modules": {
+    "CpuExpertPool.lean": {
+      "name": "CpuExpertPool.lean",
+      "hash": "aa667ec7c992",
+      "bytes": 2533
+    },
+    "ExpertBlobSource.lean": {
+      "name": "ExpertBlobSource.lean",
+      "hash": "11ff3df27586",
+      "bytes": 3106
+    },
+    "ExpertDispatchSplit.lean": {
+      "name": "ExpertDispatchSplit.lean",
+      "hash": "bddd22418063",
+      "bytes": 2124
+    },
+    "ExpertPoolProtocol.lean": {
+      "name": "ExpertPoolProtocol.lean",
+      "hash": "82c09327a7a9",
+      "bytes": 7643
+    },
+    "ExpertVramCache.lean": {
+      "name": "ExpertVramCache.lean",
+      "hash": "d67e16b5b621",
+      "bytes": 5807
+    },
+    "F16Bits.lean": {
+      "name": "F16Bits.lean",
+      "hash": "e963fede4d46",
+      "bytes": 3352
+    },
+    "FusedGatedResidualRead.lean": {
+      "name": "FusedGatedResidualRead.lean",
+      "hash": "d5957f32837f",
+      "bytes": 6020
+    },
+    "FusedGdnDecodeStep.lean": {
+      "name": "FusedGdnDecodeStep.lean",
+      "hash": "40a02e2e95bb",
+      "bytes": 6930
+    },
+    "GatedResidualReadWrite.lean": {
+      "name": "GatedResidualReadWrite.lean",
+      "hash": "14d401f4bb53",
+      "bytes": 5903
+    },
+    "GdnQsaLayerLayout.lean": {
+      "name": "GdnQsaLayerLayout.lean",
+      "hash": "9bc27ac120aa",
+      "bytes": 4204
+    },
+    "GdnReferenceKernels.lean": {
+      "name": "GdnReferenceKernels.lean",
+      "hash": "a2c39b5b14ef",
+      "bytes": 4928
+    },
+    "GenerateDriverContracts.lean": {
+      "name": "GenerateDriverContracts.lean",
+      "hash": "91beac932175",
+      "bytes": 10371
+    },
+    "IqQuantMatVec.lean": {
+      "name": "IqQuantMatVec.lean",
+      "hash": "762355b1153d",
+      "bytes": 10734
+    },
+    "IquantAvx512Rows.lean": {
+      "name": "IquantAvx512Rows.lean",
+      "hash": "4da06a332274",
+      "bytes": 7012
+    },
+    "KvCacheQ8.lean": {
+      "name": "KvCacheQ8.lean",
+      "hash": "67958b59bfb6",
+      "bytes": 6075
+    },
+    "MtpDraftRows.lean": {
+      "name": "MtpDraftRows.lean",
+      "hash": "5da89e7ed808",
+      "bytes": 3464
+    },
+    "NativeGdnPreprocessing.lean": {
+      "name": "NativeGdnPreprocessing.lean",
+      "hash": "923db5e9f5b8",
+      "bytes": 5399
+    },
+    "NativeGdnRecurrence.lean": {
+      "name": "NativeGdnRecurrence.lean",
+      "hash": "c99947b276c5",
+      "bytes": 4898
+    },
+    "NativeQuantMatVec.lean": {
+      "name": "NativeQuantMatVec.lean",
+      "hash": "19f6267da042",
+      "bytes": 11636
+    },
+    "NativeRouterTop10.lean": {
+      "name": "NativeRouterTop10.lean",
+      "hash": "22c61e9deea5",
+      "bytes": 2242
+    },
+    "NativeShortFlashAttention.lean": {
+      "name": "NativeShortFlashAttention.lean",
+      "hash": "6f39c5aa8d42",
+      "bytes": 6915
+    },
+    "NgramHashIq4nlTable.lean": {
+      "name": "NgramHashIq4nlTable.lean",
+      "hash": "21d27175c60f",
+      "bytes": 11763
+    },
+    "PleBlock.lean": {
+      "name": "PleBlock.lean",
+      "hash": "4c9d1e8609ef",
+      "bytes": 3141
+    },
+    "PleDirectRowReader.lean": {
+      "name": "PleDirectRowReader.lean",
+      "hash": "d39d9bb998ca",
+      "bytes": 6798
+    },
+    "PrefillChunkOrchestration.lean": {
+      "name": "PrefillChunkOrchestration.lean",
+      "hash": "d7f9724061e0",
+      "bytes": 5810
+    },
+    "PrefillGpuKernels.lean": {
+      "name": "PrefillGpuKernels.lean",
+      "hash": "dcb20fe326bf",
+      "bytes": 11657
+    },
+    "Q2Avx2Fallback.lean": {
+      "name": "Q2Avx2Fallback.lean",
+      "hash": "d86df51da875",
+      "bytes": 5178
+    },
+    "Q2ExpertVnniKernel.lean": {
+      "name": "Q2ExpertVnniKernel.lean",
+      "hash": "5032960fb416",
+      "bytes": 8351
+    },
+    "QsaBlockScoring.lean": {
+      "name": "QsaBlockScoring.lean",
+      "hash": "d4acea950d92",
+      "bytes": 7047
+    },
+    "QsaBlockSelect.lean": {
+      "name": "QsaBlockSelect.lean",
+      "hash": "27196356fb38",
+      "bytes": 1971
+    },
+    "QsaCacheIndexerAttention.lean": {
+      "name": "QsaCacheIndexerAttention.lean",
+      "hash": "30cd6a60c038",
+      "bytes": 2527
+    },
+    "QsaDecodeAttention.lean": {
+      "name": "QsaDecodeAttention.lean",
+      "hash": "50dde367b106",
+      "bytes": 2385
+    },
+    "QsaIndexerPooling.lean": {
+      "name": "QsaIndexerPooling.lean",
+      "hash": "4de1a4877b4a",
+      "bytes": 6470
+    },
+    "QuantizeActivation.lean": {
+      "name": "QuantizeActivation.lean",
+      "hash": "55137c7ba2b9",
+      "bytes": 2267
+    },
+    "RouterTop10.lean": {
+      "name": "RouterTop10.lean",
+      "hash": "13abb2b11e63",
+      "bytes": 2521
+    },
+    "S2ExpertGroupedGemv.lean": {
+      "name": "S2ExpertGroupedGemv.lean",
+      "hash": "c3a2c2255da0",
+      "bytes": 3592
+    },
+    "SGemv.lean": {
+      "name": "SGemv.lean",
+      "hash": "1c58349c1fe5",
+      "bytes": 2873
+    },
+    "Sampler.lean": {
+      "name": "Sampler.lean",
+      "hash": "bc08bb87b59e",
+      "bytes": 3555
+    },
+    "SessionLoopIndexing.lean": {
+      "name": "SessionLoopIndexing.lean",
+      "hash": "f452e5eefc38",
+      "bytes": 3039
+    },
+    "SpecDraftController.lean": {
+      "name": "SpecDraftController.lean",
+      "hash": "d02539df7a24",
+      "bytes": 13752
+    },
+    "SuffixLookupDrafter.lean": {
+      "name": "SuffixLookupDrafter.lean",
+      "hash": "a7f0b6c7fe79",
+      "bytes": 5453
+    },
+    "VerifyKernels.lean": {
+      "name": "VerifyKernels.lean",
+      "hash": "56475eae1eae",
+      "bytes": 3582
+    },
+    "VerifyWindowGroups.lean": {
+      "name": "VerifyWindowGroups.lean",
+      "hash": "eb9e8fd7408a",
+      "bytes": 4829
+    },
+    "WeightsLoaderSegments.lean": {
+      "name": "WeightsLoaderSegments.lean",
+      "hash": "18d6bd6f9150",
+      "bytes": 4382
+    }
+  },
+  "nodes": [
+    {
+      "id": "u1d650a56bd",
+      "modules": [
+        "ExpertVramCache.lean",
+        "ExpertBlobSource.lean",
+        "ExpertDispatchSplit.lean",
+        "CpuExpertPool.lean",
+        "F16Bits.lean",
+        "GdnQsaLayerLayout.lean",
+        "MtpDraftRows.lean",
+        "SessionLoopIndexing.lean",
+        "VerifyWindowGroups.lean",
+        "WeightsLoaderSegments.lean"
+      ],
+      "reason": "initial plan"
+    },
+    {
+      "id": "u1c981cdd76",
+      "modules": [
+        "Q2ExpertVnniKernel.lean",
+        "IquantAvx512Rows.lean",
+        "ExpertPoolProtocol.lean",
+        "Q2Avx2Fallback.lean",
+        "FusedGdnDecodeStep.lean",
+        "FusedGatedResidualRead.lean",
+        "GdnReferenceKernels.lean",
+        "GatedResidualReadWrite.lean",
+        "IqQuantMatVec.lean"
+      ],
+      "reason": "initial plan"
+    },
+    {
+      "id": "u12e951f10f",
+      "modules": [
+        "KvCacheQ8.lean",
+        "NativeShortFlashAttention.lean",
+        "NativeGdnRecurrence.lean",
+        "NativeGdnPreprocessing.lean",
+        "NativeQuantMatVec.lean",
+        "QsaIndexerPooling.lean",
+        "QsaBlockScoring.lean",
+        "NativeRouterTop10.lean",
+        "PleBlock.lean",
+        "QsaCacheIndexerAttention.lean"
+      ],
+      "reason": "initial plan"
+    },
+    {
+      "id": "u5c33e33419",
+      "modules": [
+        "QsaDecodeAttention.lean",
+        "QsaBlockSelect.lean",
+        "QuantizeActivation.lean",
+        "RouterTop10.lean",
+        "S2ExpertGroupedGemv.lean",
+        "SGemv.lean",
+        "Sampler.lean",
+        "VerifyKernels.lean",
+        "NgramHashIq4nlTable.lean",
+        "PleDirectRowReader.lean"
+      ],
+      "reason": "initial plan"
+    },
+    {
+      "id": "u01b8526be5",
+      "modules": [
+        "PrefillGpuKernels.lean",
+        "PrefillChunkOrchestration.lean",
+        "GenerateDriverContracts.lean",
+        "SuffixLookupDrafter.lean",
+        "SpecDraftController.lean"
+      ],
+      "reason": "initial plan"
+    }
+  ],
+  "state": {},
+  "fix_attempts": {},
+  "last_failure": {},
+  "infra_fails": 0
+}
