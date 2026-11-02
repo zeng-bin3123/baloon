@@ -242,7 +242,8 @@
         "ExpertCacheResidency.lean",
         "ExpertSourceDispatch.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "120cfc26-3e8d-4b53-9774-2ef6baa39ac2"
     },
     {
       "id": "u7efed2c9f3",
@@ -313,7 +314,43 @@
       "reason": "initial plan"
     }
   ],
-  "state": {},
+  "state": {
+    "ChatFrontendParsing.lean": {
+      "hash": "d7057d3e730b",
+      "pass": true,
+      "unit_id": "u8d07db6355"
+    },
+    "ExpertCacheResidency.lean": {
+      "hash": "805768056806",
+      "pass": true,
+      "unit_id": "u8d07db6355"
+    },
+    "ExpertSourceDispatch.lean": {
+      "hash": "ea309075d63e",
+      "pass": true,
+      "unit_id": "u8d07db6355"
+    },
+    "Fp16BitConversion.lean": {
+      "hash": "8d4619ba5bd2",
+      "pass": true,
+      "unit_id": "u8d07db6355"
+    },
+    "GgufHeaderReader.lean": {
+      "hash": "eed68e633774",
+      "pass": true,
+      "unit_id": "u8d07db6355"
+    },
+    "InferenceServerCore.lean": {
+      "hash": "0ef9af6b9b46",
+      "pass": true,
+      "unit_id": "u8d07db6355"
+    },
+    "QuantBlockDequant.lean": {
+      "hash": "cc4385b1f7b3",
+      "pass": true,
+      "unit_id": "u8d07db6355"
+    }
+  },
   "fix_attempts": {},
   "last_failure": {},
   "infra_fails": 0
