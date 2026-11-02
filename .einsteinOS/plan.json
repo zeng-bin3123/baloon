@@ -240,7 +240,8 @@
         "VerifyWindowGroups.lean",
         "WeightsLoaderSegments.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "e1a15cfd-80b9-45f5-b168-7bb5f6d60c27"
     },
     {
       "id": "u1c981cdd76",
@@ -301,7 +302,58 @@
       "reason": "initial plan"
     }
   ],
-  "state": {},
+  "state": {
+    "CpuExpertPool.lean": {
+      "hash": "aa667ec7c992",
+      "pass": true,
+      "unit_id": "u1d650a56bd"
+    },
+    "ExpertBlobSource.lean": {
+      "hash": "11ff3df27586",
+      "pass": true,
+      "unit_id": "u1d650a56bd"
+    },
+    "ExpertDispatchSplit.lean": {
+      "hash": "bddd22418063",
+      "pass": true,
+      "unit_id": "u1d650a56bd"
+    },
+    "ExpertVramCache.lean": {
+      "hash": "d67e16b5b621",
+      "pass": true,
+      "unit_id": "u1d650a56bd"
+    },
+    "F16Bits.lean": {
+      "hash": "e963fede4d46",
+      "pass": true,
+      "unit_id": "u1d650a56bd"
+    },
+    "GdnQsaLayerLayout.lean": {
+      "hash": "9bc27ac120aa",
+      "pass": true,
+      "unit_id": "u1d650a56bd"
+    },
+    "MtpDraftRows.lean": {
+      "hash": "5da89e7ed808",
+      "pass": true,
+      "unit_id": "u1d650a56bd"
+    },
+    "SessionLoopIndexing.lean": {
+      "hash": "f452e5eefc38",
+      "pass": true,
+      "unit_id": "u1d650a56bd"
+    },
+    "VerifyWindowGroups.lean": {
+      "hash": "eb9e8fd7408a",
+      "pass": true,
+      "unit_id": "u1d650a56bd"
+    },
+    "WeightsLoaderSegments.lean": {
+      "hash": "18d6bd6f9150",
+      "pass": true,
+      "unit_id": "u1d650a56bd"
+    }
+  },
   "fix_attempts": {},
   "last_failure": {},
   "infra_fails": 0
