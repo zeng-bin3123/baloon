@@ -290,7 +290,8 @@
         "NgramHashIq4nlTable.lean",
         "PleDirectRowReader.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "03c58e2d-f252-4bf2-aacb-5dd5838832c2"
     },
     {
       "id": "u01b8526be5",
@@ -451,7 +452,15 @@
       "unit_id": "u1d650a56bd"
     }
   },
-  "fix_attempts": {},
-  "last_failure": {},
+  "fix_attempts": {
+    "u5c33e33419": 1
+  },
+  "last_failure": {
+    "u5c33e33419": {
+      "kind": "nothing_written",
+      "text": "the conversation wrote no file (the mirror is identical to the branch tip)",
+      "base_ref": "einsteinOS/dev-6"
+    }
+  },
   "infra_fails": 0
 }
