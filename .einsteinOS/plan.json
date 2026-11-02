@@ -322,7 +322,7 @@
         "VerifyKernels.lean"
       ],
       "reason": "3 fix attempts used",
-      "conv": "5e9735b3-bde4-4c47-8a9b-da06793612a3"
+      "conv": "c20c5f7e-eb33-41d4-a652-8fcd57ec87ba"
     },
     {
       "id": "u18a4289f04",
@@ -482,12 +482,12 @@
     }
   },
   "fix_attempts": {
-    "u069682cd3d": 1
+    "u069682cd3d": 2
   },
   "last_failure": {
     "u069682cd3d": {
-      "kind": "nothing_written",
-      "text": "the conversation wrote no file (the mirror is identical to the branch tip)",
+      "kind": "review_fail",
+      "text": "VerifyKernels implements only index arithmetic with tautological tests, and Sampler's temperature/top-p order deviates from the spec, so unit 4 is incomplete",
       "base_ref": "einsteinOS/dev-6"
     }
   },
