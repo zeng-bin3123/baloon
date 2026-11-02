@@ -329,7 +329,8 @@
         "WeightPackLoader.lean",
         "Q2ExpertKernel.lean"
       ],
-      "reason": "3 fix attempts used"
+      "reason": "3 fix attempts used",
+      "conv": "10ea5392-3721-4a5a-91b3-93da9e87d905"
     },
     {
       "id": "uf8111d20aa",
@@ -380,7 +381,15 @@
       "unit_id": "u8d07db6355"
     }
   },
-  "fix_attempts": {},
-  "last_failure": {},
+  "fix_attempts": {
+    "udc8aa35c6d": 1
+  },
+  "last_failure": {
+    "udc8aa35c6d": {
+      "kind": "nothing_written",
+      "text": "the conversation wrote no file (the mirror is identical to the branch tip)",
+      "base_ref": "einsteinOS/dev-4"
+    }
+  },
   "infra_fails": 0
 }
