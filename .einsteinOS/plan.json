@@ -321,7 +321,8 @@
         "Sampler.lean",
         "VerifyKernels.lean"
       ],
-      "reason": "3 fix attempts used"
+      "reason": "3 fix attempts used",
+      "conv": "5e9735b3-bde4-4c47-8a9b-da06793612a3"
     },
     {
       "id": "u18a4289f04",
@@ -480,7 +481,15 @@
       "unit_id": "u1d650a56bd"
     }
   },
-  "fix_attempts": {},
-  "last_failure": {},
+  "fix_attempts": {
+    "u069682cd3d": 1
+  },
+  "last_failure": {
+    "u069682cd3d": {
+      "kind": "nothing_written",
+      "text": "the conversation wrote no file (the mirror is identical to the branch tip)",
+      "base_ref": "einsteinOS/dev-6"
+    }
+  },
   "infra_fails": 0
 }
