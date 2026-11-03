@@ -476,7 +476,8 @@
         "MtpDrafter.lean",
         "SessionDriver.lean"
       ],
-      "reason": "added after theory changed"
+      "reason": "added after theory changed",
+      "conv": "3273742f-54ea-4220-9d47-b9ecc08a077f"
     },
     {
       "id": "u4c397f3a6b",
@@ -644,15 +645,26 @@
       "unit_id": "ubd109f97f8"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u9dc1be2eae": 1
+  },
   "fail_history": {
     "u433ffdf2e4": [
       "gpu_not_compiled"
+    ],
+    "u9dc1be2eae": [
+      "missing"
     ],
     "ubd109f97f8": [
       "review_fail"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "u9dc1be2eae": {
+      "kind": "missing",
+      "text": "no build.sh was written; the unit cannot be verified",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-u9dc1be2eae"
+    }
+  },
   "infra_fails": 0
 }
