@@ -47,6 +47,19 @@ inline uint64_t seen(uint64_t k, uint64_t accepted) { return std::min(k, std::mi
 // Fixed-point EMA: ((S-e)*x + e*h) / S, in range whenever x,h <= S and e <= S.
 inline uint64_t ema_step(uint64_t S, uint64_t e, uint64_t x, uint64_t h) { return ((S - e) * x + e * h) / S; }
 
+// ---- cost-table ratios (x100) -----------------------------------------------------------------------------------------
+// Dense (shared) weights and distinct-expert traffic of an n-token verify pass relative to n = 1, indexed by n-1.
+constexpr uint32_t kDenseRatio[K_MAX + 1] = {100, 105, 130, 145, 185, 220, 260, 300, 330};
+constexpr uint32_t kDistinctRatio[K_MAX + 1] = {100, 170, 231, 288, 340, 389, 435, 480, 520};
+
+// Tokens committed by one verify pass: the bonus token plus the accepted prefix (accepted clamped to k).
+inline uint64_t committed(uint64_t accepted, uint64_t k) { return 1 + std::min(accepted, k); }
+
+// Keep a draft only when best*100 >= baseline*105 (min_gain = 5%), in exact integer arithmetic.
+inline bool keep_draft(uint64_t best, uint64_t baseline) {
+    return (unsigned __int128)baseline * 105 <= (unsigned __int128)best * 100;
+}
+
 // ---- controller ----------------------------------------------------------------------------------------------------------
 enum class Drafter { None, Mtp, Lookup };
 

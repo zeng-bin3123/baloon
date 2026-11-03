@@ -36,6 +36,17 @@ inline uint64_t cont_count(uint64_t best_end, uint64_t hi, uint64_t max_k) {
     return k;
 }
 
+// Capacity-doubling loop `while (cap < target) cap <<= 1`; the result is cap * 2^j, so a power of two when cap is.
+inline uint64_t pow2_at_least(uint64_t cap, uint64_t target) {
+    while (cap < target && cap <= (UINT64_MAX >> 1)) cap <<= 1;
+    return cap;
+}
+// Table capacity for a nominal entry count: a power of two holding it at load factor <= 0.5.
+inline uint64_t capacity_for(uint64_t nominal) { return pow2_at_least(16, nominal > (UINT64_MAX >> 2) ? UINT64_MAX >> 2 : nominal * 2); }
+
+// Tokens proposed from a match ending at best_end, with the suffix ending at cur (best_end <= cur).
+inline uint64_t propose_count(uint64_t cur, uint64_t best_end, uint64_t max_k) { return std::min(max_k, cur - best_end); }
+
 class SuffixDrafter {
 public:
     explicit SuffixDrafter(uint64_t table_slots = 1u << 12, uint64_t min_match = 3, uint64_t max_match = 32)
