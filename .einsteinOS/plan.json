@@ -477,7 +477,7 @@
         "SessionDriver.lean"
       ],
       "reason": "added after theory changed",
-      "conv": "3273742f-54ea-4220-9d47-b9ecc08a077f"
+      "conv": "88b4dc8c-990c-48ab-9216-a78c765fea73"
     },
     {
       "id": "u4c397f3a6b",
@@ -564,15 +564,45 @@
       "pass": true,
       "unit_id": "ub0234d85de"
     },
+    "ExpertResidencyCache.lean": {
+      "hash": "2b8adddf76b8",
+      "pass": true,
+      "unit_id": "u9dc1be2eae"
+    },
+    "ExpertSourceDispatch.lean": {
+      "hash": "013f5a33336b",
+      "pass": true,
+      "unit_id": "u9dc1be2eae"
+    },
     "GgufLazyLoader.lean": {
       "hash": "033cb4b7baa8",
       "pass": true,
       "unit_id": "u3e106cde79"
     },
+    "GraphRegistry.lean": {
+      "hash": "706628b671e6",
+      "pass": true,
+      "unit_id": "u9dc1be2eae"
+    },
+    "LayerBlockContract.lean": {
+      "hash": "fdd8e6a24699",
+      "pass": true,
+      "unit_id": "u9dc1be2eae"
+    },
+    "LayerCompose.lean": {
+      "hash": "af55440a5327",
+      "pass": true,
+      "unit_id": "u9dc1be2eae"
+    },
     "MemoryPlanner.lean": {
       "hash": "33e9d2257014",
       "pass": true,
       "unit_id": "uc2c7002b7a"
+    },
+    "MtpDrafter.lean": {
+      "hash": "548f86f63bb9",
+      "pass": true,
+      "unit_id": "u9dc1be2eae"
     },
     "NativeGdnPreprocess.lean": {
       "hash": "8ea9ad20d70e",
@@ -619,6 +649,16 @@
       "pass": true,
       "unit_id": "u6d34237bff"
     },
+    "SessionDriver.lean": {
+      "hash": "af510b7c9f9f",
+      "pass": true,
+      "unit_id": "u9dc1be2eae"
+    },
+    "SessionLoopContract.lean": {
+      "hash": "aeb35ea6e50b",
+      "pass": true,
+      "unit_id": "u9dc1be2eae"
+    },
     "SpecController.lean": {
       "hash": "6db193360f75",
       "pass": true,
@@ -634,6 +674,11 @@
       "pass": true,
       "unit_id": "u0e60a9f272"
     },
+    "VerifyWindowCommit.lean": {
+      "hash": "d572a263a11e",
+      "pass": true,
+      "unit_id": "u9dc1be2eae"
+    },
     "VisionBuildConfig.lean": {
       "hash": "52aca989cb9f",
       "pass": true,
@@ -645,9 +690,7 @@
       "unit_id": "ubd109f97f8"
     }
   },
-  "fix_attempts": {
-    "u9dc1be2eae": 1
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u433ffdf2e4": [
       "gpu_not_compiled"
@@ -659,12 +702,6 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "u9dc1be2eae": {
-      "kind": "missing",
-      "text": "no build.sh was written; the unit cannot be verified",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-u9dc1be2eae"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0
 }
