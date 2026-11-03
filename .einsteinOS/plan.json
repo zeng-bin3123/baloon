@@ -333,7 +333,7 @@
         "SFamilyGemvIndexing.lean"
       ],
       "reason": "initial plan",
-      "conv": "c2d087d9-e9eb-4b26-b2d6-103faf6c6ee7"
+      "conv": "ee6c8a21-e910-4760-aeb6-24f8061a5546"
     },
     {
       "id": "u89be81de0b",
@@ -447,6 +447,11 @@
       "pass": true,
       "unit_id": "u3e106cde79"
     },
+    "IQuantAvx512Rows.lean": {
+      "hash": "11ff061beee9",
+      "pass": true,
+      "unit_id": "ueac0e4654d"
+    },
     "IqQuantExpertLayout.lean": {
       "hash": "b4e219341c01",
       "pass": true,
@@ -467,10 +472,25 @@
       "pass": true,
       "unit_id": "u3e106cde79"
     },
+    "NativeMmvqGeometry.lean": {
+      "hash": "783a941142ee",
+      "pass": true,
+      "unit_id": "ueac0e4654d"
+    },
     "PlanPoolBudget.lean": {
       "hash": "696b7ae14c9f",
       "pass": true,
       "unit_id": "uc2c7002b7a"
+    },
+    "Q2Avx2Kernel.lean": {
+      "hash": "603d9275616a",
+      "pass": true,
+      "unit_id": "ueac0e4654d"
+    },
+    "Q2ExpertVnniKernel.lean": {
+      "hash": "187a70018c8d",
+      "pass": true,
+      "unit_id": "ueac0e4654d"
     },
     "Q2GgufWriter.lean": {
       "hash": "11ba7fe11682",
@@ -486,6 +506,11 @@
       "hash": "ba9a8e801989",
       "pass": true,
       "unit_id": "ub0234d85de"
+    },
+    "SFamilyGemvIndexing.lean": {
+      "hash": "7f0f1d93a67c",
+      "pass": true,
+      "unit_id": "ueac0e4654d"
     },
     "SamplerChainContracts.lean": {
       "hash": "ae17f0686c4c",
@@ -508,15 +533,7 @@
       "unit_id": "u3e106cde79"
     }
   },
-  "fix_attempts": {
-    "ueac0e4654d": 1
-  },
-  "last_failure": {
-    "ueac0e4654d": {
-      "kind": "missing",
-      "text": "no build.sh was written; the unit cannot be verified",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-ueac0e4654d"
-    }
-  },
+  "fix_attempts": {},
+  "last_failure": {},
   "infra_fails": 0
 }
