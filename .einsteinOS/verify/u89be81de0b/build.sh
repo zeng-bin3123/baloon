@@ -15,7 +15,7 @@ for c in "$COREX/bin/clang++" g++ clang++ c++; do
 done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
 echo "host compiler: $HOSTCXX"
-HFLAGS="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Iinclude"
+HFLAGS="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread -Iinclude"
 
 # (1) each header must be self-contained
 for h in include/baloon/*.hpp; do
