@@ -104,3 +104,56 @@ void test_planner_monotone_in_context() {
         CHECK(leftover(pl, k * a, f, bl) < bl);
     }
 }
+
+void test_planner_costs_form() {
+    const Geometry g;
+    // artifact constants through the Costs form
+    Costs c; c.state = state_bytes(g); c.dense = 5ull << 28; c.embd = 1ull << 28; c.mtp = 1ull << 26; c.workspace = 1ull << 27;
+    const uint64_t fixed = c.dense + c.embd + c.mtp + c.workspace + c.state;
+    CHECK(fixed_cost_wide(c) == fixed);
+    std::mt19937_64 rng(77);
+    long some = 0, none = 0;
+    for (int it = 0; it < 200000; ++it) {
+        Geometry h = g;
+        h.n_qsa = rng() % 49; h.kv_group = rng() % 129; h.qsa_block = rng() % 9;   // include 0 divisors
+        Costs k; k.expert_blob = rng() % 3000; k.dense = rng() % 100000; k.embd = rng() % 50000;
+        k.mtp = rng() % 50000; k.workspace = rng() % 50000; k.state = rng() % 100000;
+        const uint64_t ctx = rng() % 2000, pool = rng() % 6000000;
+        const uint64_t kvt = kv_bytes_per_token(h);
+        const uint64_t fx = k.dense + k.embd + k.mtp + k.workspace + k.state;
+        const auto p = make_plan(ctx, h, k, pool);
+        if (pool < kvt * ctx + fx) { CHECK(!p.has_value()); ++none; continue; }      // refusal
+        if (k.expert_blob == 0 || (pool - kvt * ctx - fx) / k.expert_blob == 0) { CHECK(!p.has_value()); ++none; continue; }
+        CHECK(p.has_value());
+        if (!p) continue;
+        ++some;
+        CHECK(kvt * ctx + fx + p->cache_slots * k.expert_blob <= pool);                // soundness
+        CHECK(p->cache_slots > 0 && p->vram_used <= pool);
+        CHECK(p->max_context == ctx && p->kv_bytes == kvt * ctx && p->state_bytes == k.state);
+        CHECK(p->cache_bytes == pool - kvt * ctx - fx && p->vram_budget == pool);
+        CHECK(p->vram_used == kvt * ctx + fx + p->cache_slots * k.expert_blob);
+        // completeness: whenever kv + fixed + one blob fits, a plan exists
+        CHECK(kvt * ctx + fx + k.expert_blob <= pool);
+    }
+    CHECK(some > 1000 && none > 1000);
+    // completeness direction, explicitly: pools that fit one blob always yield a plan
+    for (int it = 0; it < 100000; ++it) {
+        Costs k; k.expert_blob = 1 + rng() % 4000; k.dense = rng() % 9999; k.state = rng() % 9999;
+        const uint64_t ctx = rng() % 500, kvt = kv_bytes_per_token(g);
+        const uint64_t pool = kvt * ctx + k.dense + k.state + k.expert_blob + rng() % 7000;
+        CHECK(make_plan(ctx, g, k, pool).has_value());
+        CHECK(!make_plan(ctx, g, k, kvt * ctx + k.dense + k.state + k.expert_blob - 1).has_value());
+    }
+    // degenerate geometry never traps; overflow refuses
+    Geometry z; z.n_layers = z.n_qsa = z.n_kv_heads = z.head_dim = z.kv_group = z.qsa_block = 0;
+    z.idx_key_heads = z.idx_key_dim = z.ssm_state = z.ssm_v_heads = z.ssm_conv = z.ssm_channels = 0;
+    CHECK(kv_bytes_per_token(z) == 0 && state_bytes(z) == 0 && z.n_gdn() == 0);
+    Geometry w = g; w.n_qsa = 60; CHECK(w.n_gdn() == 0);
+    Costs big; big.dense = UINT64_MAX; big.embd = UINT64_MAX; big.expert_blob = 1;
+    CHECK(!make_plan(1, g, big, UINT64_MAX).has_value());
+    // KV monotone in context; matches the scalar form
+    for (uint64_t a = 0; a < 5000; a += 37) CHECK(kv_bytes_per_token(g) * a <= kv_bytes_per_token(g) * (a + 1));
+    const auto sp = make_plan(4096, g, c, 24ull << 30);
+    const auto op = make_plan(24ull << 30, kv_bytes_per_token(g), 4096, fixed, c.expert_blob);
+    CHECK(sp && op && sp->cache_slots == op->slots && sp->vram_used == op->used && sp->kv_bytes == op->kv);
+}

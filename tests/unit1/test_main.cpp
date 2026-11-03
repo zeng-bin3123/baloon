@@ -12,7 +12,7 @@ void test_kvq8_append_token_end_to_end(); void test_kvq8_gather_decomposition();
 void test_session_alignment(); void test_session_gdn_index(); void test_session_gdn_slices(); void test_session_qsa_arena();
 void test_session_ring_and_stages();
 void test_planner_geometry_constants(); void test_planner_budget_derivations(); void test_planner_make_plan_invariants();
-void test_planner_edges(); void test_planner_monotone_in_context();
+void test_planner_edges(); void test_planner_monotone_in_context(); void test_planner_costs_form();
 void test_bpe_byte_map(); void test_bpe_lossless_bytes(); void test_bpe_merge_step(); void test_bpe_special_and_bookkeeping();
 void test_bpe_encode_decode();
 void test_sampler_window(); void test_sampler_penalties(); void test_sampler_combine_and_argmax(); void test_sampler_launch_and_rng();
@@ -35,7 +35,7 @@ int main() {
     RUN(test_session_alignment); RUN(test_session_gdn_index); RUN(test_session_gdn_slices); RUN(test_session_qsa_arena);
     RUN(test_session_ring_and_stages);
     RUN(test_planner_geometry_constants); RUN(test_planner_budget_derivations); RUN(test_planner_make_plan_invariants);
-    RUN(test_planner_edges); RUN(test_planner_monotone_in_context);
+    RUN(test_planner_edges); RUN(test_planner_monotone_in_context); RUN(test_planner_costs_form);
     RUN(test_bpe_byte_map); RUN(test_bpe_lossless_bytes); RUN(test_bpe_merge_step); RUN(test_bpe_special_and_bookkeeping);
     RUN(test_bpe_encode_decode);
     RUN(test_sampler_window); RUN(test_sampler_penalties); RUN(test_sampler_combine_and_argmax); RUN(test_sampler_launch_and_rng);

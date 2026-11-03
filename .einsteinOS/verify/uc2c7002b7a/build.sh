@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build the WHOLE project: (1) every unit-1 header compiles standalone, (2) the unit-1 host test binary builds,
+# Build the WHOLE project: (1) every unit-1 header compiles standalone, (2) every unit's host test binary builds,
 # (3) when the corex toolchain is present, every existing CUDA source/test still compiles for ivcore10.
 # Exits 0 only if everything builds.
 set -euo pipefail
@@ -25,10 +25,12 @@ for h in include/baloon/*.hpp; do
   $HOSTCXX $HFLAGS -fsyntax-only "$OUT/hdr_check.cpp"
 done
 
-# (2) unit-1 test binary (optimised)
-SRCS=$(ls tests/unit1/*.cpp)
-echo "[build] $OUT/test_unit1"
-$HOSTCXX $HFLAGS $SRCS -o "$OUT/test_unit1"
+# (2) every unit's host test binary (the whole project), optimised
+for d in tests/unit*/; do
+  d="${d%/}"; n="$(basename "$d")"
+  echo "[build] $OUT/test_$n"
+  $HOSTCXX $HFLAGS -I"$d" "$d"/*.cpp -o "$OUT/test_$n"
+done
 
 # (3) existing GPU sources/tests, compile-only, with the project's own flags
 if [ -x "$COREX/bin/clang++" ]; then
