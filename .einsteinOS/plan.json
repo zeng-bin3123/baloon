@@ -370,7 +370,8 @@
         "NativeQsaIndexerAppend.lean",
         "NativeFlashAttnBounds.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "84d194bc-155c-4c41-a9d4-fa10466e3569"
     },
     {
       "id": "ud78dd87516",
@@ -499,6 +500,11 @@
       "pass": true,
       "unit_id": "u3e106cde79"
     },
+    "NativeFlashAttnBounds.lean": {
+      "hash": "76762e858b44",
+      "pass": true,
+      "unit_id": "u6d34237bff"
+    },
     "NativeGdnPreprocess.lean": {
       "hash": "047e4b95efb7",
       "pass": true,
@@ -513,6 +519,16 @@
       "hash": "783a941142ee",
       "pass": true,
       "unit_id": "ueac0e4654d"
+    },
+    "NativeQsaIndexerAppend.lean": {
+      "hash": "4e0011e281eb",
+      "pass": true,
+      "unit_id": "u6d34237bff"
+    },
+    "NativeQsaScore.lean": {
+      "hash": "27e075d93d0c",
+      "pass": true,
+      "unit_id": "u6d34237bff"
     },
     "PlanPoolBudget.lean": {
       "hash": "696b7ae14c9f",
@@ -553,6 +569,21 @@
       "hash": "11ba7fe11682",
       "pass": true,
       "unit_id": "u3e106cde79"
+    },
+    "QsaBlockSelect.lean": {
+      "hash": "073f68508fac",
+      "pass": true,
+      "unit_id": "u6d34237bff"
+    },
+    "QsaCacheIndexer.lean": {
+      "hash": "9a559c366e75",
+      "pass": true,
+      "unit_id": "u6d34237bff"
+    },
+    "QsaDecodeAttention.lean": {
+      "hash": "7be0dd42d44c",
+      "pass": true,
+      "unit_id": "u6d34237bff"
     },
     "RouterTopKSelection.lean": {
       "hash": "f566d1161616",
