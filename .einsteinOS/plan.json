@@ -461,7 +461,7 @@
         "VisionEncoderProtocol.lean"
       ],
       "reason": "initial plan",
-      "conv": "8967a5a3-c574-417b-9949-723252177387"
+      "conv": "2c16694c-7035-474c-a6f0-fac84d66144a"
     },
     {
       "id": "u9dc1be2eae",
@@ -644,12 +644,23 @@
       "unit_id": "ubd109f97f8"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "ubd109f97f8": 1
+  },
   "fail_history": {
     "u433ffdf2e4": [
       "gpu_not_compiled"
+    ],
+    "ubd109f97f8": [
+      "review_fail"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "ubd109f97f8": {
+      "kind": "review_fail",
+      "text": "vision_build_config.hpp omits the spec's fixed static-library (sharedLibs=false) and non-dynamic-backend (backendDl=false) invariants, and no test checks them.",
+      "base_ref": "einsteinOS/dev-c880662efd"
+    }
+  },
   "infra_fails": 0
 }
