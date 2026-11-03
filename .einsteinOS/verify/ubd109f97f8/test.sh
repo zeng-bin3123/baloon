@@ -12,7 +12,7 @@ for c in "$COREX/bin/clang++" g++ clang++ c++; do
   if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then HOSTCXX="$c"; break; fi
 done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
-HFLAGS="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Iinclude -Itests/unit10"
+HFLAGS="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread -Iinclude -Itests/unit10"
 SRCS=$(ls tests/unit10/*.cpp)
 rc=0
 
@@ -23,7 +23,7 @@ timeout 900 "$OUT/test_unit10" || { echo "optimised run FAILED (exit $?)"; rc=1;
 printf 'int main(){return 0;}\n' > "$OUT/san_probe.cpp"
 if $HOSTCXX -fsanitize=address,undefined "$OUT/san_probe.cpp" -o "$OUT/san_probe" >/dev/null 2>&1 && "$OUT/san_probe" >/dev/null 2>&1; then
   echo "== ASan/UBSan build =="
-  $HOSTCXX -std=c++17 -O1 -g -fno-omit-frame-pointer -ffp-contract=off -fsanitize=address,undefined -fno-sanitize-recover=undefined \
+  $HOSTCXX -std=c++17 -O1 -g -fno-omit-frame-pointer -ffp-contract=off -pthread -fsanitize=address,undefined -fno-sanitize-recover=undefined \
     -Iinclude -Itests/unit10 $SRCS -o "$OUT/test_unit10_san" || { echo "SAN BUILD FAILED"; exit 1; }
   timeout 1800 "$OUT/test_unit10_san" || { echo "sanitizer run FAILED (exit $?)"; rc=1; }
 else

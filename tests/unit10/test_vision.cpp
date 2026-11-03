@@ -78,3 +78,19 @@ void test_ve_args() {
     CHECK(effective(0, 7) == 7); CHECK(effective(-3, 7) == 7); CHECK(effective(5, 7) == 5);
     CHECK(!width_ok(0)); CHECK(!width_ok(-1)); CHECK(width_ok(1));
 }
+
+// Theory: parseEnc_ok / splitLastSpace_append. For any non-empty img (spaces allowed) and non-empty space-free out,
+// "img out" splits exactly at the LAST space; a space-free string has no split point.
+void test_ve_roundtrip_random() {
+    using namespace vision_enc;
+    testh::Rng rng(77);
+    const char alpha[] = {'a', 'b', '/', '.', ' ', 'Z'};
+    for (int it = 0; it < 20000; ++it) {
+        std::string img, out;
+        for (uint32_t i = 0, n = 1 + rng.below(12); i < n; ++i) img += alpha[rng.below(6)];
+        for (uint32_t i = 0, n = 1 + rng.below(8); i < n; ++i) out += alpha[rng.below(4)];   // no space in out
+        auto c = parse_enc(img + " " + out);
+        CHECK(c.ok && c.image == img && c.output == out);
+        CHECK(parse_enc(out).ok == false);                                                    // no space: rejected
+    }
+}
