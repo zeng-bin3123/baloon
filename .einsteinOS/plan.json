@@ -461,7 +461,7 @@
         "VisionEncoderProtocol.lean"
       ],
       "reason": "initial plan",
-      "conv": "2c16694c-7035-474c-a6f0-fac84d66144a"
+      "conv": "02e17a67-e773-414a-91c1-2567134ab2ae"
     },
     {
       "id": "u9dc1be2eae",
@@ -634,19 +634,17 @@
       "unit_id": "u0e60a9f272"
     },
     "VisionBuildConfig.lean": {
-      "hash": "cd48973d8c94",
-      "pass": false,
+      "hash": "52aca989cb9f",
+      "pass": true,
       "unit_id": "ubd109f97f8"
     },
     "VisionEncoderProtocol.lean": {
-      "hash": "21d02784f3e4",
-      "pass": false,
+      "hash": "124c8f543dbf",
+      "pass": true,
       "unit_id": "ubd109f97f8"
     }
   },
-  "fix_attempts": {
-    "ubd109f97f8": 1
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u433ffdf2e4": [
       "gpu_not_compiled"
@@ -655,12 +653,6 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "ubd109f97f8": {
-      "kind": "review_fail",
-      "text": "vision_build_config.hpp omits the spec's fixed static-library (sharedLibs=false) and non-dynamic-backend (backendDl=false) invariants, and no test checks them.",
-      "base_ref": "einsteinOS/dev-c880662efd"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0
 }
