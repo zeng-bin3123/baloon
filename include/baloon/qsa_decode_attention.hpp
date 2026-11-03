@@ -16,7 +16,7 @@ constexpr uint32_t kG = 12;
 constexpr uint32_t kHD = 256;
 constexpr uint32_t kWarps = 8;
 constexpr uint32_t kLanes = 32;
-constexpr uint32_t kScaleGroup = 32;               // int8 scale group size
+constexpr uint32_t kScaleGroup = 64;               // int8 scale group size (4 groups per 256-dim row)
 constexpr uint32_t kMaxBatch = 65535;              // grid.z
 
 inline uint32_t chunks(uint32_t cap) { return (cap + kChunk - 1) / kChunk; }

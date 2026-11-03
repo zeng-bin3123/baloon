@@ -31,7 +31,7 @@ void test_qd_partitions() {
     std::vector<int> cells(64, 0);
     for (uint32_t w = 0; w < 8; ++w) for (uint32_t m = 0; m < 8; ++m) cells[w + 8 * m]++;
     for (uint32_t c = 0; c < 64; ++c) { CHECK(cells[c] == 1); CHECK(cell_warp(c) + 8 * cell_iter(c) == c && cell_warp(c) < 8 && cell_iter(c) < 8); }
-    for (uint32_t d = 0; d < 256; ++d) { CHECK(dim_lane(d) < 32 && dim_slot(d) < 8 && dim_lane(d) * 8 + dim_slot(d) == d); CHECK(scale_group(d) < 8); }
+    for (uint32_t d = 0; d < 256; ++d) { CHECK(dim_lane(d) < 32 && dim_slot(d) < 8 && dim_lane(d) * 8 + dim_slot(d) == d); CHECK(scale_group(d) < 4 && scale_group(d) == (d + 7 - (d % 8)) / 64); }
     for (uint32_t h = 0; h < 12; ++h) CHECK(head_warp(h) < 8 && head_iter(h) < 2 && head_warp(h) + 8 * head_iter(h) == h);
     for (uint32_t c = 0; c < 64; ++c) CHECK(c < 32 || c - 32 < 32);
     for (uint64_t P : {1ull, 4ull}) for (uint64_t page = 0; page < P; ++page) for (uint64_t h = 0; h < 2; ++h) for (uint64_t s = 0; s < 16; ++s)
