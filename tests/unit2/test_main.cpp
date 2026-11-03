@@ -7,6 +7,7 @@ void test_canon_registry(); void test_canon_integer_facts(); void test_canon_bit
 void test_writer_code_algebra(); void test_writer_packing(); void test_writer_quantizer(); void test_writer_padding(); void test_writer_file_layout();
 void test_pack_codes(); void test_pack_alignment(); void test_pack_blob_arithmetic(); void test_pack_expert_blob_roles(); void test_pack_quantised_role_end_to_end(); void test_pack_scale_dtype_and_partition();
 void test_mtpq_shapes_and_sizes(); void test_mtpq_scale_search(); void test_mtpq_q4(); void test_mtpq_q8(); void test_mtpq_tensor_and_checkpoint();
+void test_theory_lazy_loader_facts(); void test_theory_pack_facts(); void test_theory_image_size();
 
 void run_test(const char* name, void (*fn)()) {
     const long before = testh::failures();
@@ -22,6 +23,7 @@ int main() {
     RUN(test_writer_code_algebra); RUN(test_writer_packing); RUN(test_writer_quantizer); RUN(test_writer_padding); RUN(test_writer_file_layout);
     RUN(test_pack_codes); RUN(test_pack_alignment); RUN(test_pack_blob_arithmetic); RUN(test_pack_expert_blob_roles); RUN(test_pack_quantised_role_end_to_end); RUN(test_pack_scale_dtype_and_partition);
     RUN(test_mtpq_shapes_and_sizes); RUN(test_mtpq_scale_search); RUN(test_mtpq_q4); RUN(test_mtpq_q8); RUN(test_mtpq_tensor_and_checkpoint);
+    RUN(test_theory_lazy_loader_facts); RUN(test_theory_pack_facts); RUN(test_theory_image_size);
     std::printf("checks=%ld failures=%ld\n", testh::checks(), testh::failures());
     if (testh::failures() != 0) { std::printf("UNIT2 TESTS FAILED\n"); return 1; }
     std::printf("UNIT2 TESTS PASSED\n");

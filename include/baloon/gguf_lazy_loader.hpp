@@ -46,7 +46,16 @@ inline uint64_t tensor_bytes(uint64_t elements, uint64_t el, uint64_t by) { retu
 inline uint64_t row_bytes(uint64_t width, uint64_t el, uint64_t by) { return width / el * by; }
 inline uint64_t expert_bytes(uint64_t per, uint64_t el, uint64_t by) { return per / el * by; }
 inline uint64_t expert_start(uint64_t e, uint64_t per, uint64_t el, uint64_t by) { return e * expert_bytes(per, el, by); }
+// The Python spelling of the expert start, e * (per // el) * by; always equal to expert_start (e * len).
+inline uint64_t expert_start_py(uint64_t e, uint64_t per, uint64_t el, uint64_t by) { return e * (per / el) * by; }
 inline bool whole_blocks(uint64_t elements, uint64_t el) { return el != 0 && elements % el == 0; }
+
+// ---- PLE table facts (width-160 IQ4_NL rows, 320,001,536 tokens, 16 rows per token) --------------------------
+constexpr uint64_t kPleVocab = 320001536ull, kPleWidth = 160, kPleRowsPerToken = 16;
+inline uint64_t ple_row_bytes() { auto g = block_geometry(kIQ4_NL); return row_bytes(kPleWidth, g.el, g.by); }          // 90
+inline uint64_t ple_table_bytes() { return kPleVocab * ple_row_bytes(); }                                                // 28.8e9
+inline uint64_t ple_fp32_bytes() { return kPleVocab * kPleWidth * 4; }                                                   // ~205 GB
+inline uint64_t ple_token_floats() { return kPleRowsPerToken * kPleWidth; }                                              // 2560
 
 // ---- shapes ---------------------------------------------------------------------------------------------
 inline std::vector<uint64_t> numpy_shape(std::vector<uint64_t> shape) {
@@ -214,6 +223,7 @@ class LazyImage {
 public:
     LazyImage(const uint8_t* data, uint64_t size) : data_(data), size_(size) { auto ix = parse_header(data, size); if (ix) { ix_ = *ix; ok_ = true; } }
     bool ok() const { return ok_; }
+    uint64_t size() const { return size_; }  // image length in bytes
     const Index& index() const { return ix_; }
 
     // Whole tensor bytes.

@@ -132,6 +132,14 @@ inline bool verify_expert_blob(const std::vector<uint8_t>& blob, const std::vect
     return g == gate && u == up && d == down;
 }
 
+// ---- expert arena addressing (experts.bin: layer*NE + e blobs of kBlobBytes) -------------------------------------
+constexpr uint64_t kExpertsPerLayer = 512;
+inline uint64_t expert_flat_index(uint64_t layer, uint64_t e) { return layer * kExpertsPerLayer + e; }
+inline uint64_t expert_blob_offset(uint64_t layer, uint64_t e) { return expert_flat_index(layer, e) * kBlobBytes; }
+// Experts verified with `--expert-every k` out of n: ceil(n / k); each contributes 3 role checks.
+inline uint64_t experts_checked(uint64_t n, uint64_t every) { return every == 0 ? 0 : (n + every - 1) / every; }
+inline uint64_t role_checks(uint64_t n, uint64_t every) { return 3 * experts_checked(n, every); }
+
 // ---- scale dtype ---------------------------------------------------------------------------------------------------
 inline uint64_t scale_bytes(bool fp16) { return fp16 ? 2 : 4; }
 
