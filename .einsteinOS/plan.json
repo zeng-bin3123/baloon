@@ -332,7 +332,8 @@
         "NativeMmvqGeometry.lean",
         "SFamilyGemvIndexing.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "c2d087d9-e9eb-4b26-b2d6-103faf6c6ee7"
     },
     {
       "id": "u89be81de0b",
@@ -507,7 +508,15 @@
       "unit_id": "u3e106cde79"
     }
   },
-  "fix_attempts": {},
-  "last_failure": {},
+  "fix_attempts": {
+    "ueac0e4654d": 1
+  },
+  "last_failure": {
+    "ueac0e4654d": {
+      "kind": "missing",
+      "text": "no build.sh was written; the unit cannot be verified",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-ueac0e4654d"
+    }
+  },
   "infra_fails": 0
 }
