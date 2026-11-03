@@ -452,7 +452,7 @@
         "SuffixDrafter.lean"
       ],
       "reason": "initial plan",
-      "conv": "36a19b76-18cf-40e6-91d0-51974a70fdbb"
+      "conv": "a4e8801a-8f32-4766-b52f-4f92520aaa04"
     },
     {
       "id": "ubd109f97f8",
@@ -619,8 +619,8 @@
       "unit_id": "u6d34237bff"
     },
     "SpecController.lean": {
-      "hash": "a0b02c673589",
-      "pass": false,
+      "hash": "6db193360f75",
+      "pass": true,
       "unit_id": "u0e60a9f272"
     },
     "StrataPackBuilder.lean": {
@@ -629,8 +629,8 @@
       "unit_id": "u3e106cde79"
     },
     "SuffixDrafter.lean": {
-      "hash": "787a3926c009",
-      "pass": false,
+      "hash": "3625b425d797",
+      "pass": true,
       "unit_id": "u0e60a9f272"
     },
     "VisionBuildConfig.lean": {
