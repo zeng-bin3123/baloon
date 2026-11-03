@@ -443,7 +443,7 @@
         "PrefillChunkDriver.lean"
       ],
       "reason": "initial plan",
-      "conv": "73dd7cc9-e122-40bd-afef-0ce4528d8e6c"
+      "conv": "bbd99d26-dd2d-4a06-9658-cefb896d500e"
     },
     {
       "id": "u0e60a9f272",
@@ -604,8 +604,8 @@
       "unit_id": "u89be81de0b"
     },
     "PrefillChunkDriver.lean": {
-      "hash": "aea179022d4b",
-      "pass": false,
+      "hash": "c4646d23611f",
+      "pass": true,
       "unit_id": "ud78dd87516"
     },
     "QsaBlockSelect.lean": {
