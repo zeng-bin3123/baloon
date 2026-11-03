@@ -30,5 +30,15 @@ else
   echo "sanitizers unavailable with $HOSTCXX: skipped"
 fi
 
+# GPU invariant tests: build with the corex CUDA toolchain and RUN on the BI-V100 devices (must open /dev/iluvatar*).
+if [ ! -x "$COREX/bin/clang++" ]; then echo "corex toolchain missing: GPU tests cannot run"; rc=1; else
+  CUFLAGS="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Isrc -Itests -Iinclude -O2"
+  echo "== GPU build =="
+  "$COREX/bin/clang++" $CUFLAGS src/ilu_gdn_prep.cu src/ilu_gdn_warp_step.cu tests/gpu_unit6/test_ilu_gdn.cu \
+    -o "$OUT/test_ilu_gdn" -L"$COREX/lib64" -lcudart -lpthread || { echo "GPU BUILD FAILED"; exit 1; }
+  echo "== GPU run =="
+  CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}" timeout 900 "$OUT/test_ilu_gdn" || { echo "GPU run FAILED (exit $?)"; rc=1; }
+fi
+
 [ $rc -eq 0 ] && echo "ALL UNIT-6 TESTS PASSED" || echo "UNIT-6 TESTS FAILED"
 exit $rc

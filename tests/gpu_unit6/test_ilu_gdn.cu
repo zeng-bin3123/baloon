@@ -77,8 +77,15 @@ static void test_step(int hk, int hv, float scale) {
     CHECK(e_state < 1e-4); CHECK(e_out < 1e-4);
     CHECK(ds.canary_ok() && dout.canary_ok() && dq.canary_ok() && dk.canary_ok() && dv.canary_ok());
     // every one of the 128 rows x 128 columns of every head was written (shard/column coverage)
-    size_t unchanged = 0; for (size_t i = 0; i < st.size(); ++i) if (os[i] == st[i]) ++unchanged;
-    CHECK(unchanged == 0);
+    // A skipped write leaves the element bit-identical to the input although the reference moved it; a lone
+    // bit-identical result where the reference barely moved is rounding coincidence and is not a coverage miss.
+    size_t missed = 0, bad = 0;
+    for (size_t i = 0; i < st.size(); ++i) {
+        if (os[i] == st[i] && std::fabs(rs[i] - (double)st[i]) > 1e-4) ++missed;
+        if (std::fabs((double)os[i] - rs[i]) > 1e-5 + 1e-4 * std::fabs(rs[i])) ++bad;
+    }
+    CHECK(missed == 0);
+    CHECK(bad == 0);   // elementwise agreement with the double-precision reference
     // determinism: identical input gives bitwise identical output
     Dev ds2(st), dout2((size_t)hv * S);
     CHECK(gi::step(ds2.ptr(), dq.ptr(), dk.ptr(), dv.ptr(), dg.ptr(), db.ptr(), dout2.ptr(), S, hk, hv, scale, nullptr) == gi::kOk);
@@ -140,7 +147,10 @@ static void test_conv() {
     CHECK(gi::conv_silu(dh.ptr(), dx.ptr(), dw.ptr(), dout.ptr(), 0, nullptr) == gi::kInvalid);
     CHECK(gi::conv_silu(dh.ptr(), dx.ptr(), dw.ptr(), dout.ptr(), 65536, nullptr) == gi::kInvalid);
     CHECK(gi::conv_silu(dh.ptr(), dx.ptr(), dw.ptr(), dh.ptr(), 1, nullptr) == gi::kInvalid);       // out aliases history
-    CHECK(gi::conv_silu(dh.ptr(), dh.ptr() + 3, dw.ptr(), dout.ptr(), 1, nullptr) == gi::kInvalid); // x inside history
+    CHECK(gi::conv_silu(dh.ptr(), dh.ptr() + 2, dw.ptr(), dout.ptr(), 1, nullptr) == gi::kInvalid); // x overlaps history
+    // history [p, p+12) directly followed by x at p+12 is disjoint and must be accepted (theory: history_then_raw_disjoint)
+    CHECK(gi::conv_silu(dh.ptr(), dh.ptr() + 3, dw.ptr(), dout.ptr(), 1, nullptr) == gi::kOk);
+    sync();
 }
 
 static void test_norm() {
