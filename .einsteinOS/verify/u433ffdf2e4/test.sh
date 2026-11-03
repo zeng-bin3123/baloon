@@ -12,7 +12,7 @@ for c in "$COREX/bin/clang++" g++ clang++ c++; do
   if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then HOSTCXX="$c"; break; fi
 done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
-HFLAGS="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Iinclude -Itests/unit6"
+HFLAGS="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread -Iinclude -Itests/unit6"
 SRCS=$(ls tests/unit6/*.cpp)
 rc=0
 
@@ -28,6 +28,16 @@ if $HOSTCXX -fsanitize=address,undefined "$OUT/san_probe.cpp" -o "$OUT/san_probe
   timeout 1800 "$OUT/test_unit6_san" || { echo "sanitizer run FAILED (exit $?)"; rc=1; }
 else
   echo "sanitizers unavailable with $HOSTCXX: skipped"
+fi
+
+# GPU invariant tests: build with the corex CUDA toolchain and RUN on the BI-V100 devices (must open /dev/iluvatar*).
+if [ ! -x "$COREX/bin/clang++" ]; then echo "corex toolchain missing: GPU tests cannot run"; rc=1; else
+  CUFLAGS="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Isrc -Itests -Iinclude -O2"
+  echo "== GPU build =="
+  "$COREX/bin/clang++" $CUFLAGS src/ilu_gdn_prep.cu src/ilu_gdn_warp_step.cu tests/gpu_unit6/test_ilu_gdn.cu \
+    -o "$OUT/test_ilu_gdn" -L"$COREX/lib64" -lcudart -lpthread || { echo "GPU BUILD FAILED"; exit 1; }
+  echo "== GPU run =="
+  CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}" timeout 900 "$OUT/test_ilu_gdn" || { echo "GPU run FAILED (exit $?)"; rc=1; }
 fi
 
 [ $rc -eq 0 ] && echo "ALL UNIT-6 TESTS PASSED" || echo "UNIT-6 TESTS FAILED"
