@@ -391,7 +391,7 @@
         "StrataPackBuilder.lean"
       ],
       "reason": "initial plan",
-      "conv": "ad1f34a9-5c8c-4fe5-9883-d23aef895f50"
+      "conv": "948ef32f-a7d5-4068-8f7a-296f5a639a2e"
     },
     {
       "id": "ub0234d85de",
@@ -564,8 +564,8 @@
       "unit_id": "ub0234d85de"
     },
     "GgufLazyLoader.lean": {
-      "hash": "e001f8b67aa8",
-      "pass": false,
+      "hash": "033cb4b7baa8",
+      "pass": true,
       "unit_id": "u3e106cde79"
     },
     "MemoryPlanner.lean": {
@@ -624,8 +624,8 @@
       "unit_id": "u0e60a9f272"
     },
     "StrataPackBuilder.lean": {
-      "hash": "e7b5e4fdde3a",
-      "pass": false,
+      "hash": "30f0d439f8ba",
+      "pass": true,
       "unit_id": "u3e106cde79"
     },
     "SuffixDrafter.lean": {
