@@ -424,7 +424,7 @@
         "NativeGdnPreprocess.lean"
       ],
       "reason": "initial plan",
-      "conv": "612b20fc-247c-4938-ad77-3c3b39eb95cd"
+      "conv": "8850803e-056f-462c-bb12-dc1122807cc0"
     },
     {
       "id": "u6d34237bff",
@@ -644,7 +644,20 @@
       "unit_id": "ubd109f97f8"
     }
   },
-  "fix_attempts": {},
-  "last_failure": {},
+  "fix_attempts": {
+    "u433ffdf2e4": 1
+  },
+  "fail_history": {
+    "u433ffdf2e4": [
+      "gpu_not_compiled"
+    ]
+  },
+  "last_failure": {
+    "u433ffdf2e4": {
+      "kind": "gpu_not_compiled",
+      "text": "gpu_not_compiled: build.sh ran no CUDA compile of tests/gpu_unit6/test_ilu_gdn.cu (CUDA compiles seen: dbg_router.cu tests/dbg_router.cu ilu_gdn_prep.cu src/ilu_gdn_prep.cu ilu_gdn_warp_step.cu src/ilu_gdn_warp_step.cu ix_bf16_gemv.cu src/ix_bf16_gemv.cu ix_gdn.cu src/ix_gdn.cu ix_mmvq_wave.cu src/ix_mmvq_wave.cu ix_moe_combine.cu src/ix_moe_combine.cu ix_router_top10_wave.cu src/ix_router_top10_wave.cu ix_shared_expert.cu src/ix_shared_expert.cu probe_halfwave.cu tests/probe_halfwave.cu probe_warp64.cu tests/probe_warp64.cu test_bf16_gemv.cu tests/test_bf16_gemv.cu test_gdn.cu tests/test_gdn.cu test_mmvq_wave.cu tests/test_mmvq_wave.cu test_moe_combine.cu tests/test_moe_combine.cu test_router.cu tests/test_router.cu test_shared_expert.cu tests/test_shared_expert.cu dbg_router.cu tests/dbg_router.cu ilu_gdn_prep.cu src/ilu_gdn_prep.cu ilu_gdn_warp_step.cu src/ilu_gdn_warp_step.cu ix_bf16_gemv.cu src/ix_bf16_gemv.cu ix_gdn.cu src/ix_gdn.cu ix_mmvq_wave.cu src/ix_mmvq_wave.cu ix_moe_combine.cu src/ix_moe_combine.cu ix_router_top10_wave.cu src/ix_router_top10_wave.cu ix_shared_expert.cu src/ix_shared_expert.cu probe_halfwave.cu tests/probe_halfwave.cu probe_warp64.cu tests/probe_warp64.cu test_bf16_gemv.cu tests/test_bf16_gemv.cu test_gdn.cu tests/test_gdn.cu test_mmvq_wave.cu tests/test_mmvq_wave.cu test_moe_combine.cu tests/test_moe_combine.cu test_router.cu tests/test_router.cu test_shared_expert.cu tests/test_shared_expert.cu src/ilu_gdn_prep.cu src/ilu_gdn_warp_step.cu src/ix_bf16_gemv.cu src/ix_gdn.cu src/ix_mmvq_wave.cu src/ix_moe_combine.cu src/ix_router_top10_wave.cu src/ix_shared_expert.cu tests/dbg_router.cu tests/probe_halfwave.cu tests/probe_warp64.cu tests/test_bf16_gemv.cu tests/test_gdn.cu tests/test_mmvq_wave.cu tests/test_moe_combine.cu tests/test_router.cu tests/test_shared_expert.cu)\ngpu_unused: test.sh exited 0 but none of its 20 process(es) opened a GPU device (^/dev/(iluvatar|nvidia)[0-9]+$); executables that ran: /usr/bin/bash /usr/bin/x86_64-linux-gnu-ld.bfd /usr/local/corex-3.2.3/bin/clang-16",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-u433ffdf2e4"
+    }
+  },
   "infra_fails": 0
 }
