@@ -321,6 +321,10 @@
         "Sampler.lean",
         "VerifyKernels.lean"
       ],
+      "children": [
+        "uc43be56f12",
+        "uee8db5bcca"
+      ],
       "reason": "3 fix attempts used",
       "conv": "ca14b27d-19c4-4361-93f9-6ea475af0426"
     },
@@ -330,6 +334,28 @@
       "modules": [
         "NgramHashIq4nlTable.lean",
         "PleDirectRowReader.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "uc43be56f12",
+      "parent": "u069682cd3d",
+      "modules": [
+        "QsaDecodeAttention.lean",
+        "QsaBlockSelect.lean",
+        "QuantizeActivation.lean",
+        "RouterTop10.lean",
+        "S2ExpertGroupedGemv.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "uee8db5bcca",
+      "parent": "u069682cd3d",
+      "modules": [
+        "SGemv.lean",
+        "Sampler.lean",
+        "VerifyKernels.lean"
       ],
       "reason": "3 fix attempts used"
     }
@@ -481,15 +507,7 @@
       "unit_id": "u1d650a56bd"
     }
   },
-  "fix_attempts": {
-    "u069682cd3d": 3
-  },
-  "last_failure": {
-    "u069682cd3d": {
-      "kind": "nothing_written",
-      "text": "the conversation wrote no file (the mirror is identical to the branch tip)",
-      "base_ref": "einsteinOS/dev-6"
-    }
-  },
+  "fix_attempts": {},
+  "last_failure": {},
   "infra_fails": 0
 }
