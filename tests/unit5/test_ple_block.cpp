@@ -78,7 +78,15 @@ void test_block_streams_gate() {
         CHECK((s > 0) == (g > 0.5f) || s == 0.f);
     }
     CHECK(gate(0.f) == 0.5f);
-    CHECK(std::fabs(gate(1e-9f) - 0.5f) < 1e-9f + 0.f || gate(1e-9f) == 0.5f);  // sgn(s)=1 but |s| floored: root of 1e-6
+    {   // sub-floor magnitude: sgn(s) = +-1 but |s| is floored to 1e-6, so z = +-sqrt(1e-6) = +-1e-3
+        const float z = std::sqrt(kGateFloor);
+        const float want = 1.f / (1.f + std::exp(-z));
+        CHECK(std::fabs(z - 1e-3f) < 1e-7f);
+        CHECK(gate(1e-9f) == want && gate(1e-9f) > 0.5f);
+        CHECK(gate(-1e-9f) == 1.f / (1.f + std::exp(z)) && gate(-1e-9f) < 0.5f);
+        CHECK(std::fabs(gate(1e-9f) - 0.5f) < 1e-3f);
+        CHECK(gate(1e-9f) == gate(kGateFloor));                  // everything at or below the floor collapses
+    }
 }
 
 void test_block_scratch() {
