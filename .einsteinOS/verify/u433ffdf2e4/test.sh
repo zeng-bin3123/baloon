@@ -12,7 +12,7 @@ for c in "$COREX/bin/clang++" g++ clang++ c++; do
   if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then HOSTCXX="$c"; break; fi
 done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
-HFLAGS="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Iinclude -Itests/unit6"
+HFLAGS="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread -Iinclude -Itests/unit6"
 SRCS=$(ls tests/unit6/*.cpp)
 rc=0
 
