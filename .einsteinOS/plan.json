@@ -392,7 +392,8 @@
         "SpecController.lean",
         "SuffixDrafter.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "36a19b76-18cf-40e6-91d0-51974a70fdbb"
     },
     {
       "id": "ubd109f97f8",
@@ -500,6 +501,11 @@
       "hash": "828d920b5d19",
       "pass": true,
       "unit_id": "uc2c7002b7a"
+    },
+    "MtpDraftLayer.lean": {
+      "hash": "02151565a264",
+      "pass": true,
+      "unit_id": "u0e60a9f272"
     },
     "MtpExpertQuantizer.lean": {
       "hash": "bb5874102af4",
@@ -626,10 +632,30 @@
       "pass": true,
       "unit_id": "uc2c7002b7a"
     },
+    "SpecController.lean": {
+      "hash": "a0b02c673589",
+      "pass": true,
+      "unit_id": "u0e60a9f272"
+    },
     "StrataPackBuilder.lean": {
       "hash": "e7b5e4fdde3a",
       "pass": true,
       "unit_id": "u3e106cde79"
+    },
+    "SuffixDrafter.lean": {
+      "hash": "787a3926c009",
+      "pass": true,
+      "unit_id": "u0e60a9f272"
+    },
+    "VerifyWindowIndexing.lean": {
+      "hash": "68b66367ee6d",
+      "pass": true,
+      "unit_id": "u0e60a9f272"
+    },
+    "VerifyWindowProtocol.lean": {
+      "hash": "b8e18fe883b2",
+      "pass": true,
+      "unit_id": "u0e60a9f272"
     },
     "WeightLoaderSegments.lean": {
       "hash": "6f01c5b7c8e8",
