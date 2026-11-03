@@ -306,7 +306,8 @@
         "StrataPackBuilder.lean",
         "MtpExpertQuantizer.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "ad1f34a9-5c8c-4fe5-9883-d23aef895f50"
     },
     {
       "id": "ub0234d85de",
@@ -404,6 +405,11 @@
       "pass": true,
       "unit_id": "uc2c7002b7a"
     },
+    "CanonicalFormRoundtrip.lean": {
+      "hash": "f6c68682a7e1",
+      "pass": true,
+      "unit_id": "u3e106cde79"
+    },
     "F16Conversion.lean": {
       "hash": "5eae31afb0a5",
       "pass": true,
@@ -413,6 +419,11 @@
       "hash": "f3b6ea10c6b6",
       "pass": true,
       "unit_id": "uc2c7002b7a"
+    },
+    "GgufLazyLoader.lean": {
+      "hash": "e001f8b67aa8",
+      "pass": true,
+      "unit_id": "u3e106cde79"
     },
     "KvQ8Quantization.lean": {
       "hash": "23c8c09f1955",
@@ -424,10 +435,20 @@
       "pass": true,
       "unit_id": "uc2c7002b7a"
     },
+    "MtpExpertQuantizer.lean": {
+      "hash": "bb5874102af4",
+      "pass": true,
+      "unit_id": "u3e106cde79"
+    },
     "PlanPoolBudget.lean": {
       "hash": "696b7ae14c9f",
       "pass": true,
       "unit_id": "uc2c7002b7a"
+    },
+    "Q2GgufWriter.lean": {
+      "hash": "11ba7fe11682",
+      "pass": true,
+      "unit_id": "u3e106cde79"
     },
     "SamplerChainContracts.lean": {
       "hash": "ae17f0686c4c",
@@ -438,6 +459,16 @@
       "hash": "e8a019cce8e7",
       "pass": true,
       "unit_id": "uc2c7002b7a"
+    },
+    "StrataPackBuilder.lean": {
+      "hash": "e7b5e4fdde3a",
+      "pass": true,
+      "unit_id": "u3e106cde79"
+    },
+    "WeightLoaderSegments.lean": {
+      "hash": "6f01c5b7c8e8",
+      "pass": true,
+      "unit_id": "u3e106cde79"
     }
   },
   "fix_attempts": {},
