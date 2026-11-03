@@ -1,0 +1,404 @@
+{
+  "version": 1,
+  "ref": "Niko1221/Strata",
+  "ref_sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+  "theory_hash": "15814ca0876a",
+  "modules": {
+    "ByteLevelBpeTokenizer.lean": {
+      "name": "ByteLevelBpeTokenizer.lean",
+      "hash": "5f812049668a",
+      "bytes": 5105
+    },
+    "CanonicalFormRoundtrip.lean": {
+      "name": "CanonicalFormRoundtrip.lean",
+      "hash": "f6c68682a7e1",
+      "bytes": 6338
+    },
+    "CpuExpertPool.lean": {
+      "name": "CpuExpertPool.lean",
+      "hash": "635d4a40df73",
+      "bytes": 6270
+    },
+    "ExpertCacheResidency.lean": {
+      "name": "ExpertCacheResidency.lean",
+      "hash": "905fbc41d71b",
+      "bytes": 8022
+    },
+    "ExpertDispatchContract.lean": {
+      "name": "ExpertDispatchContract.lean",
+      "hash": "6cd0d4eeeb01",
+      "bytes": 4143
+    },
+    "ExpertSourceBlobAccess.lean": {
+      "name": "ExpertSourceBlobAccess.lean",
+      "hash": "2ffd9874b608",
+      "bytes": 4765
+    },
+    "F16Conversion.lean": {
+      "name": "F16Conversion.lean",
+      "hash": "5eae31afb0a5",
+      "bytes": 5079
+    },
+    "FusedGdnKernels.lean": {
+      "name": "FusedGdnKernels.lean",
+      "hash": "2696c27ba657",
+      "bytes": 4889
+    },
+    "FusedGrKernels.lean": {
+      "name": "FusedGrKernels.lean",
+      "hash": "15a1411fe5aa",
+      "bytes": 4309
+    },
+    "GdnQsaLayerBuffers.lean": {
+      "name": "GdnQsaLayerBuffers.lean",
+      "hash": "75c823de9a58",
+      "bytes": 6248
+    },
+    "GdnReference.lean": {
+      "name": "GdnReference.lean",
+      "hash": "f8a3eae464b7",
+      "bytes": 3564
+    },
+    "GenerateDriverAccounting.lean": {
+      "name": "GenerateDriverAccounting.lean",
+      "hash": "9a7222cb09a5",
+      "bytes": 5322
+    },
+    "GgmlDequantLayouts.lean": {
+      "name": "GgmlDequantLayouts.lean",
+      "hash": "f3b6ea10c6b6",
+      "bytes": 6096
+    },
+    "GgufLazyLoader.lean": {
+      "name": "GgufLazyLoader.lean",
+      "hash": "e001f8b67aa8",
+      "bytes": 4759
+    },
+    "GrGatedResidual.lean": {
+      "name": "GrGatedResidual.lean",
+      "hash": "5f5d2e3d0696",
+      "bytes": 3702
+    },
+    "IQuantAvx512Rows.lean": {
+      "name": "IQuantAvx512Rows.lean",
+      "hash": "11ff061beee9",
+      "bytes": 6134
+    },
+    "IqQuantExpertLayout.lean": {
+      "name": "IqQuantExpertLayout.lean",
+      "hash": "b4e219341c01",
+      "bytes": 4155
+    },
+    "KvQ8Quantization.lean": {
+      "name": "KvQ8Quantization.lean",
+      "hash": "23c8c09f1955",
+      "bytes": 3607
+    },
+    "MemoryPlanner.lean": {
+      "name": "MemoryPlanner.lean",
+      "hash": "828d920b5d19",
+      "bytes": 4796
+    },
+    "MtpDraftLayer.lean": {
+      "name": "MtpDraftLayer.lean",
+      "hash": "02151565a264",
+      "bytes": 3971
+    },
+    "MtpExpertQuantizer.lean": {
+      "name": "MtpExpertQuantizer.lean",
+      "hash": "bb5874102af4",
+      "bytes": 5107
+    },
+    "NativeFlashAttnBounds.lean": {
+      "name": "NativeFlashAttnBounds.lean",
+      "hash": "76762e858b44",
+      "bytes": 4725
+    },
+    "NativeGdnPreprocess.lean": {
+      "name": "NativeGdnPreprocess.lean",
+      "hash": "047e4b95efb7",
+      "bytes": 3179
+    },
+    "NativeGdnStep.lean": {
+      "name": "NativeGdnStep.lean",
+      "hash": "62d4b4c02a35",
+      "bytes": 3428
+    },
+    "NativeMmvqGeometry.lean": {
+      "name": "NativeMmvqGeometry.lean",
+      "hash": "783a941142ee",
+      "bytes": 4284
+    },
+    "NativeQsaIndexerAppend.lean": {
+      "name": "NativeQsaIndexerAppend.lean",
+      "hash": "4e0011e281eb",
+      "bytes": 4393
+    },
+    "NativeQsaScore.lean": {
+      "name": "NativeQsaScore.lean",
+      "hash": "27e075d93d0c",
+      "bytes": 4005
+    },
+    "PlanPoolBudget.lean": {
+      "name": "PlanPoolBudget.lean",
+      "hash": "696b7ae14c9f",
+      "bytes": 3460
+    },
+    "PleBlockIndexing.lean": {
+      "name": "PleBlockIndexing.lean",
+      "hash": "98cc5ac01524",
+      "bytes": 4402
+    },
+    "PleNgramHash.lean": {
+      "name": "PleNgramHash.lean",
+      "hash": "c3e851db6326",
+      "bytes": 6333
+    },
+    "PleRowReader.lean": {
+      "name": "PleRowReader.lean",
+      "hash": "76fed2bcc5a5",
+      "bytes": 4580
+    },
+    "PleTableIo.lean": {
+      "name": "PleTableIo.lean",
+      "hash": "887730b69eb3",
+      "bytes": 4650
+    },
+    "PrefillChunkDriver.lean": {
+      "name": "PrefillChunkDriver.lean",
+      "hash": "aea179022d4b",
+      "bytes": 6065
+    },
+    "PrefillGpuKernels.lean": {
+      "name": "PrefillGpuKernels.lean",
+      "hash": "0b0f6cbc02e4",
+      "bytes": 9349
+    },
+    "Q2Avx2Kernel.lean": {
+      "name": "Q2Avx2Kernel.lean",
+      "hash": "603d9275616a",
+      "bytes": 4372
+    },
+    "Q2ExpertVnniKernel.lean": {
+      "name": "Q2ExpertVnniKernel.lean",
+      "hash": "187a70018c8d",
+      "bytes": 9233
+    },
+    "Q2GgufWriter.lean": {
+      "name": "Q2GgufWriter.lean",
+      "hash": "11ba7fe11682",
+      "bytes": 4319
+    },
+    "QsaBlockSelect.lean": {
+      "name": "QsaBlockSelect.lean",
+      "hash": "073f68508fac",
+      "bytes": 4756
+    },
+    "QsaCacheIndexer.lean": {
+      "name": "QsaCacheIndexer.lean",
+      "hash": "9a559c366e75",
+      "bytes": 5999
+    },
+    "QsaDecodeAttention.lean": {
+      "name": "QsaDecodeAttention.lean",
+      "hash": "7be0dd42d44c",
+      "bytes": 4180
+    },
+    "RouterTopKSelection.lean": {
+      "name": "RouterTopKSelection.lean",
+      "hash": "f566d1161616",
+      "bytes": 4430
+    },
+    "S2ExpertGroupedBlob.lean": {
+      "name": "S2ExpertGroupedBlob.lean",
+      "hash": "ba9a8e801989",
+      "bytes": 4564
+    },
+    "SFamilyGemvIndexing.lean": {
+      "name": "SFamilyGemvIndexing.lean",
+      "hash": "7f0f1d93a67c",
+      "bytes": 3949
+    },
+    "SamplerChainContracts.lean": {
+      "name": "SamplerChainContracts.lean",
+      "hash": "ae17f0686c4c",
+      "bytes": 4258
+    },
+    "ServeFrontend.lean": {
+      "name": "ServeFrontend.lean",
+      "hash": "a1833f99dbd9",
+      "bytes": 5401
+    },
+    "ServeServer.lean": {
+      "name": "ServeServer.lean",
+      "hash": "b150be89cb01",
+      "bytes": 6501
+    },
+    "SessionStateLayout.lean": {
+      "name": "SessionStateLayout.lean",
+      "hash": "e8a019cce8e7",
+      "bytes": 4189
+    },
+    "SpecController.lean": {
+      "name": "SpecController.lean",
+      "hash": "a0b02c673589",
+      "bytes": 5686
+    },
+    "StrataPackBuilder.lean": {
+      "name": "StrataPackBuilder.lean",
+      "hash": "e7b5e4fdde3a",
+      "bytes": 6363
+    },
+    "SuffixDrafter.lean": {
+      "name": "SuffixDrafter.lean",
+      "hash": "787a3926c009",
+      "bytes": 4722
+    },
+    "VerifyWindowIndexing.lean": {
+      "name": "VerifyWindowIndexing.lean",
+      "hash": "68b66367ee6d",
+      "bytes": 5035
+    },
+    "VerifyWindowProtocol.lean": {
+      "name": "VerifyWindowProtocol.lean",
+      "hash": "b8e18fe883b2",
+      "bytes": 6190
+    },
+    "VisionBuildConfig.lean": {
+      "name": "VisionBuildConfig.lean",
+      "hash": "cd48973d8c94",
+      "bytes": 3752
+    },
+    "VisionEncoderProtocol.lean": {
+      "name": "VisionEncoderProtocol.lean",
+      "hash": "21d02784f3e4",
+      "bytes": 11831
+    },
+    "WeightLoaderSegments.lean": {
+      "name": "WeightLoaderSegments.lean",
+      "hash": "6f01c5b7c8e8",
+      "bytes": 5195
+    }
+  },
+  "nodes": [
+    {
+      "id": "uc2c7002b7a",
+      "modules": [
+        "F16Conversion.lean",
+        "GgmlDequantLayouts.lean",
+        "KvQ8Quantization.lean",
+        "SessionStateLayout.lean",
+        "MemoryPlanner.lean",
+        "PlanPoolBudget.lean",
+        "ByteLevelBpeTokenizer.lean",
+        "SamplerChainContracts.lean"
+      ],
+      "reason": "initial plan"
+    },
+    {
+      "id": "u3e106cde79",
+      "modules": [
+        "WeightLoaderSegments.lean",
+        "GgufLazyLoader.lean",
+        "CanonicalFormRoundtrip.lean",
+        "Q2GgufWriter.lean",
+        "StrataPackBuilder.lean",
+        "MtpExpertQuantizer.lean"
+      ],
+      "reason": "initial plan"
+    },
+    {
+      "id": "ub0234d85de",
+      "modules": [
+        "ExpertSourceBlobAccess.lean",
+        "IqQuantExpertLayout.lean",
+        "S2ExpertGroupedBlob.lean",
+        "ExpertDispatchContract.lean",
+        "RouterTopKSelection.lean",
+        "ExpertCacheResidency.lean",
+        "CpuExpertPool.lean"
+      ],
+      "reason": "initial plan"
+    },
+    {
+      "id": "ueac0e4654d",
+      "modules": [
+        "Q2ExpertVnniKernel.lean",
+        "IQuantAvx512Rows.lean",
+        "Q2Avx2Kernel.lean",
+        "NativeMmvqGeometry.lean",
+        "SFamilyGemvIndexing.lean"
+      ],
+      "reason": "initial plan"
+    },
+    {
+      "id": "u89be81de0b",
+      "modules": [
+        "PleRowReader.lean",
+        "PleNgramHash.lean",
+        "PleTableIo.lean",
+        "PleBlockIndexing.lean"
+      ],
+      "reason": "initial plan"
+    },
+    {
+      "id": "u433ffdf2e4",
+      "modules": [
+        "GdnQsaLayerBuffers.lean",
+        "FusedGdnKernels.lean",
+        "GdnReference.lean",
+        "NativeGdnStep.lean",
+        "NativeGdnPreprocess.lean",
+        "FusedGrKernels.lean",
+        "GrGatedResidual.lean"
+      ],
+      "reason": "initial plan"
+    },
+    {
+      "id": "u6d34237bff",
+      "modules": [
+        "QsaCacheIndexer.lean",
+        "QsaDecodeAttention.lean",
+        "QsaBlockSelect.lean",
+        "NativeQsaScore.lean",
+        "NativeQsaIndexerAppend.lean",
+        "NativeFlashAttnBounds.lean"
+      ],
+      "reason": "initial plan"
+    },
+    {
+      "id": "ud78dd87516",
+      "modules": [
+        "PrefillGpuKernels.lean",
+        "PrefillChunkDriver.lean",
+        "GenerateDriverAccounting.lean"
+      ],
+      "reason": "initial plan"
+    },
+    {
+      "id": "u0e60a9f272",
+      "modules": [
+        "MtpDraftLayer.lean",
+        "VerifyWindowProtocol.lean",
+        "VerifyWindowIndexing.lean",
+        "SpecController.lean",
+        "SuffixDrafter.lean"
+      ],
+      "reason": "initial plan"
+    },
+    {
+      "id": "ubd109f97f8",
+      "modules": [
+        "ServeFrontend.lean",
+        "ServeServer.lean",
+        "VisionBuildConfig.lean",
+        "VisionEncoderProtocol.lean"
+      ],
+      "reason": "initial plan"
+    }
+  ],
+  "state": {},
+  "fix_attempts": {},
+  "last_failure": {},
+  "infra_fails": 0
+}
