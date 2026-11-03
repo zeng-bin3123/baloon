@@ -415,7 +415,7 @@
         "PleNgramHash.lean"
       ],
       "reason": "initial plan",
-      "conv": "ea7d1688-135b-4bbd-a262-2473d9a8ed31"
+      "conv": "d511411e-7585-49ed-a3ef-b9d2518a6465"
     },
     {
       "id": "u433ffdf2e4",
@@ -599,8 +599,8 @@
       "unit_id": "u6d34237bff"
     },
     "PleNgramHash.lean": {
-      "hash": "c3e851db6326",
-      "pass": false,
+      "hash": "ffbf1a9899c4",
+      "pass": true,
       "unit_id": "u89be81de0b"
     },
     "PrefillChunkDriver.lean": {
