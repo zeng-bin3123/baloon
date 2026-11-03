@@ -403,7 +403,8 @@
         "VisionBuildConfig.lean",
         "VisionEncoderProtocol.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "8967a5a3-c574-417b-9949-723252177387"
     }
   ],
   "state": {
@@ -627,6 +628,16 @@
       "pass": true,
       "unit_id": "uc2c7002b7a"
     },
+    "ServeFrontend.lean": {
+      "hash": "a1833f99dbd9",
+      "pass": true,
+      "unit_id": "ubd109f97f8"
+    },
+    "ServeServer.lean": {
+      "hash": "b150be89cb01",
+      "pass": true,
+      "unit_id": "ubd109f97f8"
+    },
     "SessionStateLayout.lean": {
       "hash": "e8a019cce8e7",
       "pass": true,
@@ -656,6 +667,16 @@
       "hash": "b8e18fe883b2",
       "pass": true,
       "unit_id": "u0e60a9f272"
+    },
+    "VisionBuildConfig.lean": {
+      "hash": "cd48973d8c94",
+      "pass": true,
+      "unit_id": "ubd109f97f8"
+    },
+    "VisionEncoderProtocol.lean": {
+      "hash": "21d02784f3e4",
+      "pass": true,
+      "unit_id": "ubd109f97f8"
     },
     "WeightLoaderSegments.lean": {
       "hash": "6f01c5b7c8e8",
