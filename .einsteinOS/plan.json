@@ -435,7 +435,7 @@
         "NativeQsaIndexerAppend.lean"
       ],
       "reason": "initial plan",
-      "conv": "84d194bc-155c-4c41-a9d4-fa10466e3569"
+      "conv": "5029dbed-bff4-46bb-a4d7-797a7deb336f"
     },
     {
       "id": "ud78dd87516",
@@ -589,13 +589,13 @@
       "unit_id": "ueac0e4654d"
     },
     "NativeQsaIndexerAppend.lean": {
-      "hash": "4e0011e281eb",
-      "pass": false,
+      "hash": "6f766b3c4052",
+      "pass": true,
       "unit_id": "u6d34237bff"
     },
     "NativeQsaScore.lean": {
-      "hash": "27e075d93d0c",
-      "pass": false,
+      "hash": "9f1182862842",
+      "pass": true,
       "unit_id": "u6d34237bff"
     },
     "PleNgramHash.lean": {
@@ -609,13 +609,13 @@
       "unit_id": "ud78dd87516"
     },
     "QsaBlockSelect.lean": {
-      "hash": "073f68508fac",
-      "pass": false,
+      "hash": "160ec972e71f",
+      "pass": true,
       "unit_id": "u6d34237bff"
     },
     "QsaDecodeAttention.lean": {
-      "hash": "7be0dd42d44c",
-      "pass": false,
+      "hash": "c77c427c15cc",
+      "pass": true,
       "unit_id": "u6d34237bff"
     },
     "SpecController.lean": {
