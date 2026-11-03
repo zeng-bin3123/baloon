@@ -6,6 +6,8 @@ void test_source_blob_index(); void test_source_pinned_and_dispatch(); void test
 void test_iq_calls_layout(); void test_s2_blob();
 void test_router_order_and_topk(); void test_router_clamp_and_launch();
 void test_pool_split_and_segments(); void test_pool_routing_batches_cores();
+void test_pool_claim_and_handover_arith(); void test_pool_cores_workers_rows(); void test_pool_split_decomposition_and_chunks(); void test_pool_cpu_list_parsing();
+void test_pool_real_exactly_once(); void test_pool_real_handover_waits_for_drain(); void test_pool_real_split_and_multi_cover_rows(); void test_pool_real_pinned_workers();
 
 void run_test(const char* name, void (*fn)()) {
     const long before = testh::failures();
@@ -20,6 +22,8 @@ int main() {
     RUN(test_iq_calls_layout); RUN(test_s2_blob);
     RUN(test_router_order_and_topk); RUN(test_router_clamp_and_launch);
     RUN(test_pool_split_and_segments); RUN(test_pool_routing_batches_cores);
+    RUN(test_pool_claim_and_handover_arith); RUN(test_pool_cores_workers_rows); RUN(test_pool_split_decomposition_and_chunks); RUN(test_pool_cpu_list_parsing);
+    RUN(test_pool_real_exactly_once); RUN(test_pool_real_handover_waits_for_drain); RUN(test_pool_real_split_and_multi_cover_rows); RUN(test_pool_real_pinned_workers);
     std::printf("checks=%ld failures=%ld\n", testh::checks(), testh::failures());
     if (testh::failures() != 0) { std::printf("UNIT3 TESTS FAILED\n"); return 1; }
     std::printf("UNIT3 TESTS PASSED\n");
