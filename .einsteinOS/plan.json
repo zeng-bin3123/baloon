@@ -380,7 +380,8 @@
         "PrefillChunkDriver.lean",
         "GenerateDriverAccounting.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "73dd7cc9-e122-40bd-afef-0ce4528d8e6c"
     },
     {
       "id": "u0e60a9f272",
@@ -459,6 +460,11 @@
       "hash": "f8a3eae464b7",
       "pass": true,
       "unit_id": "u433ffdf2e4"
+    },
+    "GenerateDriverAccounting.lean": {
+      "hash": "9a7222cb09a5",
+      "pass": true,
+      "unit_id": "ud78dd87516"
     },
     "GgmlDequantLayouts.lean": {
       "hash": "f3b6ea10c6b6",
@@ -554,6 +560,16 @@
       "hash": "887730b69eb3",
       "pass": true,
       "unit_id": "u89be81de0b"
+    },
+    "PrefillChunkDriver.lean": {
+      "hash": "aea179022d4b",
+      "pass": true,
+      "unit_id": "ud78dd87516"
+    },
+    "PrefillGpuKernels.lean": {
+      "hash": "0b0f6cbc02e4",
+      "pass": true,
+      "unit_id": "ud78dd87516"
     },
     "Q2Avx2Kernel.lean": {
       "hash": "603d9275616a",
