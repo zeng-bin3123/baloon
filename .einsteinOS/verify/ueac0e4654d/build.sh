@@ -1,6 +1,6 @@
 #!/bin/bash
-# Build the WHOLE project: (1) every header in include/baloon compiles standalone, (2) the unit-1..unit-4 host
-# test binaries build, (3) when the corex toolchain is present, every existing CUDA source/test compiles for ivcore10.
+# Build the WHOLE project: (1) every header in include/baloon compiles standalone, (2) every tests/unit*/ host
+# test binary builds, (3) when the corex toolchain is present, every existing CUDA source/test compiles for ivcore10.
 # Exits 0 only if everything builds.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -24,15 +24,13 @@ for h in include/baloon/*.hpp; do
   $HOSTCXX $HFLAGS -fsyntax-only "$OUT/hdr_check.cpp"
 done
 
-# (2) host test binaries
-echo "[build] $OUT/test_unit1"
-$HOSTCXX $HFLAGS -Itests/unit1 tests/unit1/*.cpp -o "$OUT/test_unit1"
-echo "[build] $OUT/test_unit2"
-$HOSTCXX $HFLAGS -Itests/unit2 tests/unit2/*.cpp -o "$OUT/test_unit2"
-echo "[build] $OUT/test_unit3"
-$HOSTCXX $HFLAGS -Itests/unit3 tests/unit3/*.cpp -o "$OUT/test_unit3"
-echo "[build] $OUT/test_unit4"
-$HOSTCXX $HFLAGS -Itests/unit4 tests/unit4/*.cpp -o "$OUT/test_unit4"
+# (2) host test binaries: every tests/unit*/ directory (each is its own binary)
+for d in tests/unit*/; do
+  u=$(basename "$d")
+  ls "$d"*.cpp >/dev/null 2>&1 || continue
+  echo "[build] $OUT/test_$u"
+  $HOSTCXX $HFLAGS -pthread -I"$d" "$d"*.cpp -o "$OUT/test_$u"
+done
 
 # (3) existing GPU sources/tests, compile-only, with the project's own flags
 if [ -x "$COREX/bin/clang++" ]; then
