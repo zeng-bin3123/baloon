@@ -11,6 +11,8 @@ void test_vc_configure() {
         vision_cfg::Options o; o.portable = m & 1; o.cuda = m & 2; o.msvc = m & 4;
         auto s = vision_cfg::configure(o);
         CHECK(s.ggml_cuda == o.cuda);
+        CHECK(s.shared_libs == false);   // static libraries, every option combination
+        CHECK(s.backend_dl == false);    // ggml backends not dynamic, every option combination
         CHECK(s.static_runtime == (o.portable && o.msvc));
         CHECK(s.native == !s.avx2);
         if (o.portable) {
@@ -22,9 +24,15 @@ void test_vc_configure() {
     }
 }
 void test_vc_lists() {
-    CHECK(vision_cfg::ALWAYS_OFF.size() == 8 && vision_cfg::ALWAYS_ON.size() == 1);
+    CHECK(vision_cfg::ALWAYS_OFF.size() == 10 && vision_cfg::ALWAYS_ON.size() == 1);
     for (auto on : vision_cfg::ALWAYS_ON) for (auto off : vision_cfg::ALWAYS_OFF) CHECK(std::strcmp(on, off) != 0);
     CHECK(std::string(vision_cfg::ALWAYS_ON[0]) == "LLAMA_BUILD_MTMD");
+    bool has_shared = false, has_dl = false;
+    for (auto off : vision_cfg::ALWAYS_OFF) {
+        has_shared |= std::strcmp(off, "BUILD_SHARED_LIBS") == 0;
+        has_dl |= std::strcmp(off, "GGML_BACKEND_DL") == 0;
+    }
+    CHECK(has_shared && has_dl);
 }
 void test_ve_command() {
     using namespace vision_enc;
