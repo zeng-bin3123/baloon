@@ -399,7 +399,7 @@
         "CpuExpertPool.lean"
       ],
       "reason": "initial plan",
-      "conv": "f4b14f62-2c95-493e-a526-9662a5c654ca"
+      "conv": "f87a854a-cd90-41d1-8f83-1b4fbe135289"
     },
     {
       "id": "ueac0e4654d",
@@ -559,8 +559,8 @@
   ],
   "state": {
     "CpuExpertPool.lean": {
-      "hash": "635d4a40df73",
-      "pass": false,
+      "hash": "bedc61df7a18",
+      "pass": true,
       "unit_id": "ub0234d85de"
     },
     "GgufLazyLoader.lean": {
