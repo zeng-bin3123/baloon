@@ -343,7 +343,8 @@
         "PleTableIo.lean",
         "PleBlockIndexing.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "a9e4205f-6b0e-4795-98b6-f05738b5ac4b"
     },
     {
       "id": "u433ffdf2e4",
@@ -533,7 +534,15 @@
       "unit_id": "u3e106cde79"
     }
   },
-  "fix_attempts": {},
-  "last_failure": {},
+  "fix_attempts": {
+    "u89be81de0b": 1
+  },
+  "last_failure": {
+    "u89be81de0b": {
+      "kind": "smoke_fail",
+      "text": "test.sh exit=1: == optimised build ==\n[ ok ] test_row_job_geometry\n[ ok ] test_row_cache\n[ ok ] test_row_slots\n[ ok ] test_row_latency_tickets\n[ ok ] test_hash_constants\n[ ok ] test_hash_mixing\n[ ok ] test_hash_context\n[ ok ] test_hash_iq4\n[ ok ] test_io_open_validation\n[ ok ] test_io_protocol\n[ ok ] test_io_bytes\n[ ok ] test_block_history\n[ ok ] test_block_conv_taps\nFAIL tests/unit5/test_ple_block.cpp:81: std::fabs(gate(1e-9f) - 0.5f) \u003c 1e-9f + 0.f || gate(1e-9f) == 0.5f\n[FAIL] test_block_streams_gate\n[ ok ] test_block_scratch\nchecks=5907698 failures=1\nUNIT5 TESTS FAILED\noptimised run FAILED (exit 1)\n== ASan/UBSan build ==\n[ ok ] test_row_job_geometry\n[ ok ] test_row_cache\n[ ok ] test_row_slots\n[ ok ] test_row_latency_tickets\n[ ok ] test_hash_constants\n[ ok ] test_hash_mixing\n[ ok ] test_hash_context\n[ ok ] test_hash_iq4\n[ ok ] test_io_open_validation\n[ ok ] test_io_protocol\n[ ok ] test_io_bytes\n[ ok ] test_block_history\n[ ok ] test_block_conv_taps\nFAIL tests/unit5/test_ple_block.cpp:81: std::fabs(gate(1e-9f) - 0.5f) \u003c 1e-9f + 0.f || gate(1e-9f) == 0.5f\n[FAIL] test_block_streams_gate\n[ ok ] test_block_scratch\nchecks=5907698 failures=1\nUNIT5 TESTS FAILED\nsanitizer run FAILED (exit 1)\nUNIT-5 TESTS FAILED",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-u89be81de0b"
+    }
+  },
   "infra_fails": 0
 }
