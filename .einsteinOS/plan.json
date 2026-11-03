@@ -293,7 +293,8 @@
         "ByteLevelBpeTokenizer.lean",
         "SamplerChainContracts.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "8bdd3219-40b0-4d17-b62f-80e4f86a856a"
     },
     {
       "id": "u3e106cde79",
@@ -397,7 +398,48 @@
       "reason": "initial plan"
     }
   ],
-  "state": {},
+  "state": {
+    "ByteLevelBpeTokenizer.lean": {
+      "hash": "5f812049668a",
+      "pass": true,
+      "unit_id": "uc2c7002b7a"
+    },
+    "F16Conversion.lean": {
+      "hash": "5eae31afb0a5",
+      "pass": true,
+      "unit_id": "uc2c7002b7a"
+    },
+    "GgmlDequantLayouts.lean": {
+      "hash": "f3b6ea10c6b6",
+      "pass": true,
+      "unit_id": "uc2c7002b7a"
+    },
+    "KvQ8Quantization.lean": {
+      "hash": "23c8c09f1955",
+      "pass": true,
+      "unit_id": "uc2c7002b7a"
+    },
+    "MemoryPlanner.lean": {
+      "hash": "828d920b5d19",
+      "pass": true,
+      "unit_id": "uc2c7002b7a"
+    },
+    "PlanPoolBudget.lean": {
+      "hash": "696b7ae14c9f",
+      "pass": true,
+      "unit_id": "uc2c7002b7a"
+    },
+    "SamplerChainContracts.lean": {
+      "hash": "ae17f0686c4c",
+      "pass": true,
+      "unit_id": "uc2c7002b7a"
+    },
+    "SessionStateLayout.lean": {
+      "hash": "e8a019cce8e7",
+      "pass": true,
+      "unit_id": "uc2c7002b7a"
+    }
+  },
   "fix_attempts": {},
   "last_failure": {},
   "infra_fails": 0
