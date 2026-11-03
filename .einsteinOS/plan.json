@@ -357,7 +357,8 @@
         "FusedGrKernels.lean",
         "GrGatedResidual.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "612b20fc-247c-4938-ad77-3c3b39eb95cd"
     },
     {
       "id": "u6d34237bff",
@@ -438,6 +439,26 @@
       "pass": true,
       "unit_id": "uc2c7002b7a"
     },
+    "FusedGdnKernels.lean": {
+      "hash": "2696c27ba657",
+      "pass": true,
+      "unit_id": "u433ffdf2e4"
+    },
+    "FusedGrKernels.lean": {
+      "hash": "15a1411fe5aa",
+      "pass": true,
+      "unit_id": "u433ffdf2e4"
+    },
+    "GdnQsaLayerBuffers.lean": {
+      "hash": "75c823de9a58",
+      "pass": true,
+      "unit_id": "u433ffdf2e4"
+    },
+    "GdnReference.lean": {
+      "hash": "f8a3eae464b7",
+      "pass": true,
+      "unit_id": "u433ffdf2e4"
+    },
     "GgmlDequantLayouts.lean": {
       "hash": "f3b6ea10c6b6",
       "pass": true,
@@ -447,6 +468,11 @@
       "hash": "e001f8b67aa8",
       "pass": true,
       "unit_id": "u3e106cde79"
+    },
+    "GrGatedResidual.lean": {
+      "hash": "5f5d2e3d0696",
+      "pass": true,
+      "unit_id": "u433ffdf2e4"
     },
     "IQuantAvx512Rows.lean": {
       "hash": "11ff061beee9",
@@ -472,6 +498,16 @@
       "hash": "bb5874102af4",
       "pass": true,
       "unit_id": "u3e106cde79"
+    },
+    "NativeGdnPreprocess.lean": {
+      "hash": "047e4b95efb7",
+      "pass": true,
+      "unit_id": "u433ffdf2e4"
+    },
+    "NativeGdnStep.lean": {
+      "hash": "62d4b4c02a35",
+      "pass": true,
+      "unit_id": "u433ffdf2e4"
     },
     "NativeMmvqGeometry.lean": {
       "hash": "783a941142ee",
