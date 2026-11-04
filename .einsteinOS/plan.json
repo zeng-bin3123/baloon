@@ -371,7 +371,8 @@
         "F16BitsRounding.lean",
         "DequantBlockLayouts.lean"
       ],
-      "reason": "3 fix attempts used"
+      "reason": "3 fix attempts used",
+      "conv": "3a28369e-fada-41a6-8c75-4e6837826990"
     },
     {
       "id": "u208dfb4222",
@@ -459,8 +460,13 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u042aaf67ce": 1
+  },
   "fail_history": {
+    "u042aaf67ce": [
+      "compile_fail"
+    ],
     "u0e60a9f272": [
       "port_incomplete"
     ],
@@ -503,7 +509,13 @@
       "existing_code_fails"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "u042aaf67ce": {
+      "kind": "compile_fail",
+      "text": "build.sh exit=1: …                                   ~~~~                          ^~~~\n                                                                         %.3f\n1 warning generated when compiling for ivcore10.\n[cuda] tests/test_shared_expert.cu\ntests/test_shared_expert.cu:26:72: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n        printf(\"gate N=%d gpu=%.9g ref=%.9g |d|=%.3g %s\\n\", N, g, ref, d, b ? \"FAIL\" : \"ok\");\n                                                ~~~~                   ^\n                                                %.3f\ntests/test_shared_expert.cu:39:131: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    printf(\"swiglu: %d beyond 1e-6 rel, max|d|=%.3g (exp() device vs host may differ in last ulp; bit-exact not required)\\n\", sb, sm); bad += sb;\n                                               ~~~~                                                                               ^~\n                                               %.3f\n2 warnings generated when compiling for ivcore10.\n[cuda] tests/gpu_unit12/test_prefill_gpu.cu\n[cuda] tests/gpu_unit19/test_u7_gpu.cu\ntests/gpu_unit19/test_u7_gpu.cu:351:169: error: no matching function for call to 'max'\n            for (int h = 0; h \u003c 4; ++h) { double dot = 0; for (int d = 0; d \u003c 128; ++d) dot += (double)hq[h * 128 + d] * hkeys[(size_t)cidx * 128 + d]; acc += hhw[h] * std::max(dot, 0.0); }\n                                                                                                                                                                        ^~~~~~~~\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/algorithmfwd.h:370:5: note: candidate template ignored: deduced conflicting types for parameter '_Tp' ('double' vs. 'float')\n    max(const _Tp\u0026, const _Tp\u0026);\n    ^\n/usr/local/corex-3.2.3/lib/clang/16/include/cuda_wrappers/algorithm:87:1: note: candidate template ignored: deduced conflicting types for parameter '__T' ('double' vs. 'float')\nmax(const __T \u0026__a, const __T \u0026__b) {\n^\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/stl_algo.h:3468:5: note: candidate template ignored: could not match 'initializer_list\u003c_Tp\u003e' against 'double'\n    max(initializer_list\u003c_Tp\u003e __l, _Compare __comp)\n    ^\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/stl_algo.h:3462:5: note: candidate function template not viable: requires single argument '__l', but 2 arguments were provided\n    max(initializer_list\u003c_Tp\u003e __l)\n    ^\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/algorithmfwd.h:375:5: note: candidate function template not viable: requires 3 arguments, but 2 were provided\n    max(const _Tp\u0026, const _Tp\u0026, _Compare);\n    ^\n/usr/local/corex-3.2.3/lib/clang/16/include/cuda_wrappers/algorithm:80:1: note: candidate function template not viable: requires 3 arguments, but 2 were provided\nmax(const __T \u0026__a, const __T \u0026__b, __Cmp __cmp) {\n^\n1 error generated when compiling for ivcore10.",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-u042aaf67ce"
+    }
+  },
   "infra_fails": 0,
   "port_units": [
     {
