@@ -300,17 +300,17 @@
   "state": {
     "PleNgramHash.lean": {
       "hash": "255f933f6849",
-      "pass": true,
+      "pass": false,
       "unit_id": "u89be81de0b"
     },
     "SpecController.lean": {
       "hash": "8e3986f7ba99",
-      "pass": true,
+      "pass": false,
       "unit_id": "u0e60a9f272"
     },
     "SuffixDrafter.lean": {
       "hash": "0c139adfc16b",
-      "pass": true,
+      "pass": false,
       "unit_id": "u0e60a9f272"
     }
   },
@@ -330,5 +330,6 @@
     ]
   },
   "last_failure": {},
-  "infra_fails": 0
+  "infra_fails": 0,
+  "gates": "build+test+gpu+isa+port+integration"
 }
