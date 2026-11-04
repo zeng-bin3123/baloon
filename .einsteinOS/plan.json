@@ -337,7 +337,7 @@
         "GatedResidual.lean"
       ],
       "reason": "3 fix attempts used",
-      "conv": "3394ed57-696a-47fc-86b4-102b546733e1"
+      "conv": "d7d91cac-60e7-4e6c-88c2-88ba958ded29"
     },
     {
       "id": "u316bd6b9ec",
@@ -439,7 +439,7 @@
     }
   },
   "fix_attempts": {
-    "u95fce8dc9d": 1
+    "u95fce8dc9d": 2
   },
   "fail_history": {
     "u0e60a9f272": [
@@ -464,7 +464,8 @@
       "port_incomplete"
     ],
     "u95fce8dc9d": [
-      "compile_fail"
+      "compile_fail",
+      "port_incomplete"
     ],
     "u9dc1be2eae": [
       "missing"
@@ -484,8 +485,8 @@
   },
   "last_failure": {
     "u95fce8dc9d": {
-      "kind": "compile_fail",
-      "text": "build.sh exit=1: …ument has type 'double' [-Wformat]\n    std::printf(\"  decode[%s] max_abs_err=%.3e (scale %.3f, attended heads %ld)\\n\", name, err, sc, attended_heads);\n                                          ~~~~                                            ^~~\n                                          %.3f\ntests/gpu_unit7/test_ilu_qsa.cu:133:96: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    std::printf(\"  decode[%s] max_abs_err=%.3e (scale %.3f, attended heads %ld)\\n\", name, err, sc, attended_heads);\n                                                      ~~~~                                     ^~\n                                                      %.3f\ntests/gpu_unit7/test_ilu_qsa.cu:380:48: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    std::printf(\"  append max_abs_err=%.3e\\n\", worst);\n                                      ~~~~     ^~~~~\n                                      %.3f\n3 warnings generated when compiling for ivcore10.\n[cuda] tests/gpu_unit95/test_unit95_gpu.cu\ntests/gpu_unit95/test_unit95_gpu.cu:248:216: error: no matching function for call to 'max'\n        for (int h = 0; h \u003c s.index_heads; ++h) { double dot = 0; for (int d = 0; d \u003c s.index_dim; ++d) dot += (double)iq[(size_t)h * s.index_dim + d] * f16f(h16(ikeys[(size_t)j * s.index_dim + d])); tot += hw[h] * std::max(dot, 0.0); }\n                                                                                                                                                                                                                       ^~~~~~~~\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/algorithmfwd.h:370:5: note: candidate template ignored: deduced conflicting types for parameter '_Tp' ('double' vs. 'float')\n    max(const _Tp\u0026, const _Tp\u0026);\n    ^\n/usr/local/corex-3.2.3/lib/clang/16/include/cuda_wrappers/algorithm:87:1: note: candidate template ignored: deduced conflicting types for parameter '__T' ('double' vs. 'float')\nmax(const __T \u0026__a, const __T \u0026__b) {\n^\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/stl_algo.h:3468:5: note: candidate template ignored: could not match 'initializer_list\u003c_Tp\u003e' against 'double'\n    max(initializer_list\u003c_Tp\u003e __l, _Compare __comp)\n    ^\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/stl_algo.h:3462:5: note: candidate function template not viable: requires single argument '__l', but 2 arguments were provided\n    max(initializer_list\u003c_Tp\u003e __l)\n    ^\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/algorithmfwd.h:375:5: note: candidate function template not viable: requires 3 arguments, but 2 were provided\n    max(const _Tp\u0026, const _Tp\u0026, _Compare);\n    ^\n/usr/local/corex-3.2.3/lib/clang/16/include/cuda_wrappers/algorithm:80:1: note: candidate function template not viable: requires 3 arguments, but 2 were provided\nmax(const __T \u0026__a, const __T \u0026__b, __Cmp __cmp) {\n^\n1 error generated when compiling for ivcore10.",
+      "kind": "port_incomplete",
+      "text": "port_incomplete: 3 of the 90 definitions of the unit's reference files have no counterpart:\n  include/ref/artifact/dequant.hpp REF_GGUF_MAIN_DISABLED → include/baloon/dequant_artifact.hpp:BALOON_DEQUANT_MAIN_DISABLED: not defined in that file\n  src/kernels/cuda/quantize_act.cu Q8K_BYTES → include/baloon/device_kv_qsa_api.hpp:Q8K_BYTES: not defined in that file\n  src/kernels/cuda/quantize_act.cu QK_K → include/baloon/device_kv_qsa_api.hpp:QK_K: not defined in that file",
       "base_ref": "einsteinOS/dev-c880662efd-wip-u95fce8dc9d"
     }
   },
