@@ -10,6 +10,9 @@
 
 // Define this to compile src/artifact/dequant_tool.cpp without its main() (it can then be linked into other tools).
 #ifndef BALOON_DEQUANT_MAIN_DISABLED
+#define BALOON_DEQUANT_MAIN_DISABLED 0
+#endif
+#if !BALOON_DEQUANT_MAIN_DISABLED
 #define BALOON_DEQUANT_MAIN_ENABLED 1
 #endif
 

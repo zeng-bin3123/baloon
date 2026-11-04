@@ -54,7 +54,9 @@ int qsa_gate_apply(const float* d_attn, const uint16_t* d_gate, float* d_out, in
 int qsa_gate_apply_f32(const float* d_attn, const float* d_gate, float* d_out, int n, void* st);
 
 // ---------------- activation quantizers ----------------
-constexpr int QK8_0 = 32, QK_K = 256, Q8K_BYTES = 292;               // Q8_K: f32 d + int8[256] + int16 bsums[16]
+constexpr int QK8_0 = 32;
+constexpr int QK_K = 256;
+constexpr int Q8K_BYTES = 292;  // Q8_K: f32 d + int8[256] + int16 bsums[16]
 constexpr int Q8_0_BYTES = 34;                                       // fp16 d + int8[32]
 int quantize_q8_0(const float* d_x, uint8_t* d_out, int n, void* st);                 // n % 32 == 0
 int quantize_q8_0_scaled(const float* d_x, float scale, uint8_t* d_out, int n, void* st);
