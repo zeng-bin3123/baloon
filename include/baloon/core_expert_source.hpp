@@ -59,8 +59,8 @@ public:
     bool open_bytes(const uint8_t* data, size_t bytes, int64_t n_layers, int64_t n_expert, int64_t blob, int64_t max_slot_blob = 0);
     void close();
     const uint8_t* blob(int64_t layer, int64_t expert) override;
-    bool pinned() const { return pinned_; }
-    const uint8_t* device_alias() const { return arena_.empty() ? nullptr : arena_.data(); }
+    bool pinned() const;
+    const uint8_t* device_alias() const;
     uint64_t arena_bytes() const { return arena_.size(); }
 
 private:

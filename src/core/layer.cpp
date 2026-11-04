@@ -14,9 +14,15 @@ namespace baloon {
 namespace core {
 
 // ---- runtime switches (process-wide, set once before the graphs are built) -------------------------------------------
-static std::atomic<bool> g_fast_attn{false}, g_fast_select{false}, g_fused_gdn{false}, g_fused_gr{false},
-    g_publish_kernel{false}, g_shared_early{false}, g_kv_int8{false}, native_bf16_projections{false},
-    native_flash_attn_short{false};
+static std::atomic<bool> g_fast_attn{false};
+static std::atomic<bool> g_fast_select{false};
+static std::atomic<bool> g_fused_gdn{false};
+static std::atomic<bool> g_fused_gr{false};
+static std::atomic<bool> g_publish_kernel{false};
+static std::atomic<bool> g_shared_early{false};
+static std::atomic<bool> g_kv_int8{false};
+static std::atomic<bool> native_bf16_projections{false};
+static std::atomic<bool> native_flash_attn_short{false};
 
 void layer_set_fast_attn(bool v) { g_fast_attn = v; }
 void layer_set_fast_select(bool v) { g_fast_select = v; }

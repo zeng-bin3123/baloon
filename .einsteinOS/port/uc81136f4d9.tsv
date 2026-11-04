@@ -82,9 +82,9 @@ src/core/expert_cache.cpp	ExpertCache::~ExpertCache	src/core/expert_cache.cpp	Ex
 src/core/expert_cache.cpp	read_expert_profile	include/baloon/core_expert_cache.hpp	read_expert_profile
 src/core/expert_source.cpp	ArenaExpertSource::blob	src/core/expert_source.cpp	ArenaExpertSource::blob
 src/core/expert_source.cpp	ArenaExpertSource::close	src/core/expert_source.cpp	ArenaExpertSource::close
-src/core/expert_source.cpp	ArenaExpertSource::device_alias	include/baloon/core_expert_source.hpp	device_alias
+src/core/expert_source.cpp	ArenaExpertSource::device_alias	src/core/expert_source.cpp	ArenaExpertSource::device_alias
 src/core/expert_source.cpp	ArenaExpertSource::open	src/core/expert_source.cpp	ArenaExpertSource::open
-src/core/expert_source.cpp	ArenaExpertSource::pinned	include/baloon/core_expert_source.hpp	pinned
+src/core/expert_source.cpp	ArenaExpertSource::pinned	src/core/expert_source.cpp	ArenaExpertSource::pinned
 src/core/expert_source.cpp	ArenaExpertSource::~ArenaExpertSource	src/core/expert_source.cpp	ArenaExpertSource::~ArenaExpertSource
 src/core/expert_source.cpp	FileExpertSource::blob	src/core/expert_source.cpp	FileExpertSource::blob
 src/core/expert_source.cpp	FileExpertSource::close	src/core/expert_source.cpp	FileExpertSource::close
@@ -250,7 +250,7 @@ src/core/weights.cpp	IndexRow	include/baloon/core_weights.hpp	WIndexRow
 src/core/weights.cpp	Seg	include/baloon/core_weights.hpp	WSeg
 src/core/weights.cpp	WeightTable::find	src/core/weights.cpp	WeightTable::find
 src/core/weights.cpp	WeightTable::load	src/core/weights.cpp	WeightTable::load
-src/core/weights.cpp	WeightTable::pool_bytes	include/baloon/core_weights.hpp	pool_bytes
+src/core/weights.cpp	WeightTable::pool_bytes	src/core/weights.cpp	WeightTable::pool_bytes
 src/core/weights.cpp	file_name	src/core/weights.cpp	file_name
 src/core/weights.cpp	now_ms	src/core/weights.cpp	now_ms
 src/core/weights.cpp	read_at	src/core/weights.cpp	read_at

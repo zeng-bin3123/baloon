@@ -188,5 +188,8 @@ bool load_experts_gguf(const uint8_t* gate, const uint8_t* up, const uint8_t* do
     return true;
 }
 
+bool ArenaExpertSource::pinned() const { return pinned_; }
+const uint8_t* ArenaExpertSource::device_alias() const { return arena_.empty() ? nullptr : arena_.data(); }
+
 }  // namespace core
 }  // namespace baloon

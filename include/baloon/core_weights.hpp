@@ -63,7 +63,7 @@ public:
     // Placement only (no bytes move): fills arena offsets and pool_bytes().
     bool place(const std::string& index_text, const std::set<std::string>& skip = {}, std::string* err = nullptr);
     const WIndexRow* find(const std::string& name) const;
-    uint64_t pool_bytes() const { return pool_; }
+    uint64_t pool_bytes() const;
     double last_load_ms() const { return last_ms_; }
     const std::vector<WIndexRow>& rows() const { return rows_; }
 

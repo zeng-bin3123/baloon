@@ -185,5 +185,7 @@ bool WeightTable::load(const std::string& dir, uint8_t* arena, uint64_t arena_by
     return ok;
 }
 
+uint64_t WeightTable::pool_bytes() const { return pool_; }
+
 }  // namespace core
 }  // namespace baloon
