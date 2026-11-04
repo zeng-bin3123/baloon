@@ -329,10 +329,30 @@
       "pass": true,
       "unit_id": "u32f71e85a9"
     },
+    "ExpertCache.lean": {
+      "hash": "b5c930321ff3",
+      "pass": true,
+      "unit_id": "uc81136f4d9"
+    },
+    "ExpertSource.lean": {
+      "hash": "11f19c5505c2",
+      "pass": true,
+      "unit_id": "uc81136f4d9"
+    },
     "GenerateDriver.lean": {
       "hash": "eb8f5c79eeef",
       "pass": true,
       "unit_id": "u253a75befe"
+    },
+    "LayerComposition.lean": {
+      "hash": "0996008c92f8",
+      "pass": true,
+      "unit_id": "uc81136f4d9"
+    },
+    "MtpDrafter.lean": {
+      "hash": "272e6ff6cb9c",
+      "pass": true,
+      "unit_id": "uc81136f4d9"
     },
     "PleDirectReader.lean": {
       "hash": "0737652f0030",
@@ -349,6 +369,21 @@
       "pass": true,
       "unit_id": "u7991572426"
     },
+    "PrefillOrchestration.lean": {
+      "hash": "5aef6597d767",
+      "pass": true,
+      "unit_id": "uc81136f4d9"
+    },
+    "ServeEngine.lean": {
+      "hash": "8ee05fd8bb2b",
+      "pass": true,
+      "unit_id": "uc81136f4d9"
+    },
+    "SessionGraphs.lean": {
+      "hash": "09cc594f517f",
+      "pass": true,
+      "unit_id": "uc81136f4d9"
+    },
     "SpecController.lean": {
       "hash": "8e3986f7ba99",
       "pass": true,
@@ -358,11 +393,14 @@
       "hash": "0c139adfc16b",
       "pass": true,
       "unit_id": "u0e60a9f272"
+    },
+    "WeightLoader.lean": {
+      "hash": "e81627089f2b",
+      "pass": true,
+      "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {
-    "uc81136f4d9": 2
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u0e60a9f272": [
       "port_incomplete"
@@ -396,20 +434,8 @@
       "port_incomplete"
     ]
   },
-  "last_failure": {
-    "uc81136f4d9": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: 9 of the 285 definitions of the unit's reference files have no counterpart:\n  src/core/layer.cpp g_fast_attn → src/core/layer.cpp:g_fast_attn: not defined in that file\n  src/core/layer.cpp g_fast_select → src/core/layer.cpp:g_fast_select: not defined in that file\n  src/core/layer.cpp g_fused_gdn → src/core/layer.cpp:g_fused_gdn: not defined in that file\n  src/core/layer.cpp g_fused_gr → src/core/layer.cpp:g_fused_gr: not defined in that file\n  src/core/layer.cpp g_kv_int8 → src/core/layer.cpp:g_kv_int8: not defined in that file\n  src/core/layer.cpp g_publish_kernel → src/core/layer.cpp:g_publish_kernel: not defined in that file\n  src/core/layer.cpp g_shared_early → src/core/layer.cpp:g_shared_early: not defined in that file\n  src/core/layer.cpp native_bf16_projections → src/core/layer.cpp:native_bf16_projections: not defined in that file\n  src/core/layer.cpp native_flash_attn_short → src/core/layer.cpp:native_flash_attn_short: not defined in that file",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-uc81136f4d9"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "uc81136f4d9": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
