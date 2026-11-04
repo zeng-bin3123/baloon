@@ -274,7 +274,8 @@
         "F16BitsRounding.lean",
         "DequantBlockLayouts.lean"
       ],
-      "reason": "added after theory changed"
+      "reason": "added after theory changed",
+      "conv": "129a677a-e7eb-4797-926f-9a1a1db5cfa6"
     },
     {
       "id": "u12d8dd5102",
@@ -400,7 +401,9 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "uca8d125571": 1
+  },
   "fail_history": {
     "u0e60a9f272": [
       "port_incomplete"
@@ -432,9 +435,18 @@
     "uc81136f4d9": [
       "port_incomplete",
       "port_incomplete"
+    ],
+    "uca8d125571": [
+      "compile_fail"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "uca8d125571": {
+      "kind": "compile_fail",
+      "text": "build.sh exit=1: …h.hpp\n[header] include/baloon/ple_ngram_kernels.hpp\n[header] include/baloon/ple_reader.hpp\n[header] include/baloon/ple_row_cache_model.hpp\n[header] include/baloon/ple_row_reader.hpp\n[header] include/baloon/ple_table_io.hpp\n[header] include/baloon/prefill_chunk_driver.hpp\n[header] include/baloon/prefill_device_api.hpp\n[header] include/baloon/prefill_gpu_kernels.hpp\n[header] include/baloon/prefill_kernel_geometry.hpp\n[header] include/baloon/prefill_kernels_api.hpp\n[header] include/baloon/prefill_session.hpp\n[header] include/baloon/q2_avx2_kernel.hpp\n[header] include/baloon/q2_expert_vnni_kernel.hpp\n[header] include/baloon/q2_gguf_writer.hpp\n[header] include/baloon/qsa_block_select.hpp\n[header] include/baloon/qsa_cache_indexer.hpp\n[header] include/baloon/qsa_decode_attention.hpp\n[header] include/baloon/qsa_kernels.hpp\n[header] include/baloon/qsa_native_kernels.hpp\n[header] include/baloon/qsa_step_state.hpp\n[header] include/baloon/router_top_k_selection.hpp\n[header] include/baloon/s2_expert_grouped_blob.hpp\n[header] include/baloon/s_family_gemv_indexing.hpp\n[header] include/baloon/sampler_chain_contracts.hpp\n[header] include/baloon/scalar_dequantizers.hpp\n[header] include/baloon/serve_engine.hpp\n[header] include/baloon/serve_frontend.hpp\n[header] include/baloon/serve_server.hpp\n[header] include/baloon/session_driver.hpp\n[header] include/baloon/session_loop_contract.hpp\n[header] include/baloon/session_state_layout.hpp\n[header] include/baloon/spec_controller.hpp\n[header] include/baloon/strata_pack_builder.hpp\n[header] include/baloon/suffix_drafter.hpp\n[header] include/baloon/verify_window_commit.hpp\n[header] include/baloon/verify_window_indexing.hpp\n[header] include/baloon/verify_window_kernels.hpp\n[header] include/baloon/verify_window_protocol.hpp\n[header] include/baloon/vision_build_config.hpp\n[header] include/baloon/vision_encoder_protocol.hpp\n[header] include/baloon/weight_loader.hpp\n[header] include/baloon/weight_loader_segments.hpp\n[header] include/baloon/window_verifier.hpp\n[object] src/core/expert_cache.cpp\n[object] src/core/expert_source.cpp\n[object] src/core/layer.cpp\n[object] src/core/mtp.cpp\n[object] src/core/session.cpp\n[object] src/core/verify.cpp\n[object] src/core/weights.cpp\n[object] src/prefill/prefill_host.cpp\n[build] /tmp/baloon_unit_uca8_build/test_unit1\n[build] /tmp/baloon_unit_uca8_build/test_unit10\n[build] /tmp/baloon_unit_uca8_build/test_unit11\n[build] /tmp/baloon_unit_uca8_build/test_unit12\n[build] /tmp/baloon_unit_uca8_build/test_unit13\n[build] /tmp/baloon_unit_uca8_build/test_unit14\n[build] /tmp/baloon_unit_uca8_build/test_unit15\n[build] /tmp/baloon_unit_uca8_build/test_unit16\n[build] /tmp/baloon_unit_uca8_build/test_unit17\n[build] /tmp/baloon_unit_uca8_build/test_unit18\n[build] /tmp/baloon_unit_uca8_build/test_unit19\n/usr/bin/ld: /tmp/test_unit19-dbfe17.o: in function `main':\ntest_unit19.cpp:(.text+0xce1): undefined reference to `__truncsfhf2'\nclang-16: error: linker command failed with exit code 1 (use -v to see invocation)",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-uca8d125571"
+    }
+  },
   "infra_fails": 0,
   "port_units": [
     {
