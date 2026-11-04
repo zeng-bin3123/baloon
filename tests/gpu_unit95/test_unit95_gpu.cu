@@ -245,7 +245,7 @@ static void test_qsa_pipeline() {
     int bad_idx = 0, bad_step = 0;
     for (int j = 0; j < n_kv; ++j) {
         double tot = 0;
-        for (int h = 0; h < s.index_heads; ++h) { double dot = 0; for (int d = 0; d < s.index_dim; ++d) dot += (double)iq[(size_t)h * s.index_dim + d] * f16f(h16(ikeys[(size_t)j * s.index_dim + d])); tot += hw[h] * std::max(dot, 0.0); }
+        for (int h = 0; h < s.index_heads; ++h) { double dot = 0; for (int d = 0; d < s.index_dim; ++d) dot += (double)iq[(size_t)h * s.index_dim + d] * f16f(h16(ikeys[(size_t)j * s.index_dim + d])); tot += hw[h] * (dot > 0.0 ? dot : 0.0); }
         if (std::fabs(sc[j] - tot) > 1e-3 * (1.0 + std::fabs(tot))) ++bad_idx;
         if (sc[j] != sc2[j]) ++bad_step;
     }
@@ -268,7 +268,7 @@ static void test_qsa_pipeline() {
     int bad_att = 0; double rowsum_dev = 0;
     for (int h = 0; h < s.n_heads; ++h) {
         std::vector<double> lg(kTopK); double m = -1e30;
-        for (int j = 0; j < kTopK; ++j) { double dot = 0; for (int d = 0; d < s.head_dim; ++d) dot += (double)q[(size_t)h * s.head_dim + d] * f16f(h16(krows[(size_t)sel[j] * row + d])); lg[j] = dot * scale; m = std::max(m, lg[j]); }
+        for (int j = 0; j < kTopK; ++j) { double dot = 0; for (int d = 0; d < s.head_dim; ++d) dot += (double)q[(size_t)h * s.head_dim + d] * f16f(h16(krows[(size_t)sel[j] * row + d])); lg[j] = dot * scale; if ((double)lg[j] > (double)m) m = lg[j]; }
         double den = 0; for (auto& l : lg) { l = std::exp(l - m); den += l; }
         for (int d = 0; d < s.head_dim; ++d) { double acc = 0; for (int j = 0; j < kTopK; ++j) acc += lg[j] * f16f(h16(vrows[(size_t)sel[j] * row + d])); acc /= den;
             if (std::fabs(o[(size_t)h * s.head_dim + d] - acc) > 2e-3 * (1.0 + std::fabs(acc))) ++bad_att; }
