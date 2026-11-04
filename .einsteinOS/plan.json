@@ -300,7 +300,7 @@
   "state": {
     "PleNgramHash.lean": {
       "hash": "255f933f6849",
-      "pass": false,
+      "pass": true,
       "unit_id": "u89be81de0b"
     },
     "SpecController.lean": {
@@ -331,12 +331,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u89be81de0b": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
