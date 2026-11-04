@@ -25,6 +25,8 @@ timeout 900 "$OUT/test_unit5" 2>&1 | tee "$LOG"
 # the theory test must actually have run and passed
 grep -q "\] test_hash_theory" "$LOG" && ! grep -q "FAIL\] test_hash_theory\|FAIL.*test_hash_theory" "$LOG" \
   || { echo "test_hash_theory missing or failed"; rc=1; }
+grep -q "\\] test_ple_kernels" "$LOG" && ! grep -q "FAIL\\] test_ple_kernels" "$LOG" \
+  || { echo "test_ple_kernels missing or failed"; rc=1; }
 
 printf 'int main(){return 0;}\n' > "$OUT/san_probe.cpp"
 if $HOSTCXX -fsanitize=address,undefined "$OUT/san_probe.cpp" -o "$OUT/san_probe" >/dev/null 2>&1 && "$OUT/san_probe" >/dev/null 2>&1; then
