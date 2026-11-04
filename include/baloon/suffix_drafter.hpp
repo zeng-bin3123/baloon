@@ -47,11 +47,25 @@ inline uint64_t capacity_for(uint64_t nominal) { return pow2_at_least(16, nomina
 // Tokens proposed from a match ending at best_end, with the suffix ending at cur (best_end <= cur).
 inline uint64_t propose_count(uint64_t cur, uint64_t best_end, uint64_t max_k) { return std::min(max_k, cur - best_end); }
 
+// ---- theory forms ------------------------------------------------------------------------------------------------------
+// Fuel-bounded match loop of the theory: extend while len <= p and tokens agree, at most `fuel` more steps.
+inline uint64_t match_aux(const std::vector<uint32_t>& h, uint64_t p, uint64_t cur, uint64_t fuel, uint64_t len) {
+    while (fuel > 0 && len <= p && h[p - len] == h[cur - len]) { ++len; --fuel; }
+    return len;
+}
+// Constructor clamps: min_match_ = max(3, a); max_match_ = max(a, b) (clamped against the RAW min_match).
+inline uint64_t min_match_of(uint64_t a) { return std::max<uint64_t>(3, a); }
+inline uint64_t max_match_of(uint64_t a, uint64_t b) { return std::max(a, b); }
+// Draft tokens copied: min(max_k, cur - best_end) for best_end <= cur.
+inline uint64_t cont_len(uint64_t cur, uint64_t best_end, uint64_t max_k) { return std::min(max_k, cur >= best_end ? cur - best_end : 0); }
+// Power-of-two mask probe: (i + 1) & mask.
+inline uint64_t probe_next_mask(uint64_t i, uint64_t mask) { return (i + 1) & mask; }
+
 class SuffixDrafter {
 public:
     explicit SuffixDrafter(uint64_t table_slots = 1u << 12, uint64_t min_match = 3, uint64_t max_match = 32)
         : min_match_(std::max<uint64_t>(3, min_match)), max_match_(0) {
-        max_match_ = std::max(min_match_, max_match);
+        max_match_ = max_match_of(min_match, max_match);  // raw min_match: a degenerate pair can never match
         uint64_t cap = 16;
         while (cap < table_slots) cap <<= 1;
         slots_.assign(cap, Slot{});

@@ -8,8 +8,10 @@ void test_sd_basic() {
     CHECK(key_of(0) == 1 && key_of(6) == 7);
     for (uint64_t cap : {1ull, 2ull, 16ull, 100ull}) for (uint64_t i = 0; i < cap; ++i) CHECK(probe_next(i, cap) < cap);
     CHECK(probe_next(15, 16) == 0);
-    SuffixDrafter s(64, 1, 1);                       // constructor clamps: min_match >= 3, max_match >= min_match
-    CHECK(s.min_match() == 3 && s.max_match() == 3);
+    SuffixDrafter s(64, 1, 1);                       // degenerate pair: max_match_ = max(raw min, max) = 1 < min_match_ = 3
+    CHECK(s.min_match() == 3 && s.max_match() == 1);
+    for (uint32_t v : {1u, 2u, 3u, 1u, 2u, 3u}) s.append(v);
+    CHECK(s.propose(4).empty());
     SuffixDrafter t(64, 5, 2);
     CHECK(t.min_match() == 5 && t.max_match() == 5);
     CHECK(t.propose(4).empty());

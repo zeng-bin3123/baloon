@@ -121,5 +121,23 @@ public:
     }
 };
 
+// ---- fixed-point (per mille, 1000 = 1.0) forms of the theory -------------------------------------------------------------
+// Clamped table position n = max(1, min(k+1, K_MAX+1)); the table index is n-1.
+inline uint64_t clamp_n(uint64_t k) { return std::max<uint64_t>(1, std::min<uint64_t>(k + 1, K_MAX + 1)); }
+// Sum of cumulative acceptance products over k positions from index i with running product run (per mille).
+template <class P> inline uint64_t exp_aux_pm(P p, uint64_t i, uint64_t run, uint64_t k) {
+    uint64_t s = 0;
+    for (; k > 0; --k, ++i) { run = run * p(i) / 1000; s += run; }
+    return s;
+}
+// Expected committed tokens per mille: the always-committed token plus the accepted-draft terms.
+template <class P> inline uint64_t expected_pm(P p, uint64_t k) { return 1000 + exp_aux_pm(p, 0, 1000, k); }
+// Threshold gate in per mille: keep speculation only when rate*1000 >= base*(1000+gain).
+inline bool clears_gate_pm(uint64_t rate, uint64_t base, uint64_t gain) {
+    return (unsigned __int128)base * (1000 + gain) <= (unsigned __int128)rate * 1000;
+}
+// Lookup candidate count is clipped to the window limit.
+inline uint64_t lookup_clip(uint64_t avail) { return std::min<uint64_t>(avail, K_MAX); }
+
 }  // namespace spec
 }  // namespace baloon

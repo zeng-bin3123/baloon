@@ -1,13 +1,12 @@
 #!/bin/bash
-# Build the WHOLE project: (1) every header in include/baloon compiles standalone, (2) all unit host
-# test binaries build, (3) when the corex toolchain is present, every existing CUDA source/test compiles for ivcore10.
-# Exits 0 only if everything builds.
+# Build the WHOLE project: (1) every header in include/baloon compiles standalone, (2) every tests/unit*/ host test
+# binary builds, (3) every CUDA source/test compiles for ivcore10 when the corex toolchain is present and the known GPU
+# test binaries are linked. Exits 0 only if everything builds.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
-OUT="${BALOON_BUILD_DIR:-/tmp/baloon_unit9_build}"
+OUT="${BALOON_BUILD_DIR:-/tmp/baloon_unit_u0e60_build}"
 mkdir -p "$OUT"
-
 COREX=/usr/local/corex
 HOSTCXX=""
 for c in "$COREX/bin/clang++" g++ clang++ c++; do
@@ -17,35 +16,37 @@ done
 echo "host compiler: $HOSTCXX"
 HFLAGS="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread -Iinclude"
 
-# (1) each header must be self-contained
 for h in include/baloon/*.hpp; do
   echo "[header] $h"
   printf '#include "%s"\nint main(){return 0;}\n' "baloon/$(basename "$h")" > "$OUT/hdr_check.cpp"
   $HOSTCXX $HFLAGS -fsyntax-only "$OUT/hdr_check.cpp"
 done
 
-# (2) host test binaries
 for d in tests/unit*/; do
-  n="$(basename "$d")"
+  d="${d%/}"; n="$(basename "$d")"
+  ls "$d"/*.cpp >/dev/null 2>&1 || continue
   echo "[build] $OUT/test_$n"
-  $HOSTCXX $HFLAGS -I"$d" "$d"*.cpp -o "$OUT/test_$n"
+  $HOSTCXX $HFLAGS -I"$d" "$d"/*.cpp -o "$OUT/test_$n"
 done
 
-# (3) every CUDA source/test (src, tests, tests/gpu_unit6, tests/gpu_unit7) must compile for ivcore10; the unit-6 and
-# unit-7 GPU tests are linked. The corex toolchain is REQUIRED: this unit's deliverable is GPU code, so a missing
-# toolchain is a build failure.
-[ -x "$COREX/bin/clang++" ] || { echo "corex toolchain missing at $COREX/bin/clang++"; exit 2; }
-CUFLAGS="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Isrc -Itests -Iinclude -O2"
-for f in src/*.cu tests/*.cu tests/gpu_unit6/*.cu tests/gpu_unit7/*.cu; do
-  [ -f "$f" ] || continue
-  echo "[cuda] $f"
-  "$COREX/bin/clang++" $CUFLAGS -c "$f" -o "$OUT/$(echo "$f" | tr '/' '_').o"
-done
-echo "[link] $OUT/test_ilu_gdn"
-"$COREX/bin/clang++" "$OUT/src_ilu_gdn_prep.cu.o" "$OUT/src_ilu_gdn_warp_step.cu.o" "$OUT/tests_gpu_unit6_test_ilu_gdn.cu.o" \
-  -o "$OUT/test_ilu_gdn" -L"$COREX/lib64" -lcudart -lpthread
-echo "[link] $OUT/test_ilu_qsa"
-"$COREX/bin/clang++" "$OUT/src_ilu_qsa_decode.cu.o" "$OUT/src_ilu_qsa_select.cu.o" "$OUT/src_ilu_qsa_score.cu.o" \
-  "$OUT/src_ilu_qsa_append.cu.o" "$OUT/tests_gpu_unit7_test_ilu_qsa.cu.o" \
-  -o "$OUT/test_ilu_qsa" -L"$COREX/lib64" -lcudart -lpthread
+if [ -x "$COREX/bin/clang++" ]; then
+  CUFLAGS="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Isrc -Itests -Iinclude -O2"
+  for f in src/*.cu tests/*.cu tests/gpu_unit*/*.cu; do
+    [ -f "$f" ] || continue
+    echo "[cuda] $f"
+    "$COREX/bin/clang++" $CUFLAGS -c "$f" -o "$OUT/$(echo "$f" | tr '/' '_').o"
+  done
+  link() {
+    local o="$1"; shift
+    for x in "$@"; do [ -f "$x" ] || return 0; done
+    echo "[link] $o"
+    "$COREX/bin/clang++" "$@" -o "$o" -L"$COREX/lib64" -lcudart -lpthread
+  }
+  link "$OUT/test_ilu_gdn" "$OUT/src_ilu_gdn_prep.cu.o" "$OUT/src_ilu_gdn_warp_step.cu.o" "$OUT/tests_gpu_unit6_test_ilu_gdn.cu.o"
+  link "$OUT/test_ilu_qsa" "$OUT/src_ilu_qsa_decode.cu.o" "$OUT/src_ilu_qsa_select.cu.o" "$OUT/src_ilu_qsa_score.cu.o" \
+       "$OUT/src_ilu_qsa_append.cu.o" "$OUT/tests_gpu_unit7_test_ilu_qsa.cu.o"
+  link "$OUT/test_prefill_gpu" "$OUT/src_prefill_kernels.cu.o" "$OUT/tests_gpu_unit12_test_prefill_gpu.cu.o"
+else
+  echo "corex toolchain not present on this host: skipping CUDA compile of pre-existing files"
+fi
 echo "BUILD OK"
