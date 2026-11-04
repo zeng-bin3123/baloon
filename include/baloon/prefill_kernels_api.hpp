@@ -7,7 +7,15 @@
 namespace baloon {
 namespace pk {
 
-constexpr int N = 2560, HC = 4, D = N * HC, LR = 320, S = 128, HK = 16, HV = 48, C = 10240, RG = 4;
+constexpr int N = 2560;
+constexpr int HC = 4;
+constexpr int D = N * HC;
+constexpr int LR = 320;
+constexpr int S = 128;
+constexpr int HK = 16;
+constexpr int HV = 48;
+constexpr int C = 10240;
+constexpr int RG = 4;
 constexpr int kRoutedK = 10, kExperts = 512;
 constexpr int64_t kBlobBytes = 1382400;
 constexpr int64_t kGuOff = 0, kDownOff = 1280 * 640, kGuScaleOff = kDownOff + 2560 * 160,

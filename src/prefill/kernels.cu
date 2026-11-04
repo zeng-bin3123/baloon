@@ -78,7 +78,7 @@ __device__ float block_sum(float v, float* sh) {
 }
 
 // ---- hyper-connection --------------------------------------------------------------------------------------------
-__global__ void __launch_bounds__(256) gr_norm_kernel(const float* x, float* out, float eps) {
+__global__ __launch_bounds__(256) void gr_norm_kernel(const float* x, float* out, float eps) {
     __shared__ float sh[256];
     const int64_t t = blockIdx.x;
     const float* row = x + t * D;
@@ -89,7 +89,7 @@ __global__ void __launch_bounds__(256) gr_norm_kernel(const float* x, float* out
     for (int i = threadIdx.x; i < D; i += blockDim.x) out[t * D + i] = row[i] * inv;
 }
 
-__global__ void __launch_bounds__(256) gr_mix_kernel(const float* x, const float* coef, int ld, float* out, int64_t n) {
+__global__ __launch_bounds__(256) void gr_mix_kernel(const float* x, const float* coef, int ld, float* out, int64_t n) {
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;  // i = t*N + d
     if (i >= n) return;
     const int64_t t = i / N;
@@ -99,7 +99,7 @@ __global__ void __launch_bounds__(256) gr_mix_kernel(const float* x, const float
     out[i] = acc;
 }
 
-__global__ void __launch_bounds__(256) gr_write_kernel(const float* res, const float* y, const float* inj, int ld, float* out, int64_t n) {
+__global__ __launch_bounds__(256) void gr_write_kernel(const float* res, const float* y, const float* inj, int ld, float* out, int64_t n) {
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;  // i = t*D + c*N + d
     if (i >= n) return;
     const int64_t t = i / D;
@@ -108,20 +108,20 @@ __global__ void __launch_bounds__(256) gr_write_kernel(const float* res, const f
     out[i] = res[i] + inj[t * ld + c] * y[t * N + d];
 }
 
-__global__ void __launch_bounds__(256) gr_broadcast_kernel(const float* e, float* out, int64_t n) {
+__global__ __launch_bounds__(256) void gr_broadcast_kernel(const float* e, float* out, int64_t n) {
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
     out[i] = e[i / D * N + i % N];
 }
 
-__global__ void __launch_bounds__(256) gr_silu_kernel(const float* x, float* out, int64_t n) {
+__global__ __launch_bounds__(256) void gr_silu_kernel(const float* x, float* out, int64_t n) {
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
     out[i] = x[i] * sigm(x[i]);
 }
 
 // ---- gated delta net ---------------------------------------------------------------------------------------------
-__global__ void __launch_bounds__(256) gdn_gates_kernel(const float* a, const float* b, const float* a_log, const float* dt_bias,
+__global__ __launch_bounds__(256) void gdn_gates_kernel(const float* a, const float* b, const float* a_log, const float* dt_bias,
                                                         float* g, float* beta, int64_t n) {
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;  // i = t*HV + h
     if (i >= n) return;
@@ -133,7 +133,7 @@ __global__ void __launch_bounds__(256) gdn_gates_kernel(const float* a, const fl
 }
 
 // one thread per channel; blocks of 128 cover C = 10240 channels exactly; tokens are sequential per channel
-__global__ void __launch_bounds__(128) gdn_conv_kernel(const float* x, const float* w, float* state, float* out, int T) {
+__global__ __launch_bounds__(128) void gdn_conv_kernel(const float* x, const float* w, float* state, float* out, int T) {
     const int c = blockIdx.x * blockDim.x + threadIdx.x;
     if (c >= C) return;
     float s0 = state[(int64_t)c * 3 + 0], s1 = state[(int64_t)c * 3 + 1], s2 = state[(int64_t)c * 3 + 2];  // oldest .. newest
@@ -148,7 +148,7 @@ __global__ void __launch_bounds__(128) gdn_conv_kernel(const float* x, const flo
 }
 
 // grid (2*HK, T): one block of S threads per q/k head of a token
-__global__ void __launch_bounds__(128) gdn_l2_kernel(float* qkv, float eps) {
+__global__ __launch_bounds__(128) void gdn_l2_kernel(float* qkv, float eps) {
     __shared__ float sh[128];
     const int head = blockIdx.x, tid = threadIdx.x;
     float* p = qkv + (int64_t)blockIdx.y * C + head * S;
@@ -182,7 +182,7 @@ __global__ void __launch_bounds__(128) gdn_rec_kernel(const float* qkv, const fl
 
 // ---- MoE ---------------------------------------------------------------------------------------------------------
 // One block per token. Lane l < 32 owns experts l + 32*i, i < 16. Ten rounds of arg-max (ties: lowest expert id).
-__global__ void __launch_bounds__(64) route_kernel(const float* logits, int32_t* ids, float* wts) {
+__global__ __launch_bounds__(64) void route_kernel(const float* logits, int32_t* ids, float* wts) {
     __shared__ float cv[32];
     __shared__ int ci[32];
     __shared__ int chosen[kRoutedK];
@@ -219,7 +219,7 @@ __global__ void __launch_bounds__(64) route_kernel(const float* logits, int32_t*
 
 // Thread i < 1,228,800 handles one code byte (four 2-bit values) and writes four outputs: (code - 1) * f16 scale.
 template <bool F16>
-__global__ void __launch_bounds__(256) blob_dequant_kernel(const uint8_t* blob, void* gu_out, void* d_out) {
+__global__ __launch_bounds__(256) void blob_dequant_kernel(const uint8_t* blob, void* gu_out, void* d_out) {
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;
     constexpr int64_t GU = 1280 * 640, DN = 2560 * 160;
     if (i >= GU + DN) return;
@@ -239,13 +239,13 @@ __global__ void __launch_bounds__(256) blob_dequant_kernel(const uint8_t* blob, 
     }
 }
 
-__global__ void __launch_bounds__(256) swiglu_pair_kernel(const float* gate, const float* up, float* out, int64_t n) {
+__global__ __launch_bounds__(256) void swiglu_pair_kernel(const float* gate, const float* up, float* out, int64_t n) {
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
     out[i] = gate[i] * sigm(gate[i]) * up[i];
 }
 
-__global__ void __launch_bounds__(256) swiglu_il_kernel(const float* in, float* out, int64_t n, int width) {
+__global__ __launch_bounds__(256) void swiglu_il_kernel(const float* in, float* out, int64_t n, int width) {
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;  // i = r*width + k
     if (i >= n) return;
     const int64_t r = i / width, k = i % width;
@@ -254,14 +254,14 @@ __global__ void __launch_bounds__(256) swiglu_il_kernel(const float* in, float* 
 }
 
 // 16-byte moves: width/8 uint4 per row (width counted in 16-bit elements)
-__global__ void __launch_bounds__(256) gather_rows16_kernel(const uint4* src, const int32_t* idx, uint4* dst, int64_t n, int per_row) {
+__global__ __launch_bounds__(256) void gather_rows16_kernel(const uint4* src, const int32_t* idx, uint4* dst, int64_t n, int per_row) {
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
     const int64_t r = i / per_row, j = i % per_row;
     dst[i] = src[(int64_t)idx[r] * per_row + j];
 }
 
-__global__ void __launch_bounds__(256) moe_combine_kernel(const float* eo, const float* wts, const float* shared, float* out, int64_t n) {
+__global__ __launch_bounds__(256) void moe_combine_kernel(const float* eo, const float* wts, const float* shared, float* out, int64_t n) {
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;  // i = t*N + d
     if (i >= n) return;
     const int64_t t = i / N;
@@ -272,7 +272,7 @@ __global__ void __launch_bounds__(256) moe_combine_kernel(const float* eo, const
 }
 
 // ---- QSA helpers -------------------------------------------------------------------------------------------------
-__global__ void __launch_bounds__(256) rms_rows_kernel(const float* x, const float* w, float* out, int width, float eps) {
+__global__ __launch_bounds__(256) void rms_rows_kernel(const float* x, const float* w, float* out, int width, float eps) {
     __shared__ float sh[256];
     const int64_t r = blockIdx.x;
     float acc = 0.f;
@@ -283,7 +283,7 @@ __global__ void __launch_bounds__(256) rms_rows_kernel(const float* x, const flo
 }
 
 // rotates dims (p, p+32) of the first 64 dims of every head; one thread per (token, head, pair)
-__global__ void __launch_bounds__(256) rope_kernel(float* x, const int32_t* pos, int64_t n, int heads, int head_dim, float theta) {
+__global__ __launch_bounds__(256) void rope_kernel(float* x, const int32_t* pos, int64_t n, int heads, int head_dim, float theta) {
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
     const int p = (int)(i % 32);
@@ -297,7 +297,7 @@ __global__ void __launch_bounds__(256) rope_kernel(float* x, const int32_t* pos,
     v[p + 32] = a * sn + b * cs;
 }
 
-__global__ void __launch_bounds__(256) split_q_kernel(const float* qfull, float* q, float* gate, int64_t n) {
+__global__ __launch_bounds__(256) void split_q_kernel(const float* qfull, float* q, float* gate, int64_t n) {
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;  // i = t*6144 + h*256 + d
     if (i >= n) return;
     const int64_t t = i / 6144;
@@ -307,14 +307,14 @@ __global__ void __launch_bounds__(256) split_q_kernel(const float* qfull, float*
     gate[i] = row[256 + d];
 }
 
-__global__ void __launch_bounds__(256) gate_attn_kernel(const float* attn, const float* gate, float* out, int64_t n) {
+__global__ __launch_bounds__(256) void gate_attn_kernel(const float* attn, const float* gate, float* out, int64_t n) {
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
     out[i] = attn[i] * sigm(gate[i]);
 }
 
 // grid (4, T), block 64: one quantisation group of 64 channels of one row; scale = amax/127, codes clamped to +-127
-__global__ void __launch_bounds__(64) kv_append_kernel(const float* k, int8_t* kq, float* ks, int64_t base_row) {
+__global__ __launch_bounds__(64) void kv_append_kernel(const float* k, int8_t* kq, float* ks, int64_t base_row) {
     __shared__ float sh[64];
     const int g = blockIdx.x, tid = threadIdx.x;
     const int64_t t = blockIdx.y, row = base_row + t;
@@ -333,12 +333,12 @@ __global__ void __launch_bounds__(64) kv_append_kernel(const float* k, int8_t* k
     if (tid == 0) ks[row * 4 + g] = scale;
 }
 
-__global__ void __launch_bounds__(256) to_bf16_kernel(const float* x, uint16_t* out, int64_t n) {
+__global__ __launch_bounds__(256) void to_bf16_kernel(const float* x, uint16_t* out, int64_t n) {
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
     out[i] = bf(x[i]);
 }
-__global__ void __launch_bounds__(256) to_f16_kernel(const float* x, uint16_t* out, int64_t n) {
+__global__ __launch_bounds__(256) void to_f16_kernel(const float* x, uint16_t* out, int64_t n) {
     const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
     out[i] = f16_bits(x[i]);
