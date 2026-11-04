@@ -62,6 +62,8 @@ inline bool keep_draft(uint64_t best, uint64_t baseline) {
 
 // ---- controller ----------------------------------------------------------------------------------------------------------
 enum class Drafter { None, Mtp, Lookup };
+// Where a draft comes from: plain decoding, the MTP head, or the suffix lookup table (the theory's none|lookup|MTP).
+using Source = Drafter;
 
 struct CostModel {
     double step_ms[K_MAX + 1];   // verify pass of n = k+1 tokens, indexed by step_idx(k)
@@ -87,25 +89,33 @@ public:
         for (int i = 0; i < 4; ++i) lookup_q[i] = q[i];
     }
 
+    // Expected committed tokens of a k-token draft from `src`: 1 + sum of running acceptance products. MTP uses the
+    // per-position table; lookup uses one bucket entry (chosen by match length) for every position. k is clipped to
+    // K_MAX; plain decoding commits exactly one token.
+    double expected(Source src, uint64_t k, uint64_t lookup_match = 0) const {
+        if (src == Source::None || k == 0) return 1.0;
+        k = std::min(k, K_MAX);
+        if (src == Source::Mtp) return spec::expected(mtp_p, k);
+        double q[K_MAX];
+        for (uint64_t i = 0; i < K_MAX; ++i) q[i] = lookup_q[bucket(lookup_match)];
+        return spec::expected(q, k);
+    }
+
     // mtp_k_max: longest MTP chain available; lookup_avail/lookup_match: size and match length of the lookup proposal.
     Choice choose(uint64_t mtp_k_max, uint64_t lookup_avail, uint64_t lookup_match) const {
         const double base = 1.0 / cost.step(0);
         Choice best; best.rate = base;
         const uint64_t mk = std::min(mtp_k_max, K_MAX);
         for (uint64_t k = 1; k <= mk; ++k) {
-            const double r = expected(mtp_p, k) / (cost.step(k) + (double)k * cost.mtp_ms_per_tok);
-            if (r > best.rate) { best.drafter = Drafter::Mtp; best.k = k; best.rate = r; }
+            const double r = expected(Source::Mtp, k) / (cost.step(k) + (double)k * cost.mtp_ms_per_tok);
+            if (r > best.rate) { best.drafter = Source::Mtp; best.k = k; best.rate = r; }
         }
         const uint64_t lk = std::min(lookup_avail, K_MAX);
-        if (lk > 0) {
-            double q[K_MAX];
-            for (uint64_t i = 0; i < K_MAX; ++i) q[i] = lookup_q[bucket(lookup_match)];
-            for (uint64_t k = 1; k <= lk; ++k) {
-                const double r = expected(q, k) / (cost.step(k) + cost.lookup_ms);
-                if (r > best.rate) { best.drafter = Drafter::Lookup; best.k = k; best.rate = r; }
-            }
+        for (uint64_t k = 1; k <= lk; ++k) {
+            const double r = expected(Source::Lookup, k, lookup_match) / (cost.step(k) + cost.lookup_ms);
+            if (r > best.rate) { best.drafter = Source::Lookup; best.k = k; best.rate = r; }
         }
-        if (best.drafter == Drafter::None || best.rate < base * (1.0 + threshold)) return Choice{Drafter::None, 0, base};
+        if (best.drafter == Source::None || best.rate < base * (1.0 + threshold)) return Choice{Source::None, 0, base};
         return best;
     }
 
