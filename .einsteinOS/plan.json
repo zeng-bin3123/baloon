@@ -323,6 +323,11 @@
     }
   ],
   "state": {
+    "ChatFrontend.lean": {
+      "hash": "e30953cb2b0d",
+      "pass": true,
+      "unit_id": "u32f71e85a9"
+    },
     "GenerateDriver.lean": {
       "hash": "eb8f5c79eeef",
       "pass": true,
@@ -386,12 +391,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u32f71e85a9": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
