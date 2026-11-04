@@ -274,6 +274,11 @@
         "F16BitsRounding.lean",
         "DequantBlockLayouts.lean"
       ],
+      "children": [
+        "u95fce8dc9d",
+        "u316bd6b9ec",
+        "u52d156705c"
+      ],
       "reason": "added after theory changed",
       "conv": "3476f75c-de08-4cf6-b0c1-ef8744149fd0"
     },
@@ -322,6 +327,37 @@
       ],
       "reason": "3 fix attempts used",
       "conv": "a7f1b378-79cf-4b47-beb6-d122721dab28"
+    },
+    {
+      "id": "u95fce8dc9d",
+      "parent": "uca8d125571",
+      "modules": [
+        "F16BitsRounding.lean",
+        "DequantBlockLayouts.lean",
+        "GatedResidual.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "u316bd6b9ec",
+      "parent": "uca8d125571",
+      "modules": [
+        "NativeQsaScore.lean",
+        "QsaSelect.lean",
+        "QsaCacheStep.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "u52d156705c",
+      "parent": "uca8d125571",
+      "modules": [
+        "QsaDecodeAttn.lean",
+        "NativeFlashAttn.lean",
+        "GdnRecurrence.lean",
+        "VerifyWindow.lean"
+      ],
+      "reason": "3 fix attempts used"
     }
   ],
   "state": {
@@ -401,9 +437,7 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {
-    "uca8d125571": 3
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u0e60a9f272": [
       "port_incomplete"
@@ -442,13 +476,7 @@
       "existing_code_fails"
     ]
   },
-  "last_failure": {
-    "uca8d125571": {
-      "kind": "existing_code_fails",
-      "text": "the conversation wrote no file, and the code already on the branch for this unit fails on the real machine:\nport_incomplete: 29 of the 434 definitions of the unit's reference files have no counterpart:\n  src/kernels/cuda/kv_q8.cu kv_append_q8_kernel → src/kernels/kv_q8.cu:kv_append_q8_kernel: not defined in that file\n  src/kernels/cuda/kv_q8.cu kv_gather_q8_kernel → src/kernels/kv_q8.cu:kv_gather_q8_kernel: not defined in that file\n  src/kernels/cuda/qsa.cu indexer_key_append_kernel → src/kernels/qsa.cu:indexer_key_append_kernel: not defined in that file\n  src/kernels/cuda/qsa.cu kv_append_kernel → src/kernels/qsa.cu:kv_append_kernel: not defined in that file\n  src/kernels/cuda/qsa.cu kv_gather_kernel → src/kernels/qsa.cu:kv_gather_kernel: not defined in that file\n  src/kernels/cuda/qsa.cu qsa_attend_kernel → src/kernels/qsa.cu:qsa_attend_kernel: not defined in that file\n  src/kernels/cuda/qsa.cu qsa_gate_apply_f32_kernel → src/kernels/qsa.cu:qsa_gate_apply_f32_kernel: not defined in that file\n  src/kernels/cuda/qsa.cu qsa_gate_apply_kernel → src/kernels/qsa.cu:qsa_gate_apply_kernel: not defined in that file\n  src/kernels/cuda/qsa.cu qsa_index_kernel → src/kernels/qsa.cu:qsa_index_kernel: not defined in that file\n  src/kernels/cuda/qsa.cu topk_kernel → src/kernels/qsa.cu:topk_kernel: not defined in that file\n  src/kernels/cuda/quantize_act.cu dequant_q8_0_kernel → src/kernels/quantize_act.cu:dequant_q8_0_kernel: not defined in that file\n  src/kernels/cuda/quantize_act.cu dequant_q8_K_kernel → src/kernels/quantize_act.cu:dequant_q8_K_kernel: not defined in that file\n  src/kernels/cuda/quantize_act.cu quantize_q8_0_kernel → src/kernels/quantize_act.cu:quantize_q8_0_kernel: not defined in that file\n  src/kernels/cuda/quantize_act.cu quantize_q8_0_scaled_kernel → src/kernels/quantize_act.cu:quantize_q8_0_scaled_kernel: not defined in that file\n  src/kernels/cuda/quantize_act.cu quantize_q8_K_kernel → src/kernels/quantize_act.cu:quantize_q8_K_kernel: not defined in that file\n  src/kernels/cuda/verify_kernels.cu add_streams_broadcast_kernel → src/kernels/verify_kernels.cu:add_streams_broadcast_kernel: not defined in that file\n  src/kernels/cuda/verify_kernels.cu broadcast_streams_kernel → src/kernels/verify_kernels.cu:broadcast_streams_kernel: not defined in that file\n  src/kernels/cuda/verify_kernels.cu copy_indexed_kernel → src/kernels/verify_kernels.cu:copy_indexed_kernel: not defined in that file\n  src/kernels/cuda/verify_kernels.cu dense_steps_kernel → src/kernels/verify_kernels.cu:dense_steps_kernel: not defined in that file\n  src/kernels/cuda/verify_kernels.cu embedding_gather_dev_kernel → src/kernels/verify_kernels.cu:embedding_gather_dev_kernel: not defined in that file\n  src/kernels/cuda/verify_kernels.cu fetch_blobs_kernel → src/kernels/verify_kernels.cu:fetch_blobs_kernel: not defined in that file\n  src/kernels/cuda/verify_kernels.cu gather_rows_kernel → src/kernels/verify_kernels.cu:gather_rows_kernel: not defined in that file\n  src/kernels/cuda/verify_kernels.cu gdn_conv_commit_kernel → src/kernels/verify_kernels.cu:gdn_conv_commit_kernel: not defined in that file\n  src/kernels/cuda/verify_kernels.cu ident_hits_kernel → src/kernels/verify_kernels.cu:ident_hits_kernel: not defined in that file\n  src/kernels/cuda/verify_kernels.cu map_ids_kernel → src/kernels/verify_kernels.cu:map_ids_kernel: not defined in that file\n  src/kernels/cuda/verify_kernels.cu mtp_select_kernel → src/kernels/verify_kernels.cu:mtp_select_kernel: not defined in that file\n  src/kernels/cuda/verify_kernels.cu rebase_ptrs_kernel → src/kernels/verify_kernels.cu:rebase_ptrs_kernel: not defined in that file\n  src/kernels/cuda/verify_kernels.cu row_top_prob_kernel → src/kernels/verify_kernels.cu:row_top_prob_kernel: not defined in that file\n  src/kernels/cuda/verify_kernels.cu window_ids_kernel → src/kernels/verify_kernels.cu:window_ids_kernel: not defined in that file",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-uca8d125571"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
   "port_units": [
     {
