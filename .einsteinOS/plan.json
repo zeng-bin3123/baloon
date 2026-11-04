@@ -308,7 +308,8 @@
         "PleDirectReader.lean",
         "PrefillKernels.lean"
       ],
-      "reason": "3 fix attempts used"
+      "reason": "3 fix attempts used",
+      "conv": "5c74a900-8327-48e3-b00d-34babd8a0a12"
     },
     {
       "id": "u253a75befe",
@@ -336,7 +337,9 @@
       "unit_id": "u0e60a9f272"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u7991572426": 1
+  },
   "fail_history": {
     "u0e60a9f272": [
       "port_incomplete"
@@ -352,6 +355,9 @@
     "u6d34237bff": [
       "nothing_written"
     ],
+    "u7991572426": [
+      "port_incomplete"
+    ],
     "u9dc1be2eae": [
       "missing"
     ],
@@ -359,7 +365,13 @@
       "review_fail"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "u7991572426": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: 23 of the 76 definitions of the unit's reference files have no counterpart:\n  src/prefill/kernels.cu RG → include/baloon/prefill_kernels_api.hpp:RG: not defined in that file\n  src/prefill/kernels.cu S → include/baloon/prefill_kernels_api.hpp:S: not defined in that file\n  src/prefill/kernels.cu blob_dequant_kernel → src/prefill/kernels.cu:blob_dequant_kernel: not defined in that file\n  src/prefill/kernels.cu gate_attn_kernel → src/prefill/kernels.cu:gate_attn_kernel: not defined in that file\n  src/prefill/kernels.cu gather_rows16_kernel → src/prefill/kernels.cu:gather_rows16_kernel: not defined in that file\n  src/prefill/kernels.cu gdn_conv_kernel → src/prefill/kernels.cu:gdn_conv_kernel: not defined in that file\n  src/prefill/kernels.cu gdn_gates_kernel → src/prefill/kernels.cu:gdn_gates_kernel: not defined in that file\n  src/prefill/kernels.cu gdn_l2_kernel → src/prefill/kernels.cu:gdn_l2_kernel: not defined in that file\n  src/prefill/kernels.cu gr_broadcast_kernel → src/prefill/kernels.cu:gr_broadcast_kernel: not defined in that file\n  src/prefill/kernels.cu gr_mix_kernel → src/prefill/kernels.cu:gr_mix_kernel: not defined in that file\n  src/prefill/kernels.cu gr_norm_kernel → src/prefill/kernels.cu:gr_norm_kernel: not defined in that file\n  src/prefill/kernels.cu gr_silu_kernel → src/prefill/kernels.cu:gr_silu_kernel: not defined in that file\n  src/prefill/kernels.cu gr_write_kernel → src/prefill/kernels.cu:gr_write_kernel: not defined in that file\n  src/prefill/kernels.cu kv_append_kernel → src/prefill/kernels.cu:kv_append_kernel: not defined in that file\n  src/prefill/kernels.cu moe_combine_kernel → src/prefill/kernels.cu:moe_combine_kernel: not defined in that file\n  src/prefill/kernels.cu rms_rows_kernel → src/prefill/kernels.cu:rms_rows_kernel: not defined in that file\n  src/prefill/kernels.cu rope_kernel → src/prefill/kernels.cu:rope_kernel: not defined in that file\n  src/prefill/kernels.cu route_kernel → src/prefill/kernels.cu:route_kernel: not defined in that file\n  src/prefill/kernels.cu split_q_kernel → src/prefill/kernels.cu:split_q_kernel: not defined in that file\n  src/prefill/kernels.cu swiglu_il_kernel → src/prefill/kernels.cu:swiglu_il_kernel: not defined in that file\n  src/prefill/kernels.cu swiglu_pair_kernel → src/prefill/kernels.cu:swiglu_pair_kernel: not defined in that file\n  src/prefill/kernels.cu to_bf16_kernel → src/prefill/kernels.cu:to_bf16_kernel: not defined in that file\n  src/prefill/kernels.cu to_f16_kernel → src/prefill/kernels.cu:to_f16_kernel: not defined in that file",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-u7991572426"
+    }
+  },
   "infra_fails": 0,
   "port_units": [
     {
