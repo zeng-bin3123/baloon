@@ -65,7 +65,7 @@ struct ReaderStats {
 
 class PleReader {
 public:
-    PleReader() = default;
+    PleReader();
     ~PleReader();
     PleReader(const PleReader&) = delete;
     PleReader& operator=(const PleReader&) = delete;
@@ -74,7 +74,7 @@ public:
     bool open(const std::string& path, uint64_t table_off, uint64_t n_rows, uint64_t cache_rows, int max_inflight,
               std::string* err = nullptr);
     void close();
-    bool is_open() const { return fd_ >= 0; }
+    bool is_open() const;
 
     // Queue the n rows (copies of cache hits are made at once, misses by the worker). `out` must stay valid until
     // collect() returns. Returns a ticket (never 0), or 0 when rejected (closed reader / row out of range).
@@ -82,11 +82,11 @@ public:
     // Wait for the ticket's jobs; false if a read failed or the ticket is unknown.
     bool collect(uint32_t ticket, std::string* err = nullptr);
 
-    uint64_t cache_capacity() const { return cache_.capacity(); }
+    uint64_t cache_capacity() const;
     uint64_t cache_size() const;
     ReaderStats stats() const;
     void reset_stats();
-    void set_injected_delay_us(uint64_t us) { delay_us_ = us; }
+    void set_injected_delay_us(uint64_t us);
 
 private:
     void worker();

@@ -59,7 +59,15 @@ uint64_t ReaderStats::percentile(double q) const {
 }
 
 // ---- reader --------------------------------------------------------------------------------------------------------
+PleReader::PleReader() {}
+
 PleReader::~PleReader() { close(); }
+
+bool PleReader::is_open() const { return fd_ >= 0; }
+
+uint64_t PleReader::cache_capacity() const { return cache_.capacity(); }
+
+void PleReader::set_injected_delay_us(uint64_t us) { delay_us_ = us; }
 
 bool PleReader::open(const std::string& path, uint64_t table_off, uint64_t n_rows, uint64_t cache_rows,
                      int max_inflight, std::string* err) {

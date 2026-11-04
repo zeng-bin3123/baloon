@@ -67,17 +67,17 @@ int check() {
 }
 
 // ---- format conversion ---------------------------------------------------------------------------------------------
-__global__ void __launch_bounds__(kT) to_bf16_kernel(const float* x, uint16_t* y, int64_t n) {
+__global__ __launch_bounds__(kT) void to_bf16_kernel(const float* x, uint16_t* y, int64_t n) {
     const int64_t i = gid();
     if (i < n) y[i] = bf(x[i]);
 }
-__global__ void __launch_bounds__(kT) to_f16_kernel(const float* x, uint16_t* y, int64_t n) {
+__global__ __launch_bounds__(kT) void to_f16_kernel(const float* x, uint16_t* y, int64_t n) {
     const int64_t i = gid();
     if (i < n) y[i] = hf(x[i]);
 }
 
 // ---- norms and hyper-connection ------------------------------------------------------------------------------------
-__global__ void __launch_bounds__(kT) rms_rows_kernel(const float* x, const float* w, float* y, int dim, float eps) {
+__global__ __launch_bounds__(kT) void rms_rows_kernel(const float* x, const float* w, float* y, int dim, float eps) {
     __shared__ float sh[32];
     const float* xr = x + (int64_t)blockIdx.x * dim;
     float s = 0.f;
@@ -86,7 +86,7 @@ __global__ void __launch_bounds__(kT) rms_rows_kernel(const float* x, const floa
     for (int d = threadIdx.x; d < dim; d += blockDim.x) y[(int64_t)blockIdx.x * dim + d] = xr[d] * r * w[d];
 }
 // One block per token: normalise the whole [4][2560] residual of the token by its RMS.
-__global__ void __launch_bounds__(kT) gr_norm_kernel(const float* res, float* y, float eps) {
+__global__ __launch_bounds__(kT) void gr_norm_kernel(const float* res, float* y, float eps) {
     __shared__ float sh[32];
     const float* r = res + (int64_t)blockIdx.x * kHcWidth;
     float s = 0.f;
@@ -94,7 +94,7 @@ __global__ void __launch_bounds__(kT) gr_norm_kernel(const float* res, float* y,
     const float k = rsqrtf(block_sum(s, sh) / (float)kHcWidth + eps);
     for (int i = threadIdx.x; i < kHcWidth; i += blockDim.x) y[(int64_t)blockIdx.x * kHcWidth + i] = r[i] * k;
 }
-__global__ void __launch_bounds__(kT) gr_mix_kernel(const float* res, const float* coef, int ld, float* y, int64_t n) {
+__global__ __launch_bounds__(kT) void gr_mix_kernel(const float* res, const float* coef, int ld, float* y, int64_t n) {
     const int64_t i = gid();  // i = t*N + d
     if (i >= n) return;
     const int64_t t = i / kEmbN;
@@ -103,7 +103,7 @@ __global__ void __launch_bounds__(kT) gr_mix_kernel(const float* res, const floa
     for (int c = 0; c < kStreams; ++c) a += coef[t * ld + c] * res[t * kHcWidth + (int64_t)c * kEmbN + d];
     y[i] = a;
 }
-__global__ void __launch_bounds__(kT) gr_write_kernel(const float* res, const float* inj, int ld, const float* blk,
+__global__ __launch_bounds__(kT) void gr_write_kernel(const float* res, const float* inj, int ld, const float* blk,
                                                        float* out, int64_t n) {
     const int64_t i = gid();  // i = t*D + c*N + d
     if (i >= n) return;
@@ -112,18 +112,18 @@ __global__ void __launch_bounds__(kT) gr_write_kernel(const float* res, const fl
     const int d = (int)(i % kEmbN);
     out[i] = res[i] + inj[t * ld + c] * blk[t * kEmbN + d];
 }
-__global__ void __launch_bounds__(kT) gr_broadcast_kernel(const float* e, float* out, int64_t n) {
+__global__ __launch_bounds__(kT) void gr_broadcast_kernel(const float* e, float* out, int64_t n) {
     const int64_t i = gid();
     if (i >= n) return;
     out[i] = e[i / kHcWidth * kEmbN + i % kEmbN];
 }
-__global__ void __launch_bounds__(kT) gr_silu_kernel(const float* x, float* y, int64_t n) {
+__global__ __launch_bounds__(kT) void gr_silu_kernel(const float* x, float* y, int64_t n) {
     const int64_t i = gid();
     if (i < n) y[i] = x[i] * sigm(x[i]);
 }
 
 // ---- gated delta net -----------------------------------------------------------------------------------------------
-__global__ void __launch_bounds__(kT) gdn_gates_kernel(const float* a, const float* b, const float* a_log,
+__global__ __launch_bounds__(kT) void gdn_gates_kernel(const float* a, const float* b, const float* a_log,
                                                         const float* dt_bias, float* g, float* beta, int64_t n) {
     const int64_t i = gid();  // i = t*48 + h
     if (i >= n) return;
@@ -134,7 +134,7 @@ __global__ void __launch_bounds__(kT) gdn_gates_kernel(const float* a, const flo
     beta[i] = sigm(b[i]);
 }
 // Grid C/128 blocks of 128 threads: one thread per channel walks the tokens sequentially (causal depthwise conv).
-__global__ void __launch_bounds__(128) gdn_conv_kernel(const float* x, const float* w, float* state, float* out, int T) {
+__global__ __launch_bounds__(128) void gdn_conv_kernel(const float* x, const float* w, float* state, float* out, int T) {
     const int c = blockIdx.x * blockDim.x + threadIdx.x;
     if (c >= kConvC) return;
     float s0 = state[c * 3], s1 = state[c * 3 + 1], s2 = state[c * 3 + 2];
@@ -148,7 +148,7 @@ __global__ void __launch_bounds__(128) gdn_conv_kernel(const float* x, const flo
     state[c * 3] = s0; state[c * 3 + 1] = s1; state[c * 3 + 2] = s2;
 }
 // Grid (32 q/k heads, T): one block of S threads per head normalises its 128 values.
-__global__ void __launch_bounds__(kStateS) gdn_l2_kernel(float* qkv, float eps) {
+__global__ __launch_bounds__(kStateS) void gdn_l2_kernel(float* qkv, float eps) {
     __shared__ float sh[32];
     float* p = qkv + (int64_t)blockIdx.y * kConvC + (int64_t)blockIdx.x * kStateS;
     const float v = p[threadIdx.x];
@@ -157,7 +157,7 @@ __global__ void __launch_bounds__(kStateS) gdn_l2_kernel(float* qkv, float eps) 
 }
 // Grid (48 heads, 4 column blocks), block = 4 row groups x 32 columns. State is [row][head][col]; each thread owns one
 // column and the 32 rows of its group; group partials are combined through shared memory.
-__global__ void __launch_bounds__(128) gdn_recurrence_kernel(const float* qkv, const float* g, const float* beta,
+__global__ __launch_bounds__(128) void gdn_recurrence_kernel(const float* qkv, const float* g, const float* beta,
                                                               float* state, float* out, int T, float scale) {
     __shared__ float sq[kStateS], sk[kStateS], p1[kRowGroups][32], p2[kRowGroups][32];
     const int rg = threadIdx.x >> 5, lane = threadIdx.x & 31;
@@ -194,7 +194,7 @@ __global__ void __launch_bounds__(128) gdn_recurrence_kernel(const float* qkv, c
 
 // ---- MoE -----------------------------------------------------------------------------------------------------------
 // One block of 32 logical lanes per token; lane owns experts lane + 32*i. Ten rounds of arg-max (ties: lowest index).
-__global__ void __launch_bounds__(32) route_kernel(const float* logits, int32_t* ids, float* wts) {
+__global__ __launch_bounds__(32) void route_kernel(const float* logits, int32_t* ids, float* wts) {
     __shared__ float sv[kLanes];
     __shared__ int si[kLanes];
     __shared__ int chosen;
@@ -232,7 +232,7 @@ __global__ void __launch_bounds__(32) route_kernel(const float* logits, int32_t*
 }
 // One thread per code byte; the four 2-bit codes dequantise to (code-1)*scale. OutT is float or f16 bits.
 template <bool F16>
-__global__ void __launch_bounds__(kT) blob_dequant_kernel(const uint8_t* blob, void* gu, void* dn) {
+__global__ __launch_bounds__(kT) void blob_dequant_kernel(const uint8_t* blob, void* gu, void* dn) {
     const int64_t i = gid();
     constexpr int64_t guBytes = kGuRows * (kGuCols / 4), dnBytes = kDnRows * (kDnCols / 4);
     if (i >= guBytes + dnBytes) return;
@@ -251,22 +251,22 @@ __global__ void __launch_bounds__(kT) blob_dequant_kernel(const uint8_t* blob, v
         else ((float*)(isGu ? gu : dn))[o + k] = v;
     }
 }
-__global__ void __launch_bounds__(kT) swiglu_il_kernel(const float* x, float* y, int64_t n) {
+__global__ __launch_bounds__(kT) void swiglu_il_kernel(const float* x, float* y, int64_t n) {
     const int64_t i = gid();  // i = r*640 + k
     if (i >= n) return;
     const float gt = x[2 * i], up = x[2 * i + 1];
     y[i] = gt * sigm(gt) * up;
 }
-__global__ void __launch_bounds__(kT) swiglu_pair_kernel(const float* gate, const float* up, float* y, int64_t n) {
+__global__ __launch_bounds__(kT) void swiglu_pair_kernel(const float* gate, const float* up, float* y, int64_t n) {
     const int64_t i = gid();
     if (i < n) y[i] = gate[i] * sigm(gate[i]) * up[i];
 }
-__global__ void __launch_bounds__(kT) gather_rows16_kernel(const uint4* src, const int32_t* idx, uint4* dst, int64_t n, int per) {
+__global__ __launch_bounds__(kT) void gather_rows16_kernel(const uint4* src, const int32_t* idx, uint4* dst, int64_t n, int per) {
     const int64_t i = gid();  // i = r*per + j
     if (i >= n) return;
     dst[i] = src[(int64_t)idx[i / per] * per + i % per];
 }
-__global__ void __launch_bounds__(kT) moe_combine_kernel(const float* shared, const float* expert, const float* w,
+__global__ __launch_bounds__(kT) void moe_combine_kernel(const float* shared, const float* expert, const float* w,
                                                           float* out, int64_t n) {
     const int64_t i = gid();  // i = t*N + d
     if (i >= n) return;
@@ -277,14 +277,14 @@ __global__ void __launch_bounds__(kT) moe_combine_kernel(const float* shared, co
 }
 
 // ---- QSA helpers ---------------------------------------------------------------------------------------------------
-__global__ void __launch_bounds__(kT) split_q_kernel(const float* qfull, float* q, int64_t n) {
+__global__ __launch_bounds__(kT) void split_q_kernel(const float* qfull, float* q, int64_t n) {
     const int64_t i = gid();  // i = t*6144 + h*256 + d
     if (i >= n) return;
     const int64_t t = i / (kQHeads * kQHeadDim);
     const int h = (int)((i / kQHeadDim) % kQHeads), d = (int)(i % kQHeadDim);
     q[i] = qfull[t * kQHeads * kQFullPerHead + h * kQFullPerHead + d];
 }
-__global__ void __launch_bounds__(kT) gate_attn_kernel(const float* attn, const float* qfull, float* out, int64_t n) {
+__global__ __launch_bounds__(kT) void gate_attn_kernel(const float* attn, const float* qfull, float* out, int64_t n) {
     const int64_t i = gid();
     if (i >= n) return;
     const int64_t t = i / (kQHeads * kQHeadDim);
@@ -292,7 +292,7 @@ __global__ void __launch_bounds__(kT) gate_attn_kernel(const float* attn, const 
     out[i] = attn[i] * sigm(qfull[t * kQHeads * kQFullPerHead + h * kQFullPerHead + kQHeadDim + d]);
 }
 // Rotates pair (p, p+32) of the first 64 dims of every head: theta = pos * base^(-2p/64).
-__global__ void __launch_bounds__(kT) rope_kernel(float* x, const int32_t* pos, int64_t n, int heads, int head_dim, float base) {
+__global__ __launch_bounds__(kT) void rope_kernel(float* x, const int32_t* pos, int64_t n, int heads, int head_dim, float base) {
     const int64_t i = gid();  // i = (t*heads + h)*32 + pair
     if (i >= n) return;
     const int pair = (int)(i % 32);
@@ -305,7 +305,7 @@ __global__ void __launch_bounds__(kT) rope_kernel(float* x, const int32_t* pos, 
     p[pair + 32] = a * s + b * c;
 }
 // Grid (T, 4 groups), 64 threads: int8 quantisation with one scale per 64-channel group, never -128.
-__global__ void __launch_bounds__(kKvGroupWidth) kv_append_kernel(const float* x, const int32_t* rows, int8_t* kq, float* sc) {
+__global__ __launch_bounds__(kKvGroupWidth) void kv_append_kernel(const float* x, const int32_t* rows, int8_t* kq, float* sc) {
     __shared__ float sh[32];
     const int t = blockIdx.x, grp = blockIdx.y, ch = grp * kKvGroupWidth + threadIdx.x;
     const float v = x[(int64_t)t * kKvChannels + ch];
@@ -323,7 +323,10 @@ __global__ void __launch_bounds__(kKvGroupWidth) kv_append_kernel(const float* x
 #define LAUNCH1D(kernel, n, ...)                                                           \
     do { kernel<<<(unsigned)blocks_for((n), kT), kT>>>(__VA_ARGS__); return check(); } while (0)
 
-int to_bf16(const float* x, uint16_t* y, int64_t n) { if (!x || !y || n <= 0) return -1; LAUNCH1D(to_bf16_kernel, n, x, y, n); }
+int to_bf16(const float* x, uint16_t* y, int64_t n) {
+    if (!x || !y || n <= 0) return -1;
+    LAUNCH1D(to_bf16_kernel, n, x, y, n);
+}
 int to_f16(const float* x, uint16_t* y, int64_t n) { if (!x || !y || n <= 0) return -1; LAUNCH1D(to_f16_kernel, n, x, y, n); }
 int rms_rows(const float* x, const float* w, float* y, int rows, int dim, float eps) {
     if (!x || !w || !y || rows <= 0 || dim <= 0) return -1;
