@@ -2,7 +2,7 @@
   "version": 1,
   "ref": "Niko1221/Strata",
   "ref_sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
-  "theory_hash": "adb646eef828",
+  "theory_hash": "6f8a8e4da5bc",
   "modules": {
     "ActivationQuantize.lean": {
       "name": "ActivationQuantize.lean",
@@ -196,8 +196,8 @@
     },
     "VisionEncoderTool.lean": {
       "name": "VisionEncoderTool.lean",
-      "hash": "aa100f7d8557",
-      "bytes": 11655
+      "hash": "24e4dcc767a9",
+      "bytes": 4609
     },
     "WeightLoader.lean": {
       "name": "WeightLoader.lean",
