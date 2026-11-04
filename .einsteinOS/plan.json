@@ -230,6 +230,10 @@
         "PleDirectReader.lean",
         "PrefillKernels.lean"
       ],
+      "children": [
+        "u7991572426",
+        "u253a75befe"
+      ],
       "reason": "added after theory changed",
       "conv": "c45157d2-a9b8-416b-b1b3-c3d80976b198"
     },
@@ -296,6 +300,23 @@
         "VisionEncoderTool.lean"
       ],
       "reason": "added after theory changed"
+    },
+    {
+      "id": "u7991572426",
+      "parent": "u4c397f3a6b",
+      "modules": [
+        "PleDirectReader.lean",
+        "PrefillKernels.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "u253a75befe",
+      "parent": "u4c397f3a6b",
+      "modules": [
+        "GenerateDriver.lean"
+      ],
+      "reason": "3 fix attempts used"
     }
   ],
   "state": {
@@ -315,9 +336,7 @@
       "unit_id": "u0e60a9f272"
     }
   },
-  "fix_attempts": {
-    "u4c397f3a6b": 3
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u0e60a9f272": [
       "port_incomplete"
@@ -340,13 +359,7 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "u4c397f3a6b": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: 22 of the 85 definitions of the unit's reference files have no counterpart:\n  src/prefill/kernels.cu blob_dequant_kernel → src/prefill_batch_kernels.cu:blob_dequant_kernel: not defined in that file\n  src/prefill/kernels.cu gate_attn_kernel → src/prefill_batch_kernels.cu:gate_attn_kernel: not defined in that file\n  src/prefill/kernels.cu gather_rows16_kernel → src/prefill_batch_kernels.cu:gather_rows16_kernel: not defined in that file\n  src/prefill/kernels.cu gdn_conv_kernel → src/prefill_batch_kernels.cu:gdn_conv_kernel: not defined in that file\n  src/prefill/kernels.cu gdn_gates_kernel → src/prefill_batch_kernels.cu:gdn_gates_kernel: not defined in that file\n  src/prefill/kernels.cu gdn_l2_kernel → src/prefill_batch_kernels.cu:gdn_l2_kernel: not defined in that file\n  src/prefill/kernels.cu gr_broadcast_kernel → src/prefill_batch_kernels.cu:gr_broadcast_kernel: not defined in that file\n  src/prefill/kernels.cu gr_mix_kernel → src/prefill_batch_kernels.cu:gr_mix_kernel: not defined in that file\n  src/prefill/kernels.cu gr_norm_kernel → src/prefill_batch_kernels.cu:gr_norm_kernel: not defined in that file\n  src/prefill/kernels.cu gr_silu_kernel → src/prefill_batch_kernels.cu:gr_silu_kernel: not defined in that file\n  src/prefill/kernels.cu gr_write_kernel → src/prefill_batch_kernels.cu:gr_write_kernel: not defined in that file\n  src/prefill/kernels.cu kv_append_kernel → src/prefill_batch_kernels.cu:kv_append_kernel: not defined in that file\n  src/prefill/kernels.cu moe_combine_kernel → src/prefill_batch_kernels.cu:moe_combine_kernel: not defined in that file\n  src/prefill/kernels.cu rms_rows_kernel → src/prefill_batch_kernels.cu:rms_rows_kernel: not defined in that file\n  src/prefill/kernels.cu rope_kernel → src/prefill_batch_kernels.cu:rope_kernel: not defined in that file\n  src/prefill/kernels.cu route_kernel → src/prefill_batch_kernels.cu:route_kernel: not defined in that file\n  src/prefill/kernels.cu split_q_kernel → src/prefill_batch_kernels.cu:split_q_kernel: not defined in that file\n  src/prefill/kernels.cu swiglu_il_kernel → src/prefill_batch_kernels.cu:swiglu_il_kernel: not defined in that file\n  src/prefill/kernels.cu swiglu_pair_kernel → src/prefill_batch_kernels.cu:swiglu_pair_kernel: not defined in that file\n  src/prefill/kernels.cu to_bf16 → src/prefill_batch_kernels.cu:to_bf16: not defined in that file\n  src/prefill/kernels.cu to_bf16_kernel → src/prefill_batch_kernels.cu:to_bf16_kernel: not defined in that file\n  src/prefill/kernels.cu to_f16_kernel → src/prefill_batch_kernels.cu:to_f16_kernel: not defined in that file",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-u4c397f3a6b"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
   "port_units": [
     {
