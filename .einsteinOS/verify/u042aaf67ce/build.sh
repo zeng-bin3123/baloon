@@ -52,7 +52,7 @@ echo "[build] dequant tool"
 $HOSTCXX $HFLAGS -Wall -Wextra src/tools/dequant_tool.cpp -o "$OUT/dequant_tool"
 
 [ -x "$CLANG" ] || { echo "corex toolchain missing at $CLANG: cannot build the CUDA sources"; exit 2; }
-CUFLAGS="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Isrc -Itests -Itests/pk_unit3 -Iinclude -O2"
+CUFLAGS="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Isrc -Itests -Itests/pk_unit3 -Iinclude -O2 -ffp-contract=off"
 for f in src/*.cu src/prefill/*.cu tests/*.cu tests/gpu_unit*/*.cu tests/pk_unit3/*.cu; do
   [ -f "$f" ] || continue
   echo "[cuda] $f"

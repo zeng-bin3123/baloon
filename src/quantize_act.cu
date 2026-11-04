@@ -6,6 +6,10 @@
 #include "baloon/act_quant_kernels.hpp"
 #include "baloon/f16_bits.hpp"
 
+// The rounding trick below needs the product rounded to fp32 BEFORE the magic-constant add; an FMA would fuse them and change
+// near-tie codes relative to the host reference. Forbid contraction in this file.
+#pragma clang fp contract(off)
+
 namespace baloon {
 namespace actq {
 namespace {

@@ -50,7 +50,7 @@ echo "== GPU kernels =="
 if [ ! -x "$CLANG" ]; then
   echo "corex toolchain missing at $CLANG: the GPU tests cannot run"; rc=1
 else
-  CUFLAGS="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Isrc -Iinclude -O2"
+  CUFLAGS="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Isrc -Iinclude -O2 -ffp-contract=off"
   objs=""
   for f in src/qsa.cu src/kv_q8.cu src/quantize_act.cu tests/gpu_unit19/test_u7_gpu.cu; do
     o="$OUT/u7_$(basename "$f").o"

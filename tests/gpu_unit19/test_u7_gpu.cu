@@ -116,6 +116,15 @@ static void test_act_quant() {
         CUOK(cudaDeviceSynchronize());
         std::vector<uint8_t> gk = qk.get(), rk(gk.size());
         for (size_t b = 0; b < n / 256; ++b) host_q8_K(&x[b * 256], &rk[b * 292]);
+        if (gk != rk) {
+            for (size_t i = 0; i < gk.size(); ++i) if (gk[i] != rk[i]) {
+                const size_t b = i / 292, r = i % 292;
+                std::fprintf(stderr, "q8_K mismatch mode %d block %zu byte %zu got %d want %d\n", mode, b, r, (int)gk[i], (int)rk[i]);
+                if (r >= 4 && r < 260) { const float xv = x[b * 256 + (r - 4)]; float dd, dr; std::memcpy(&dd, &gk[b*292], 4); std::memcpy(&dr, &rk[b*292], 4); std::fprintf(stderr, "  x=%.9g d_gpu=%.9g d_ref=%.9g\n", xv, dd, dr); }
+                else if (r < 4) { float dd, dr; std::memcpy(&dd, &gk[b*292], 4); std::memcpy(&dr, &rk[b*292], 4); std::fprintf(stderr, "  d_gpu=%.9g d_ref=%.9g\n", dd, dr); }
+                break;
+            }
+        }
         CHECK(gk == rk);
         for (size_t b = 0; b < n / 256; ++b) {
             const uint8_t* o = &gk[b * 292];
