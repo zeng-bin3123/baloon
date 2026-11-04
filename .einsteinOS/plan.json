@@ -331,6 +331,282 @@
   },
   "last_failure": {},
   "infra_fails": 0,
+  "port_units": [
+    {
+      "id": "pfcccb31b26",
+      "modules": null,
+      "reason": "port: reference files of . no theory unit covers",
+      "sources": [
+        "chat.py",
+        "setup.py"
+      ]
+    },
+    {
+      "id": "pb7e2533792",
+      "modules": null,
+      "reason": "port: reference files of include/strata/artifact no theory unit covers",
+      "sources": [
+        "include/strata/artifact/gguf_reader.hpp"
+      ]
+    },
+    {
+      "id": "p00a7a246af",
+      "modules": null,
+      "reason": "port: reference files of include/strata/core no theory unit covers",
+      "sources": [
+        "include/strata/core/device.hpp",
+        "include/strata/core/graph.hpp",
+        "include/strata/core/hit_hook.hpp",
+        "include/strata/core/layout.hpp",
+        "include/strata/core/native_dense.hpp",
+        "include/strata/core/native_head.hpp",
+        "include/strata/core/pinned.hpp",
+        "include/strata/core/session.hpp",
+        "include/strata/core/verify.hpp",
+        "include/strata/core/weights.hpp"
+      ]
+    },
+    {
+      "id": "pe1f7ca5c00",
+      "modules": null,
+      "reason": "port: reference files of include/strata/kernels no theory unit covers",
+      "sources": [
+        "include/strata/kernels/bf16_bits.hpp",
+        "include/strata/kernels/bf16_gemv.hpp",
+        "include/strata/kernels/dequant_bf16.hpp",
+        "include/strata/kernels/dequant_s2.hpp",
+        "include/strata/kernels/elementwise.hpp",
+        "include/strata/kernels/fused_gdn.hpp",
+        "include/strata/kernels/fused_gr.hpp",
+        "include/strata/kernels/gdn.hpp",
+        "include/strata/kernels/gr.hpp",
+        "include/strata/kernels/iq_kernels.hpp",
+        "include/strata/kernels/kv_q8.hpp",
+        "include/strata/kernels/mrope.hpp",
+        "include/strata/kernels/native_flash_attn.hpp",
+        "include/strata/kernels/native_gdn.hpp",
+        "include/strata/kernels/native_gdn_preprocess.hpp",
+        "include/strata/kernels/native_gr_norm.hpp",
+        "include/strata/kernels/native_gr_postops.hpp",
+        "include/strata/kernels/native_mmvq.hpp",
+        "include/strata/kernels/native_moe.hpp",
+        "include/strata/kernels/native_ple_postops.hpp",
+        "include/strata/kernels/native_qsa.hpp",
+        "include/strata/kernels/native_qsa_indexer.hpp",
+        "include/strata/kernels/native_qsa_score.hpp",
+        "include/strata/kernels/native_rope.hpp",
+        "include/strata/kernels/native_router.hpp",
+        "include/strata/kernels/qsa_select.hpp",
+        "include/strata/kernels/quantize_act.hpp",
+        "include/strata/kernels/rope.hpp",
+        "include/strata/kernels/router_top10.hpp",
+        "include/strata/kernels/s2_expert_grouped.hpp",
+        "include/strata/kernels/s2_gemv.hpp",
+        "include/strata/kernels/s2_gemv_q8.hpp",
+        "include/strata/kernels/s_gemv.hpp",
+        "include/strata/kernels/sampler.hpp",
+        "include/strata/kernels/shared_expert.hpp"
+      ]
+    },
+    {
+      "id": "p61ad38075a",
+      "modules": null,
+      "reason": "port: reference files of include/strata/kernels/cpu no theory unit covers",
+      "sources": [
+        "include/strata/kernels/cpu/expert_layout.hpp",
+        "include/strata/kernels/cpu/iq_avx512.hpp",
+        "include/strata/kernels/cpu/native_expert.hpp"
+      ]
+    },
+    {
+      "id": "p3798e66f3c",
+      "modules": null,
+      "reason": "port: reference files of include/strata/ngram no theory unit covers",
+      "sources": [
+        "include/strata/ngram/ple_reader.hpp"
+      ]
+    },
+    {
+      "id": "p71c0367d2e",
+      "modules": null,
+      "reason": "port: reference files of include/strata/plan no theory unit covers",
+      "sources": [
+        "include/strata/plan/plan.hpp"
+      ]
+    },
+    {
+      "id": "pd8e380f419",
+      "modules": null,
+      "reason": "port: reference files of include/strata/platform no theory unit covers",
+      "sources": [
+        "include/strata/platform/direct_file.hpp",
+        "include/strata/platform/memory.hpp"
+      ]
+    },
+    {
+      "id": "pb0569948de",
+      "modules": null,
+      "reason": "port: reference files of include/strata/prefill no theory unit covers",
+      "sources": [
+        "include/strata/prefill/gemm.hpp"
+      ]
+    },
+    {
+      "id": "p4fde6588a6",
+      "modules": null,
+      "reason": "port: reference files of include/strata/program no theory unit covers",
+      "sources": [
+        "include/strata/program/logits_selection.hpp"
+      ]
+    },
+    {
+      "id": "p984d0d954f",
+      "modules": null,
+      "reason": "port: reference files of ref no theory unit covers",
+      "sources": [
+        "ref/load.py"
+      ]
+    },
+    {
+      "id": "p3ff4aef2d0",
+      "modules": null,
+      "reason": "port: reference files of serve no theory unit covers",
+      "sources": [
+        "serve/__init__.py",
+        "serve/frontend.py",
+        "serve/server.py"
+      ]
+    },
+    {
+      "id": "p45808a8a9c",
+      "modules": null,
+      "reason": "port: reference files of src/artifact no theory unit covers",
+      "sources": [
+        "src/artifact/gguf_reader.cpp"
+      ]
+    },
+    {
+      "id": "pe1ab8a4555",
+      "modules": null,
+      "reason": "port: reference files of src/core no theory unit covers",
+      "sources": [
+        "src/core/concurrent_main.cpp",
+        "src/core/device.cu",
+        "src/core/device_main.cpp",
+        "src/core/graph.cpp",
+        "src/core/layout.cpp",
+        "src/core/load_main.cpp",
+        "src/core/native_dense.cpp",
+        "src/core/native_head.cpp",
+        "src/core/overlap_main.cpp",
+        "src/core/pinned.cu"
+      ]
+    },
+    {
+      "id": "p61c3495016",
+      "modules": null,
+      "reason": "port: reference files of src/kernels no theory unit covers",
+      "sources": [
+        "src/kernels/ngram.cpp",
+        "src/kernels/ple_oracle_vectors.inc",
+        "src/kernels/qsa_oracle_vectors.inc"
+      ]
+    },
+    {
+      "id": "p1bc270de01",
+      "modules": null,
+      "reason": "port: reference files of src/kernels/cpu no theory unit covers",
+      "sources": [
+        "src/kernels/cpu/expert_layout.cpp",
+        "src/kernels/cpu/native_expert.cpp"
+      ]
+    },
+    {
+      "id": "pcd027bc02f",
+      "modules": null,
+      "reason": "port: reference files of src/kernels/cuda no theory unit covers",
+      "sources": [
+        "src/kernels/cuda/bf16_gemv.cu",
+        "src/kernels/cuda/dequant_s2.cu",
+        "src/kernels/cuda/elementwise.cu",
+        "src/kernels/cuda/fused_gdn.cu",
+        "src/kernels/cuda/fused_gr.cu",
+        "src/kernels/cuda/gdn.cu",
+        "src/kernels/cuda/gr.cu",
+        "src/kernels/cuda/iq_kernels.cu",
+        "src/kernels/cuda/native_bf16.cu",
+        "src/kernels/cuda/native_gdn.cu",
+        "src/kernels/cuda/native_gdn_preprocess.cu",
+        "src/kernels/cuda/native_gr_norm.cu",
+        "src/kernels/cuda/native_gr_postops.cu",
+        "src/kernels/cuda/native_moe.cu",
+        "src/kernels/cuda/native_ple_postops.cu",
+        "src/kernels/cuda/native_qsa.cu",
+        "src/kernels/cuda/native_qsa_indexer.cu",
+        "src/kernels/cuda/native_rope.cu",
+        "src/kernels/cuda/native_router.cu",
+        "src/kernels/cuda/rope.cu",
+        "src/kernels/cuda/router_top10.cu",
+        "src/kernels/cuda/s2_gemv.cu",
+        "src/kernels/cuda/s2_gemv_fast.cu",
+        "src/kernels/cuda/s2_gemv_q8.cu",
+        "src/kernels/cuda/s2_gemv_quads.cu",
+        "src/kernels/cuda/shared_expert.cu"
+      ]
+    },
+    {
+      "id": "p11b3c1e15c",
+      "modules": null,
+      "reason": "port: reference files of src/plan no theory unit covers",
+      "sources": [
+        "src/plan/plan_main.cpp"
+      ]
+    },
+    {
+      "id": "p3199202ac2",
+      "modules": null,
+      "reason": "port: reference files of src/platform no theory unit covers",
+      "sources": [
+        "src/platform/direct_file.cpp",
+        "src/platform/memory.cpp"
+      ]
+    },
+    {
+      "id": "p42de699ebc",
+      "modules": null,
+      "reason": "port: reference files of src/prefill no theory unit covers",
+      "sources": [
+        "src/prefill/gemm.cu"
+      ]
+    },
+    {
+      "id": "p25f728b4fe",
+      "modules": null,
+      "reason": "port: reference files of third_party/ggml no theory unit covers",
+      "sources": [
+        "third_party/ggml/ggml-common.h"
+      ]
+    },
+    {
+      "id": "p17652417b0",
+      "modules": null,
+      "reason": "port: reference files of tools no theory unit covers",
+      "sources": [
+        "tools/_paths.py",
+        "tools/canonical_xcheck.py",
+        "tools/gguf_reader.py",
+        "tools/gguf_writer.py",
+        "tools/iq_pack.py",
+        "tools/mtp_fetch.py",
+        "tools/mtp_pack.py",
+        "tools/mtp_rt.py",
+        "tools/pack_index.py",
+        "tools/pack_layer.py",
+        "tools/strata_pack.py",
+        "tools/strata_tokenizer.py"
+      ]
+    }
+  ],
   "gates": "build+test+gpu+isa+port+integration",
   "integration_unit": {
     "id": "uintegration01529aaa82b9",
