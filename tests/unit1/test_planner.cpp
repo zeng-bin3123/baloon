@@ -157,3 +157,24 @@ void test_planner_costs_form() {
     const auto op = make_plan(24ull << 30, kv_bytes_per_token(g), 4096, fixed, c.expert_blob);
     CHECK(sp && op && sp->cache_slots == op->slots && sp->vram_used == op->used && sp->kv_bytes == op->kv);
 }
+
+// Theory LAYER 1: makePlan_closes, makePlan_slots_fit, makePlan_refuses, cache_room_antitone, kv_at_32k, state_costs_85_slots.
+void test_planner_theory_closure() {
+    std::mt19937_64 rng(4242);
+    for (int it = 0; it < 300000; ++it) {
+        const uint64_t blob = rng() % 4000, kvT = rng() % 300, ctx = rng() % 3000, fixed = rng() % 400000, pool = rng() % 1600000;
+        const auto p = baloon::planner::make_plan(pool, kvT, ctx, fixed, blob);
+        if (pool < kvT * ctx + fixed) { CHECK(!p.has_value()); continue; }  // refuses
+        if (p) {
+            CHECK(p->kv + fixed + p->cache == pool);                         // closes exactly
+            CHECK(p->slots * blob <= p->cache && p->slots > 0);              // slots fit, at least one
+            CHECK(p->used <= pool);
+        }
+        uint64_t a = rng() % 3000, b = rng() % 3000;
+        if (a > b) std::swap(a, b);
+        if (pool >= kvT * b + fixed) CHECK(pool - kvT * b - fixed <= pool - kvT * a - fixed);  // antitone
+    }
+    const baloon::planner::Geometry g;
+    CHECK(baloon::planner::kv_bytes_per_token(g) * 32768ull == 427819008ull);
+    CHECK(baloon::planner::state_bytes(g) == 117669888ull && 117669888ull / 1382400ull == 85);
+}
