@@ -264,7 +264,7 @@ void test_pool_multi() {
     Options o = opts(9, 64, 0, 3);
     prompts.push_back(std::vector<int64_t>(70, 1));  // does not fit
     prompts.push_back({});                           // empty
-    auto make = [V](int) { return synthetic_drive(V); };
+    auto make = [](int) { return synthetic_drive(V); };
     const auto ref = drive_pool_multi(make, prompts, o, 1);
     for (int64_t w : {1, 2, 3, 8, 64}) {
         const auto got = drive_pool_multi(make, prompts, o, w);
@@ -282,7 +282,7 @@ void test_pool_multi() {
     const auto bad = drive_pool_multi(thrower, {{1, 2}, {3}}, o, 2);
     CHECK(bad.size() == 2 && !bad[0].ok && !bad[1].ok && bad[0].error == "no device");
     // a backend that throws mid-run fails only that request
-    auto flaky = [V](int) { Drive d = synthetic_drive(V); auto s = d.step; d.step = [s](int64_t t, int64_t p, std::vector<float>& l) { if (t == 13) throw std::runtime_error("boom"); s(t, p, l); }; d.prefill = nullptr; return d; };
+    auto flaky = [](int) { Drive d = synthetic_drive(V); auto s = d.step; d.step = [s](int64_t t, int64_t p, std::vector<float>& l) { if (t == 13) throw std::runtime_error("boom"); s(t, p, l); }; d.prefill = nullptr; return d; };
     const auto fl = drive_pool_multi(flaky, {{13, 2}, {1, 2}}, opts(3, 64), 2);
     CHECK(!fl[0].ok && fl[0].error == "boom" && fl[1].ok);
 }
@@ -290,7 +290,7 @@ void test_pool_multi() {
 void test_serve() {
     const int64_t V = 257;
     Options o = opts(4, 64); o.serve = true;
-    auto make = [V](int) { return synthetic_drive(V); };
+    auto make = [](int) { return synthetic_drive(V); };
     std::istringstream in("GEN 3 1,2,3\n\nGEN 5 10\nGEN 0 1\nGEN 3 \nGEN 3 1,x\nGEN 60 1,2,3\nGEN 56 1\nFOO 1 2\nGEN 2 -4\nQUIT\nGEN 1 1\n");
     std::ostringstream out;
     const int64_t n = serve_loop(in, out, o, make);
