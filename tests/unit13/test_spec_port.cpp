@@ -53,23 +53,23 @@ void test_port_choose_argmax() {
         c.cost.mtp_ms_per_tok = rng.uni() * 0.3;
         c.cost.lookup_ms = rng.uni() * 0.3;
         double t = 0.5 + rng.uni();
-        for (uint64_t i = 0; i <= K_MAX; ++i) { t += rng.uni() * 0.25; c.cost.step_ms[i] = t; }
+        for (uint64_t i = 0; i <= K_MAX; ++i) { t += rng.uni() * 0.25; c.cost.table[i] = t; }
         for (uint64_t i = 0; i < K_MAX; ++i) c.mtp_p[i] = rng.uni();
         for (int i = 0; i < 4; ++i) c.lookup_q[i] = rng.uni();
         const uint64_t mk = rng.below(12), av = rng.below(12), ml = rng.below(40);
 
-        const double base = 1.0 / c.cost.step_ms[0];
+        const double base = 1.0 / c.cost.table[0];
         double best = base; Source bs = Source::None; uint64_t bk = 0;
         for (uint64_t k = 1; k <= std::min<uint64_t>(mk, K_MAX); ++k) {
             double run = 1.0, s = 1.0;
             for (uint64_t i = 0; i < k; ++i) { run *= c.mtp_p[i]; s += run; }
-            const double r = s / (c.cost.step_ms[k] + (double)k * c.cost.mtp_ms_per_tok);
+            const double r = s / (c.cost.table[k] + (double)k * c.cost.mtp_ms_per_tok);
             if (r > best) { best = r; bs = Source::Mtp; bk = k; }
         }
         for (uint64_t k = 1; k <= std::min<uint64_t>(av, K_MAX); ++k) {
             double run = 1.0, s = 1.0;
             for (uint64_t i = 0; i < k; ++i) { run *= c.lookup_q[bucket(ml)]; s += run; }
-            const double r = s / (c.cost.step_ms[k] + c.cost.lookup_ms);
+            const double r = s / (c.cost.table[k] + c.cost.lookup_ms);
             if (r > best) { best = r; bs = Source::Lookup; bk = k; }
         }
         if (bs != Source::None && best < base * (1.0 + c.threshold)) { bs = Source::None; bk = 0; best = base; }

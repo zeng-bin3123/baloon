@@ -86,7 +86,7 @@ void test_sc_theory_gain_threshold() {
     long drafted = 0, plain = 0;
     for (int it = 0; it < 20000; ++it) {
         sc::Controller c;
-        for (uint64_t i = 0; i <= sc::K_MAX; ++i) c.cost.step_ms[i] = 1.0 + 0.1 * (double)i * (0.2 + 2.0 * rng.uni());
+        for (uint64_t i = 0; i <= sc::K_MAX; ++i) c.cost.table[i] = 1.0 + 0.1 * (double)i * (0.2 + 2.0 * rng.uni());
         c.cost.mtp_ms_per_tok = 0.3 * rng.uni();
         c.cost.lookup_ms = 0.5 * rng.uni();
         for (auto& v : c.mtp_p) v = rng.uni();
