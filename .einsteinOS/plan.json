@@ -362,7 +362,7 @@
         "MemoryPlanner.lean"
       ],
       "reason": "initial plan",
-      "conv": "d4da09c9-fe42-4186-a5a9-9e224d3e8ab6"
+      "conv": "ab071f8c-0bd6-436e-8001-3a27e30290af"
     },
     {
       "id": "u89be81de0b",
@@ -541,8 +541,8 @@
       "unit_id": "u9dc1be2eae"
     },
     "MemoryPlanner.lean": {
-      "hash": "33e9d2257014",
-      "pass": false,
+      "hash": "4616a64c038d",
+      "pass": true,
       "unit_id": "uc2c7002b7a"
     },
     "NativeQsaIndexerAppend.lean": {
