@@ -299,8 +299,8 @@
   ],
   "state": {
     "PleNgramHash.lean": {
-      "hash": "4aa286f93219",
-      "pass": false,
+      "hash": "255f933f6849",
+      "pass": true,
       "unit_id": "u89be81de0b"
     },
     "SpecController.lean": {
@@ -330,12 +330,5 @@
     ]
   },
   "last_failure": {},
-  "infra_fails": 0,
-  "review_pending": {
-    "u89be81de0b": {
-      "compile": "pass",
-      "existing_code": "true",
-      "smoke": "pass"
-    }
-  }
+  "infra_fails": 0
 }
