@@ -2,377 +2,357 @@
   "version": 1,
   "ref": "Niko1221/Strata",
   "ref_sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
-  "theory_hash": "e2025b4986a4",
+  "theory_hash": "50a2dd470d1b",
   "modules": {
-    "ActivationQuantize.lean": {
-      "name": "ActivationQuantize.lean",
-      "hash": "37324969cfc4",
-      "bytes": 4358
+    "ArtifactDequantReference.lean": {
+      "name": "ArtifactDequantReference.lean",
+      "hash": "66cb312aad4b",
+      "bytes": 8287
     },
-    "CanonicalFormDecode.lean": {
-      "name": "CanonicalFormDecode.lean",
-      "hash": "88a48ca96c7a",
-      "bytes": 11504
+    "ByteLevelBpeTokenizer.lean": {
+      "name": "ByteLevelBpeTokenizer.lean",
+      "hash": "7469e44756df",
+      "bytes": 5471
     },
-    "CpuExpertPool.lean": {
-      "name": "CpuExpertPool.lean",
-      "hash": "bedc61df7a18",
-      "bytes": 8214
+    "CanonicalFormCodebookDecode.lean": {
+      "name": "CanonicalFormCodebookDecode.lean",
+      "hash": "801e9a3a5a0f",
+      "bytes": 7495
     },
-    "CpuIqAvx512Rows.lean": {
-      "name": "CpuIqAvx512Rows.lean",
-      "hash": "9d9fced03ad0",
-      "bytes": 7070
+    "ChatFrontend.lean": {
+      "name": "ChatFrontend.lean",
+      "hash": "2937feb79db0",
+      "bytes": 6077
     },
-    "CpuQ2Avx2Rows.lean": {
-      "name": "CpuQ2Avx2Rows.lean",
-      "hash": "20bb67155d35",
-      "bytes": 5753
+    "CpuExpertGeometry.lean": {
+      "name": "CpuExpertGeometry.lean",
+      "hash": "0dc0f268126c",
+      "bytes": 7088
     },
-    "CpuQ2ExpertKernel.lean": {
-      "name": "CpuQ2ExpertKernel.lean",
-      "hash": "72a2852c23d1",
-      "bytes": 10768
+    "CpuExpertKernel.lean": {
+      "name": "CpuExpertKernel.lean",
+      "hash": "6055435367d1",
+      "bytes": 8357
     },
-    "DequantGpuKernels.lean": {
-      "name": "DequantGpuKernels.lean",
-      "hash": "2531d6cf1b97",
-      "bytes": 5249
+    "CpuExpertPoolScheduling.lean": {
+      "name": "CpuExpertPoolScheduling.lean",
+      "hash": "afb173389711",
+      "bytes": 8715
     },
-    "DirectFileIo.lean": {
-      "name": "DirectFileIo.lean",
-      "hash": "b85ba91499d1",
-      "bytes": 4181
+    "CpuIqAvx512Kernels.lean": {
+      "name": "CpuIqAvx512Kernels.lean",
+      "hash": "926ddca0794a",
+      "bytes": 7018
+    },
+    "CpuQ2Avx2Kernel.lean": {
+      "name": "CpuQ2Avx2Kernel.lean",
+      "hash": "82b3ea5d8b9b",
+      "bytes": 5584
+    },
+    "CudaDequantBf16.lean": {
+      "name": "CudaDequantBf16.lean",
+      "hash": "425cac8a3622",
+      "bytes": 7825
+    },
+    "CudaQuantizeActivation.lean": {
+      "name": "CudaQuantizeActivation.lean",
+      "hash": "3cd135e38c88",
+      "bytes": 6469
     },
     "ElementwiseGlueKernels.lean": {
       "name": "ElementwiseGlueKernels.lean",
-      "hash": "8b986a78a7c4",
-      "bytes": 4862
+      "hash": "7e2abdb4b601",
+      "bytes": 7183
     },
-    "ExpertResidencyCache.lean": {
-      "name": "ExpertResidencyCache.lean",
-      "hash": "2b8adddf76b8",
-      "bytes": 11389
+    "ExpertArenaBlobLayout.lean": {
+      "name": "ExpertArenaBlobLayout.lean",
+      "hash": "e95d899be7f4",
+      "bytes": 4500
+    },
+    "ExpertCacheSlots.lean": {
+      "name": "ExpertCacheSlots.lean",
+      "hash": "b47d6d4e6626",
+      "bytes": 11804
     },
     "ExpertSourceDispatch.lean": {
       "name": "ExpertSourceDispatch.lean",
-      "hash": "013f5a33336b",
-      "bytes": 5995
+      "hash": "8d6e5314c382",
+      "bytes": 8070
     },
-    "F16Bits.lean": {
-      "name": "F16Bits.lean",
-      "hash": "84cc1ef48052",
-      "bytes": 6035
+    "FusedGatedResidualReadKernels.lean": {
+      "name": "FusedGatedResidualReadKernels.lean",
+      "hash": "19706dc29c11",
+      "bytes": 6723
     },
-    "FusedGdnDecodeKernels.lean": {
-      "name": "FusedGdnDecodeKernels.lean",
-      "hash": "1a275fa8fa1a",
-      "bytes": 6254
+    "FusedGdnStepNormKernels.lean": {
+      "name": "FusedGdnStepNormKernels.lean",
+      "hash": "26eb0570313e",
+      "bytes": 8458
     },
-    "FusedGrKernel.lean": {
-      "name": "FusedGrKernel.lean",
-      "hash": "0a897eadbaea",
-      "bytes": 7731
+    "GatedResidualReadWriteKernels.lean": {
+      "name": "GatedResidualReadWriteKernels.lean",
+      "hash": "b0736c20ac54",
+      "bytes": 7750
     },
-    "GatedResidualKernels.lean": {
-      "name": "GatedResidualKernels.lean",
-      "hash": "71919b7867de",
-      "bytes": 5590
-    },
-    "GdnLayerContracts.lean": {
-      "name": "GdnLayerContracts.lean",
-      "hash": "62b16c90e27e",
-      "bytes": 4694
-    },
-    "GdnReferenceKernels.lean": {
-      "name": "GdnReferenceKernels.lean",
-      "hash": "99255ec4d8c7",
-      "bytes": 5084
+    "GdnColumnRecurrenceKernels.lean": {
+      "name": "GdnColumnRecurrenceKernels.lean",
+      "hash": "7f29ab8fe80c",
+      "bytes": 7850
     },
     "GenerateDriver.lean": {
       "name": "GenerateDriver.lean",
-      "hash": "d8f32a95c324",
-      "bytes": 5044
+      "hash": "82a66265bbcd",
+      "bytes": 6987
     },
-    "GgufLazyLoader.lean": {
-      "name": "GgufLazyLoader.lean",
-      "hash": "033cb4b7baa8",
-      "bytes": 4263
-    },
-    "GgufQ2_0Writer.lean": {
-      "name": "GgufQ2_0Writer.lean",
-      "hash": "13ef632c23ee",
-      "bytes": 3599
-    },
-    "GgufReaderGeometry.lean": {
-      "name": "GgufReaderGeometry.lean",
-      "hash": "57e887f7422f",
-      "bytes": 5507
+    "GgufQ2WriterPacking.lean": {
+      "name": "GgufQ2WriterPacking.lean",
+      "hash": "430ad0820495",
+      "bytes": 4674
     },
     "GraphRegistry.lean": {
       "name": "GraphRegistry.lean",
-      "hash": "706628b671e6",
-      "bytes": 3884
+      "hash": "6cfddf155d08",
+      "bytes": 5079
     },
-    "IqKernelsGeometry.lean": {
-      "name": "IqKernelsGeometry.lean",
-      "hash": "5c899a076995",
-      "bytes": 12714
+    "IqKernelsVecDotLayout.lean": {
+      "name": "IqKernelsVecDotLayout.lean",
+      "hash": "865a83139797",
+      "bytes": 7162
     },
-    "KvQ8Cache.lean": {
-      "name": "KvQ8Cache.lean",
-      "hash": "67cd9d18518e",
-      "bytes": 4827
+    "KernelsF16Bits.lean": {
+      "name": "KernelsF16Bits.lean",
+      "hash": "87e3980cc797",
+      "bytes": 9294
     },
-    "LayerBlockContract.lean": {
-      "name": "LayerBlockContract.lean",
-      "hash": "fdd8e6a24699",
-      "bytes": 6312
+    "KvQ8Quant.lean": {
+      "name": "KvQ8Quant.lean",
+      "hash": "f1cb128a65fa",
+      "bytes": 4052
     },
-    "LayerCompose.lean": {
-      "name": "LayerCompose.lean",
-      "hash": "af55440a5327",
-      "bytes": 10018
+    "LayerBufferLayout.lean": {
+      "name": "LayerBufferLayout.lean",
+      "hash": "795669f7ee92",
+      "bytes": 7209
+    },
+    "LazyGgufTensorAddressing.lean": {
+      "name": "LazyGgufTensorAddressing.lean",
+      "hash": "42f9ffe3e865",
+      "bytes": 4387
     },
     "MemoryPlanner.lean": {
       "name": "MemoryPlanner.lean",
-      "hash": "33e9d2257014",
-      "bytes": 6151
+      "hash": "4616a64c038d",
+      "bytes": 5849
     },
-    "MtpDrafter.lean": {
-      "name": "MtpDrafter.lean",
-      "hash": "548f86f63bb9",
-      "bytes": 5750
+    "MtpDraftQuantizers.lean": {
+      "name": "MtpDraftQuantizers.lean",
+      "hash": "8dd815a37d19",
+      "bytes": 3782
     },
-    "MtpPackQuantizers.lean": {
-      "name": "MtpPackQuantizers.lean",
-      "hash": "f6c887766949",
-      "bytes": 4061
+    "MtpDrafterSchedule.lean": {
+      "name": "MtpDrafterSchedule.lean",
+      "hash": "b686163285db",
+      "bytes": 6507
     },
-    "MtpRuntimeRelayout.lean": {
-      "name": "MtpRuntimeRelayout.lean",
-      "hash": "df5403e91a64",
-      "bytes": 3605
+    "MtpRuntimeBlobRelayout.lean": {
+      "name": "MtpRuntimeBlobRelayout.lean",
+      "hash": "095b17bf871d",
+      "bytes": 3034
     },
-    "NativeFlashAttnShort.lean": {
-      "name": "NativeFlashAttnShort.lean",
-      "hash": "188785051fd9",
-      "bytes": 5629
+    "NativeExpertPackLayout.lean": {
+      "name": "NativeExpertPackLayout.lean",
+      "hash": "7d0471cda625",
+      "bytes": 3327
     },
-    "NativeGdnPreprocess.lean": {
-      "name": "NativeGdnPreprocess.lean",
-      "hash": "8ea9ad20d70e",
-      "bytes": 4876
+    "NativeFlashAttnShortStep.lean": {
+      "name": "NativeFlashAttnShortStep.lean",
+      "hash": "b85cdec01483",
+      "bytes": 4600
     },
-    "NativeGdnStep.lean": {
-      "name": "NativeGdnStep.lean",
-      "hash": "ae4a15b3b48b",
-      "bytes": 4638
+    "NativeGdnPreprocessKernels.lean": {
+      "name": "NativeGdnPreprocessKernels.lean",
+      "hash": "2c337d81176a",
+      "bytes": 5777
     },
-    "NativeMmvqGeometry.lean": {
-      "name": "NativeMmvqGeometry.lean",
-      "hash": "93a8f8a6a9a1",
-      "bytes": 11118
+    "NativeGdnWarpStepKernel.lean": {
+      "name": "NativeGdnWarpStepKernel.lean",
+      "hash": "eceb241b8655",
+      "bytes": 8809
     },
-    "NativePlePostops.lean": {
-      "name": "NativePlePostops.lean",
-      "hash": "1f691e19b78e",
-      "bytes": 5125
+    "NativeMmvqBlockGeometry.lean": {
+      "name": "NativeMmvqBlockGeometry.lean",
+      "hash": "4c24ee680b3f",
+      "bytes": 8041
+    },
+    "NativePlePostopsKernels.lean": {
+      "name": "NativePlePostopsKernels.lean",
+      "hash": "8610c9b4b0fe",
+      "bytes": 4827
     },
     "NativeQsaIndexerAppend.lean": {
       "name": "NativeQsaIndexerAppend.lean",
-      "hash": "6f766b3c4052",
-      "bytes": 5155
+      "hash": "55b7d680ea6e",
+      "bytes": 4076
     },
-    "NativeQsaNorms.lean": {
-      "name": "NativeQsaNorms.lean",
-      "hash": "cf33c738917f",
-      "bytes": 4012
+    "NativeQsaNormGate.lean": {
+      "name": "NativeQsaNormGate.lean",
+      "hash": "e47ab7308ce4",
+      "bytes": 4259
     },
-    "NativeQsaScore.lean": {
-      "name": "NativeQsaScore.lean",
-      "hash": "9f1182862842",
-      "bytes": 5113
+    "NativeQsaScoreTiles.lean": {
+      "name": "NativeQsaScoreTiles.lean",
+      "hash": "69aeeb52c5e5",
+      "bytes": 4855
     },
-    "NativeRouterTop10.lean": {
-      "name": "NativeRouterTop10.lean",
-      "hash": "62f3278042de",
-      "bytes": 6525
+    "NativeRouterLaneLayout.lean": {
+      "name": "NativeRouterLaneLayout.lean",
+      "hash": "5d2d979f26e8",
+      "bytes": 5457
     },
-    "PinnedArena.lean": {
-      "name": "PinnedArena.lean",
-      "hash": "b925ace233bc",
-      "bytes": 3960
+    "PackBuilderCodeRoundtrip.lean": {
+      "name": "PackBuilderCodeRoundtrip.lean",
+      "hash": "2a0715a5e27b",
+      "bytes": 5168
     },
-    "PleBlockKernel.lean": {
-      "name": "PleBlockKernel.lean",
-      "hash": "ce99b46cd143",
-      "bytes": 6235
+    "PackIndexPlaneContract.lean": {
+      "name": "PackIndexPlaneContract.lean",
+      "hash": "a9adc67d272e",
+      "bytes": 4891
+    },
+    "PinnedArenaLoad.lean": {
+      "name": "PinnedArenaLoad.lean",
+      "hash": "dda0431d978c",
+      "bytes": 5654
+    },
+    "PleBlockKernels.lean": {
+      "name": "PleBlockKernels.lean",
+      "hash": "ca10800365a8",
+      "bytes": 9171
     },
     "PleDirectReader.lean": {
       "name": "PleDirectReader.lean",
-      "hash": "6df947a8f840",
-      "bytes": 4704
-    },
-    "PleNgramContext.lean": {
-      "name": "PleNgramContext.lean",
-      "hash": "79be629e6f73",
-      "bytes": 3778
+      "hash": "bed770de13dc",
+      "bytes": 4706
     },
     "PleNgramHash.lean": {
       "name": "PleNgramHash.lean",
-      "hash": "ffbf1a9899c4",
-      "bytes": 5653
-    },
-    "PleRowCacheModel.lean": {
-      "name": "PleRowCacheModel.lean",
-      "hash": "8a13ed3cf526",
-      "bytes": 4168
-    },
-    "PrefillChunkDriver.lean": {
-      "name": "PrefillChunkDriver.lean",
-      "hash": "c4646d23611f",
-      "bytes": 6739
+      "hash": "4aa286f93219",
+      "bytes": 6568
     },
     "PrefillKernels.lean": {
       "name": "PrefillKernels.lean",
-      "hash": "916664fd7a5a",
-      "bytes": 7854
+      "hash": "264d498ec7ad",
+      "bytes": 5633
     },
-    "QsaAttentionLayout.lean": {
-      "name": "QsaAttentionLayout.lean",
-      "hash": "5b4f47105071",
-      "bytes": 8947
+    "PrefillPipeline.lean": {
+      "name": "PrefillPipeline.lean",
+      "hash": "4fc2a2814a53",
+      "bytes": 6313
     },
     "QsaBlockSelect.lean": {
       "name": "QsaBlockSelect.lean",
-      "hash": "160ec972e71f",
-      "bytes": 4984
+      "hash": "6fdfad300df2",
+      "bytes": 5475
     },
-    "QsaCacheIndexerAttention.lean": {
-      "name": "QsaCacheIndexerAttention.lean",
-      "hash": "041930e297d0",
-      "bytes": 10098
+    "QsaCacheIndexTopk.lean": {
+      "name": "QsaCacheIndexTopk.lean",
+      "hash": "94ecc57764a7",
+      "bytes": 8777
     },
-    "QsaDecodeAttention.lean": {
-      "name": "QsaDecodeAttention.lean",
-      "hash": "c77c427c15cc",
-      "bytes": 5181
+    "QsaDecodeAttnChunks.lean": {
+      "name": "QsaDecodeAttnChunks.lean",
+      "hash": "49600846cc1e",
+      "bytes": 3743
     },
-    "RouterTop10Selection.lean": {
-      "name": "RouterTop10Selection.lean",
-      "hash": "e74f1b093aa9",
-      "bytes": 7760
+    "RouterTop10SelectionSemantics.lean": {
+      "name": "RouterTop10SelectionSemantics.lean",
+      "hash": "0818f216e3b1",
+      "bytes": 6642
     },
-    "S2ExpertGroupedLayout.lean": {
-      "name": "S2ExpertGroupedLayout.lean",
-      "hash": "f0c541a6c441",
-      "bytes": 9306
+    "S2ExpertGroupedBlobLayout.lean": {
+      "name": "S2ExpertGroupedBlobLayout.lean",
+      "hash": "9df8699bce04",
+      "bytes": 6749
     },
-    "S2GemvFastLut.lean": {
-      "name": "S2GemvFastLut.lean",
-      "hash": "b2fe8d4e4249",
-      "bytes": 4867
+    "S2GemvLutStagedExperiment.lean": {
+      "name": "S2GemvLutStagedExperiment.lean",
+      "hash": "33e66b1ae869",
+      "bytes": 5522
     },
-    "S2GemvQ8Activation.lean": {
-      "name": "S2GemvQ8Activation.lean",
-      "hash": "963214404c48",
-      "bytes": 4362
+    "S2GemvQ8ActivationContract.lean": {
+      "name": "S2GemvQ8ActivationContract.lean",
+      "hash": "5eba03f0f0a7",
+      "bytes": 4966
     },
-    "SGemvCanonicalForm.lean": {
-      "name": "SGemvCanonicalForm.lean",
-      "hash": "95e44b64cdfa",
-      "bytes": 4908
+    "S2GemvQuadAmortised.lean": {
+      "name": "S2GemvQuadAmortised.lean",
+      "hash": "59068789109d",
+      "bytes": 4638
     },
-    "SGemvQuadDecode.lean": {
-      "name": "SGemvQuadDecode.lean",
-      "hash": "f1167bb9f3f4",
-      "bytes": 10676
+    "SGemvDequantRowKernels.lean": {
+      "name": "SGemvDequantRowKernels.lean",
+      "hash": "1550301d6547",
+      "bytes": 9165
     },
-    "SamplerChain.lean": {
-      "name": "SamplerChain.lean",
-      "hash": "92937df9f223",
-      "bytes": 7374
+    "SamplerGreedyPenalties.lean": {
+      "name": "SamplerGreedyPenalties.lean",
+      "hash": "f861faa81827",
+      "bytes": 5948
     },
-    "ScalarDequantizers.lean": {
-      "name": "ScalarDequantizers.lean",
-      "hash": "257cf3765b1c",
-      "bytes": 7271
+    "ServeEndpoints.lean": {
+      "name": "ServeEndpoints.lean",
+      "hash": "6c0fd06283e3",
+      "bytes": 7524
     },
-    "ServeFrontendParser.lean": {
-      "name": "ServeFrontendParser.lean",
-      "hash": "a4a6967861c9",
-      "bytes": 6724
+    "SessionStateLayout.lean": {
+      "name": "SessionStateLayout.lean",
+      "hash": "80004b9ee2dc",
+      "bytes": 5723
     },
-    "ServeServerService.lean": {
-      "name": "ServeServerService.lean",
-      "hash": "baa199d29d1f",
-      "bytes": 6828
-    },
-    "SessionDriver.lean": {
-      "name": "SessionDriver.lean",
-      "hash": "af510b7c9f9f",
-      "bytes": 7020
-    },
-    "SessionLoopContract.lean": {
-      "name": "SessionLoopContract.lean",
-      "hash": "aeb35ea6e50b",
-      "bytes": 4675
-    },
-    "SharedExpertDispatch.lean": {
-      "name": "SharedExpertDispatch.lean",
-      "hash": "8bfde7dfb606",
-      "bytes": 8429
+    "SharedExpertScratchAndCombine.lean": {
+      "name": "SharedExpertScratchAndCombine.lean",
+      "hash": "835804bb4aa3",
+      "bytes": 6320
     },
     "SpecController.lean": {
       "name": "SpecController.lean",
-      "hash": "6db193360f75",
-      "bytes": 4862
+      "hash": "a02ba9f4a499",
+      "bytes": 6148
     },
-    "StrataPackBuilder.lean": {
-      "name": "StrataPackBuilder.lean",
-      "hash": "30f0d439f8ba",
-      "bytes": 5103
-    },
-    "StrataTokenizerBpe.lean": {
-      "name": "StrataTokenizerBpe.lean",
-      "hash": "010748942df6",
-      "bytes": 4723
+    "SpecCostModel.lean": {
+      "name": "SpecCostModel.lean",
+      "hash": "63a9388e070e",
+      "bytes": 3057
     },
     "SuffixDrafter.lean": {
       "name": "SuffixDrafter.lean",
-      "hash": "3625b425d797",
-      "bytes": 5031
-    },
-    "VerifyWindowCommit.lean": {
-      "name": "VerifyWindowCommit.lean",
-      "hash": "d572a263a11e",
-      "bytes": 4068
+      "hash": "652c58ca3fda",
+      "bytes": 5446
     },
     "VerifyWindowKernels.lean": {
       "name": "VerifyWindowKernels.lean",
-      "hash": "5491e1f0daf9",
-      "bytes": 5561
+      "hash": "e5db3811bb94",
+      "bytes": 9013
     },
-    "VisionBuildConfig.lean": {
-      "name": "VisionBuildConfig.lean",
-      "hash": "52aca989cb9f",
-      "bytes": 10071
+    "VerifyWindowSchedule.lean": {
+      "name": "VerifyWindowSchedule.lean",
+      "hash": "77aef15c868b",
+      "bytes": 7861
+    },
+    "VisionBuildConfiguration.lean": {
+      "name": "VisionBuildConfiguration.lean",
+      "hash": "5c366064776c",
+      "bytes": 4007
     },
     "VisionEncoderProtocol.lean": {
       "name": "VisionEncoderProtocol.lean",
-      "hash": "124c8f543dbf",
-      "bytes": 4041
+      "hash": "9d5c0d9e902e",
+      "bytes": 11051
     },
-    "WeightLoader.lean": {
-      "name": "WeightLoader.lean",
-      "hash": "6c79c891aae5",
-      "bytes": 5318
-    },
-    "WindowVerifier.lean": {
-      "name": "WindowVerifier.lean",
-      "hash": "ebeca825895a",
-      "bytes": 6540
+    "WeightsLoaderSegments.lean": {
+      "name": "WeightsLoaderSegments.lean",
+      "hash": "a70dc68841b0",
+      "bytes": 8153
     }
   },
   "nodes": [
@@ -385,31 +365,6 @@
       "conv": "d4da09c9-fe42-4186-a5a9-9e224d3e8ab6"
     },
     {
-      "id": "u3e106cde79",
-      "modules": [
-        "GgufLazyLoader.lean",
-        "StrataPackBuilder.lean"
-      ],
-      "reason": "initial plan",
-      "conv": "948ef32f-a7d5-4068-8f7a-296f5a639a2e"
-    },
-    {
-      "id": "ub0234d85de",
-      "modules": [
-        "CpuExpertPool.lean"
-      ],
-      "reason": "initial plan",
-      "conv": "f87a854a-cd90-41d1-8f83-1b4fbe135289"
-    },
-    {
-      "id": "ueac0e4654d",
-      "modules": [
-        "NativeMmvqGeometry.lean"
-      ],
-      "reason": "initial plan",
-      "conv": "dcbbbbca-55fa-4e66-a2f8-0fd56dc48d9c"
-    },
-    {
       "id": "u89be81de0b",
       "modules": [
         "PleNgramHash.lean"
@@ -418,32 +373,13 @@
       "conv": "d511411e-7585-49ed-a3ef-b9d2518a6465"
     },
     {
-      "id": "u433ffdf2e4",
-      "modules": [
-        "NativeGdnStep.lean",
-        "NativeGdnPreprocess.lean"
-      ],
-      "reason": "initial plan",
-      "conv": "e9d543ee-1e5b-48a0-ad3a-fcaa25b75a06"
-    },
-    {
       "id": "u6d34237bff",
       "modules": [
-        "QsaDecodeAttention.lean",
         "QsaBlockSelect.lean",
-        "NativeQsaScore.lean",
         "NativeQsaIndexerAppend.lean"
       ],
       "reason": "initial plan",
       "conv": "5029dbed-bff4-46bb-a4d7-797a7deb336f"
-    },
-    {
-      "id": "ud78dd87516",
-      "modules": [
-        "PrefillChunkDriver.lean"
-      ],
-      "reason": "initial plan",
-      "conv": "bbd99d26-dd2d-4a06-9658-cefb896d500e"
     },
     {
       "id": "u0e60a9f272",
@@ -457,7 +393,6 @@
     {
       "id": "ubd109f97f8",
       "modules": [
-        "VisionBuildConfig.lean",
         "VisionEncoderProtocol.lean"
       ],
       "reason": "initial plan",
@@ -466,15 +401,8 @@
     {
       "id": "u9dc1be2eae",
       "modules": [
-        "ExpertResidencyCache.lean",
         "ExpertSourceDispatch.lean",
-        "LayerBlockContract.lean",
-        "SessionLoopContract.lean",
-        "VerifyWindowCommit.lean",
-        "GraphRegistry.lean",
-        "LayerCompose.lean",
-        "MtpDrafter.lean",
-        "SessionDriver.lean"
+        "GraphRegistry.lean"
       ],
       "reason": "added after theory changed",
       "conv": "88b4dc8c-990c-48ab-9216-a78c765fea73"
@@ -482,211 +410,169 @@
     {
       "id": "u4c397f3a6b",
       "modules": [
-        "WindowVerifier.lean",
-        "WeightLoader.lean",
-        "PinnedArena.lean",
         "GenerateDriver.lean",
         "PleDirectReader.lean",
-        "DirectFileIo.lean",
-        "PrefillKernels.lean",
-        "PleRowCacheModel.lean",
-        "PleNgramContext.lean",
-        "ScalarDequantizers.lean"
+        "PrefillKernels.lean"
       ],
       "reason": "added after theory changed"
     },
     {
       "id": "ub215c75739",
       "modules": [
-        "GgufReaderGeometry.lean",
-        "F16Bits.lean",
-        "QsaAttentionLayout.lean",
-        "SGemvCanonicalForm.lean",
-        "DequantGpuKernels.lean",
-        "ElementwiseGlueKernels.lean",
-        "ActivationQuantize.lean",
-        "FusedGdnDecodeKernels.lean",
-        "GdnReferenceKernels.lean",
-        "QsaCacheIndexerAttention.lean"
-      ],
-      "reason": "added after theory changed"
-    },
-    {
-      "id": "u727497dc10",
-      "modules": [
-        "NativeQsaNorms.lean",
-        "NativeFlashAttnShort.lean",
-        "KvQ8Cache.lean",
-        "SGemvQuadDecode.lean",
-        "S2GemvFastLut.lean",
-        "S2GemvQ8Activation.lean",
-        "S2ExpertGroupedLayout.lean",
-        "IqKernelsGeometry.lean",
-        "SharedExpertDispatch.lean"
+        "ElementwiseGlueKernels.lean"
       ],
       "reason": "added after theory changed"
     },
     {
       "id": "ucae78d2474",
       "modules": [
-        "RouterTop10Selection.lean",
-        "NativeRouterTop10.lean",
-        "FusedGrKernel.lean",
-        "GatedResidualKernels.lean",
-        "PleBlockKernel.lean",
-        "NativePlePostops.lean",
-        "SamplerChain.lean",
-        "VerifyWindowKernels.lean",
-        "GdnLayerContracts.lean"
+        "VerifyWindowKernels.lean"
       ],
       "reason": "added after theory changed"
     },
     {
-      "id": "u76ded1600b",
+      "id": "u68c0356a2e",
       "modules": [
-        "CpuQ2ExpertKernel.lean",
-        "CpuIqAvx512Rows.lean",
-        "CpuQ2Avx2Rows.lean",
-        "ServeFrontendParser.lean",
-        "ServeServerService.lean",
-        "CanonicalFormDecode.lean",
-        "GgufQ2_0Writer.lean",
-        "MtpPackQuantizers.lean",
-        "MtpRuntimeRelayout.lean",
-        "StrataTokenizerBpe.lean"
+        "ExpertCacheSlots.lean",
+        "LayerBufferLayout.lean",
+        "MtpDrafterSchedule.lean",
+        "PinnedArenaLoad.lean",
+        "SessionStateLayout.lean",
+        "VerifyWindowSchedule.lean",
+        "WeightsLoaderSegments.lean",
+        "PrefillPipeline.lean",
+        "SpecCostModel.lean"
+      ],
+      "reason": "added after theory changed"
+    },
+    {
+      "id": "u32f71e85a9",
+      "modules": [
+        "ChatFrontend.lean",
+        "ServeEndpoints.lean",
+        "CpuExpertGeometry.lean",
+        "CpuExpertKernel.lean",
+        "CpuIqAvx512Kernels.lean",
+        "CpuExpertPoolScheduling.lean",
+        "CpuQ2Avx2Kernel.lean",
+        "ArtifactDequantReference.lean"
+      ],
+      "reason": "added after theory changed"
+    },
+    {
+      "id": "u60a33c6290",
+      "modules": [
+        "KernelsF16Bits.lean",
+        "CudaDequantBf16.lean",
+        "CudaQuantizeActivation.lean",
+        "SGemvDequantRowKernels.lean",
+        "IqKernelsVecDotLayout.lean",
+        "NativeMmvqBlockGeometry.lean",
+        "S2ExpertGroupedBlobLayout.lean",
+        "S2GemvLutStagedExperiment.lean",
+        "S2GemvQ8ActivationContract.lean"
+      ],
+      "reason": "added after theory changed"
+    },
+    {
+      "id": "uc6bf75af80",
+      "modules": [
+        "S2GemvQuadAmortised.lean",
+        "SharedExpertScratchAndCombine.lean",
+        "RouterTop10SelectionSemantics.lean",
+        "NativeRouterLaneLayout.lean",
+        "QsaCacheIndexTopk.lean",
+        "QsaDecodeAttnChunks.lean",
+        "KvQ8Quant.lean",
+        "NativeFlashAttnShortStep.lean",
+        "NativeQsaNormGate.lean",
+        "NativeQsaScoreTiles.lean"
+      ],
+      "reason": "added after theory changed"
+    },
+    {
+      "id": "uacb84fe7a8",
+      "modules": [
+        "SamplerGreedyPenalties.lean",
+        "GdnColumnRecurrenceKernels.lean",
+        "FusedGdnStepNormKernels.lean",
+        "NativeGdnWarpStepKernel.lean",
+        "NativeGdnPreprocessKernels.lean",
+        "FusedGatedResidualReadKernels.lean",
+        "GatedResidualReadWriteKernels.lean",
+        "NativePlePostopsKernels.lean",
+        "PleBlockKernels.lean"
+      ],
+      "reason": "added after theory changed"
+    },
+    {
+      "id": "u8c5c57b843",
+      "modules": [
+        "CanonicalFormCodebookDecode.lean",
+        "GgufQ2WriterPacking.lean",
+        "NativeExpertPackLayout.lean",
+        "MtpDraftQuantizers.lean",
+        "MtpRuntimeBlobRelayout.lean",
+        "PackIndexPlaneContract.lean",
+        "ExpertArenaBlobLayout.lean",
+        "PackBuilderCodeRoundtrip.lean",
+        "ByteLevelBpeTokenizer.lean",
+        "LazyGgufTensorAddressing.lean"
+      ],
+      "reason": "added after theory changed"
+    },
+    {
+      "id": "u905ad31bbd",
+      "modules": [
+        "VisionBuildConfiguration.lean"
       ],
       "reason": "added after theory changed"
     }
   ],
   "state": {
-    "CpuExpertPool.lean": {
-      "hash": "bedc61df7a18",
-      "pass": true,
-      "unit_id": "ub0234d85de"
-    },
-    "ExpertResidencyCache.lean": {
-      "hash": "2b8adddf76b8",
-      "pass": true,
-      "unit_id": "u9dc1be2eae"
-    },
     "ExpertSourceDispatch.lean": {
       "hash": "013f5a33336b",
-      "pass": true,
+      "pass": false,
       "unit_id": "u9dc1be2eae"
-    },
-    "GgufLazyLoader.lean": {
-      "hash": "033cb4b7baa8",
-      "pass": true,
-      "unit_id": "u3e106cde79"
     },
     "GraphRegistry.lean": {
       "hash": "706628b671e6",
-      "pass": true,
-      "unit_id": "u9dc1be2eae"
-    },
-    "LayerBlockContract.lean": {
-      "hash": "fdd8e6a24699",
-      "pass": true,
-      "unit_id": "u9dc1be2eae"
-    },
-    "LayerCompose.lean": {
-      "hash": "af55440a5327",
-      "pass": true,
+      "pass": false,
       "unit_id": "u9dc1be2eae"
     },
     "MemoryPlanner.lean": {
       "hash": "33e9d2257014",
-      "pass": true,
+      "pass": false,
       "unit_id": "uc2c7002b7a"
-    },
-    "MtpDrafter.lean": {
-      "hash": "548f86f63bb9",
-      "pass": true,
-      "unit_id": "u9dc1be2eae"
-    },
-    "NativeGdnPreprocess.lean": {
-      "hash": "8ea9ad20d70e",
-      "pass": true,
-      "unit_id": "u433ffdf2e4"
-    },
-    "NativeGdnStep.lean": {
-      "hash": "ae4a15b3b48b",
-      "pass": true,
-      "unit_id": "u433ffdf2e4"
-    },
-    "NativeMmvqGeometry.lean": {
-      "hash": "93a8f8a6a9a1",
-      "pass": true,
-      "unit_id": "ueac0e4654d"
     },
     "NativeQsaIndexerAppend.lean": {
       "hash": "6f766b3c4052",
-      "pass": true,
-      "unit_id": "u6d34237bff"
-    },
-    "NativeQsaScore.lean": {
-      "hash": "9f1182862842",
-      "pass": true,
+      "pass": false,
       "unit_id": "u6d34237bff"
     },
     "PleNgramHash.lean": {
       "hash": "ffbf1a9899c4",
-      "pass": true,
+      "pass": false,
       "unit_id": "u89be81de0b"
-    },
-    "PrefillChunkDriver.lean": {
-      "hash": "c4646d23611f",
-      "pass": true,
-      "unit_id": "ud78dd87516"
     },
     "QsaBlockSelect.lean": {
       "hash": "160ec972e71f",
-      "pass": true,
+      "pass": false,
       "unit_id": "u6d34237bff"
-    },
-    "QsaDecodeAttention.lean": {
-      "hash": "c77c427c15cc",
-      "pass": true,
-      "unit_id": "u6d34237bff"
-    },
-    "SessionDriver.lean": {
-      "hash": "af510b7c9f9f",
-      "pass": true,
-      "unit_id": "u9dc1be2eae"
-    },
-    "SessionLoopContract.lean": {
-      "hash": "aeb35ea6e50b",
-      "pass": true,
-      "unit_id": "u9dc1be2eae"
     },
     "SpecController.lean": {
       "hash": "6db193360f75",
-      "pass": true,
+      "pass": false,
       "unit_id": "u0e60a9f272"
-    },
-    "StrataPackBuilder.lean": {
-      "hash": "30f0d439f8ba",
-      "pass": true,
-      "unit_id": "u3e106cde79"
     },
     "SuffixDrafter.lean": {
       "hash": "3625b425d797",
-      "pass": true,
+      "pass": false,
       "unit_id": "u0e60a9f272"
-    },
-    "VerifyWindowCommit.lean": {
-      "hash": "d572a263a11e",
-      "pass": true,
-      "unit_id": "u9dc1be2eae"
-    },
-    "VisionBuildConfig.lean": {
-      "hash": "52aca989cb9f",
-      "pass": true,
-      "unit_id": "ubd109f97f8"
     },
     "VisionEncoderProtocol.lean": {
       "hash": "124c8f543dbf",
-      "pass": true,
+      "pass": false,
       "unit_id": "ubd109f97f8"
     }
   },
