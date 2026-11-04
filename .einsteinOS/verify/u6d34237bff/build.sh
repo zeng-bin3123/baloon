@@ -45,7 +45,7 @@ $HOSTCXX $HFLAGS -Itests/unit7 tests/unit7/*.cpp -o "$OUT/test_unit7"
 # toolchain is a build failure.
 [ -x "$COREX/bin/clang++" ] || { echo "corex toolchain missing at $COREX/bin/clang++"; exit 2; }
 CUFLAGS="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Isrc -Itests -Iinclude -O2"
-for f in src/*.cu tests/*.cu tests/gpu_unit6/*.cu tests/gpu_unit7/*.cu; do
+for f in src/*.cu tests/*.cu tests/gpu_unit6/*.cu tests/gpu_unit7/*.cu tests/gpu_unit3/*.cu; do
   [ -f "$f" ] || continue
   echo "[cuda] $f"
   "$COREX/bin/clang++" $CUFLAGS -c "$f" -o "$OUT/$(echo "$f" | tr '/' '_').o"
@@ -57,4 +57,7 @@ echo "[link] $OUT/test_ilu_qsa"
 "$COREX/bin/clang++" "$OUT/src_ilu_qsa_decode.cu.o" "$OUT/src_ilu_qsa_select.cu.o" "$OUT/src_ilu_qsa_score.cu.o" \
   "$OUT/src_ilu_qsa_append.cu.o" "$OUT/tests_gpu_unit7_test_ilu_qsa.cu.o" \
   -o "$OUT/test_ilu_qsa" -L"$COREX/lib64" -lcudart -lpthread
+echo "[link] $OUT/test_qsa_inv"
+"$COREX/bin/clang++" "$OUT/src_ilu_qsa_select.cu.o" "$OUT/src_ilu_qsa_append.cu.o" \
+  "$OUT/tests_gpu_unit3_test_qsa_select_append_inv.cu.o" -o "$OUT/test_qsa_inv" -L"$COREX/lib64" -lcudart -lpthread
 echo "BUILD OK"

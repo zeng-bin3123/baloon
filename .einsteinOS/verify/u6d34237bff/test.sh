@@ -36,6 +36,11 @@ if [ ! -x "$COREX/bin/clang++" ]; then echo "corex toolchain missing: GPU tests 
   echo "== GPU build =="
   "$COREX/bin/clang++" $CUFLAGS src/ilu_qsa_decode.cu src/ilu_qsa_select.cu src/ilu_qsa_score.cu src/ilu_qsa_append.cu \
     tests/gpu_unit7/test_ilu_qsa.cu -o "$OUT/test_ilu_qsa" -L"$COREX/lib64" -lcudart -lpthread || { echo "GPU BUILD FAILED"; exit 1; }
+  echo "== GPU build (unit-3 invariants) =="
+  "$COREX/bin/clang++" $CUFLAGS src/ilu_qsa_select.cu src/ilu_qsa_append.cu tests/gpu_unit3/test_qsa_select_append_inv.cu \
+    -o "$OUT/test_qsa_inv" -L"$COREX/lib64" -lcudart -lpthread || { echo "GPU UNIT-3 BUILD FAILED"; exit 1; }
+  echo "== GPU run (unit-3 invariants) =="
+  CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}" timeout 900 "$OUT/test_qsa_inv" || { echo "GPU unit-3 run FAILED (exit $?)"; rc=1; }
   echo "== GPU run =="
   CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3}" timeout 900 "$OUT/test_ilu_qsa" || { echo "GPU run FAILED (exit $?)"; rc=1; }
 fi
