@@ -231,7 +231,7 @@
         "PrefillKernels.lean"
       ],
       "reason": "added after theory changed",
-      "conv": "88350291-0dae-4517-a51a-469afdd7b6b9"
+      "conv": "c45157d2-a9b8-416b-b1b3-c3d80976b198"
     },
     {
       "id": "u32f71e85a9",
@@ -316,7 +316,7 @@
     }
   },
   "fix_attempts": {
-    "u4c397f3a6b": 2
+    "u4c397f3a6b": 3
   },
   "fail_history": {
     "u0e60a9f272": [
@@ -326,6 +326,7 @@
       "gpu_not_compiled"
     ],
     "u4c397f3a6b": [
+      "port_incomplete",
       "port_incomplete",
       "port_incomplete"
     ],
