@@ -322,6 +322,11 @@
     }
   ],
   "state": {
+    "GenerateDriver.lean": {
+      "hash": "eb8f5c79eeef",
+      "pass": true,
+      "unit_id": "u253a75befe"
+    },
     "PleDirectReader.lean": {
       "hash": "0737652f0030",
       "pass": true,
@@ -348,9 +353,7 @@
       "unit_id": "u0e60a9f272"
     }
   },
-  "fix_attempts": {
-    "u253a75befe": 1
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u0e60a9f272": [
       "port_incomplete"
@@ -380,20 +383,8 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "u253a75befe": {
-      "kind": "smoke_fail",
-      "text": "test.sh exit=1: == unit16 (host) ==\ntests/unit16/test_cli.cpp:267:18: error: lambda capture 'V' is not required to be captured for this use [-Werror,-Wunused-lambda-capture]\n    auto make = [V](int) { return synthetic_drive(V); };\n                 ^\ntests/unit16/test_cli.cpp:285:19: error: lambda capture 'V' is not required to be captured for this use [-Werror,-Wunused-lambda-capture]\n    auto flaky = [V](int) { Drive d = synthetic_drive(V); auto s = d.step; d.step = [s](int64_t t, int64_t p, std::vector\u003cfloat\u003e\u0026 l) { if (t == 13) throw std::runtime_error(\"boom\"); s(t, p, l); }; d.prefill = nullptr; return d; };\n                  ^\ntests/unit16/test_cli.cpp:293:18: error: lambda capture 'V' is not required to be captured for this use [-Werror,-Wunused-lambda-capture]\n    auto make = [V](int) { return synthetic_drive(V); };\n                 ^\n3 errors generated.\nBUILD FAILED (unit16)",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-u253a75befe"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u253a75befe": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
