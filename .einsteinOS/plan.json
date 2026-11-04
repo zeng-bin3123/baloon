@@ -371,6 +371,10 @@
         "F16BitsRounding.lean",
         "DequantBlockLayouts.lean"
       ],
+      "children": [
+        "u60723386cc",
+        "ubb8353e58b"
+      ],
       "reason": "3 fix attempts used",
       "conv": "80d295cd-b0c7-454e-ab07-65e563f18288"
     },
@@ -379,6 +383,22 @@
       "parent": "u95fce8dc9d",
       "modules": [
         "GatedResidual.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "u60723386cc",
+      "parent": "u042aaf67ce",
+      "modules": [
+        "F16BitsRounding.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "ubb8353e58b",
+      "parent": "u042aaf67ce",
+      "modules": [
+        "DequantBlockLayouts.lean"
       ],
       "reason": "3 fix attempts used"
     }
@@ -460,9 +480,7 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {
-    "u042aaf67ce": 3
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u042aaf67ce": [
       "compile_fail",
@@ -511,13 +529,7 @@
       "existing_code_fails"
     ]
   },
-  "last_failure": {
-    "u042aaf67ce": {
-      "kind": "smoke_fail",
-      "text": "test.sh exit=1: == unit19 (host) ==\n[ ok ] test_decode_exhaustive\n[ ok ] test_encode_rne\n[ ok ] test_inf_nan_split\n[ ok ] test_subnormals\n[ ok ] test_bf16\n[ ok ] test_rne_step\n[ ok ] test_geometry\n[ ok ] test_layouts_and_strides\n[ ok ] test_row_bytes\n[ ok ] test_value_ranges\n[ ok ] test_dispatch_and_plain\n8947404 checks, 0 failures\n== unit19 (ASan/UBSan) ==\n[ ok ] test_decode_exhaustive\n[ ok ] test_encode_rne\n[ ok ] test_inf_nan_split\n[ ok ] test_subnormals\n[ ok ] test_bf16\n[ ok ] test_rne_step\n[ ok ] test_geometry\n[ ok ] test_layouts_and_strides\n[ ok ] test_row_bytes\n[ ok ] test_value_ranges\n[ ok ] test_dispatch_and_plain\n8947404 checks, 0 failures\n== dequant_tool (CLI) ==\n== GPU kernels ==\n-- GPU 0 --\nq8_K mismatch mode 3 block 19 byte 116 got 151 want 152\n  x=0.819616437 d_gpu=-0.00784321968 d_ref=-0.00784321968\nFAIL tests/gpu_unit19/test_u7_gpu.cu:128  gk == rk\nact_quant done (192093 checks, 1 failures)\nkv_q8 done (217576 checks, 1 failures)\nstep_state done (217591 checks, 1 failures)\nqsa done (263320 checks, 1 failures)\n266325 checks, 1 failures\nGPU tests FAILED on GPU 0 (exit 1)\n-- GPU 1 --\nq8_K mismatch mode 3 block 19 byte 116 got 151 want 152\n  x=0.819616437 d_gpu=-0.00784321968 d_ref=-0.00784321968\nFAIL tests/gpu_unit19/test_u7_gpu.cu:128  gk == rk\nact_quant done (192093 checks, 1 failures)\nkv_q8 done (217576 checks, 1 failures)\nstep_state done (217591 checks, 1 failures)\nqsa done (263320 checks, 1 failures)\n266325 checks, 1 failures\nGPU tests FAILED on GPU 1 (exit 1)\n-- GPU 2 --\nq8_K mismatch mode 3 block 19 byte 116 got 151 want 152\n  x=0.819616437 d_gpu=-0.00784321968 d_ref=-0.00784321968\nFAIL tests/gpu_unit19/test_u7_gpu.cu:128  gk == rk\nact_quant done (192093 checks, 1 failures)\nkv_q8 done (217576 checks, 1 failures)\nstep_state done (217591 checks, 1 failures)\nqsa done (263320 checks, 1 failures)\n266325 checks, 1 failures\nGPU tests FAILED on GPU 2 (exit 1)\n-- GPU 3 --\nq8_K mismatch mode 3 block 19 byte 116 got 151 want 152\n  x=0.819616437 d_gpu=-0.00784321968 d_ref=-0.00784321968\nFAIL tests/gpu_unit19/test_u7_gpu.cu:128  gk == rk\nact_quant done (192093 checks, 1 failures)\nkv_q8 done (217576 checks, 1 failures)\nstep_state done (217591 checks, 1 failures)\nqsa done (263320 checks, 1 failures)\n266325 checks, 1 failures\nGPU tests FAILED on GPU 3 (exit 1)\n== port table ==\nUNIT TESTS FAILED",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-u042aaf67ce"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
   "port_units": [
     {
