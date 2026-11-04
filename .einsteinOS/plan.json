@@ -331,5 +331,11 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "gates": "build+test+gpu+isa+port+integration"
+  "gates": "build+test+gpu+isa+port+integration",
+  "integration_unit": {
+    "id": "uintegration01529aaa82b9",
+    "modules": null,
+    "reason": "integration: the reference's registered tests",
+    "integration": true
+  }
 }
