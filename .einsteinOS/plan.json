@@ -337,7 +337,7 @@
         "GatedResidual.lean"
       ],
       "reason": "3 fix attempts used",
-      "conv": "d7d91cac-60e7-4e6c-88c2-88ba958ded29"
+      "conv": "ede066be-7b3e-4ba3-b296-3a7edf5a5b81"
     },
     {
       "id": "u316bd6b9ec",
@@ -439,7 +439,7 @@
     }
   },
   "fix_attempts": {
-    "u95fce8dc9d": 2
+    "u95fce8dc9d": 3
   },
   "fail_history": {
     "u0e60a9f272": [
@@ -465,7 +465,8 @@
     ],
     "u95fce8dc9d": [
       "compile_fail",
-      "port_incomplete"
+      "port_incomplete",
+      "gpu_code_missing"
     ],
     "u9dc1be2eae": [
       "missing"
@@ -485,8 +486,8 @@
   },
   "last_failure": {
     "u95fce8dc9d": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: 3 of the 90 definitions of the unit's reference files have no counterpart:\n  include/ref/artifact/dequant.hpp REF_GGUF_MAIN_DISABLED → include/baloon/dequant_artifact.hpp:BALOON_DEQUANT_MAIN_DISABLED: not defined in that file\n  src/kernels/cuda/quantize_act.cu Q8K_BYTES → include/baloon/device_kv_qsa_api.hpp:Q8K_BYTES: not defined in that file\n  src/kernels/cuda/quantize_act.cu QK_K → include/baloon/device_kv_qsa_api.hpp:QK_K: not defined in that file",
+      "kind": "gpu_code_missing",
+      "text": "gpu_code_missing: the unit's modules come from CUDA sources in the reference (src/kernels/cuda/kv_q8.cu, src/kernels/cuda/qsa.cu, src/kernels/cuda/quantize_act.cu) but it wrote no .cu/.cuh file",
       "base_ref": "einsteinOS/dev-c880662efd-wip-u95fce8dc9d"
     }
   },
