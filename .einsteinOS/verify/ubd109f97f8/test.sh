@@ -1,10 +1,10 @@
 #!/bin/bash
-# Runs the unit-10 invariant tests (optimised build, plus ASan/UBSan build when supported).
-# Exits non-zero if any build or any check fails.
+# Runs the VisionEncoderProtocol invariant tests: unit14 (theory invariants) and unit10 (earlier vision/serve tests),
+# optimised and, when supported, under ASan/UBSan. Exits non-zero if any build or any check fails.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
-OUT="${BALOON_BUILD_DIR:-/tmp/baloon_unit10_build}"
+OUT="${BALOON_BUILD_DIR:-/tmp/baloon_unit_ubd109_build}"
 mkdir -p "$OUT"
 COREX=/usr/local/corex
 HOSTCXX=""
@@ -12,23 +12,23 @@ for c in "$COREX/bin/clang++" g++ clang++ c++; do
   if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then HOSTCXX="$c"; break; fi
 done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
-HFLAGS="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread -Iinclude -Itests/unit10"
-SRCS=$(ls tests/unit10/*.cpp)
 rc=0
-
-echo "== optimised build =="
-$HOSTCXX $HFLAGS $SRCS -o "$OUT/test_unit10" || { echo "BUILD FAILED"; exit 1; }
-timeout 900 "$OUT/test_unit10" || { echo "optimised run FAILED (exit $?)"; rc=1; }
-
+for u in unit14 unit10; do
+  HFLAGS="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread -Iinclude -Itests/$u"
+  echo "== $u optimised build =="
+  $HOSTCXX $HFLAGS $(ls tests/$u/*.cpp) -o "$OUT/test_$u" || { echo "BUILD FAILED ($u)"; exit 1; }
+  timeout 900 "$OUT/test_$u" || { echo "$u optimised run FAILED (exit $?)"; rc=1; }
+done
 printf 'int main(){return 0;}\n' > "$OUT/san_probe.cpp"
 if $HOSTCXX -fsanitize=address,undefined "$OUT/san_probe.cpp" -o "$OUT/san_probe" >/dev/null 2>&1 && "$OUT/san_probe" >/dev/null 2>&1; then
-  echo "== ASan/UBSan build =="
-  $HOSTCXX -std=c++17 -O1 -g -fno-omit-frame-pointer -ffp-contract=off -pthread -fsanitize=address,undefined -fno-sanitize-recover=undefined \
-    -Iinclude -Itests/unit10 $SRCS -o "$OUT/test_unit10_san" || { echo "SAN BUILD FAILED"; exit 1; }
-  timeout 1800 "$OUT/test_unit10_san" || { echo "sanitizer run FAILED (exit $?)"; rc=1; }
+  for u in unit14 unit10; do
+    echo "== $u ASan/UBSan build =="
+    $HOSTCXX -std=c++17 -O1 -g -fno-omit-frame-pointer -ffp-contract=off -fsanitize=address,undefined -fno-sanitize-recover=undefined -pthread \
+      -Iinclude -Itests/$u $(ls tests/$u/*.cpp) -o "$OUT/test_${u}_san" || { echo "SAN BUILD FAILED ($u)"; exit 1; }
+    timeout 1800 "$OUT/test_${u}_san" || { echo "$u sanitizer run FAILED (exit $?)"; rc=1; }
+  done
 else
   echo "sanitizers unavailable with $HOSTCXX: skipped"
 fi
-
-[ $rc -eq 0 ] && echo "ALL UNIT-10 TESTS PASSED" || echo "UNIT-10 TESTS FAILED"
+[ $rc -eq 0 ] && echo "ALL VISION-ENCODER-PROTOCOL TESTS PASSED" || echo "VISION-ENCODER-PROTOCOL TESTS FAILED"
 exit $rc
