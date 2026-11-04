@@ -305,18 +305,16 @@
     },
     "SpecController.lean": {
       "hash": "8e3986f7ba99",
-      "pass": false,
+      "pass": true,
       "unit_id": "u0e60a9f272"
     },
     "SuffixDrafter.lean": {
       "hash": "0c139adfc16b",
-      "pass": false,
+      "pass": true,
       "unit_id": "u0e60a9f272"
     }
   },
-  "fix_attempts": {
-    "u0e60a9f272": 1
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u0e60a9f272": [
       "port_incomplete"
@@ -334,20 +332,8 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "u0e60a9f272": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: 8 of the 18 definitions of the unit's reference files have no counterpart:\n  src/spec/controller.cpp Controller::choose → include/baloon/spec_controller.hpp:choose: not defined in that file\n  src/spec/controller.cpp Controller::observe → include/baloon/spec_controller.hpp:observe: not defined in that file\n  src/spec/controller.cpp CostModel::step_ms → include/baloon/spec_controller.hpp:step_ms: not defined in that file\n  src/spec/suffix_drafter.cpp SuffixDrafter::append → include/baloon/suffix_drafter.hpp:append: not defined in that file\n  src/spec/suffix_drafter.cpp SuffixDrafter::find_slot → include/baloon/suffix_drafter.hpp:find_slot: not defined in that file\n  src/spec/suffix_drafter.cpp SuffixDrafter::key_at → include/baloon/suffix_drafter.hpp:key_at: not defined in that file\n  src/spec/suffix_drafter.cpp SuffixDrafter::propose → include/baloon/suffix_drafter.hpp:propose: not defined in that file\n  src/spec/suffix_drafter.cpp SuffixDrafter::reset → include/baloon/suffix_drafter.hpp:reset: not defined in that file",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-u0e60a9f272"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u0e60a9f272": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
