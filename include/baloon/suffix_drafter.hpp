@@ -14,6 +14,8 @@ namespace suffix {
 constexpr uint32_t WAYS = 4;
 
 inline uint64_t key_of(uint64_t x) { return x | 1ull; }                       // never 0 (0 marks an empty slot)
+// One hashing round: fold token `tok` into running state `x` (xor, FNV prime multiply, xorshift fold).
+inline uint64_t mix(uint64_t x, uint32_t tok) { x ^= tok; x *= 0x100000001b3ull; x ^= x >> 29; return x; }
 inline uint64_t probe_next(uint64_t i, uint64_t cap) { return (i + 1) % cap; }  // wraps
 
 // Newest-first way list with at most W entries.
@@ -77,79 +79,91 @@ public:
     const std::vector<uint32_t>& history() const { return hist_; }
     uint64_t capacity() const { return slots_.size(); }
 
+    // Forget all history and empty every slot (capacity and match limits are kept).
+    void reset();
     // Key of the trigram ending at index i (i >= 2).
-    uint64_t key_at(uint64_t i) const {
-        uint64_t x = 0xcbf29ce484222325ull;
-        for (uint64_t j = i - 2; j <= i; ++j) { x ^= hist_[j]; x *= 0x100000001b3ull; x ^= x >> 29; }
-        return key_of(x);
-    }
-
-    void append(uint32_t tok) {
-        hist_.push_back(tok);
-        if (hist_.size() < 3) return;
-        const uint64_t e = hist_.size() - 1, key = key_at(e);
-        uint64_t i = key & mask_;
-        for (uint64_t n = 0; n < slots_.size(); ++n, i = probe_next(i, slots_.size())) {
-            Slot& s = slots_[i];
-            if (s.key == 0) { s.key = key; s.n = 1; s.pos[0] = e; return; }
-            if (s.key == key) {
-                for (uint32_t w = std::min<uint32_t>(s.n, WAYS - 1); w > 0; --w) s.pos[w] = s.pos[w - 1];
-                s.pos[0] = e;
-                if (s.n < WAYS) ++s.n;
-                return;
-            }
-        }
-        // table full of other keys: the insert is dropped
-    }
-
+    uint64_t key_at(uint64_t i) const;
+    void append(uint32_t tok);
     // Tokens that followed the best earlier occurrence of the current suffix; empty when no match >= min_match.
-    std::vector<uint32_t> propose(uint64_t max_k) const {
-        std::vector<uint32_t> out;
-        if (hist_.size() < 3 || max_k == 0) return out;
-        const uint64_t cur = hist_.size() - 1, key = key_at(cur);
-        uint64_t i = key & mask_;
-        const Slot* hit = nullptr;
-        for (uint64_t n = 0; n < slots_.size(); ++n, i = probe_next(i, slots_.size())) {
-            if (slots_[i].key == 0) break;
-            if (slots_[i].key == key) { hit = &slots_[i]; break; }
-        }
-        if (!hit) return out;
-        uint64_t best_len = 0, best_end = 0;
-        for (uint32_t w = 0; w < hit->n; ++w) {
-            const uint64_t p = hit->pos[w];
-            if (p >= cur) continue;                       // the current occurrence itself
-            const uint64_t len = match_len(hist_, p, cur, max_match_);
-            if (len > best_len) { best_len = len; best_end = p; }   // ties keep the newest
-        }
-        if (best_len < min_match_) return out;
-        const uint64_t k = cont_count(best_end, cur, max_k);
-        for (uint64_t j = 0; j < k; ++j) out.push_back(hist_[best_end + 1 + j]);
-        return out;
-    }
+    std::vector<uint32_t> propose(uint64_t max_k) const;
 
     // Length of the best match (for acceptance bucketing); 0 when none.
     uint64_t last_match_len() const {
         if (hist_.size() < 3) return 0;
-        const uint64_t cur = hist_.size() - 1, key = key_at(cur);
-        uint64_t i = key & mask_;
-        for (uint64_t n = 0; n < slots_.size(); ++n, i = probe_next(i, slots_.size())) {
-            const Slot& s = slots_[i];
-            if (s.key == 0) return 0;
-            if (s.key == key) {
-                uint64_t best = 0;
-                for (uint32_t w = 0; w < s.n; ++w) if (s.pos[w] < cur) best = std::max(best, match_len(hist_, s.pos[w], cur, max_match_));
-                return best;
-            }
-        }
-        return 0;
+        const uint64_t cur = hist_.size() - 1;
+        const Slot* hit = find_slot(key_at(cur));
+        if (!hit) return 0;
+        uint64_t best = 0;
+        for (uint32_t w = 0; w < hit->n; ++w) if (hit->pos[w] < cur) best = std::max(best, match_len(hist_, hit->pos[w], cur, max_match_));
+        return best;
     }
 
 private:
     struct Slot { uint64_t key = 0; uint32_t n = 0; uint64_t pos[WAYS] = {0, 0, 0, 0}; };
+
+    // Linear-probe lookup of `key`: the slot holding it, or nullptr when an empty slot (or a full sweep) ends the probe.
+    const Slot* find_slot(uint64_t key) const;
     std::vector<Slot> slots_;
     std::vector<uint32_t> hist_;
     uint64_t mask_ = 0, min_match_, max_match_;
 };
+
+inline void SuffixDrafter::reset() {
+    hist_.clear();
+    for (Slot& s : slots_) s = Slot{};
+}
+
+inline uint64_t SuffixDrafter::key_at(uint64_t i) const {
+    uint64_t x = 0xcbf29ce484222325ull;
+    for (uint64_t j = i - 2; j <= i; ++j) x = mix(x, hist_[j]);
+    return key_of(x);
+}
+
+inline const SuffixDrafter::Slot* SuffixDrafter::find_slot(uint64_t key) const {
+    uint64_t i = key & mask_;
+    for (uint64_t n = 0; n < slots_.size(); ++n, i = probe_next(i, slots_.size())) {
+        if (slots_[i].key == 0) return nullptr;
+        if (slots_[i].key == key) return &slots_[i];
+    }
+    return nullptr;
+}
+
+inline void SuffixDrafter::append(uint32_t tok) {
+    hist_.push_back(tok);
+    if (hist_.size() < 3) return;
+    const uint64_t e = hist_.size() - 1, key = key_at(e);
+    uint64_t i = key & mask_;
+    for (uint64_t n = 0; n < slots_.size(); ++n, i = probe_next(i, slots_.size())) {
+        Slot& s = slots_[i];
+        if (s.key == 0) { s.key = key; s.n = 1; s.pos[0] = e; return; }
+        if (s.key == key) {
+            for (uint32_t w = std::min<uint32_t>(s.n, WAYS - 1); w > 0; --w) s.pos[w] = s.pos[w - 1];
+            s.pos[0] = e;
+            if (s.n < WAYS) ++s.n;
+            return;
+        }
+    }
+    // table full of other keys: the insert is dropped
+}
+
+inline std::vector<uint32_t> SuffixDrafter::propose(uint64_t max_k) const {
+    std::vector<uint32_t> out;
+    if (hist_.size() < 3 || max_k == 0) return out;
+    const uint64_t cur = hist_.size() - 1;
+    const Slot* hit = find_slot(key_at(cur));
+    if (!hit) return out;
+    uint64_t best_len = 0, best_end = 0;
+    for (uint32_t w = 0; w < hit->n; ++w) {
+        const uint64_t p = hit->pos[w];
+        if (p >= cur) continue;                       // the current occurrence itself
+        const uint64_t len = match_len(hist_, p, cur, max_match_);
+        if (len > best_len) { best_len = len; best_end = p; }   // ties keep the newest
+    }
+    if (best_len < min_match_) return out;
+    const uint64_t k = cont_count(best_end, cur, max_k);
+    for (uint64_t j = 0; j < k; ++j) out.push_back(hist_[best_end + 1 + j]);
+    return out;
+}
 
 }  // namespace suffix
 }  // namespace baloon

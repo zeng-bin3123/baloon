@@ -81,7 +81,7 @@ void test_sc_choose_learn() {
     // free, perfect drafts: the longest chain is chosen
     Controller g;
     for (auto& v : g.mtp_p) v = 1.0;
-    for (uint64_t i = 0; i <= K_MAX; ++i) g.cost.step_ms[i] = 1.0;
+    for (uint64_t i = 0; i <= K_MAX; ++i) g.cost.table[i] = 1.0;
     ch = g.choose(K_MAX, 0, 0);
     CHECK(ch.drafter == Drafter::Mtp && ch.k == K_MAX);
     ch = g.choose(3, 0, 0);

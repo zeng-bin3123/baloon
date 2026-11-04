@@ -86,7 +86,7 @@ void test_pm_controller() {
         c.cost.mtp_ms_per_tok = rng.uni() * 0.5;
         c.cost.lookup_ms = rng.uni() * 0.5;
         double t = 1.0;
-        for (uint64_t i = 0; i <= K_MAX; ++i) { t += rng.uni() * 0.4; c.cost.step_ms[i] = t; }
+        for (uint64_t i = 0; i <= K_MAX; ++i) { t += rng.uni() * 0.4; c.cost.table[i] = t; }
         for (int r = 0; r < 60; ++r) {
             const uint64_t mk = rng.below(12), av = rng.below(12), ml = rng.below(40);
             const Choice ch = c.choose(mk, av, ml);
@@ -106,11 +106,11 @@ void test_pm_controller() {
     // perfectly cheap verify + great acceptance must speculate; costly verify + poor acceptance must not
     Controller good;
     for (uint64_t i = 0; i < K_MAX; ++i) good.mtp_p[i] = 1.0;
-    for (uint64_t i = 0; i <= K_MAX; ++i) good.cost.step_ms[i] = 1.0;
+    for (uint64_t i = 0; i <= K_MAX; ++i) good.cost.table[i] = 1.0;
     CHECK(good.choose(4, 0, 0).drafter == Drafter::Mtp);
     Controller bad;
     for (uint64_t i = 0; i < K_MAX; ++i) bad.mtp_p[i] = 0.0;
-    for (uint64_t i = 0; i <= K_MAX; ++i) bad.cost.step_ms[i] = 1.0 + i;
+    for (uint64_t i = 0; i <= K_MAX; ++i) bad.cost.table[i] = 1.0 + i;
     CHECK(bad.choose(8, 8, 20).drafter == Drafter::None);
     // observe only touches positions < seen
     Controller o;
