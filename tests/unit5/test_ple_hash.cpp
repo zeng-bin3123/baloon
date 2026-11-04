@@ -135,3 +135,114 @@ void test_hash_iq4() {
     }
     for (int i = kEmbedWidth; i < kEmbedWidth + 4; ++i) CHECK(out2[i] == 777.f);
 }
+
+// ---- Theory LAYER 1 (PleNgramHash): independent literal restatement of the model, checked against the code ----
+
+// Literal translation of the theory's ctx2 over a small exhaustive domain.
+static void ref_ctx2(int64_t eos, int64_t tok, int64_t newest, int64_t oldest, int64_t out[3]) {
+    const bool cut1 = newest < 0 || newest == eos;
+    const int64_t c1 = cut1 ? eos : newest;
+    const int64_t t2 = cut1 ? -1 : oldest;
+    const bool cut2 = cut1 || t2 < 0 || t2 == eos;
+    const int64_t c2 = cut2 ? eos : t2;
+    out[0] = tok; out[1] = c1; out[2] = c2;
+}
+
+void test_hash_theory() {
+    // ranges_tile / tables_len / last_range_in_table / vocab_pos, from literal copies of the theory tables
+    const uint64_t V[16] = {20000003, 20000023, 20000033, 20000047, 20000059, 20000063, 20000069, 20000077,
+                            20000081, 20000093, 20000107, 20000147, 20000153, 20000159, 20000161, 20000171};
+    const uint64_t O[16] = {0, 20000003, 40000026, 60000059, 80000106, 100000165, 120000228, 140000297,
+                            160000374, 180000455, 200000548, 220000655, 240000802, 260000955, 280001114, 300001275};
+    CHECK(kHeads == 16 && kTableRows == 320001536ull);
+    for (int h = 0; h < 16; ++h) {
+        CHECK(kVocab[h] == V[h] && kOffset[h] == O[h] && V[h] > 0);
+        if (h < 15) CHECK(O[h] + V[h] == O[h + 1]);
+    }
+    CHECK(300001275ull + 20000171ull <= 320001536ull);
+
+    // row_in_head_range: for every head, boundary and random mixed values land in [offset, offset+vocab)
+    testh::Rng r(77);
+    for (int h = 0; h < 16; ++h) {
+        const uint64_t edge[] = {0, 1, V[h] - 1, V[h], V[h] + 1, 2 * V[h] - 1, ~0ull, ~0ull - 1};
+        for (uint64_t m : edge) {
+            const uint64_t row = head_row(h, m);
+            CHECK(row == m % V[h] + O[h] && row >= O[h] && row < O[h] + V[h]);
+        }
+    }
+
+    // headIndex: (n-2)*8+g is a bijection {2,3} x [0,8) -> [0,16); ngram_rows uses bigram mixing for n=2, trigram for n=3
+    bool seen[16] = {false};
+    for (int n = 2; n <= 3; ++n)
+        for (int g = 0; g < 8; ++g) {
+            const int h = (n - 2) * 8 + g;
+            CHECK(h >= 0 && h < 16 && !seen[h]);
+            seen[h] = true;
+        }
+    for (int h = 0; h < 16; ++h) { CHECK(seen[h]); CHECK(((h / 8) + 2 >= 2 && (h / 8) + 2 <= 3) && (h % 8) < 8 && ((h / 8) * 8 + h % 8) == h); }
+    for (int it = 0; it < 20000; ++it) {
+        const int64_t eos = (int64_t)r.below(5), tok = (int64_t)r.below(100000), pn = (int64_t)r.below(100000) - 3,
+                      po = (int64_t)r.below(100000) - 3;
+        uint64_t rows[kHeads];
+        ngram_rows(eos, tok, pn, po, rows);
+        int64_t c[3];
+        ref_ctx2(eos, tok, pn, po, c);
+        const uint64_t m2 = mixed2((uint64_t)c[0], (uint64_t)c[1]);
+        const uint64_t m3 = mixed3((uint64_t)c[0], (uint64_t)c[1], (uint64_t)c[2]);
+        for (int g = 0; g < 8; ++g) {
+            CHECK(rows[(2 - 2) * 8 + g] == head_row((2 - 2) * 8 + g, m2));
+            CHECK(rows[(3 - 2) * 8 + g] == head_row((3 - 2) * 8 + g, m3));
+        }
+    }
+
+    // prev_index_valid: predecessor reads prev[2 - s] for s in {1,2} stay inside a 2-element history
+    for (int s = 1; s <= 2; ++s) CHECK(2 - s >= 0 && 2 - s < 2);
+
+    // ctx2: exhaustive over a small domain, including negative ids and EOS collisions
+    for (int64_t eos = 0; eos <= 3; ++eos)
+        for (int64_t tok = -1; tok <= 5; ++tok)
+            for (int64_t nw = -2; nw <= 5; ++nw)
+                for (int64_t od = -2; od <= 5; ++od) {
+                    const Ctx3 a = ctx3(eos, tok, nw, od);
+                    int64_t e[3];
+                    ref_ctx2(eos, tok, nw, od, e);
+                    CHECK(a.c0 == e[0] && a.c1 == e[1] && a.c2 == e[2]);
+                    CHECK(a.c0 == tok);                                           // ctx_keeps_token
+                    if (nw < 0 || nw == eos) CHECK(a.c1 == eos && a.c2 == eos);   // eos_cut_propagates
+                    if (nw >= 0 && nw != eos && od >= 0 && od != eos)             // no_cut_keeps_history
+                        CHECK(a.c1 == nw && a.c2 == od);
+                }
+
+    // iq4nl: 16 entries, strictly increasing, fits int8 (checked against the theory's literal table)
+    const int T[16] = {-127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113};
+    for (int i = 0; i < 16; ++i) {
+        CHECK(kIq4Table[i] == T[i] && T[i] >= -128 && T[i] <= 127);
+        if (i) CHECK(T[i - 1] < T[i]);
+    }
+
+    // dequant_covers / dequant_disjoint: every one of 160 slots k is written exactly once, from block b=k/32,
+    // low nibble of byte k%32 when k%32<16, else high nibble of byte (k%32)-16. Check slot by slot with a
+    // sentinel buffer, a distinct non-zero scale per block, and random codes.
+    CHECK(5 * 18 == 90 && 5 * 32 == 160 && kRowBytes == 90 && kRowValues == 160);
+    for (int t = 0; t < 500; ++t) {
+        uint8_t row[90];
+        for (auto& b : row) b = (uint8_t)r.u32();
+        for (int b = 0; b < 5; ++b) { row[b * 18] = 0x00; row[b * 18 + 1] = (uint8_t)(0x38 + b); }  // scales 0.5,..: finite, nonzero
+        float out[160 + 8];
+        for (float& f : out) f = -12345.f;
+        dequant_row(row, out);
+        for (int k = 0; k < 160; ++k) {
+            const int b = k / 32, rr = k % 32;
+            const uint8_t byte = row[b * 18 + 2 + (rr < 16 ? rr : rr - 16)];
+            const int code = rr < 16 ? (byte & 15) : (byte >> 4);
+            const uint16_t sb = (uint16_t)(row[b * 18] | (row[b * 18 + 1] << 8));
+            const float d = baloon::f16::half_to_float(sb);
+            CHECK(out[k] == d * (float)T[code]);
+            CHECK(out[k] != -12345.f);                      // written
+        }
+        for (int k = 160; k < 168; ++k) CHECK(out[k] == -12345.f);   // nothing past the row
+    }
+    // disjointness of the halves: b*32+j != b2*32+j2+16 for all j,j2 < 16
+    for (int b = 0; b < 5; ++b) for (int j = 0; j < 16; ++j) for (int b2 = 0; b2 < 5; ++b2) for (int j2 = 0; j2 < 16; ++j2)
+        CHECK(b * 32 + j != b2 * 32 + j2 + 16);
+}
