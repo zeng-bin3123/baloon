@@ -304,13 +304,13 @@
       "unit_id": "u89be81de0b"
     },
     "SpecController.lean": {
-      "hash": "a02ba9f4a499",
-      "pass": false,
+      "hash": "8e3986f7ba99",
+      "pass": true,
       "unit_id": "u0e60a9f272"
     },
     "SuffixDrafter.lean": {
-      "hash": "652c58ca3fda",
-      "pass": false,
+      "hash": "0c139adfc16b",
+      "pass": true,
       "unit_id": "u0e60a9f272"
     }
   },
@@ -330,12 +330,5 @@
     ]
   },
   "last_failure": {},
-  "infra_fails": 0,
-  "review_pending": {
-    "u0e60a9f272": {
-      "compile": "pass",
-      "existing_code": "true",
-      "smoke": "pass"
-    }
-  }
+  "infra_fails": 0
 }
