@@ -348,7 +348,7 @@ static void test_kv_and_index_and_attend() {
         std::vector<double> s(n);
         for (int cidx = 0; cidx < n; ++cidx) {
             double acc = 0;
-            for (int h = 0; h < 4; ++h) { double dot = 0; for (int d = 0; d < 128; ++d) dot += (double)hq[h * 128 + d] * hkeys[(size_t)cidx * 128 + d]; acc += hhw[h] * std::max(dot, 0.0); }
+            for (int h = 0; h < 4; ++h) { double dot = 0; for (int d = 0; d < 128; ++d) dot += (double)hq[h * 128 + d] * hkeys[(size_t)cidx * 128 + d]; acc += (double)hhw[h] * (dot > 0.0 ? dot : 0.0); }
             s[cidx] = acc;
         }
         return s;
