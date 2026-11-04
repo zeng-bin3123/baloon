@@ -12,6 +12,14 @@ using Key = std::pair<uint64_t, uint64_t>;
 
 constexpr bool end_ok(uint64_t nodes) { return nodes != 0; }
 
+// Bounded poll: n attempts at times t, t+1, ...; true iff some poll observes completion. Zero bound never succeeds.
+template <class Pred>
+constexpr bool wait_fuel(uint64_t n, Pred done, uint64_t t = 0) {
+    for (uint64_t i = 0; i < n; ++i)
+        if (done(t + i)) return true;
+    return false;
+}
+
 class Registry {
 public:
     // First match wins, as in a map. Returns false when absent.
