@@ -336,6 +336,10 @@
         "DequantBlockLayouts.lean",
         "GatedResidual.lean"
       ],
+      "children": [
+        "u042aaf67ce",
+        "u208dfb4222"
+      ],
       "reason": "3 fix attempts used",
       "conv": "ede066be-7b3e-4ba3-b296-3a7edf5a5b81"
     },
@@ -357,6 +361,23 @@
         "NativeFlashAttn.lean",
         "GdnRecurrence.lean",
         "VerifyWindow.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "u042aaf67ce",
+      "parent": "u95fce8dc9d",
+      "modules": [
+        "F16BitsRounding.lean",
+        "DequantBlockLayouts.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "u208dfb4222",
+      "parent": "u95fce8dc9d",
+      "modules": [
+        "GatedResidual.lean"
       ],
       "reason": "3 fix attempts used"
     }
@@ -438,9 +459,7 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {
-    "u95fce8dc9d": 3
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u0e60a9f272": [
       "port_incomplete"
@@ -484,13 +503,7 @@
       "existing_code_fails"
     ]
   },
-  "last_failure": {
-    "u95fce8dc9d": {
-      "kind": "gpu_code_missing",
-      "text": "gpu_code_missing: the unit's modules come from CUDA sources in the reference (src/kernels/cuda/kv_q8.cu, src/kernels/cuda/qsa.cu, src/kernels/cuda/quantize_act.cu) but it wrote no .cu/.cuh file",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-u95fce8dc9d"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
   "port_units": [
     {
