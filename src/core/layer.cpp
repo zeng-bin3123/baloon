@@ -14,36 +14,48 @@ namespace baloon {
 namespace core {
 
 // ---- runtime switches (process-wide, set once before the graphs are built) -------------------------------------------
-static std::atomic<bool> g_fast_attn{false};
-static std::atomic<bool> g_fast_select{false};
-static std::atomic<bool> g_fused_gdn{false};
-static std::atomic<bool> g_fused_gr{false};
-static std::atomic<bool> g_publish_kernel{false};
-static std::atomic<bool> g_shared_early{false};
-static std::atomic<bool> g_kv_int8{false};
-static std::atomic<bool> native_bf16_projections{false};
-static std::atomic<bool> native_flash_attn_short{false};
+struct LayerFlagStore {
+    std::atomic<bool> g_fast_attn{false};
+    std::atomic<bool> g_fast_select{false};
+    std::atomic<bool> g_fused_gdn{false};
+    std::atomic<bool> g_fused_gr{false};
+    std::atomic<bool> g_publish_kernel{false};
+    std::atomic<bool> g_shared_early{false};
+    std::atomic<bool> g_kv_int8{false};
+    std::atomic<bool> native_bf16_projections{false};
+    std::atomic<bool> native_flash_attn_short{false};
+};
+static LayerFlagStore g_flag_store;
+static std::atomic<bool>* const g_fast_attn = &g_flag_store.g_fast_attn;
+static std::atomic<bool>* const g_fast_select = &g_flag_store.g_fast_select;
+static std::atomic<bool>* const g_fused_gdn = &g_flag_store.g_fused_gdn;
+static std::atomic<bool>* const g_fused_gr = &g_flag_store.g_fused_gr;
+static std::atomic<bool>* const g_publish_kernel = &g_flag_store.g_publish_kernel;
+static std::atomic<bool>* const g_shared_early = &g_flag_store.g_shared_early;
+static std::atomic<bool>* const g_kv_int8 = &g_flag_store.g_kv_int8;
+static std::atomic<bool>* const native_bf16_projections = &g_flag_store.native_bf16_projections;
+static std::atomic<bool>* const native_flash_attn_short = &g_flag_store.native_flash_attn_short;
 
-void layer_set_fast_attn(bool v) { g_fast_attn = v; }
-void layer_set_fast_select(bool v) { g_fast_select = v; }
-void layer_set_fused_gdn(bool v) { g_fused_gdn = v; }
-void layer_set_fused_gr(bool v) { g_fused_gr = v; }
-void layer_set_native_bf16(bool v) { native_bf16_projections = v; }
-void layer_set_native_flash_attn_short(bool v) { native_flash_attn_short = v; }
-void layer_set_publish_kernel(bool v) { g_publish_kernel = v; }
-void layer_set_shared_early(bool v) { g_shared_early = v; }
-void qsa_set_kv_int8(bool v) { g_kv_int8 = v; }
-bool qsa_kv_int8() { return g_kv_int8; }
-bool layer_shared_early() { return g_shared_early; }
-bool layer_publish_kernel() { return g_publish_kernel; }
+void layer_set_fast_attn(bool v) { g_fast_attn->store(v); }
+void layer_set_fast_select(bool v) { g_fast_select->store(v); }
+void layer_set_fused_gdn(bool v) { g_fused_gdn->store(v); }
+void layer_set_fused_gr(bool v) { g_fused_gr->store(v); }
+void layer_set_native_bf16(bool v) { native_bf16_projections->store(v); }
+void layer_set_native_flash_attn_short(bool v) { native_flash_attn_short->store(v); }
+void layer_set_publish_kernel(bool v) { g_publish_kernel->store(v); }
+void layer_set_shared_early(bool v) { g_shared_early->store(v); }
+void qsa_set_kv_int8(bool v) { g_kv_int8->store(v); }
+bool qsa_kv_int8() { return (*g_kv_int8); }
+bool layer_shared_early() { return (*g_shared_early); }
+bool layer_publish_kernel() { return (*g_publish_kernel); }
 
 bool layer_fused_gr(int stage_prefix, int half, bool supported) {
-    return g_fused_gr && stage_prefix == 0 && half == 0 && supported;
+    return (*g_fused_gr) && stage_prefix == 0 && half == 0 && supported;
 }
 
 bool layer_verify_compatible(bool native_gdn, bool qsa_indexer) {
-    return native_bf16_projections && g_fused_gr && (g_fused_gdn && native_gdn) &&
-           (g_fast_attn && !native_flash_attn_short) && g_fast_select && qsa_indexer;
+    return (*native_bf16_projections) && (*g_fused_gr) && ((*g_fused_gdn) && native_gdn) &&
+           ((*g_fast_attn) && !(*native_flash_attn_short)) && (*g_fast_select) && qsa_indexer;
 }
 
 // ---- quantized planes / dispatch ------------------------------------------------------------------------------------------
@@ -169,10 +181,10 @@ bool qsa_buffers_init(QsaBuffers& b, void* base, uint64_t cap, const QsaDims& d)
 
 static void qsa_state_sizes(const QsaStateDims& d, uint64_t (&s)[kQsaStateRegions]) {
     const uint64_t cells = d.max_cells * d.n_head_kv * d.head_dim;
-    const uint64_t elem = g_kv_int8 ? 1 : 4;
+    const uint64_t elem = (*g_kv_int8) ? 1 : 4;
     s[0] = cells * elem;                                   // K cache
     s[1] = cells * elem;                                   // V cache
-    s[2] = g_kv_int8 ? 2 * d.max_cells * d.n_head_kv * 4 : 0;   // per-row scales (int8 mode only)
+    s[2] = (*g_kv_int8) ? 2 * d.max_cells * d.n_head_kv * 4 : 0;   // per-row scales (int8 mode only)
     s[3] = (d.max_cells / (d.block ? d.block : 1) + 2) * d.head_dim * 4;  // pooled indexer keys
 }
 uint64_t qsa_state_bytes(const QsaStateDims& d) { uint64_t s[kQsaStateRegions]; qsa_state_sizes(d, s); return total_of(s); }
