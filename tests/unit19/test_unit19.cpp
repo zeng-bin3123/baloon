@@ -33,9 +33,21 @@ static uint32_t rnd() { return rng(); }
 // ============================================================================================================================
 // F16BitsRounding
 // ============================================================================================================================
-#if defined(__FLT16_MAX__)
-static float oracle_f16(float f) { _Float16 h = (_Float16)f; uint16_t b; std::memcpy(&b, &h, 2); return (float)b; }
-#endif
+// Software round-to-nearest-even oracle (no _Float16: the host runtime has no __truncsfhf2).
+static float oracle_f16(float f) {
+    const uint32_t sign = std::signbit(f) ? 0x8000u : 0u;
+    const double a = std::fabs((double)f);
+    uint32_t bits;
+    if (a >= 65520.0) bits = 0x7C00;
+    else if (a < 6.103515625e-05) bits = (uint32_t)std::nearbyint(std::ldexp(a, 24));
+    else {
+        int e = std::ilogb(a);
+        double m = std::nearbyint(std::ldexp(a, 10 - e));
+        if (m >= 2048.0) { m = 1024.0; ++e; }
+        bits = e > 15 ? 0x7C00u : (uint32_t)(((e + 15) << 10) | ((int)m - 1024));
+    }
+    return (float)(sign | bits);
+}
 static void test_f16() {
     using namespace f16bits;
     // every half decodes and re-encodes to itself (NaNs stay NaN)
@@ -72,14 +84,12 @@ static void test_f16() {
         const float ulp = std::max(std::ldexp(1.0f, (int)((h >> 10) & 31) - 25), 5.9604645e-8f);
         CHECK(std::fabs(back - f) <= ulp * 0.5f * 1.0001f);
     }
-#if defined(__FLT16_MAX__)
     for (int i = 0; i < 3000000; ++i) {
         const uint32_t u = rnd();
         const float f = f16bits::float_of(u);
         if (std::isnan(f)) continue;
         CHECK((float)f16_from_f32(f) == oracle_f16(f));
     }
-#endif
     // subnormals: exact decode value m * 2^-24, normalisation shifts at most 10
     for (uint32_t m = 1; m < 1024; ++m) CHECK(f32_from_f16((uint16_t)m) == std::ldexp((float)m, -24));
     // bf16: exact on bf16 values, below half truncates, above half rounds up, tie is even
