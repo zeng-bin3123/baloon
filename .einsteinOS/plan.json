@@ -669,12 +669,13 @@
     }
   },
   "fix_attempts": {
-    "pb0569948de": 1,
+    "pb0569948de": 2,
     "pb7e2533792": 1,
     "pe1f7ca5c00": 1
   },
   "fail_history": {
     "pb0569948de": [
+      "review_fail",
       "review_fail"
     ],
     "pb7e2533792": [
@@ -760,7 +761,7 @@
   "last_failure": {
     "pb0569948de": {
       "kind": "review_fail",
-      "text": "Gemm::valid() accepts overflowing padded byte counts (k=2^62 wraps to 0; a=F16/w=F32 scratch wraps to 0), contradicting its own contract, and the tests/mutants never exercise those checks",
+      "text": "Gemm::valid()'s scratch-bytes overflow check (a=F16/w=F32 scratch wrap, e.g. m=2^40,n=1,k=2^22) is untested and unmutated, so deleting it would still pass every test and mutant",
       "base_ref": "einsteinOS/dev-c880662efd"
     },
     "pb7e2533792": {
@@ -775,12 +776,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "pb0569948de": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
