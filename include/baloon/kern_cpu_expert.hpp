@@ -18,10 +18,15 @@ constexpr uint32_t QKA = q2geo::QKA;    // activations per chunk
 constexpr uint32_t BB = q2geo::BB;      // bytes of one GGUF-layout Q2_0 block (fp16 scale + 16 code bytes)
 constexpr uint32_t MAXC = q2geo::MAXC;  // activation chunks of a hidden vector
 constexpr uint32_t MAXT = q2geo::MAXT;  // widest multi-token batch
-constexpr uint32_t ROW_GU = q2geo::ROW_GU, ROW_D = q2geo::ROW_D, SC_GU = q2geo::SC_GU, SC_D = q2geo::SC_D;
+constexpr uint32_t ROW_GU = q2geo::ROW_GU;
+constexpr uint32_t ROW_D = q2geo::ROW_D;
+constexpr uint32_t SC_GU = q2geo::SC_GU;
+constexpr uint32_t SC_D = q2geo::SC_D;
 constexpr uint64_t BLOB = q2geo::BLOB;
-constexpr uint64_t O_GU_CODES = q2geo::O_GU_CODES, O_D_CODES = q2geo::O_D_CODES, O_GU_SCALES = q2geo::O_GU_SCALES,
-                   O_D_SCALES = q2geo::O_D_SCALES;
+constexpr uint64_t O_GU_CODES = q2geo::O_GU_CODES;
+constexpr uint64_t O_D_CODES = q2geo::O_D_CODES;
+constexpr uint64_t O_GU_SCALES = q2geo::O_GU_SCALES;
+constexpr uint64_t O_D_SCALES = q2geo::O_D_SCALES;
 
 // ---- quantized activation: per-32 scale, int8 in [-127, 127], chunk sum hx ---------------------------------
 struct ActQ {

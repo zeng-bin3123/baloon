@@ -23,7 +23,8 @@ namespace kern {
 namespace {
 
 constexpr uint32_t kZmm = 64;   // bytes of one 512-bit register (= codes of one Q2_0 block)
-std::atomic<bool> expert_oracle_q8_0{false};
+std::atomic<bool> oracle_flag{false};
+inline bool expert_oracle_q8_0() { return oracle_flag.load(std::memory_order_relaxed); }
 
 inline float h2f(uint16_t h) { return _cvtsh_ss(h); }
 inline uint16_t load_u16(const uint8_t* p) { uint16_t v; std::memcpy(&v, p, 2); return v; }
@@ -53,8 +54,8 @@ inline __m512i unpack64_q2_0(const uint8_t* p16) {
 // Integer dot of one 64-weight block (codes 0..3, no offset) against 64 int8 activations: low and high 32.
 inline void block_dot(const uint8_t* codes16, const int8_t* q64, int32_t& lo, int32_t& hi) {
     const __m512i s = _mm512_dpbusd_epi32(_mm512_setzero_si512(), unpack64_q2_0(codes16), _mm512_loadu_si512((const void*)q64));
-    lo = _mm512_reduce_add_epi32(_mm512_zextsi256_si512(_mm512_castsi512_si256(s)));
-    hi = _mm512_reduce_add_epi32(_mm512_zextsi256_si512(_mm512_extracti64x4_epi64(s, 1)));
+    lo = _mm512_reduce_add_epi32(_mm512_inserti64x4(_mm512_setzero_si512(), _mm512_castsi512_si256(s), 0));
+    hi = _mm512_reduce_add_epi32(_mm512_inserti64x4(_mm512_setzero_si512(), _mm512_extracti64x4_epi64(s, 1), 0));
 }
 
 // ---- scalar reference (blob layout) ------------------------------------------------------------------------
@@ -107,8 +108,8 @@ inline void row_dot_multi_z(const uint8_t* codes, const uint8_t* scales, uint32_
             const __m512i c = unpack64_q2_0(codes + (size_t)b * 16);
             for (uint32_t t = 0; t < nt; ++t) {
                 const __m512i s = _mm512_dpbusd_epi32(_mm512_setzero_si512(), c, _mm512_loadu_si512((const void*)(a[t].q + (size_t)b * kZmm)));
-                const int32_t lo = _mm512_reduce_add_epi32(_mm512_zextsi256_si512(_mm512_castsi512_si256(s)));
-                const int32_t hi = _mm512_reduce_add_epi32(_mm512_zextsi256_si512(_mm512_extracti64x4_epi64(s, 1)));
+                const int32_t lo = _mm512_reduce_add_epi32(_mm512_inserti64x4(_mm512_setzero_si512(), _mm512_castsi512_si256(s), 0));
+                const int32_t hi = _mm512_reduce_add_epi32(_mm512_inserti64x4(_mm512_setzero_si512(), _mm512_extracti64x4_epi64(s, 1), 0));
                 acc[t] += wd[k] * a[t].d[2 * b] * (float)(lo - a[t].hx[2 * b]);
                 acc[t] += wd[k] * a[t].d[2 * b + 1] * (float)(hi - a[t].hx[2 * b + 1]);
             }
@@ -156,7 +157,7 @@ inline float row_dot_oracle(const uint8_t* codes, const uint8_t* scales, uint32_
     return acc;
 }
 
-inline bool oracle_on() { return expert_oracle_q8_0.load(std::memory_order_relaxed); }
+inline bool oracle_on() { return expert_oracle_q8_0(); }
 
 inline float rd(const uint8_t* codes, const uint8_t* scales, uint32_t nb, const ActQ& a) {
     return oracle_on() ? row_dot_oracle(codes, scales, nb, a.q, a.d, a.hx) : row_dot_z(codes, scales, nb, a.q, a.d, a.hx);
@@ -219,8 +220,8 @@ inline void q2g_row_multi(const uint8_t* row, uint32_t nb, uint32_t nt, const in
         const __m512i c = unpack64_q2_0(blk + 2);
         for (uint32_t t = 0; t < nt; ++t) {
             const __m512i s = _mm512_dpbusd_epi32(_mm512_setzero_si512(), c, _mm512_loadu_si512((const void*)(q + t * q_stride + (size_t)b * kZmm)));
-            const int32_t lo = _mm512_reduce_add_epi32(_mm512_zextsi256_si512(_mm512_castsi512_si256(s)));
-            const int32_t hi = _mm512_reduce_add_epi32(_mm512_zextsi256_si512(_mm512_extracti64x4_epi64(s, 1)));
+            const int32_t lo = _mm512_reduce_add_epi32(_mm512_inserti64x4(_mm512_setzero_si512(), _mm512_castsi512_si256(s), 0));
+            const int32_t hi = _mm512_reduce_add_epi32(_mm512_inserti64x4(_mm512_setzero_si512(), _mm512_extracti64x4_epi64(s, 1), 0));
             acc[t] += wd * xd[t * ch_stride + 2 * b] * (float)(lo - hx[t * ch_stride + 2 * b]);
             acc[t] += wd * xd[t * ch_stride + 2 * b + 1] * (float)(hi - hx[t * ch_stride + 2 * b + 1]);
         }
@@ -274,8 +275,8 @@ void cpu_require_expert_support() {
     }
 }
 
-void expert_set_oracle_q8_0(bool on) { expert_oracle_q8_0.store(on, std::memory_order_relaxed); }
-bool expert_oracle_q8_0_enabled() { return expert_oracle_q8_0.load(std::memory_order_relaxed); }
+void expert_set_oracle_q8_0(bool on) { oracle_flag.store(on, std::memory_order_relaxed); }
+bool expert_oracle_q8_0_enabled() { return expert_oracle_q8_0(); }
 
 // ============================================================================================ public: quantization
 void act_quant_q8_1(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx) {

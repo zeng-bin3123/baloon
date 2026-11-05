@@ -176,7 +176,7 @@ inline void row_dot(const uint8_t* row, uint32_t nb, const Q8KBlock* acts, float
             const __m512i sv = scales4(c.scale);
             for (uint32_t t = 0; t < NT; ++t) acc[t] = _mm512_add_epi32(acc[t], chunk_dot(c, sv, acts[(size_t)t * nb + b].qs + 64 * j));
         }
-        for (uint32_t t = 0; t < NT; ++t) total[t] += d * acts[(size_t)t * nb + b].d * (float)_mm512_reduce_add_epi32(acc[t]);
+        for (uint32_t t = 0; t < NT; ++t) total[t] = _mm_cvtss_f32(_mm_fmadd_ss(_mm_set_ss(d * acts[(size_t)t * nb + b].d), _mm_set_ss((float)_mm512_reduce_add_epi32(acc[t])), _mm_set_ss(total[t])));
     }
     for (uint32_t t = 0; t < NT; ++t) out[t] = total[t] * ((float)Fmt<TY>::K / 8.f);
 }

@@ -42,7 +42,7 @@ struct Q4KBlock { uint16_t d, dmin; uint8_t scales[12]; uint8_t qs[128]; };
 struct Q5KBlock { uint16_t d, dmin; uint8_t scales[12]; uint8_t qh[32]; uint8_t qs[128]; };
 struct Q6KBlock { uint8_t ql[128]; uint8_t qh[64]; int8_t scales[16]; uint16_t d; };
 struct IQ4XSBlock { uint16_t d; uint16_t scales_h; uint8_t scales_l[4]; uint8_t qs[128]; };
-struct __align__(4) Q81Block { uint16_t d; uint16_t s; int8_t qs[32]; };   // d = scale, s = d * sum(q)
+struct Q81Block { uint16_t d; uint16_t s; int8_t qs[32]; } __align__(4);   // d = scale, s = d * sum(q)
 static_assert(sizeof(Q20Block) == 18 && sizeof(Q40Block) == 18 && sizeof(Q50Block) == 22 && sizeof(Q80Block) == 34 &&
               sizeof(IQ4NLBlock) == 18 && sizeof(Q3KBlock) == 110 && sizeof(Q4KBlock) == 144 && sizeof(Q5KBlock) == 176 &&
               sizeof(Q6KBlock) == 210 && sizeof(IQ4XSBlock) == 136 && sizeof(Q81Block) == 36, "ggml block sizes");

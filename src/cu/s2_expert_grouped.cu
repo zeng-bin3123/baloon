@@ -191,7 +191,7 @@ __global__ void activation_correction_kernel(const int8_t* q, int len, int rows,
 
 // ---- projections (fast path) -----------------------------------------------------------------------------------------------
 // Gate/up: one 32-lane group per interleaved row slot; output gate-major: gm(N, p, i) = (i%2)*N + p*FF + i/2, N = P*FF.
-__global__ void __launch_bounds__(THREADS) gu_kernel(const uint8_t* pool, uint64_t slot_bytes, Pairs a, S2Ptrs s) {
+__global__ __launch_bounds__(THREADS) void gu_kernel(const uint8_t* pool, uint64_t slot_bytes, Pairs a, S2Ptrs s) {
     const int p = blockIdx.x;
     const int i = blockIdx.y * WARPS_PER_BLOCK + (threadIdx.x >> 5);
     int slot, tok, dst;
@@ -216,7 +216,7 @@ __global__ void swiglu_kernel(Pairs a, S2Ptrs s) {
     s.gu[idx] = v;
 }
 // Down: 32-lane group per output row; chunks 0..19 on lanes 0..19.
-__global__ void __launch_bounds__(THREADS) down_kernel(const uint8_t* pool, uint64_t slot_bytes, Pairs a, int K, S2Ptrs s) {
+__global__ __launch_bounds__(THREADS) void down_kernel(const uint8_t* pool, uint64_t slot_bytes, Pairs a, int K, S2Ptrs s) {
     const int p = blockIdx.x;
     const int r = blockIdx.y * WARPS_PER_BLOCK + (threadIdx.x >> 5);
     int slot, tok, dst;
