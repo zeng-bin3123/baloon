@@ -456,6 +456,11 @@
     }
   ],
   "state": {
+    "ActivationQuantize.lean": {
+      "hash": "b81028d85481",
+      "pass": true,
+      "unit_id": "u12d8dd5102"
+    },
     "ChatFrontend.lean": {
       "hash": "e30953cb2b0d",
       "pass": true,
@@ -466,10 +471,20 @@
       "pass": true,
       "unit_id": "ubb8353e58b"
     },
+    "DotProductAlgebra.lean": {
+      "hash": "081f7496fc79",
+      "pass": true,
+      "unit_id": "u12d8dd5102"
+    },
     "ExpertCache.lean": {
       "hash": "b5c930321ff3",
       "pass": true,
       "unit_id": "uc81136f4d9"
+    },
+    "ExpertPoolScheduling.lean": {
+      "hash": "1c2c77389750",
+      "pass": true,
+      "unit_id": "u12d8dd5102"
     },
     "ExpertSource.lean": {
       "hash": "11f19c5505c2",
@@ -506,10 +521,20 @@
       "pass": true,
       "unit_id": "u253a75befe"
     },
+    "IquantBlockDecode.lean": {
+      "hash": "b13022296492",
+      "pass": true,
+      "unit_id": "u12d8dd5102"
+    },
     "LayerComposition.lean": {
       "hash": "0996008c92f8",
       "pass": true,
       "unit_id": "uc81136f4d9"
+    },
+    "MmvqIterationGeometry.lean": {
+      "hash": "910c0624c5e8",
+      "pass": true,
+      "unit_id": "u12d8dd5102"
     },
     "MtpDrafter.lean": {
       "hash": "272e6ff6cb9c",
@@ -525,6 +550,11 @@
       "hash": "98165629712f",
       "pass": true,
       "unit_id": "u316bd6b9ec"
+    },
+    "PleBlockGeometry.lean": {
+      "hash": "805d2371587d",
+      "pass": true,
+      "unit_id": "u12d8dd5102"
     },
     "PleDirectReader.lean": {
       "hash": "0737652f0030",
@@ -546,6 +576,11 @@
       "pass": true,
       "unit_id": "uc81136f4d9"
     },
+    "Q2ExpertKernelLayout.lean": {
+      "hash": "860dd6abfb82",
+      "pass": true,
+      "unit_id": "u12d8dd5102"
+    },
     "QsaCacheStep.lean": {
       "hash": "e94687212f66",
       "pass": true,
@@ -560,6 +595,21 @@
       "hash": "ded819668ab3",
       "pass": true,
       "unit_id": "u316bd6b9ec"
+    },
+    "RouterSamplerSelection.lean": {
+      "hash": "6f2e8eeca2fc",
+      "pass": true,
+      "unit_id": "u12d8dd5102"
+    },
+    "S2ExpertLayout.lean": {
+      "hash": "8f55fb7e1d95",
+      "pass": true,
+      "unit_id": "u12d8dd5102"
+    },
+    "SGemvCodeUnpack.lean": {
+      "hash": "deeabba3b269",
+      "pass": true,
+      "unit_id": "u12d8dd5102"
     },
     "ServeEngine.lean": {
       "hash": "8ee05fd8bb2b",
@@ -592,9 +642,7 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {
-    "u12d8dd5102": 2
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u02c65ed515": [
       "gpu_code_missing"
@@ -667,20 +715,8 @@
       "smoke_fail"
     ]
   },
-  "last_failure": {
-    "u12d8dd5102": {
-      "kind": "isa_path_missing",
-      "text": "isa_path_missing: the reference builds src/kernels/cpu/expert.cpp, src/kernels/cpu/iq_avx512.cpp with -mavx512f -mavx512vbmi -mavx512vnni -mf16c -mfma; no binary the build produced or the test ran contains -mavx512f (%zmm[0-9]+), -mavx512vbmi (\\bvpermb\\b|\\bvperm[it]2b\\b|\\bvpmultishiftqb\\b), -mavx512vnni (\\bvpdpbusds?\\b|\\bvpdpwssds?\\b), -mf16c (\\bvcvtph2ps\\b|\\bvcvtps2ph\\b), -mfma (\\bvf(n?m(add|sub))(132|213|231)[ps][sd]\\b) (binaries looked at: /tmp/baloon_unit_u12d8_build/tests__dbg_router.cu.o /tmp/baloon_unit_u12d8_build/src__cu__dequant_bf16.cu.o /tmp/baloon_unit_u12d8_build/src__ilu_f16_decode_bf16.cu.o /tmp/baloon_unit_u12d8_build/src__ilu_f16_encode_top.cu.o /tmp/baloon_unit_u12d8_build/src__ilu_gdn_prep.cu.o /tmp/baloon_unit_u12d8_build/src__ilu_gdn_warp_step.cu.o (+18 more))\nport_incomplete: 2 of the 310 definitions of the unit's reference files have no counterpart:\n  src/kernels/cuda/s2_expert_grouped.cu down_kernel → src/cu/s2_expert_grouped.cu:down_kernel: not defined in that file\n  src/kernels/cuda/s2_expert_grouped.cu gu_kernel → src/cu/s2_expert_grouped.cu:gu_kernel: not defined in that file",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-u12d8dd5102"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u12d8dd5102": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
