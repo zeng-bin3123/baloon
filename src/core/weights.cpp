@@ -13,6 +13,12 @@ namespace baloon {
 namespace core {
 namespace weights_impl {
 
+// Short local names for the loader's vocabulary (type aliases and the staging chunk size).
+using Conv = WConv;
+using IndexRow = WIndexRow;
+using Seg = WSeg;
+[[maybe_unused]] static constexpr uint64_t CHUNK = kWeightChunk;
+
 static double now_ms() {
     using C = std::chrono::steady_clock;
     return std::chrono::duration<double, std::milli>(C::now().time_since_epoch()).count();
