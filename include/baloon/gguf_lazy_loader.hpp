@@ -18,7 +18,7 @@ namespace gguf {
 enum GgmlType : uint32_t {
     kF32 = 0, kF16 = 1, kQ4_0 = 2, kQ5_0 = 6, kQ8_0 = 8, kQ3_K = 11, kQ4_K = 12, kQ5_K = 13, kQ6_K = 14,
     kIQ4_NL = 20, kIQ4_XS = 23, kBF16 = 30,
-    kQ2_0 = 100  // project-private id: 64 elements / 18 bytes (fp16 scale + 64 two-bit codes)
+    kQ2_0 = 42  // GGML type id 42: 64 elements / 18 bytes (fp16 scale + 64 two-bit codes)
 };
 
 struct BlockGeometry { uint64_t el = 0, by = 0; };  // el == 0 means unknown type

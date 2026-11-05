@@ -39,15 +39,18 @@ int main() {
     // geometry facts
     CHECK(block_geometry(8).el == 32 && block_geometry(8).by == 34);
     CHECK(block_geometry(12).el == 256 && block_geometry(12).by == 144);
-    CHECK(block_geometry(100).el == 64 && block_geometry(100).by == 18);
+    CHECK(block_geometry(42).el == 64 && block_geometry(42).by == 18);
     CHECK(block_geometry(999).el == 0);
+    CHECK(block_geometry(100).el == 0 && std::strcmp(ggml_type_name(100), "UNKNOWN") == 0);  // 100 is no longer a type
+    CHECK(baloon::gguf::kQ2_0 == 42 && baloon::gguf::block_geometry(42).el == 64 && baloon::gguf::block_geometry(42).by == 18);
+    CHECK(2 + 64 * 2 / 8 == 18);
     // agreement with the lazy loader on every type it knows
-    for (uint32_t t : {0u, 1u, 2u, 6u, 8u, 11u, 12u, 13u, 14u, 20u, 23u, 30u, 100u}) {
+    for (uint32_t t : {0u, 1u, 2u, 6u, 8u, 11u, 12u, 13u, 14u, 20u, 23u, 30u, 42u}) {
         CHECK(block_geometry(t).el == baloon::gguf::block_geometry(t).el);
         CHECK(block_geometry(t).by == baloon::gguf::block_geometry(t).by);
     }
     CHECK(std::strcmp(ggml_type_name(12), "Q4_K") == 0);
-    CHECK(std::strcmp(ggml_type_name(100), "Q2_0") == 0);
+    CHECK(std::strcmp(ggml_type_name(42), "Q2_0") == 0);
     CHECK(std::strcmp(ggml_type_name(77), "UNKNOWN") == 0);
     for (uint32_t t = 0; t < 31; ++t) CHECK((block_geometry(t).el == 0) == (std::strcmp(ggml_type_name(t), "UNKNOWN") == 0) || t == 4 || t == 5);
 

@@ -124,7 +124,7 @@ inline BlockGeometry block_geometry(uint32_t type) {
         case 16: return {256, 66};  case 17: return {256, 74}; case 18: return {256, 98};
         case 19: return {256, 50};  case 20: return {32, 18};  case 21: return {256, 110};
         case 22: return {256, 82};  case 23: return {256, 136}; case 29: return {256, 56};
-        case 100: return {64, 18};  // project-private Q2_0
+        case 42: return {64, 18};   // Q2_0 (theory geom 42)
         default: return {0, 0};
     }
 }
@@ -138,7 +138,7 @@ inline const char* ggml_type_name(uint32_t type) {
         case 18: return "IQ3_XXS"; case 19: return "IQ1_S"; case 20: return "IQ4_NL"; case 21: return "IQ3_S";
         case 22: return "IQ2_S"; case 23: return "IQ4_XS"; case 24: return "I8"; case 25: return "I16";
         case 26: return "I32"; case 27: return "I64"; case 28: return "F64"; case 29: return "IQ1_M";
-        case 30: return "BF16"; case 100: return "Q2_0";
+        case 30: return "BF16"; case 42: return "Q2_0";
         default: return "UNKNOWN";
     }
 }
