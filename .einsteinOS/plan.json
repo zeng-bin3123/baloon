@@ -363,7 +363,8 @@
         "GdnRecurrence.lean",
         "VerifyWindow.lean"
       ],
-      "reason": "3 fix attempts used"
+      "reason": "3 fix attempts used",
+      "conv": "c9b0b46a-edd6-4262-8903-0600fd22dd7e"
     },
     {
       "id": "u042aaf67ce",
@@ -570,7 +571,9 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u52d156705c": 1
+  },
   "fail_history": {
     "u02c65ed515": [
       "gpu_code_missing"
@@ -596,6 +599,9 @@
       "port_incomplete",
       "port_incomplete",
       "port_incomplete"
+    ],
+    "u52d156705c": [
+      "compile_fail"
     ],
     "u60723386cc": [
       "compile_fail",
@@ -635,7 +641,13 @@
       "smoke_fail"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "u52d156705c": {
+      "kind": "compile_fail",
+      "text": "build.sh exit=1: … file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for host.\n[cuda] src/ix_gdn.cu\nsrc/ix_gdn.cu:11:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for ivcore10.\nsrc/ix_gdn.cu:11:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for host.\n[cuda] src/ix_mmvq_wave.cu\nsrc/ix_mmvq_wave.cu:10:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for ivcore10.\nsrc/ix_mmvq_wave.cu:10:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for host.\n[cuda] src/ix_moe_combine.cu\nsrc/ix_moe_combine.cu:5:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for ivcore10.\nsrc/ix_moe_combine.cu:5:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for host.\n[cuda] src/ix_router_top10_wave.cu\nsrc/ix_router_top10_wave.cu:5:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for ivcore10.\nsrc/ix_router_top10_wave.cu:5:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for host.\n[cuda] src/ix_shared_expert.cu\nsrc/ix_shared_expert.cu:7:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for ivcore10.\nsrc/ix_shared_expert.cu:7:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for host.\n[cuda] src/native_flash_attn.cu\n[cuda] src/prefill_kernels.cu\n[cuda] src/qsa_decode_attn.cu\nsrc/qsa_decode_attn.cu:61:39: error: no matching function for call to 'qsa_scratch_floats'\n    const size_t qbase = (size_t)qi * qsa_scratch_floats(a.cap, n_head);\n                                      ^~~~~~~~~~~~~~~~~~\ninclude/baloon/decode_attn_kernels.hpp:15:17: note: candidate function not viable: call to __host__ function from __global__ function\ninline uint64_t qsa_scratch_floats(int cap, int n_head) { return (uint64_t)n_chunks(cap) * n_head * (kHD + 2) + 64; }\n                ^\nsrc/qsa_decode_attn.cu:135:39: error: no matching function for call to 'qsa_scratch_floats'\n    const size_t qbase = (size_t)qi * qsa_scratch_floats(a.cap, n_head);\n                                      ^~~~~~~~~~~~~~~~~~\ninclude/baloon/decode_attn_kernels.hpp:15:17: note: candidate function not viable: call to __host__ function from __global__ function\ninline uint64_t qsa_scratch_floats(int cap, int n_head) { return (uint64_t)n_chunks(cap) * n_head * (kHD + 2) + 64; }\n                ^\n2 errors generated when compiling for ivcore10.",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-u52d156705c"
+    }
+  },
   "infra_fails": 0,
   "port_units": [
     {
@@ -915,7 +927,8 @@
   ],
   "verify_seen": {
     "u0868e10073": true,
-    "u316bd6b9ec": true
+    "u316bd6b9ec": true,
+    "u52d156705c": true
   },
   "gates": "build+test+gpu+isa+port+integration",
   "integration_unit": {
