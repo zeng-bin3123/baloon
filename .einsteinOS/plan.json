@@ -428,7 +428,8 @@
         "F16BitsRounding.lean"
       ],
       "scope": "items: normShift, normShift_spec, subnormal_bias, subnormal_exp_field, normal_exp_field, nat_truncation_hazard, bf16Round, bf16_exact, bf16_below_half, bf16_above_half, bf16_tie_even",
-      "reason": "3 fix attempts used"
+      "reason": "3 fix attempts used",
+      "conv": "1910bc14-2039-4431-aa78-9da442ffa82f"
     },
     {
       "id": "uebd9b81357",
@@ -602,6 +603,12 @@
   },
   "last_failure": {},
   "infra_fails": 0,
+  "review_pending": {
+    "u0868e10073": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -878,6 +885,9 @@
       ]
     }
   ],
+  "verify_seen": {
+    "u0868e10073": true
+  },
   "gates": "build+test+gpu+isa+port+integration",
   "integration_unit": {
     "id": "uintegration01529aaa82b9",
