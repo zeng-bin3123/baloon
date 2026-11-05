@@ -46,7 +46,7 @@ __device__ __forceinline__ unsigned giesen_f16(uint32_t f) {  // independent: fl
     }
     return o | (sign >> 16);
 }
-__global__ void k_f32_to_f16(uint64_t base, uint64_t n, unsigned long long* bad, unsigned long long* first_bad) {
+__global__ void k_f32_to_f16(uint64_t base, uint64_t n, unsigned long long* bad, unsigned int* first_bad) {
     const uint64_t i = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
     const uint32_t u = (uint32_t)(base + i);
@@ -55,7 +55,7 @@ __global__ void k_f32_to_f16(uint64_t base, uint64_t n, unsigned long long* bad,
     bool ok;
     if ((u & 0x7FFFFFFFu) > 0x7F800000u) ok = (got & 0x7C00u) == 0x7C00u && (got & 0x3FFu) != 0 && (got & 0x8000u) == (want & 0x8000u);
     else ok = got == want;
-    if (!ok) { atomicAdd(bad, 1ull); atomicMin(first_bad, (unsigned long long)u); }
+    if (!ok) { atomicAdd(bad, 1ull); atomicMin(first_bad, (unsigned int)u); }
 }
 __global__ void k_f32_to_bf16(uint64_t base, uint64_t n, unsigned long long* bad) {
     const uint64_t i = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
@@ -81,9 +81,10 @@ static double decode_half(unsigned h) {
 }
 static void test_conversions() {
     std::printf("-- (A) exhaustive conversions\n");
-    Dev<unsigned long long> bad(1), first(1), badbf(1);
-    unsigned long long big = ~0ull;
-    CUOK(cudaMemcpy(first.p, &big, 8, cudaMemcpyHostToDevice));
+    Dev<unsigned long long> bad(1), badbf(1);
+    Dev<unsigned int> first(1);
+    unsigned int big = ~0u;
+    CUOK(cudaMemcpy(first.p, &big, 4, cudaMemcpyHostToDevice));
     const uint64_t chunk = 1ull << 26;
     for (uint64_t base = 0; base < (1ull << 32); base += chunk) {
         k_f32_to_f16<<<(unsigned)(chunk / 256), 256>>>(base, chunk, bad.p, first.p);
@@ -91,7 +92,8 @@ static void test_conversions() {
     }
     CUOK(cudaGetLastError());
     CUOK(cudaDeviceSynchronize());
-    const unsigned long long nb = bad.down()[0], nbf = badbf.down()[0], fb = first.down()[0];
+    const unsigned long long nb = bad.down()[0], nbf = badbf.down()[0];
+    const unsigned long long fb = first.down()[0];
     if (nb) std::printf("first f32->f16 mismatch at bits %08llx\n", fb);
     CHECK(nb == 0);
     CHECK(nbf == 0);
@@ -321,7 +323,7 @@ static void test_qsa() {
     for (int c = 0; c < cap; ++c) {
         if (c >= n_cells) { if (!(std::isinf(sc[c]) && sc[c] < 0)) ++bad_sc; continue; }
         double s = 0;
-        for (int h = 0; h < nih; ++h) { double dot = 0; for (int d = 0; d < d_idx; ++d) dot += (double)iq[h * d_idx + d] * hik[(size_t)c * d_idx + d]; s += (double)w[h] * std::max(dot, 0.0); }
+        for (int h = 0; h < nih; ++h) { double dot = 0; for (int d = 0; d < d_idx; ++d) dot += (double)iq[h * d_idx + d] * hik[(size_t)c * d_idx + d]; s += (double)w[h] * (dot > 0.0 ? dot : 0.0); }
         if (std::fabs(sc[c] - s) > 1e-4 * (1.0 + std::fabs(s))) ++bad_sc;
     }
     CHECK(bad_sc == 0);
@@ -368,11 +370,11 @@ static void test_qsa() {
         for (int h = 0; h < n_head; ++h) {
             const int kvh = h / (n_head / n_kv);
             std::vector<double> sco(width);
-            double m = -1e300;
+            double m = -1.0e30;
             for (int j = 0; j < width; ++j) {
                 double dot = 0;
                 for (int d = 0; d < D; ++d) dot += (double)q[h * D + d] * scale * h2f_host(hk[((size_t)ids[j] * n_kv + kvh) * D + d]);
-                sco[j] = dot; m = std::max(m, dot);
+                sco[j] = dot; m = (dot > m ? dot : m);
             }
             double l = 0;
             std::vector<double> acc(D, 0.0);
