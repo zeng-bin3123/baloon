@@ -467,6 +467,11 @@
       "pass": true,
       "unit_id": "uc81136f4d9"
     },
+    "F16BitsRounding.lean#items: encodeTop, finite_overflow_is_inf, nan_stays_nan, inf_stays_inf, conflation_hazard": {
+      "hash": "7c4403b77fca",
+      "pass": true,
+      "unit_id": "u02c65ed515"
+    },
     "F16BitsRounding.lean#items: rneStep, rne_below_half, rne_above_half, rne_tie_even, rne_le_succ": {
       "hash": "7c4403b77fca",
       "pass": true,
@@ -533,9 +538,7 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {
-    "u02c65ed515": 1
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u02c65ed515": [
       "gpu_code_missing"
@@ -597,20 +600,8 @@
       "smoke_fail"
     ]
   },
-  "last_failure": {
-    "u02c65ed515": {
-      "kind": "gpu_code_missing",
-      "text": "gpu_code_missing: the unit's modules come from CUDA sources in the reference (src/kernels/cuda/kv_q8.cu, src/kernels/cuda/qsa.cu, src/kernels/cuda/quantize_act.cu) but it wrote no .cu/.cuh file",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-u02c65ed515"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u02c65ed515": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
