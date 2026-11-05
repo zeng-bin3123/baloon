@@ -18,6 +18,10 @@ namespace {
 
 constexpr int CHUNK = 64, G = 12, HD = 256, THREADS = 256, WARPS = 8;
 static_assert(CHUNK == kChunk && G == kG && HD == kHD, "geometry");
+
+__host__ __device__ static inline size_t dev_scratch_floats(int cap, int n_head) {
+    return (size_t)((cap + CHUNK - 1) / CHUNK) * n_head * (HD + 2) + 64;
+}
 constexpr unsigned long long kBadRow = ~0ull;
 
 __device__ __forceinline__ float warp_sum(float v) { return ilu_gdn::lane_reduce(v); }
@@ -58,7 +62,7 @@ __global__ void __launch_bounds__(THREADS) partial_kernel(QsaArgs a, int nch) {
     const int n_ids = max(0, min(a.n_ids[qi], a.cap));
     const int c0 = chunk * CHUNK;
     const int n_here = n_ids > c0 ? min(CHUNK, n_ids - c0) : 0;
-    const size_t qbase = (size_t)qi * qsa_scratch_floats(a.cap, n_head);
+    const size_t qbase = (size_t)qi * dev_scratch_floats(a.cap, n_head);
     const size_t xs = (size_t)nch * n_head;
     float* acc_out = a.scratch + qbase;
     float* m_out = a.scratch + qbase + xs * HD;
@@ -132,7 +136,7 @@ __global__ void __launch_bounds__(THREADS) partial_kernel(QsaArgs a, int nch) {
 __global__ void __launch_bounds__(THREADS) merge_kernel(QsaArgs a, int nch) {
     const int head = blockIdx.x, qi = blockIdx.y, t = threadIdx.x;
     const int n_head = a.n_kv * G;
-    const size_t qbase = (size_t)qi * qsa_scratch_floats(a.cap, n_head);
+    const size_t qbase = (size_t)qi * dev_scratch_floats(a.cap, n_head);
     const size_t xs = (size_t)nch * n_head;
     const float* acc_in = a.scratch + qbase;
     const float* m_in = a.scratch + qbase + xs * HD;

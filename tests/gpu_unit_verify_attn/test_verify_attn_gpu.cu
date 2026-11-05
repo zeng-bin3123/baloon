@@ -75,7 +75,7 @@ static void test_conv_l2_and_commit() {
         }
         for (int t = 0; t < T; ++t) for (int hd = 0; hd < 2 * hk; ++hd) {
             double ss = 0; for (int d = 0; d < 128; ++d) { const double v = ref[(size_t)t * C + hd * 128 + d]; ss += v * v; }
-            const double inv = 1.0 / std::max(std::sqrt(ss), 1e-6);
+            const double nrm = std::sqrt(ss); const double inv = 1.0 / (nrm > 1e-6 ? nrm : 1e-6);
             for (int d = 0; d < 128; ++d) ref[(size_t)t * C + hd * 128 + d] *= inv;
             double n2 = 0; for (int d = 0; d < 128; ++d) { const double v = got[(size_t)t * C + hd * 128 + d]; n2 += v * v; }
             CHECK(std::fabs(n2 - 1.0) < 1e-4);   // l2-normalised heads have unit norm
@@ -310,7 +310,7 @@ static void test_steps_ids_select() {
     }
 }
 
-static void qsa_case(bool q8, int nq, int n_kv, int cap, int page_size, int n_cells, const std::vector<int>& nids_in, uint64_t seed) {
+static void qsa_case(bool q8, int nq, int n_kv, int cap, int page_size, int n_cells, const std::vector<int>& nids_in, uint64_t seed, float qmean = 0.f, float kbias = 0.f) {
     Rng rng(seed); const int HD = 256, G = 12, n_head = n_kv * G;
     const int pages = (n_cells + page_size - 1) / page_size; const size_t rows = (size_t)pages * n_kv * page_size;
     std::vector<float> kf(rows * HD), vf(rows * HD), ks(rows * 4, 1.f), vs(rows * 4, 1.f);
@@ -320,9 +320,10 @@ static void qsa_case(bool q8, int nq, int n_kv, int cap, int page_size, int n_ce
         for (auto& s : vs) s = (float)(0.01 + 0.03 * rng.uni());
         for (size_t i = 0; i < rows * HD; ++i) { k8[i] = (int8_t)((int)rng.below(255) - 127); v8[i] = (int8_t)((int)rng.below(255) - 127); kf[i] = k8[i] * ks[i / HD * 4 + (i % HD) / 64]; vf[i] = v8[i] * vs[i / HD * 4 + (i % HD) / 64]; }
     } else {
-        for (size_t i = 0; i < rows * HD; ++i) { k16[i] = f2h(rng.gauss()); v16[i] = f2h(rng.gauss()); kf[i] = h2f(k16[i]); vf[i] = h2f(v16[i]); }
+        for (size_t i = 0; i < rows * HD; ++i) { k16[i] = f2h(rng.gauss() + kbias); v16[i] = f2h(rng.gauss()); kf[i] = h2f(k16[i]); vf[i] = h2f(v16[i]); }
     }
     auto q = rnd(rng, (size_t)nq * n_head * HD, 1.f);
+    if (qmean != 0.f) for (auto& x : q) x = qmean + 0.1f * x;   // strongly biased scores (see test_qsa)
     std::vector<int32_t> ids((size_t)nq * cap), nids(nq);
     for (int z = 0; z < nq; ++z) {
         nids[z] = nids_in[z % nids_in.size()];
@@ -361,6 +362,10 @@ static void test_qsa() {
     qsa_case(false, 2, 1, 64, 8, 100, {64, 1}, 23);          // single chunk
     qsa_case(false, 1, 2, 130, 32, 300, {129}, 24);          // chunk boundary (64 * 2 + 1)
     qsa_case(true, 2, 2, 200, 16, 512, {200, 65}, 25);       // int8 + scales
+    // all scores near -96: exp(m) underflows, exp(-m) overflows. Only a merge that subtracts the global max M and skips the
+    // empty-chunk sentinels reproduces the double reference (chunks 2 and 3 are empty for nids = 70; {0} is all empty).
+    qsa_case(false, 2, 2, 200, 16, 512, {70, 200}, 26, 4.f, -1.5f);
+    qsa_case(false, 1, 2, 200, 16, 512, {0}, 27, 4.f, -1.5f);
     { // invalid arguments are rejected without launching
         float* p = dalloc<float>(4); ak::QsaArgs a{}; a.q = p; a.nq = 0;
         CHECK(ak::qsa_decode_attn_batch(a, nullptr) == -1); cudaFree(p);
@@ -379,7 +384,7 @@ static void test_flash() {
         CHECK(fetch(dst, 1)[0] == 0);
         const auto out = fetch(dout, 24 * 256);
         for (int h = 0; h < 24; ++h) {
-            const int kvh = h / 12; std::vector<double> sc(width); double mx = -1e300;
+            const int kvh = h / 12; std::vector<double> sc(width); double mx = -1.0e30;
             for (int c = 0; c < width; ++c) { double d = 0; for (int j = 0; j < 256; ++j) d += (double)q[h * 256 + j] * 0.0625 * kf[((size_t)c * 2 + kvh) * 256 + j]; sc[c] = d; mx = std::max(mx, d); }
             double L = 0; std::vector<double> ref(256, 0.0);
             for (int c = 0; c < width; ++c) { const double e = std::exp(sc[c] - mx); L += e; for (int j = 0; j < 256; ++j) ref[j] += e * vf[((size_t)c * 2 + kvh) * 256 + j]; }

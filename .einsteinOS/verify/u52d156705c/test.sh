@@ -72,9 +72,9 @@ else
   grep -q "VERIFY ATTN GPU TESTS PASSED" "$OUT/gpu.log" || { echo "GPU suite did not report PASSED"; rc=1; }
 
   mutate_dev() {  # name, source file, sed expression
-    local name="$1" src="$2" expr="$3" MD="$OUT/mutdev_$1"
+    local name="$1" src="$2" MD="$OUT/mutdev_$1"; shift 2
     rm -rf "$MD"; mkdir -p "$MD"; cp "$src" "$MD/m.cu"
-    sed -i "$expr" "$MD/m.cu"
+    sed -i "$@" "$MD/m.cu"
     if cmp -s "$src" "$MD/m.cu"; then echo "device mutation $name did not apply"; rc=1; return; fi
     local mo=() x
     for x in "${objs[@]}"; do
@@ -90,7 +90,7 @@ else
   mutate_dev conv src/verify_kernels.cu 's|out\[g\] = acc;|out[g] = acc + 1e-3f;|'
   mutate_dev rowsum src/verify_kernels.cu 's|((sa\[col\] + sa\[128 + col\]) + sa\[256 + col\]) + sa\[384 + col\]|((sa[col] + sa[128 + col]) + sa[256 + col])|'
   mutate_dev merge src/qsa_decode_attn.cu 's|expf(m_in\[slot\] - M)|expf(m_in[slot])|'
-  mutate_dev sentinel src/qsa_decode_attn.cu 's|if (l > 0.f) {   // sentinel chunks are skipped|if (true) {|'
+  mutate_dev sentinel src/qsa_decode_attn.cu -e 's|if (l > 0.f) {   // sentinel chunks are skipped|if (true) {|' -e 's|(l > 0.f) ? m : -FLT_MAX;|0.f;|'
   mutate_dev kvhead src/native_flash_attn.cu 's|const int kvh = head / (kFlashHeads / kFlashKvHeads);|const int kvh = head % 2;|'
   mutate_dev fscale src/native_flash_attn.cu 's|\* 0.0625f;|* 0.125f;|'
 fi
