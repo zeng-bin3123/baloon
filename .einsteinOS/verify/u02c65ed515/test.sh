@@ -110,6 +110,32 @@ else
   grep -q "UNIT7 GPU TESTS PASSED" "$OUT/gpu.log" || { echo "GPU suite did not report PASSED"; rc=1; }
 fi
 
+echo "== encodeTop on the GPU (device split == literal expectations) =="
+if [ -x "$CLANG" ]; then
+  tobjs=()
+  for f in src/ilu_f16_encode_top.cu tests/gpu_unit_f16bits_top/test_encode_top_gpu.cu; do
+    o="$OUT/gputop_$(basename "$f").o"
+    "$CLANG" $CUFLAGS -c "$f" -o "$o" || { echo "BUILD FAILED ($f)"; exit 1; }
+    tobjs+=("$o")
+  done
+  "$CLANG" "${tobjs[@]}" -o "$OUT/test_encode_top_gpu" -L"$COREX/lib64" -lcudart -lpthread || { echo "LINK FAILED (encode top gpu)"; exit 1; }
+  timeout 600 "$OUT/test_encode_top_gpu" | tee "$OUT/gputop.log"
+  [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "encodeTop GPU tests FAILED"; rc=1; }
+  grep -q "ENCODE TOP GPU TESTS PASSED" "$OUT/gputop.log" || { echo "encodeTop GPU suite did not report PASSED"; rc=1; }
+  # mutation: a device split that lets raw exponent 255 fall into the overflow branch must be caught
+  MD="$OUT/mut_dev"; rm -rf "$MD"; mkdir -p "$MD"; cp -r include "$MD/include"
+  sed -i 's/if (rawexp == 255u) return (int32_t)(sign + 31744u + (man != 0u ? 512u : 0u));//' "$MD/include/baloon/f16_encode_top.hpp"
+  if cmp -s include/baloon/f16_encode_top.hpp "$MD/include/baloon/f16_encode_top.hpp"; then echo "device mutation did not apply"; rc=1
+  else
+    MCU="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -I$MD/include -O2"
+    "$CLANG" $MCU -c src/ilu_f16_encode_top.cu -o "$MD/k.o" && "$CLANG" $MCU -c tests/gpu_unit_f16bits_top/test_encode_top_gpu.cu -o "$MD/t.o" \
+      && "$CLANG" "$MD/k.o" "$MD/t.o" -o "$MD/t" -L"$COREX/lib64" -lcudart -lpthread || { echo "device mutant failed to build"; rc=1; }
+    if [ -x "$MD/t" ] && "$MD/t" >/dev/null 2>&1; then echo "DEVICE MUTANT SURVIVED"; rc=1; else echo "device mutant detected"; fi
+  fi
+else
+  echo "corex toolchain missing: cannot run encodeTop GPU test"; rc=1
+fi
+
 echo "== port table =="
 TSV=.einsteinOS/port/u02c65ed515.tsv
 [ "$(wc -l < "$TSV")" -eq 90 ] || { echo "port table must have 90 lines"; rc=1; }
