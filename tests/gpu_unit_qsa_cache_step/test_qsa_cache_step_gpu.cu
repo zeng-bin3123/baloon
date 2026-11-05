@@ -220,7 +220,7 @@ static void test_index_and_score() {
         std::vector<double> ref(n);
         for (int b = 0; b < nb; ++b) {
             double s = 0;
-            for (int h = 0; h < 4; ++h) { double dot = 0; for (int d = 0; d < 128; ++d) dot += (double)q[h * 128 + d] * pooled[(size_t)b * 128 + d]; s += hw[h] * std::max(dot, 0.0); }
+            for (int h = 0; h < 4; ++h) { double dot = 0; for (int d = 0; d < 128; ++d) dot += (double)q[h * 128 + d] * pooled[(size_t)b * 128 + d]; s += hw[h] * (dot > 0.0 ? dot : 0.0); }
             for (int c = b * 4; c < std::min(n, b * 4 + 4); ++c) ref[c] = s;
         }
         CUOK(cudaMemset(d_cs, 0, max_cells * 4)); CUOK(cudaMemset(d_ms, 0, max_cells * 4));
