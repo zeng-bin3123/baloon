@@ -9,6 +9,10 @@
 
 // Macro kept for parity with the standalone dequant tool: when defined, the tool's main() is compiled out so the header
 // set can be linked into a larger binary.
+// Defining BALOON_DEQUANT_LIB_ONLY before including this header defines BALOON_DEQUANT_MAIN_DISABLED.
+#ifdef BALOON_DEQUANT_LIB_ONLY
+#define BALOON_DEQUANT_MAIN_DISABLED 1
+#endif
 #ifndef BALOON_DEQUANT_MAIN_DISABLED
 #define BALOON_DEQUANT_MAIN_ENABLED 1
 #endif

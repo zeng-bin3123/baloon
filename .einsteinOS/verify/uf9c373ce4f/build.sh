@@ -71,4 +71,6 @@ link "$OUT/test_ilu_qsa" "$OUT/src__ilu_qsa_decode.cu.o" "$OUT/src__ilu_qsa_sele
 link "$OUT/test_prefill_gpu" "$OUT/src__prefill_kernels.cu.o" "$OUT/tests__gpu_unit12__test_prefill_gpu.cu.o"
 link "$OUT/test_prefill_kernels" "$OUT/src__prefill__kernels.cu.o" "$OUT/tests__pk_unit3__test_prefill_kernels.cu.o"
 link "$OUT/test_f16_bits_gpu" "$OUT/src__kernels__cuda__f16_bits_rounding.cu.o" "$OUT/tests__gpu_unit_f16__test_f16_bits_gpu.cu.o"
+link "$OUT/test_act_kv_qsa_gpu" "$OUT/src__kernels__cuda__kv_q8.cu.o" "$OUT/src__kernels__cuda__qsa.cu.o" \
+     "$OUT/src__kernels__cuda__quantize_act.cu.o" "$OUT/tests__gpu_unit_f16__test_act_kv_qsa_gpu.cu.o"
 echo "BUILD OK"

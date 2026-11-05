@@ -3,7 +3,7 @@
 # inf/NaN/finite-overflow split and the conflation hazard, normShift spec, re-bias 113, normal-regime encoder == rneStep
 # model exhaustively, exhaustive fp16 decode, bf16Round exact/below/above/tie, dense dequantisers), the same invariants on
 # the GPU (device == host bit-for-bit on every GPU in EINSTEINOS_GPUS), the dequant tool, and the port table.
-# Exits non-zero if any build or any check fails.
+# Also builds and runs the act-quant / Q8 KV / QSA kernel tests on every GPU. Exits non-zero if any build or check fails.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -33,10 +33,18 @@ else
   "$CLANG" $CUFLAGS -c tests/gpu_unit_f16/test_f16_bits_gpu.cu -o "$OUT/f16t.o" && \
   "$CLANG" "$OUT/f16k.o" "$OUT/f16t.o" -o "$OUT/t_f16_gpu" -L"$COREX/lib64" -lcudart -lpthread \
     || { echo "BUILD FAILED (gpu test)"; exit 1; }
+  K=src/kernels/cuda
+  for u in kv_q8 qsa quantize_act; do
+    "$CLANG" $CUFLAGS -c $K/$u.cu -o "$OUT/k_$u.o" || { echo "BUILD FAILED ($u.cu)"; exit 1; }
+  done
+  "$CLANG" $CUFLAGS -c tests/gpu_unit_f16/test_act_kv_qsa_gpu.cu -o "$OUT/akq_t.o" && \
+  "$CLANG" "$OUT/k_kv_q8.o" "$OUT/k_qsa.o" "$OUT/k_quantize_act.o" "$OUT/akq_t.o" -o "$OUT/t_akq_gpu" \
+    -L"$COREX/lib64" -lcudart -lpthread || { echo "BUILD FAILED (act/kv/qsa gpu test)"; exit 1; }
   GPUS="${EINSTEINOS_GPUS:-${CUDA_VISIBLE_DEVICES:-0}}"
   for g in $(echo "$GPUS" | tr ',' ' '); do
     echo "-- GPU $g --"
     CUDA_VISIBLE_DEVICES=$g timeout 600 "$OUT/t_f16_gpu" || { echo "GPU test FAILED on GPU $g (exit $?)"; rc=1; }
+    CUDA_VISIBLE_DEVICES=$g timeout 600 "$OUT/t_akq_gpu" || { echo "act/kv/qsa GPU test FAILED on GPU $g (exit $?)"; rc=1; }
   done
 fi
 
