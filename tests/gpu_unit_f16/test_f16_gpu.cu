@@ -172,11 +172,17 @@ static void test_actq() {
     auto o = dout.down();
     for (int b = 0; b < NB0; ++b) {
         const float d = f16bits::widen_f16_bits((uint16_t)(y0[(size_t)b * 34] | (y0[(size_t)b * 34 + 1] << 8)));
+        // Quantisation rounds with the f32 scale d32 = amax/127 but the block stores it as f16, so the reconstruction
+        // error is <= 0.5*d32 (rounding) + |q|*|d16-d32| (scale storage error, |q| <= 127).
+        float amax = 0.f;
+        for (int i = 0; i < 32; ++i) amax = std::max(amax, std::fabs(x0[b * 32 + i]));
+        const float d32 = amax / 127.f;
+        const float bound = d32 * 0.5f * 1.001f + 127.f * std::fabs(d - d32) * 1.001f + 1e-30f;
         for (int i = 0; i < 32; ++i) {
             const int q = (int8_t)y0[(size_t)b * 34 + 2 + i];
             CHECK(q >= -127 && q <= 127);
             CHECK(o[b * 32 + i] == d * (float)q);
-            CHECK(std::fabs(o[b * 32 + i] - x0[b * 32 + i]) <= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f);
+            CHECK(std::fabs(o[b * 32 + i] - x0[b * 32 + i]) <= bound);
         }
     }
     CHECK(actq::dequant_q8_K(dyk.p, dout.p, NBK, nullptr) == 0);
