@@ -16,7 +16,11 @@ namespace baloon {
 namespace attn_kernels {
 namespace {
 
-constexpr int CHUNK = 64, G = 12, HD = 256, THREADS = 256, WARPS = 8;
+constexpr int CHUNK = 64;
+constexpr int G = 12;
+constexpr int HD = 256;
+constexpr int THREADS = 256;
+constexpr int WARPS = 8;
 static_assert(CHUNK == kChunk && G == kG && HD == kHD, "geometry");
 
 __host__ __device__ static inline size_t dev_scratch_floats(int cap, int n_head) {

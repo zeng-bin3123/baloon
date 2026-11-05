@@ -7,21 +7,29 @@
 namespace baloon {
 namespace pk {
 
+#ifndef BALOON_PK_GEOMETRY_IN_TU
 constexpr int N = 2560;
+#endif
 constexpr int HC = 4;
 constexpr int D = N * HC;
 constexpr int LR = 320;
+#ifndef BALOON_PK_GEOMETRY_IN_TU
 constexpr int S = 128;
+#endif
 constexpr int HK = 16;
 constexpr int HV = 48;
 constexpr int C = 10240;
+#ifndef BALOON_PK_GEOMETRY_IN_TU
 constexpr int RG = 4;
+#endif
 constexpr int kRoutedK = 10, kExperts = 512;
 constexpr int64_t kBlobBytes = 1382400;
 constexpr int64_t kGuOff = 0, kDownOff = 1280 * 640, kGuScaleOff = kDownOff + 2560 * 160,
                   kDownScaleOff = kGuScaleOff + 1280 * 40 * 2;
 
+#ifndef BALOON_PK_GEOMETRY_IN_TU
 inline int64_t blocks_for(int64_t n, int64_t t) { return (n + t - 1) / t; }
+#endif
 
 // hyper-connection (residual [T][4][2560])
 int gr_norm(const float* x, float* out, int T, float eps);                                  // rms over the 4 streams of a token
