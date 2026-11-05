@@ -488,6 +488,11 @@
       "pass": true,
       "unit_id": "uebd9b81357"
     },
+    "GatedResidual.lean": {
+      "hash": "5205679882ba",
+      "pass": true,
+      "unit_id": "u208dfb4222"
+    },
     "GenerateDriver.lean": {
       "hash": "eb8f5c79eeef",
       "pass": true,
