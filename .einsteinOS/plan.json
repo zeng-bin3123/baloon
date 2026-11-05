@@ -669,10 +669,14 @@
     }
   },
   "fix_attempts": {
+    "pb0569948de": 1,
     "pb7e2533792": 1,
     "pe1f7ca5c00": 1
   },
   "fail_history": {
+    "pb0569948de": [
+      "review_fail"
+    ],
     "pb7e2533792": [
       "review_fail"
     ],
@@ -754,6 +758,11 @@
     ]
   },
   "last_failure": {
+    "pb0569948de": {
+      "kind": "review_fail",
+      "text": "Gemm::valid() accepts overflowing padded byte counts (k=2^62 wraps to 0; a=F16/w=F32 scratch wraps to 0), contradicting its own contract, and the tests/mutants never exercise those checks",
+      "base_ref": "einsteinOS/dev-c880662efd"
+    },
     "pb7e2533792": {
       "kind": "review_fail",
       "text": "block_geometry/ggml_type_name map Q2_0 to private id 100 and treat id 42 as unknown, but theory DequantBlockLayouts specifies geom 42 = (64,18); the test never checks id 42",
@@ -766,12 +775,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "pb0569948de": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
