@@ -393,7 +393,7 @@
         "F16BitsRounding.lean"
       ],
       "reason": "3 fix attempts used",
-      "conv": "cb5e1f43-d7b4-4d72-916b-14c7c283e036"
+      "conv": "770863a8-b8b0-4a6f-a121-d8d3ec04f295"
     },
     {
       "id": "ubb8353e58b",
@@ -482,7 +482,7 @@
     }
   },
   "fix_attempts": {
-    "u60723386cc": 2
+    "u60723386cc": 3
   },
   "fail_history": {
     "u042aaf67ce": [
@@ -506,6 +506,7 @@
     ],
     "u60723386cc": [
       "compile_fail",
+      "smoke_fail",
       "smoke_fail"
     ],
     "u6d34237bff": [
@@ -539,7 +540,7 @@
   "last_failure": {
     "u60723386cc": {
       "kind": "smoke_fail",
-      "text": "test.sh exit=1: … + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:179  std::fabs(o[b * 32 + i] - x0[b * 32 + i]) \u003c= d * 0.5f * 1.01f + 1e-6f * std::fabs(x0[b * 32 + i]) + 1e-30f\n-- (C) paged int8 KV cache\n-- (D) QSA decode step\nf16_gpu checks=682630 failures=373\nF16 GPU TESTS FAILED\nGPU tests FAILED on GPU 3 (exit 1)\n== port table ==\nUNIT TESTS FAILED",
+      "text": "test.sh exit=1: == host: conversions, row dequantisers, tool library ==\nf16_host checks=11771763 failures=0\nF16 HOST TESTS PASSED\n== dequant tool (command line) ==\n== GPU: conversions (all bit patterns), activation quantisation, KV cache, QSA step ==\n-- GPU 0 --\nqsa: kv_append: position out of range\nqsa: indexer_key_append: invalid arguments\nqsa: step_upload_width: width out of range\nqsa: qsa_attend_step: invalid arguments\nqsa: qsa_gate_apply_f32: invalid arguments\ndevice 0: Iluvatar BI-V100\n-- (A) exhaustive conversions\n-- (B) activation quantisation\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  bad0 == 0\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  badk == 0\nquantise mismatches: q8_0=1 scaled=0 q8_K=1\n-- (C) paged int8 KV cache\n-- (D) QSA decode step\nf16_gpu checks=682630 failures=2\nF16 GPU TESTS FAILED\nGPU tests FAILED on GPU 0 (exit 1)\n-- GPU 1 --\nqsa: kv_append: position out of range\nqsa: indexer_key_append: invalid arguments\nqsa: step_upload_width: width out of range\nqsa: qsa_attend_step: invalid arguments\nqsa: qsa_gate_apply_f32: invalid arguments\ndevice 0: Iluvatar BI-V100\n-- (A) exhaustive conversions\n-- (B) activation quantisation\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  bad0 == 0\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  badk == 0\nquantise mismatches: q8_0=1 scaled=0 q8_K=1\n-- (C) paged int8 KV cache\n-- (D) QSA decode step\nf16_gpu checks=682630 failures=2\nF16 GPU TESTS FAILED\nGPU tests FAILED on GPU 1 (exit 1)\n-- GPU 2 --\nqsa: kv_append: position out of range\nqsa: indexer_key_append: invalid arguments\nqsa: step_upload_width: width out of range\nqsa: qsa_attend_step: invalid arguments\nqsa: qsa_gate_apply_f32: invalid arguments\ndevice 0: Iluvatar BI-V100\n-- (A) exhaustive conversions\n-- (B) activation quantisation\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  bad0 == 0\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  badk == 0\nquantise mismatches: q8_0=1 scaled=0 q8_K=1\n-- (C) paged int8 KV cache\n-- (D) QSA decode step\nf16_gpu checks=682630 failures=2\nF16 GPU TESTS FAILED\nGPU tests FAILED on GPU 2 (exit 1)\n-- GPU 3 --\nqsa: kv_append: position out of range\nqsa: indexer_key_append: invalid arguments\nqsa: step_upload_width: width out of range\nqsa: qsa_attend_step: invalid arguments\nqsa: qsa_gate_apply_f32: invalid arguments\ndevice 0: Iluvatar BI-V100\n-- (A) exhaustive conversions\n-- (B) activation quantisation\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  bad0 == 0\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  badk == 0\nquantise mismatches: q8_0=1 scaled=0 q8_K=1\n-- (C) paged int8 KV cache\n-- (D) QSA decode step\nf16_gpu checks=682630 failures=2\nF16 GPU TESTS FAILED\nGPU tests FAILED on GPU 3 (exit 1)\n== port table ==\nUNIT TESTS FAILED",
       "base_ref": "einsteinOS/dev-c880662efd-wip-u60723386cc"
     }
   },
