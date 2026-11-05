@@ -392,7 +392,8 @@
       "modules": [
         "F16BitsRounding.lean"
       ],
-      "reason": "3 fix attempts used"
+      "reason": "3 fix attempts used",
+      "conv": "2b27e60f-67ab-49e8-94d5-a2ea22f826c1"
     },
     {
       "id": "ubb8353e58b",
@@ -480,7 +481,9 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u60723386cc": 1
+  },
   "fail_history": {
     "u042aaf67ce": [
       "compile_fail",
@@ -500,6 +503,9 @@
       "port_incomplete",
       "port_incomplete",
       "port_incomplete"
+    ],
+    "u60723386cc": [
+      "compile_fail"
     ],
     "u6d34237bff": [
       "nothing_written"
@@ -529,7 +535,13 @@
       "existing_code_fails"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "u60723386cc": {
+      "kind": "compile_fail",
+      "text": "build.sh exit=1: …nerated when compiling for ivcore10.\n[cuda] tests/gpu_unit_f16/test_f16_gpu.cu\ntests/gpu_unit_f16/test_f16_gpu.cu:58:38: error: no matching function for call to 'atomicMin'\n    if (!ok) { atomicAdd(bad, 1ull); atomicMin(first_bad, (unsigned long long)u); }\n                                     ^~~~~~~~~\n/usr/local/corex/include/device_atomic_functions.hpp:110:38: note: candidate function not viable: no known conversion from 'unsigned long long *' to 'int *' for 1st argument\n__DEVICE_ATOMIC_FUNCTIONS_DECL__ int atomicMin(int *address, int val)\n                                     ^\n/usr/local/corex/include/device_atomic_functions.hpp:115:47: note: candidate function not viable: no known conversion from 'unsigned long long *' to 'unsigned int *' for 1st argument\n__DEVICE_ATOMIC_FUNCTIONS_DECL__ unsigned int atomicMin(unsigned int *address, unsigned int val)\n                                              ^\ntests/gpu_unit_f16/test_f16_gpu.cu:324:172: error: no matching function for call to 'max'\n        for (int h = 0; h \u003c nih; ++h) { double dot = 0; for (int d = 0; d \u003c d_idx; ++d) dot += (double)iq[h * d_idx + d] * hik[(size_t)c * d_idx + d]; s += (double)w[h] * std::max(dot, 0.0); }\n                                                                                                                                                                           ^~~~~~~~\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/algorithmfwd.h:370:5: note: candidate template ignored: deduced conflicting types for parameter '_Tp' ('double' vs. 'float')\n    max(const _Tp\u0026, const _Tp\u0026);\n    ^\n/usr/local/corex-3.2.3/lib/clang/16/include/cuda_wrappers/algorithm:87:1: note: candidate template ignored: deduced conflicting types for parameter '__T' ('double' vs. 'float')\nmax(const __T \u0026__a, const __T \u0026__b) {\n^\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/stl_algo.h:3468:5: note: candidate template ignored: could not match 'initializer_list\u003c_Tp\u003e' against 'double'\n    max(initializer_list\u003c_Tp\u003e __l, _Compare __comp)\n    ^\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/stl_algo.h:3462:5: note: candidate function template not viable: requires single argument '__l', but 2 arguments were provided\n    max(initializer_list\u003c_Tp\u003e __l)\n    ^\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/algorithmfwd.h:375:5: note: candidate function template not viable: requires 3 arguments, but 2 were provided\n    max(const _Tp\u0026, const _Tp\u0026, _Compare);\n    ^\n/usr/local/corex-3.2.3/lib/clang/16/include/cuda_wrappers/algorithm:80:1: note: candidate function template not viable: requires 3 arguments, but 2 were provided\nmax(const __T \u0026__a, const __T \u0026__b, __Cmp __cmp) {\n^\ntests/gpu_unit_f16/test_f16_gpu.cu:371:25: warning: magnitude of floating-point constant too large for type 'float'; maximum is 3.40282347E+38 [-Wliteral-range]\n            double m = -1e300;\n                        ^\n1 warning and 2 errors generated when compiling for ivcore10.",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-u60723386cc"
+    }
+  },
   "infra_fails": 0,
   "port_units": [
     {
