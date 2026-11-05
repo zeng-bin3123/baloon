@@ -50,10 +50,15 @@ mutate scrpad   $H 's|return round_up(m, kTileM) \* round_up(k, kTileK) \* elem_
 mutate wspad    $H 's|(round_up(m, kTileM) / kTileM) \* (round_up(n, kTileN) / kTileN)|(m / kTileM) * (n / kTileN)|'
 mutate fitsws   $H 's|workspace_bytes() <= ws_cap|true|'
 mutate zerok    $H 's|if (m == 0 \|\| n == 0 \|\| k == 0) return false;|if (m == 0 \|\| n == 0) return false;|'
-mutate ovf      $H 's|if (mul_overflows(m, n)) return false;||'
 mutate roundup  $H 's|return r == 0 ? v : v + (a - r);|return v + a - r;|'
 mutate refdot   $H 's|acc += a\[t \* k + c\] \* w\[r \* k + c\];|acc += a[t * k + c] * w[c * n + r % k];|'
 mutate refidx   $H 's|out\[t \* n + r\] = acc;|out[r * m + t] = acc;|'
+mutate ovfA     $H 's|^.*// padded A bytes$||'
+mutate ovfW     $H 's|^.*// padded W bytes$||'
+mutate ovfOut   $H 's|^.*// f32 output bytes$||'
+mutate ovfFlops $H 's|^.*// flops$||'
+mutate ovfWs    $H 's|^.*// workspace$||'
+mutate ovfhelp  $H 's|if (mul_overflows(a, b)) return false;||'
 mutate chunk    $H 's|m / chunk + (m % chunk != 0)|m / chunk|'
 [ $rc -eq 0 ] && echo "ALL UNIT TESTS PASSED" || echo "UNIT TESTS FAILED"
 exit $rc

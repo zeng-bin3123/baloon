@@ -13,6 +13,35 @@ static void test_validity() {
     g.m = UINT64_MAX; g.n = 2; g.k = 1; CHECK(!g.valid());
     g.m = 1ull << 40; g.n = 1ull << 40; g.k = 1; CHECK(!g.valid());   // m*n overflows
 }
+static Gemm mk(uint64_t m, uint64_t n, uint64_t k, Elem a = Elem::F32, Elem w = Elem::F32) {
+    Gemm g; g.m = m; g.n = n; g.k = k; g.a_type = a; g.w_type = w; return g;
+}
+// valid() must reject every description for which any accessor would wrap past 2^64, and accept the boundary cases below it.
+static void test_overflow_contract() {
+    CHECK(!mk(1, 1, 1ull << 62).valid());                       // padded A bytes: k*4 wraps to 0
+    CHECK(!mk(1, 1, 1ull << 62, Elem::F16, Elem::F16).valid());
+    CHECK(!mk(1, 1, 1ull << 57).valid());                       // 64 * 2^57 * 4 wraps
+    CHECK(!mk(1, 1, 1ull << 57, Elem::F16, Elem::F32).valid()); // a=F16 / w=F32 scratch + W bytes wrap
+    CHECK(!mk(1, 1, 1ull << 61, Elem::F16, Elem::F32).valid());
+    CHECK(!mk(1, 1, UINT64_MAX).valid());                       // round_up wraps
+    CHECK(!mk(1ull << 31, 1ull << 31, 1).valid());              // m*n*4 wraps
+    CHECK(!mk(1ull << 20, 1ull << 20, 1ull << 23).valid());     // flops wrap, bytes fine
+    CHECK(!mk((1ull << 31) - 1, (1ull << 31) - 1, 1).valid());  // workspace (padded) wraps, m*n*4 does not
+    CHECK(!mk(1ull << 58, 1, 1, Elem::F16, Elem::BF16).valid());// padded A bytes wrap via pm*pk
+    CHECK(!mk(1ull << 40, 1, 1ull << 22).valid());              // only padded A bytes wrap (flops, W, out, ws fit)
+    CHECK(!mk(1, 1ull << 40, 1ull << 22).valid());              // only padded W bytes wrap
+    CHECK(mk(1ull << 40, 1, 1ull << 21).valid());               // half of that is fine
+    CHECK(mk(1, 1ull << 40, 1ull << 21).valid());
+    // boundary: just below the limits is accepted and its accessors do not wrap
+    Gemm ok = mk(1ull << 20, 1ull << 20, 1ull << 22);
+    CHECK(ok.valid());
+    CHECK(ok.flops() == 2ull * (1ull << 20) * (1ull << 20) * (1ull << 22));
+    CHECK(ok.out_bytes() == (1ull << 40) * 4);
+    Gemm sc = mk(64, 64, 1ull << 20, Elem::F16, Elem::F32);
+    CHECK(sc.valid() && sc.scratch_bytes() == 64ull * (1ull << 20) * 4);
+    Gemm ws = mk(1ull << 30, 1ull << 30, 1);
+    CHECK(ws.valid() && ws.workspace_bytes() == (1ull << 60) * 4);
+}
 static void test_accounting() {
     Gemm g; g.m = 100; g.n = 70; g.k = 33;
     CHECK(g.flops() == 2ull * 100 * 70 * 33);
@@ -51,7 +80,7 @@ static void test_reference() {
     for (int i = 0; i < 12; ++i) CHECK(o[i] == a[i]);
 }
 int main() {
-    test_validity(); test_accounting(); test_reference();
+    test_validity(); test_overflow_contract(); test_accounting(); test_reference();
     std::printf("%ld checks, %ld failed\n", th::checks(), th::fails());
     if (th::fails()) return 1;
     std::printf("UNIT 24 TESTS PASSED\n");

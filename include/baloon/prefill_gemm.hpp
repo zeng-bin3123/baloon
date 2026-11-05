@@ -20,18 +20,33 @@ inline uint64_t round_up(uint64_t v, uint64_t a) {
     return r == 0 ? v : v + (a - r);
 }
 inline bool mul_overflows(uint64_t a, uint64_t b) { return a != 0 && b > UINT64_MAX / a; }
+inline bool mul_checked(uint64_t a, uint64_t b, uint64_t* out) {
+    if (mul_overflows(a, b)) return false;
+    *out = a * b;
+    return true;
+}
 
 struct Gemm {
     uint64_t m = 0, n = 0, k = 0;          // tokens, output rows, reduction width
     Elem a_type = Elem::F32, w_type = Elem::F32;
 
+    // Every quantity the other members compute (padded extents, A/W/scratch/output/workspace byte counts, flops) must be
+    // representable in 64 bits, so no accessor below can wrap.
     bool valid() const {
         if (m == 0 || n == 0 || k == 0) return false;
-        // every padded extent and byte count must fit in 64 bits
-        if (round_up(m, kTileM) < m || round_up(n, kTileN) < n || round_up(k, kTileK) < k) return false;
-        if (mul_overflows(round_up(m, kTileM), round_up(k, kTileK) * elem_bytes(a_type))) return false;
-        if (mul_overflows(round_up(n, kTileN), round_up(k, kTileK) * elem_bytes(w_type))) return false;
-        if (mul_overflows(m, n)) return false;
+        const uint64_t pm = round_up(m, kTileM), pn = round_up(n, kTileN), pk = round_up(k, kTileK);
+        if (pm < m || pn < n || pk < k) return false;
+        uint64_t t = 0;
+        if (!mul_checked(pm, pk, &t) || !mul_checked(t, elem_bytes(a_type), &t)) return false;   // padded A bytes
+        if (!mul_checked(pn, pk, &t) || !mul_checked(t, elem_bytes(w_type), &t)) return false;   // padded W bytes
+        if (a_type != w_type) {                                                                  // scratch bytes
+            if (!mul_checked(pm, pk, &t) || !mul_checked(t, elem_bytes(w_type), &t)) return false;
+        }
+        uint64_t mn = 0;
+        if (!mul_checked(m, n, &mn) || !mul_checked(mn, 4, &t)) return false;                    // f32 output bytes
+        if (!mul_checked(mn, k, &t) || !mul_checked(t, 2, &t)) return false;                     // flops
+        uint64_t tiles = 0;
+        if (!mul_checked(pm / kTileM, pn / kTileN, &tiles) || !mul_checked(tiles, kTileM * kTileN * 4ull, &t)) return false;  // workspace
         return true;
     }
     uint64_t flops() const { return 2ull * m * n * k; }                       // multiply + add per term
