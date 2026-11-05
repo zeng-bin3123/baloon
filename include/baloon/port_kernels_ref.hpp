@@ -269,7 +269,7 @@ inline bool fused_gr_read_multi(const FusedGrArgs& a) {
 }
 
 // ================================================================== short flash step (single query, GQA)
-constexpr int kFlashShortMaxCells = 1024;
+constexpr int kFlashShortMaxCells = 256;  // theory: short-context kernel valid for width in [1, 256]
 inline NativeFlashAttnStatus native_flash_attn_short_step(const float* q, const float* k, const float* v, float* out, int heads, int kv_heads,
                                                           int hd, int n_cells, float scale) {
     if (heads <= 0 || kv_heads <= 0 || hd <= 0 || heads % kv_heads != 0 || n_cells < 1) return NativeFlashAttnStatus::BadShape;

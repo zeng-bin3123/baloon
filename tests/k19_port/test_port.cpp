@@ -189,6 +189,11 @@ int main() {
       CHECK(native_flash_attn_short_step(q.data(), k.data(), v.data(), o.data(), 3, 2, D, N, 1.f) == NativeFlashAttnStatus::BadShape);
       CHECK(native_flash_attn_short_step(q.data(), k.data(), v.data(), o.data(), H, KV, D, 0, 1.f) == NativeFlashAttnStatus::BadShape);
       CHECK(native_flash_attn_short_step(q.data(), k.data(), v.data(), o.data(), H, KV, D, kFlashShortMaxCells + 1, 1.f) == NativeFlashAttnStatus::TooLong);
+      CHECK(kFlashShortMaxCells == 256);   // pinned literally to the theory bound, independent of the constant's definition
+      { const int NB = 256, NT = 257; std::vector<float> kb((size_t)NT * KV * D, 0.f), vb((size_t)NT * KV * D, 1.f);
+        CHECK(native_flash_attn_short_step(q.data(), kb.data(), vb.data(), o.data(), H, KV, D, 256, 1.f) == NativeFlashAttnStatus::Ok);
+        CHECK(native_flash_attn_short_step(q.data(), kb.data(), vb.data(), o.data(), H, KV, D, 257, 1.f) == NativeFlashAttnStatus::TooLong);
+        (void)NB; (void)NT; }
       std::vector<float> k2(N * KV * D, 0.f); for (int i = 0; i < D; ++i) k2[(2 * KV + 0) * D + i] = 100.f; float q1[16] = {0}; for (int h = 0; h < H; ++h) q1[h * D] = 1.f;
       k2[(2 * KV + 0) * D] = 100.f;
       native_flash_attn_short_step(q1, k2.data(), v.data(), o.data(), H, KV, D, N, 1.f);       // cell 2 dominates for heads 0,1 (kv head 0)
