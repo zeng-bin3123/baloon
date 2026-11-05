@@ -776,12 +776,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "p61c3495016": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -1065,6 +1059,7 @@
     "p45808a8a9c": true,
     "p4fde6588a6": true,
     "p61ad38075a": true,
+    "p61c3495016": true,
     "p71c0367d2e": true,
     "p984d0d954f": true,
     "pb0569948de": true,
