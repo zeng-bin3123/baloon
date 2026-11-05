@@ -643,7 +643,9 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "ubb09633f12": 1
+  },
   "fail_history": {
     "u02c65ed515": [
       "gpu_code_missing"
@@ -698,6 +700,9 @@
     "u9dc1be2eae": [
       "missing"
     ],
+    "ubb09633f12": [
+      "review_fail"
+    ],
     "ubd109f97f8": [
       "review_fail"
     ],
@@ -716,14 +721,14 @@
       "smoke_fail"
     ]
   },
-  "last_failure": {},
-  "infra_fails": 0,
-  "review_pending": {
+  "last_failure": {
     "ubb09633f12": {
-      "compile": "pass",
-      "smoke": "pass"
+      "kind": "review_fail",
+      "text": "activation_quantizer rounds half-to-even (cvtps_epi32) but the theory spec requires half-away ties, and test_rounding_model only checks local lambdas so it cannot fail",
+      "base_ref": "einsteinOS/dev-c880662efd"
     }
   },
+  "infra_fails": 0,
   "port_units": [
     {
       "id": "pfcccb31b26",
