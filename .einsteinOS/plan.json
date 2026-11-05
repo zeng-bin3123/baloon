@@ -364,7 +364,7 @@
         "VerifyWindow.lean"
       ],
       "reason": "3 fix attempts used",
-      "conv": "c9b0b46a-edd6-4262-8903-0600fd22dd7e"
+      "conv": "e87a03a8-0c3a-491a-9730-88bdea1cce3c"
     },
     {
       "id": "u042aaf67ce",
@@ -572,7 +572,7 @@
     }
   },
   "fix_attempts": {
-    "u52d156705c": 1
+    "u52d156705c": 2
   },
   "fail_history": {
     "u02c65ed515": [
@@ -601,7 +601,8 @@
       "port_incomplete"
     ],
     "u52d156705c": [
-      "compile_fail"
+      "compile_fail",
+      "port_incomplete"
     ],
     "u60723386cc": [
       "compile_fail",
@@ -643,8 +644,8 @@
   },
   "last_failure": {
     "u52d156705c": {
-      "kind": "compile_fail",
-      "text": "build.sh exit=1: … file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for host.\n[cuda] src/ix_gdn.cu\nsrc/ix_gdn.cu:11:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for ivcore10.\nsrc/ix_gdn.cu:11:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for host.\n[cuda] src/ix_mmvq_wave.cu\nsrc/ix_mmvq_wave.cu:10:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for ivcore10.\nsrc/ix_mmvq_wave.cu:10:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for host.\n[cuda] src/ix_moe_combine.cu\nsrc/ix_moe_combine.cu:5:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for ivcore10.\nsrc/ix_moe_combine.cu:5:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for host.\n[cuda] src/ix_router_top10_wave.cu\nsrc/ix_router_top10_wave.cu:5:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for ivcore10.\nsrc/ix_router_top10_wave.cu:5:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for host.\n[cuda] src/ix_shared_expert.cu\nsrc/ix_shared_expert.cu:7:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for ivcore10.\nsrc/ix_shared_expert.cu:7:9: warning: #pragma once in main file [-Wpragma-once-outside-header]\n#pragma once\n        ^\n1 warning generated when compiling for host.\n[cuda] src/native_flash_attn.cu\n[cuda] src/prefill_kernels.cu\n[cuda] src/qsa_decode_attn.cu\nsrc/qsa_decode_attn.cu:61:39: error: no matching function for call to 'qsa_scratch_floats'\n    const size_t qbase = (size_t)qi * qsa_scratch_floats(a.cap, n_head);\n                                      ^~~~~~~~~~~~~~~~~~\ninclude/baloon/decode_attn_kernels.hpp:15:17: note: candidate function not viable: call to __host__ function from __global__ function\ninline uint64_t qsa_scratch_floats(int cap, int n_head) { return (uint64_t)n_chunks(cap) * n_head * (kHD + 2) + 64; }\n                ^\nsrc/qsa_decode_attn.cu:135:39: error: no matching function for call to 'qsa_scratch_floats'\n    const size_t qbase = (size_t)qi * qsa_scratch_floats(a.cap, n_head);\n                                      ^~~~~~~~~~~~~~~~~~\ninclude/baloon/decode_attn_kernels.hpp:15:17: note: candidate function not viable: call to __host__ function from __global__ function\ninline uint64_t qsa_scratch_floats(int cap, int n_head) { return (uint64_t)n_chunks(cap) * n_head * (kHD + 2) + 64; }\n                ^\n2 errors generated when compiling for ivcore10.",
+      "kind": "port_incomplete",
+      "text": "port_incomplete: 8 of the 86 definitions of the unit's reference files have no counterpart:\n  src/kernels/cuda/qsa_decode_attn.cu G → src/qsa_decode_attn.cu:G: not defined in that file\n  src/kernels/cuda/qsa_decode_attn.cu HD → src/qsa_decode_attn.cu:HD: not defined in that file\n  src/kernels/cuda/qsa_decode_attn.cu THREADS → src/qsa_decode_attn.cu:THREADS: not defined in that file\n  src/kernels/cuda/qsa_decode_attn.cu WARPS → src/qsa_decode_attn.cu:WARPS: not defined in that file\n  src/prefill/kernels.cu N → src/prefill/kernels.cu:N: not defined in that file\n  src/prefill/kernels.cu RG → src/prefill/kernels.cu:RG: not defined in that file\n  src/prefill/kernels.cu S → src/prefill/kernels.cu:S: not defined in that file\n  src/prefill/kernels.cu blocks_for → src/prefill/kernels.cu:blocks_for: not defined in that file",
       "base_ref": "einsteinOS/dev-c880662efd-wip-u52d156705c"
     }
   },
