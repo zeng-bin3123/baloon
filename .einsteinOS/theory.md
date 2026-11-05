@@ -2542,7 +2542,7 @@ end Ref.Prefill
 # MODULE: serve_engine
 SOURCES: serve/server.py
 OpenAI / Anthropic HTTP front for a single resident engine: a FIFO-serialized `Service`, a
-`StrataEngine` speaking the `GEN / T / DONE / ERR` line protocol, an image-embedding cache
+`RefEngine` speaking the `GEN / T / DONE / ERR` line protocol, an image-embedding cache
 bounded to 64 entries, API-key authorization and finish-reason mapping.
 
 ## Source semantics
@@ -6601,7 +6601,7 @@ theorem portable_not_native : ggmlNative true = false := rfl
 theorem default_native : ggmlNative false = true ∧ baselineFlags false = false := by decide
 
 /-- Vision runs on the GPU only if the CUDA option is on. -/
-def ggmlCuda (stratavisioncuda : Bool) : Bool := stratavisioncuda
+def ggmlCuda (refvisioncuda : Bool) : Bool := refvisioncuda
 
 /-- The default (OFF) builds no CUDA backend. -/
 theorem cuda_default_off : ggmlCuda false = false := rfl
