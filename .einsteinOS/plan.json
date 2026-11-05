@@ -462,6 +462,16 @@
       "pass": true,
       "unit_id": "u12d8dd5102"
     },
+    "ByteLevelTokenizer.lean": {
+      "hash": "63ffd844d132",
+      "pass": true,
+      "unit_id": "ubb09633f12"
+    },
+    "CanonicalQuantPack.lean": {
+      "hash": "7c285807b859",
+      "pass": true,
+      "unit_id": "ubb09633f12"
+    },
     "ChatFrontend.lean": {
       "hash": "e30953cb2b0d",
       "pass": true,
@@ -522,6 +532,11 @@
       "pass": true,
       "unit_id": "u253a75befe"
     },
+    "GgufLazyLoader.lean": {
+      "hash": "4c8cfaa7a4fa",
+      "pass": true,
+      "unit_id": "ubb09633f12"
+    },
     "IquantBlockDecode.lean": {
       "hash": "b13022296492",
       "pass": true,
@@ -576,6 +591,11 @@
       "hash": "5aef6597d767",
       "pass": true,
       "unit_id": "uc81136f4d9"
+    },
+    "Q2Avx2GgufRows.lean": {
+      "hash": "da3d71d3b07b",
+      "pass": true,
+      "unit_id": "ubb09633f12"
     },
     "Q2ExpertKernelLayout.lean": {
       "hash": "860dd6abfb82",
@@ -637,15 +657,18 @@
       "pass": true,
       "unit_id": "u52d156705c"
     },
+    "VisionEncoderTool.lean": {
+      "hash": "24e4dcc767a9",
+      "pass": true,
+      "unit_id": "ubb09633f12"
+    },
     "WeightLoader.lean": {
       "hash": "e81627089f2b",
       "pass": true,
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {
-    "ubb09633f12": 1
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u02c65ed515": [
       "gpu_code_missing"
@@ -721,20 +744,8 @@
       "smoke_fail"
     ]
   },
-  "last_failure": {
-    "ubb09633f12": {
-      "kind": "review_fail",
-      "text": "activation_quantizer rounds half-to-even (cvtps_epi32) but the theory spec requires half-away ties, and test_rounding_model only checks local lambdas so it cannot fail",
-      "base_ref": "einsteinOS/dev-c880662efd"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "ubb09633f12": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
