@@ -296,7 +296,8 @@
         "ExpertPoolScheduling.lean",
         "IquantBlockDecode.lean"
       ],
-      "reason": "added after theory changed"
+      "reason": "added after theory changed",
+      "conv": "32fc6f2e-ad68-43d9-b93b-387435fccbf2"
     },
     {
       "id": "ubb09633f12",
@@ -591,7 +592,9 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u12d8dd5102": 1
+  },
   "fail_history": {
     "u02c65ed515": [
       "gpu_code_missing"
@@ -603,6 +606,9 @@
     ],
     "u0e60a9f272": [
       "port_incomplete"
+    ],
+    "u12d8dd5102": [
+      "isa_path_missing"
     ],
     "u253a75befe": [
       "smoke_fail"
@@ -660,7 +666,13 @@
       "smoke_fail"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "u12d8dd5102": {
+      "kind": "isa_path_missing",
+      "text": "isa_path_missing: the reference builds src/kernels/cpu/expert.cpp, src/kernels/cpu/iq_avx512.cpp with -mavx512f -mavx512vbmi -mavx512vnni -mf16c -mfma; no binary the build produced or the test ran contains -mavx512f (%zmm[0-9]+), -mavx512vbmi (\\bvpermb\\b|\\bvperm[it]2b\\b|\\bvpmultishiftqb\\b), -mavx512vnni (\\bvpdpbusds?\\b|\\bvpdpwssds?\\b), -mf16c (\\bvcvtph2ps\\b|\\bvcvtps2ph\\b), -mfma (\\bvf(n?m(add|sub))(132|213|231)[ps][sd]\\b) (binaries looked at: /tmp/baloon_unit_u12d8_build/tests__dbg_router.cu.o /tmp/baloon_unit_u12d8_build/src__cu__dequant_bf16.cu.o /tmp/baloon_unit_u12d8_build/src__ilu_f16_decode_bf16.cu.o /tmp/baloon_unit_u12d8_build/src__ilu_f16_encode_top.cu.o /tmp/baloon_unit_u12d8_build/src__ilu_gdn_prep.cu.o /tmp/baloon_unit_u12d8_build/src__ilu_gdn_warp_step.cu.o (+18 more))\nport_incomplete: 10 of the 310 definitions of the unit's reference files have no counterpart:\n  include/ref/kernels/cpu/expert.hpp O_D_CODES → include/baloon/kern_cpu_expert.hpp:O_D_CODES: not defined in that file\n  include/ref/kernels/cpu/expert.hpp O_D_SCALES → include/baloon/kern_cpu_expert.hpp:O_D_SCALES: not defined in that file\n  include/ref/kernels/cpu/expert.hpp O_GU_SCALES → include/baloon/kern_cpu_expert.hpp:O_GU_SCALES: not defined in that file\n  include/ref/kernels/cpu/expert.hpp ROW_D → include/baloon/kern_cpu_expert.hpp:ROW_D: not defined in that file\n  include/ref/kernels/cpu/expert.hpp SC_D → include/baloon/kern_cpu_expert.hpp:SC_D: not defined in that file\n  include/ref/kernels/cpu/expert.hpp SC_GU → include/baloon/kern_cpu_expert.hpp:SC_GU: not defined in that file\n  src/kernels/cpu/expert.cpp expert_oracle_q8_0 → src/cpu/expert_q2.cpp:expert_oracle_q8_0: not defined in that file\n  src/kernels/cuda/native_mmvq.cu Q81Block → src/cu/native_mmvq.cu:Q81Block: not defined in that file\n  src/kernels/cuda/s2_expert_grouped.cu down_kernel → src/cu/s2_expert_grouped.cu:down_kernel: not defined in that file\n  src/kernels/cuda/s2_expert_grouped.cu gu_kernel → src/cu/s2_expert_grouped.cu:gu_kernel: not defined in that file",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-u12d8dd5102"
+    }
+  },
   "infra_fails": 0,
   "port_units": [
     {
@@ -940,6 +952,7 @@
   ],
   "verify_seen": {
     "u0868e10073": true,
+    "u12d8dd5102": true,
     "u316bd6b9ec": true,
     "u52d156705c": true
   },
