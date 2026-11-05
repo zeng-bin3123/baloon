@@ -30,6 +30,12 @@ static void test_overflow_contract() {
     CHECK(!mk(1ull << 58, 1, 1, Elem::F16, Elem::BF16).valid());// padded A bytes wrap via pm*pk
     CHECK(!mk(1ull << 40, 1, 1ull << 22).valid());              // only padded A bytes wrap (flops, W, out, ws fit)
     CHECK(!mk(1, 1ull << 40, 1ull << 22).valid());              // only padded W bytes wrap
+    // Scratch-only wrap: a=F16 (A bytes 2^63 fit), w=F32 (scratch 2^40*2^22*4 = 2^64 wraps to 0); W, out, flops, ws all fit.
+    CHECK(!mk(1ull << 40, 1, 1ull << 22, Elem::F16, Elem::F32).valid());
+    CHECK(!mk(1ull << 40, 1, 1ull << 22, Elem::BF16, Elem::F32).valid());
+    CHECK(mk(1ull << 40, 1, 1ull << 21, Elem::F16, Elem::F32).valid());   // half of that fits
+    CHECK(mk(1ull << 40, 1, 1ull << 22, Elem::F16, Elem::F16).valid());   // no conversion -> no scratch, A bytes 2^63 fit
+    CHECK(mk(1ull << 40, 1, 1ull << 22, Elem::F32, Elem::F16).valid() == false);  // A bytes 2^64 wrap
     CHECK(mk(1ull << 40, 1, 1ull << 21).valid());               // half of that is fine
     CHECK(mk(1, 1ull << 40, 1ull << 21).valid());
     // boundary: just below the limits is accepted and its accessors do not wrap

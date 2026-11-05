@@ -39,9 +39,7 @@ struct Gemm {
         uint64_t t = 0;
         if (!mul_checked(pm, pk, &t) || !mul_checked(t, elem_bytes(a_type), &t)) return false;   // padded A bytes
         if (!mul_checked(pn, pk, &t) || !mul_checked(t, elem_bytes(w_type), &t)) return false;   // padded W bytes
-        if (a_type != w_type) {                                                                  // scratch bytes
-            if (!mul_checked(pm, pk, &t) || !mul_checked(t, elem_bytes(w_type), &t)) return false;
-        }
+        if (a_type != w_type && (!mul_checked(pm, pk, &t) || !mul_checked(t, elem_bytes(w_type), &t))) return false;  // scratch bytes
         uint64_t mn = 0;
         if (!mul_checked(m, n, &mn) || !mul_checked(mn, 4, &t)) return false;                    // f32 output bytes
         if (!mul_checked(mn, k, &t) || !mul_checked(t, 2, &t)) return false;                     // flops

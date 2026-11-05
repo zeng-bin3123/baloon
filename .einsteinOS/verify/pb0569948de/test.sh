@@ -55,6 +55,7 @@ mutate refdot   $H 's|acc += a\[t \* k + c\] \* w\[r \* k + c\];|acc += a[t * k 
 mutate refidx   $H 's|out\[t \* n + r\] = acc;|out[r * m + t] = acc;|'
 mutate ovfA     $H 's|^.*// padded A bytes$||'
 mutate ovfW     $H 's|^.*// padded W bytes$||'
+mutate ovfScr   $H 's|^.*// scratch bytes$||'
 mutate ovfOut   $H 's|^.*// f32 output bytes$||'
 mutate ovfFlops $H 's|^.*// flops$||'
 mutate ovfWs    $H 's|^.*// workspace$||'
