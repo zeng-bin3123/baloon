@@ -414,7 +414,8 @@
         "F16BitsRounding.lean"
       ],
       "scope": "items: rneStep, rne_below_half, rne_above_half, rne_tie_even, rne_le_succ, encodeTop, finite_overflow_is_inf, nan_stays_nan, inf_stays_inf, conflation_hazard",
-      "reason": "3 fix attempts used"
+      "reason": "3 fix attempts used",
+      "conv": "18f7987b-c9f8-4959-8fe1-770ff43c89f7"
     },
     {
       "id": "u0868e10073",
@@ -503,7 +504,9 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "uf9c373ce4f": 1
+  },
   "fail_history": {
     "u042aaf67ce": [
       "compile_fail",
@@ -555,9 +558,18 @@
       "compile_fail",
       "gpu_code_missing",
       "existing_code_fails"
+    ],
+    "uf9c373ce4f": [
+      "port_incomplete"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "uf9c373ce4f": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: 57 of the 90 definitions of the unit's reference files have no counterpart:\n  include/ref/artifact/dequant.hpp REF_GGUF_MAIN_DISABLED → include/baloon/f16_bits_rounding.hpp:BALOON_DEQUANT_MAIN_DISABLED: not defined in that file\n  src/kernels/cuda/kv_q8.cu func check: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/kv_q8.cu func kv_append_q8_kernel: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/kv_q8.cu func kv_append_q8_step: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/kv_q8.cu func kv_gather_q8_kernel: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/kv_q8.cu func kv_gather_q8_step: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/kv_q8.cu func validate: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu const THREADS: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu const TOPK_THREADS: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func check_launch: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func check_sync: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func fail: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func grid_for: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func h2f: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func indexer_key_append: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func indexer_key_append_kernel: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func kv_append: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func kv_append_kernel: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func kv_append_step: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func kv_gather: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func kv_gather_kernel: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func kv_gather_step: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func qsa_attend: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func qsa_attend_kernel: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func qsa_attend_step: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func qsa_gate_apply: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func qsa_gate_apply_f32: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func qsa_gate_apply_f32_kernel: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func qsa_gate_apply_kernel: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func qsa_index: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func qsa_index_kernel: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func qsa_index_step: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func qsa_step_fill: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func step_scratch: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func step_upload: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func step_upload_raw: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func step_upload_width: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func topk_512: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func topk_512_step: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func topk_kernel: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func validate: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func warp_max: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/qsa.cu func warp_sum: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/quantize_act.cu const Q8K_BYTES: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/quantize_act.cu const QK8_0: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/quantize_act.cu const QK_K: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/quantize_act.cu func dequant_q8_0: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/quantize_act.cu func dequant_q8_0_kernel: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/quantize_act.cu func dequant_q8_K: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/quantize_act.cu func dequant_q8_K_kernel: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/quantize_act.cu func nearest_int_dev: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/quantize_act.cu func quantize_q8_0: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/quantize_act.cu func quantize_q8_0_kernel: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/quantize_act.cu func quantize_q8_0_scaled: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/quantize_act.cu func quantize_q8_0_scaled_kernel: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/quantize_act.cu func quantize_q8_K: no line in .einsteinOS/port/uf9c373ce4f.tsv\n  src/kernels/cuda/quantize_act.cu func quantize_q8_K_kernel: no line in .einsteinOS/port/uf9c373ce4f.tsv",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-uf9c373ce4f"
+    }
+  },
   "infra_fails": 0,
   "port_units": [
     {
