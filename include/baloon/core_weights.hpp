@@ -19,11 +19,17 @@ namespace baloon {
 namespace core {
 
 constexpr uint64_t kWeightChunk = 8388608ull;     // 8 MiB of source per staging round
+constexpr uint64_t CHUNK = kWeightChunk;
 
 enum class WConv { Copy, WidenF16, Bf16High, ToF16 };
+using Conv = WConv;                               // short names used by the port table / tests
 
+struct WSeg;
+using Seg = WSeg;
 struct WSeg { uint64_t src_off = 0, dst_off = 0, src_bytes = 0, dst_bytes = 0; WConv conv = WConv::Copy; };
 
+struct WIndexRow;
+using IndexRow = WIndexRow;
 struct WIndexRow {
     std::string name;
     int kind = 0;                                  // index kind as written
