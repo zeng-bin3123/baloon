@@ -87,7 +87,7 @@ static void test_unpack() {
     }
 }
 
-static int rne_clamp(float v) { int r = (int)std::nearbyint(v); return std::max(-127, std::min(127, r)); }
+static int rne_clamp(float v) { int r = (int)std::round(v); return std::max(-127, std::min(127, r)); }  // std::round = half away from zero
 
 static void test_quantizer() {
     Rng rng(12);
@@ -205,7 +205,26 @@ static void test_rows() {
     }
 }
 
+// Ties through the REAL quantizer: chunk = {127, then t+0.5 style values}; amax=127 gives id==1/ (127/127) so x is the quantized input.
+static void test_quantizer_ties() {
+    std::vector<float> x(32, 0.f); x[0] = 127.f;
+    const float ties[] = {0.5f, -0.5f, 1.5f, -1.5f, 2.5f, -2.5f, 3.5f, -3.5f, 62.5f, -62.5f, 0.49999997f, -0.49999997f, 2.4999998f, 126.5f, -126.5f};
+    const int expect[] = {1, -1, 2, -2, 3, -3, 4, -4, 63, -63, 0, 0, 2, 127, -127};
+    const size_t nt = sizeof(ties) / sizeof(ties[0]);
+    for (size_t i = 0; i < nt; ++i) {
+        for (int k = 1; k < 32; ++k) x[k] = 0.f;
+        x[1] = ties[i];
+        int8_t q[32]; float d[1]; int32_t hx[1];
+        q2rows::activation_quantizer(x.data(), 32, q, d, hx);
+        K15(d[0] == 1.f);
+        K15(q[0] == 127);
+        K15(q[1] == expect[i]);
+        K15(hx[0] == 127 + expect[i]);
+    }
+}
+
 static void test_rounding_model() {
+    test_quantizer_ties();
     auto half_away = [](int t2) { return t2 >= 0 ? (t2 + 1) / 2 : -((-t2 + 1) / 2); };
     K15(half_away(5) == 3 && half_away(-5) == -3 && half_away(4) == 2 && half_away(-4) == -2);
     auto clampq = [](long v) { return std::max(-127L, std::min(v, 127L)); };

@@ -70,6 +70,17 @@ bool built_with_required_isa() {
 #endif
 }
 
+// Round-half-away-from-zero (ties |frac| == 0.5 go away from zero). Exact: trunc and frac are exact in float.
+static inline __m256i round_half_away_epi32(__m256 t) {
+    const __m256 tr = _mm256_round_ps(t, _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC);
+    const __m256 frac = _mm256_sub_ps(t, tr);
+    const __m256 absmask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff));
+    const __m256 ge = _mm256_cmp_ps(_mm256_and_ps(frac, absmask), _mm256_set1_ps(0.5f), _CMP_GE_OQ);
+    const __m256 sgn = _mm256_andnot_ps(absmask, t);                       // sign bit of t
+    const __m256 step = _mm256_and_ps(ge, _mm256_or_ps(sgn, _mm256_set1_ps(1.f)));
+    return _mm256_cvttps_epi32(_mm256_add_ps(tr, step));
+}
+
 void activation_quantizer(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx) {
     const __m256 absmask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff));
     const __m256i lo = _mm256_set1_epi32(-127), hi = _mm256_set1_epi32(127);
@@ -85,7 +96,7 @@ void activation_quantizer(const float* x, uint32_t n, int8_t* q, float* d, int32
         const __m256 vid = _mm256_set1_ps(id);
         __m256i qi[4], sum = _mm256_setzero_si256();
         for (int k = 0; k < 4; ++k) {
-            qi[k] = _mm256_min_epi32(_mm256_max_epi32(_mm256_cvtps_epi32(_mm256_mul_ps(v[k], vid)), lo), hi);  // RNE, clamp
+            qi[k] = _mm256_min_epi32(_mm256_max_epi32(round_half_away_epi32(_mm256_mul_ps(v[k], vid)), lo), hi);  // half-away, clamp
             sum = _mm256_add_epi32(sum, qi[k]);
         }
         __m256i p = _mm256_packs_epi16(_mm256_packs_epi32(qi[0], qi[1]), _mm256_packs_epi32(qi[2], qi[3]));
