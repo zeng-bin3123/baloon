@@ -182,7 +182,7 @@ static void test_qsa() {
     for (int c = 0; c < cap; ++c) {
         if (c >= nkv) { CHECK(std::isinf(sc[c]) && sc[c] < 0); continue; }
         double s = 0;
-        for (int h = 0; h < 4; ++h) { double dot = 0; for (int d = 0; d < 128; ++d) dot += (double)q[h * 128 + d] * hkeys[(size_t)c * 128 + d]; s += hw[h] * std::max(dot, 0.0); }
+        for (int h = 0; h < 4; ++h) { double dot = 0; for (int d = 0; d < 128; ++d) dot += (double)q[h * 128 + d] * hkeys[(size_t)c * 128 + d]; s += hw[h] * (dot > 0.0 ? dot : 0.0); }
         ref[c] = (float)s; CHECK(std::fabs(sc[c] - s) <= 1e-3 * (1.0 + std::fabs(s)));
     }
     CHECK(qsak::step_upload(0, nkv) == 0);
@@ -222,15 +222,15 @@ static void test_qsa() {
     float* dqa = up(qa); int32_t* dsel = up(sel); float* dout = dalloc<float>(dim);
     CHECK(qsak::qsa_attend(dqa, kc, vc, dsel, nsel, ncell, dim, scale, dout) == 0);
     auto o = down(dout, dim);
-    std::vector<double> lg(nsel, -1e300); double m = -1e300;
+    std::vector<double> lg(nsel, -1e30); double m = -1e30;
     for (int i = 0; i < nsel; ++i) if (sel[i] >= 0 && sel[i] < ncell) {
         double s = 0; for (int d = 0; d < dim; ++d) s += (double)qa[d] * f16::half_to_float(hk[(size_t)sel[i] * dim + d]);
         lg[i] = s * scale; m = std::max(m, lg[i]);
     }
-    double den = 0; for (int i = 0; i < nsel; ++i) if (lg[i] > -1e299) den += std::exp(lg[i] - m);
+    double den = 0; for (int i = 0; i < nsel; ++i) if (lg[i] > -1e29) den += std::exp(lg[i] - m);
     for (int d = 0; d < dim; ++d) {
         double a = 0;
-        for (int i = 0; i < nsel; ++i) if (lg[i] > -1e299) a += std::exp(lg[i] - m) * f16::half_to_float(hv[(size_t)sel[i] * dim + d]);
+        for (int i = 0; i < nsel; ++i) if (lg[i] > -1e29) a += std::exp(lg[i] - m) * f16::half_to_float(hv[(size_t)sel[i] * dim + d]);
         a /= den; CHECK(std::fabs(o[d] - a) <= 2e-4 * (1.0 + std::fabs(a)));
     }
     CHECK(qsak::step_upload_width(0, nsel) == 0);
