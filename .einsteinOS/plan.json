@@ -414,6 +414,10 @@
         "F16BitsRounding.lean"
       ],
       "scope": "items: rneStep, rne_below_half, rne_above_half, rne_tie_even, rne_le_succ, encodeTop, finite_overflow_is_inf, nan_stays_nan, inf_stays_inf, conflation_hazard",
+      "children": [
+        "uebd9b81357",
+        "u02c65ed515"
+      ],
       "reason": "3 fix attempts used",
       "conv": "53a86f26-0591-48a7-b821-3fae71fde47f"
     },
@@ -424,6 +428,24 @@
         "F16BitsRounding.lean"
       ],
       "scope": "items: normShift, normShift_spec, subnormal_bias, subnormal_exp_field, normal_exp_field, nat_truncation_hazard, bf16Round, bf16_exact, bf16_below_half, bf16_above_half, bf16_tie_even",
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "uebd9b81357",
+      "parent": "uf9c373ce4f",
+      "modules": [
+        "F16BitsRounding.lean"
+      ],
+      "scope": "items: rneStep, rne_below_half, rne_above_half, rne_tie_even, rne_le_succ",
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "u02c65ed515",
+      "parent": "uf9c373ce4f",
+      "modules": [
+        "F16BitsRounding.lean"
+      ],
+      "scope": "items: encodeTop, finite_overflow_is_inf, nan_stays_nan, inf_stays_inf, conflation_hazard",
       "reason": "3 fix attempts used"
     }
   ],
@@ -504,9 +526,7 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {
-    "uf9c373ce4f": 3
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u042aaf67ce": [
       "compile_fail",
@@ -565,13 +585,7 @@
       "smoke_fail"
     ]
   },
-  "last_failure": {
-    "uf9c373ce4f": {
-      "kind": "smoke_fail",
-      "text": "test.sh exit=1: == host tests ==\nf16 bits rounding host tests: 17418200 checks, 0 failures\ndequant_check ok\n== GPU tests ==\n-- GPU 0 --\nf16 bits gpu test: 1067008 inputs, 0 failures\ntimeout: the monitored command dumped core\n.einsteinOS/verify/uf9c373ce4f/test.sh: line 44: 48597 Trace/breakpoint trap   CUDA_VISIBLE_DEVICES=$g timeout 600 \"$OUT/t_akq_gpu\"\nact/kv/qsa GPU test FAILED on GPU 0 (exit 133)\n-- GPU 1 --\nf16 bits gpu test: 1067008 inputs, 0 failures\ntimeout: the monitored command dumped core\n.einsteinOS/verify/uf9c373ce4f/test.sh: line 44: 48605 Trace/breakpoint trap   CUDA_VISIBLE_DEVICES=$g timeout 600 \"$OUT/t_akq_gpu\"\nact/kv/qsa GPU test FAILED on GPU 1 (exit 133)\n-- GPU 2 --\nf16 bits gpu test: 1067008 inputs, 0 failures\ntimeout: the monitored command dumped core\n.einsteinOS/verify/uf9c373ce4f/test.sh: line 44: 48613 Trace/breakpoint trap   CUDA_VISIBLE_DEVICES=$g timeout 600 \"$OUT/t_akq_gpu\"\nact/kv/qsa GPU test FAILED on GPU 2 (exit 133)\n-- GPU 3 --\nf16 bits gpu test: 1067008 inputs, 0 failures\ntimeout: the monitored command dumped core\n.einsteinOS/verify/uf9c373ce4f/test.sh: line 44: 48621 Trace/breakpoint trap   CUDA_VISIBLE_DEVICES=$g timeout 600 \"$OUT/t_akq_gpu\"\nact/kv/qsa GPU test FAILED on GPU 3 (exit 133)\n== port table ==\nUNIT TESTS FAILED",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-uf9c373ce4f"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
   "port_units": [
     {
