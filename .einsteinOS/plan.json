@@ -668,8 +668,13 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "pb7e2533792": 1
+  },
   "fail_history": {
+    "pb7e2533792": [
+      "review_fail"
+    ],
     "u02c65ed515": [
       "gpu_code_missing"
     ],
@@ -744,14 +749,14 @@
       "smoke_fail"
     ]
   },
-  "last_failure": {},
-  "infra_fails": 0,
-  "review_pending": {
+  "last_failure": {
     "pb7e2533792": {
-      "compile": "pass",
-      "smoke": "pass"
+      "kind": "review_fail",
+      "text": "block_geometry/ggml_type_name map Q2_0 to private id 100 and treat id 42 as unknown, but theory DequantBlockLayouts specifies geom 42 = (64,18); the test never checks id 42",
+      "base_ref": "einsteinOS/dev-c880662efd"
     }
   },
+  "infra_fails": 0,
   "port_units": [
     {
       "id": "pfcccb31b26",
