@@ -1,0 +1,6 @@
+include/ref/platform/direct_file.hpp	Completion	include/baloon/direct_file_io.hpp	Completion
+include/ref/platform/direct_file.hpp	DirectFile	include/baloon/direct_file.hpp	DirectFile
+include/ref/platform/direct_file.hpp	now_us	include/baloon/direct_file.hpp	now_us
+include/ref/platform/memory.hpp	LockResult	include/baloon/resident_memory.hpp	LockResult
+include/ref/platform/memory.hpp	lock_resident	include/baloon/resident_memory.hpp	lock_resident
+include/ref/platform/memory.hpp	unlock_resident	include/baloon/resident_memory.hpp	unlock_resident
