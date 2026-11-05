@@ -999,7 +999,7 @@ f2323d876d20384a0285f5c15d466026def7c1c0|2026-10-23|Niko1221|setup test + docs: 
 237eb667d3ca25b03984d8090a6d966207bfb009|2026-10-23|Niko1221|Merge branch 'f-dsv41-rel' into f-dsv41-setup
 d6f18babe9cfb27baff074443c40f5d70c41483f|2026-10-23|Niko1221|Merge f-dsv41-r97 fb321d62c into f-dsv41-rel (layer-major chunked prompt as the engine default)
 1747c8e538820755886ac522503ca09f2b5a07ef|2026-10-23|Niko1221|dsv41 cpu lane: one-token AVX-512 rows - sign masks by popcount (IQ2_XXS, IQ2_XS, IQ3_XXS), IQ1_M AVX-512 rows with pdep indices; chosen per CPU (Zen 5 from 1 token)
-f1cb66d09e664fc1e4503b9959ebaf3825f6f180|2026-10-23|Niko1221|dsv41: ref-dsv41 --version and a 'ds4: build <commit>' line with --verbose (commit from git at configure, a BUILD_ID file in an archive, or -DSTRATA_BUILD_ID)
+f1cb66d09e664fc1e4503b9959ebaf3825f6f180|2026-10-23|Niko1221|dsv41: ref-dsv41 --version and a 'ds4: build <commit>' line with --verbose (commit from git at configure, a BUILD_ID file in an archive, or -DREF_BUILD_ID)
 4eedb86b4fc719369c28b46bed839ffda0c6c662|2026-10-23|Niko1221|Merge f-dsv41-h100 (store pre-grow: register the whole arena before the first kernel on Linux, fixes the --ssd-cache zero-copy hang)
 e917cf5b373e745f67b6a0afb7be7ab827f5b580|2026-10-23|Niko1221|Merge branch 'f-dsv41-rel' into f-dsv41-setup
 c506238ce28207f736eb2b864450e08f86388b12|2026-10-23|Niko1221|setup: DeepSeek official sets start with --dspark-conf 0.65 (H100 measured default)
@@ -1029,7 +1029,7 @@ b5b4a97c0a9b0c2c5f5e2d96529c126cc8aec899|2026-10-23|Niko1221|metal: the mHC dens
 7519b1c75c583844669efc18de877c3a3cca43f7|2026-10-23|Niko1221|pack_gguf: warn loudly when --skip-tensors / --dense-override are used on an official IST-DAS set (engram_k/q/wkv present): the rebuilt pack loads but gives garbage text; the plain recipe is right
 dbf3bb2e643c769df89c96c891787afda3cba22c|2026-10-23|Niko1221|dsv41: the layer-major run's RAM is given back before the cache catch-up and the store fill
 86bdfbd0dafe2c167a3917e12acb322ae35a7927|2026-10-23|Niko1221|dsv41 iq: HIP keeps the release grids and kernels (no persistent work-item grid there)
-796dbb77b47a5b63eea000c6a1c3a0f5d2af026b|2026-10-23|Niko1221|dsv41 iq: the IQ1_M code-table copy is CUDA only (kIq1mCodes does not exist on HIP; found by building the HIP-guarded paths under nvcc with -DSTRATA_USE_HIP)
+796dbb77b47a5b63eea000c6a1c3a0f5d2af026b|2026-10-23|Niko1221|dsv41 iq: the IQ1_M code-table copy is CUDA only (kIq1mCodes does not exist on HIP; found by building the HIP-guarded paths under nvcc with -DREF_USE_HIP)
 96a47b79d5109ab074203e0d39e0fb7bda70e88a|2026-10-23|Niko1221|dsv41: after a chunked prompt the RAM store is filled with the prompt's hottest CPU-lane experts (a window prompt fills it through the CPU lane; the chunk path streams past it)
 9c46ab821a2fa1e74fa67b5e5296210b2d7cf45f|2026-10-23|Niko1221|dsv41 iq: kIq1mCodes is CUDA-only, so its use in load_tab_fast is under #if !REF_USE_HIP (HIP failed 'undeclared identifier kIq1mCodes': non-dependent names are looked up in the dead constexpr branch)
 12595032e7c7564ccc4120aeecffde4f1c7b2b25|2026-10-23|Niko1221|Merge f-dsv41-cuk a3d955201 into f-dsv41-rel (persistent grids only for codebooks >= 8 KiB: fixes 2.5x slowdown with 1 active expert)
@@ -2522,10 +2522,10 @@ a35ac34944f6d9d08cdfefe9e8062a4b51716c23|2026-10-15|Niko1221|metal: wrap_split_t
 2b296987b98331d46cb1592a5ed2b7afb8ff06de|2026-10-15|Niko1221|conversation cache: a match that reaches a pin=N prefix is taken instead of borrowed (#1164)
 c9e571e057ca51012e828d6a01cf8f26f3804111|2026-10-15|Niko1221|serve: a new conversation that starts with a checkpoint of a parked one borrows it, the parked conversation stays (#1164)
 04e3481b99be56faab670cc2cb73d71103f25a39|2026-10-15|Niko1221|docs: --conversation-cache-park-gain (#2265)
-3d99819e38585286cf3e63d3f46c9c139da303f6|2026-10-15|Niko1221|setup: the engine builds pin -DSTRATA_MMQ_KQUANTS=ON too (465cd61d flipped it with REF_Q6K_EXPERTS, and a stale CMakeCache.txt keeps the old OFF the same way; found by qiuzan2001 on #2515)
+3d99819e38585286cf3e63d3f46c9c139da303f6|2026-10-15|Niko1221|setup: the engine builds pin -DREF_MMQ_KQUANTS=ON too (465cd61d flipped it with REF_Q6K_EXPERTS, and a stale CMakeCache.txt keeps the old OFF the same way; found by qiuzan2001 on #2515)
 dd08a7d0ec42d7252222789ad61574a973c6d895|2026-10-15|Niko1221|serve: pick_slot sends a chat's next turn to the slot that holds it, found by its turn checkpoint (#2518)
 c2215a2af3eaae9605141e51c52da71c4764e8f6|2026-10-15|Niko1221|docs/DETAILS.md: the elastic encoder at 196K context
-5d83130cdb5dcb72e054fc589a0a36800f25f6a7|2026-10-15|Niko1221|setup: the HIP engine build pins -DSTRATA_Q6K_EXPERTS=ON too (the same stale CMake cache as #2515 for the CUDA build); the CUDA configure line is tested (tools/test_setup_stale_stamp.py)
+5d83130cdb5dcb72e054fc589a0a36800f25f6a7|2026-10-15|Niko1221|setup: the HIP engine build pins -DREF_Q6K_EXPERTS=ON too (the same stale CMake cache as #2515 for the CUDA build); the CUDA configure line is tested (tools/test_setup_stale_stamp.py)
 a7d4b75443ff249cad776fb44a831ea87002b7ea|2026-10-11|xrip|serve: --prompt-cache-spread, checkpoints kept spread back from the conversation's end (opt-in)
 d9cb22d287d88b3a6ead0cf81c51c9f85aa96ffa|2026-10-13|Krypto-Whitehat|Conversation cache: --conversation-cache-park-gain N stops a turn that grew a few hundred tokens from rewriting a whole snapshot (RTX 5090 Laptop, IQ3_XXS: 1,418 parks -> 1, 2,251.9 GB -> 3.26 GB host copy at 4.7 % read back; decode -3.4 %, inside the run-to-run spread)
 53f72571fb74a21312a939ee3aee44b146feeb05|2026-10-02|BlueKingMuch|conversation cache: a conversation parked again keeps at most an eighth of each K/V buffer in reserve (was up to 16 MiB per buffer, 0.4-0.5 GB per conversation)
@@ -2534,7 +2534,7 @@ f13a870d52bcff43f15068d3611e0d3410a36f37|2026-10-15|Niko1221|serve: tokenise the
 40a6220f24606e5008d0dde89a6a95c9b13b2902|2026-10-15|Niko1221|docs: DEQUANT_WIDE on sm_86 also measured on the RTX A4000
 abce866ebee2c0a7e83c5886121b733bdc6f2a0a|2026-10-15|Niko1221|docs: the CUDA opt-in switches ported for 0.1.45 (#2058 #2059 #2075 #1888 #1889 #1418 #1370 #1367 #1262 #1368 #1107), measured on sm_86; REF_DEQUANT_WIDE default on sm_86
 5f843a926f6cc202220114fdd87de5c409f84b55|2026-10-15|Niko1221|dequant: the wide kernels (REF_DEQUANT_WIDE) are on by default on sm_86 too
-27835694949fd059cd03eacca99cdfa8170f1165|2026-10-15|p3lusa|setup: pin -DSTRATA_Q6K_EXPERTS=ON in the CUDA engine build
+27835694949fd059cd03eacca99cdfa8170f1165|2026-10-15|p3lusa|setup: pin -DREF_Q6K_EXPERTS=ON in the CUDA engine build
 c8cab035030c8f0c1aa7b9131db56fe8efc0bd9e|2026-10-15|Niko1221|docs/DETAILS.md: the image encoder on 16 GB cards, measured (#2406)
 df44bcb7125224e1141035443b8b7830f9e017c2|2026-10-15|Niko1221|Merge f-145-havok (#2364 multi-user series, opt-in)
 45752724d9f649d14e38fc5d1aa0c2068f094a3a|2026-10-15|Niko1221|setup: Flash-Next images 'yes' gets the CPU encoder on an NVIDIA card under 24 GB, --vision gpu kept with a note (#2406: the GPU encoder cost 3-5% of text speed on 16 GB cards, 35-60% on an RTX 4080 SUPER under Windows as reported); goldens re-recorded for the two 16 GB Unsloth configs
@@ -2586,7 +2586,7 @@ cea3d61b6620d0cd8efe40a95506d79459b08309|2026-10-13|Vop3p|tests: hc_persist_pari
 6cbc15a81ad8bc9dd46b1129a76fa2d8b4d2c398|2026-10-12|Vop3p|REF_HC_PERSIST=1 (opt-in, HIP): the verifier's hyper-connection read as one persistent kernel
 e5d91bf239a07baee7ac8d6c1af974fbcb6d14b5|2026-10-11|2jztricks|hip: add opt-in exact gfx1100 QSA prefill scorer
 82922f55e2d952c9c98a73c7e1bb9347f0f5a090|2026-10-08|sa|topk: compile the wide kernel on HIP too (it was CUDA-only; every deep context on AMD paid the ref radix)
-b0e88eb12f9e7c95a63c5a61eb5705516374ba11|2026-10-14|Niko1221|pcie: the in-window share refinement (PcieAuto) on HIP too — gfx1100 port of the XeStrata stabilization cluster's finding
+b0e88eb12f9e7c95a63c5a61eb5705516374ba11|2026-10-14|Niko1221|pcie: the in-window share refinement (PcieAuto) on HIP too — gfx1100 port of the XeRef stabilization cluster's finding
 01e1bc5c0e4d221cfb13c3b907ad881dd9d9e6e6|2026-10-14|Niko1221|setup: write the gfx1150 speed switches for the opt-in install
 6f0505c69e8cb85906e70250d6e2dec8b8826b17|2026-10-14|Niko1221|setup: opt-in gfx1150 (Radeon 890M / 880M, Strix Point) as a unified-memory AMD card
 d3c4a6de77a06290dfca1b2cba2cde309310a923|2026-10-14|Niko1221|setup: write the gfx1103 exact speed switches for the opt-in install
@@ -2721,7 +2721,7 @@ bebeb791a460dd1cd777599c9dbfe4cd9b789471|2026-10-11|havok2-htwo|generate: REF_CK
 a62bd38eba139c159c04d5e828df2afdd343c621|2026-10-11|havok2-htwo|generate: REF_PIPE_BYIELD_NODRAIN=1 drops a BYIELD without draining the pipelined groups
 bc761d06b1eeb4526d7e41e3b0862e36fce6409b|2026-10-11|havok2-htwo|generate: REF_TRACE times a batch admission's phases
 6ab4c312431abb0b314c6292cc194470679f851f|2026-10-11|havok2-htwo|generate: more than 8 batch slots are held to 8 rows per group window once the slot sessions that fit are known
-574dcbf9c335e741548a29585da2412617cdb2b4|2026-10-11|havok2-htwo|docs: REF_MMQ_DIRECT needs -DSTRATA_MMQ_TAB=ON; its VRAM and build cost; the hack is no bound; engine exactness
+574dcbf9c335e741548a29585da2412617cdb2b4|2026-10-11|havok2-htwo|docs: REF_MMQ_DIRECT needs -DREF_MMQ_TAB=ON; its VRAM and build cost; the hack is no bound; engine exactness
 02d0c23a599127b8b5ad26880699404b9021097d|2026-10-11|havok2-htwo|docs: REF_MMQ_DIRECT (opt-in) and the REF_MMQ_TAB build option, with the measurements
 a2d979b9990faf4df8edd3107ad6717c519ff380|2026-10-11|havok2-htwo|prefill mmq tab: moe_mmq_tab.cuh carries ggml's MIT notice
 c2b44ca5b8774eec80f07e3e065aa0a301741011|2026-10-11|havok2-htwo|expert cache: slot_guard() reports the guard applied; a test for slot_tail on uniform and sized caches
@@ -2899,7 +2899,7 @@ dd5f09a50ec22e3c027b9c658a074588b5852bb8|2026-10-13|Niko1221|docs: QUANTS.md spe
 6339e8610da7d55b09e78e1b9517ce0aaf597924|2026-10-13|Niko1221|serve: the stdin reader shares its state with main instead of borrowing main's locals (QUIT race)
 f5082f41a6a1527c8a8522ea6bfc01da1486f1f8|2026-10-13|Niko1221|Sources: no raw NUL bytes (expert_source.cpp, pinned.cu) + a test that scans for them
 12be1059df38d211221300e1798f3582080f17e6|2026-10-13|Niko1221|setup: images on by default for Unsloth's files where the encoder has room (NVIDIA 16 GB and more: the GPU encoder; AMD Linux with every expert in RAM: the CPU encoder); UD-Q4_K_XL's images no longer untested (run end to end on an RTX A4000 and an R9700); the yardstick keeps a config's --resident-budget-gib
-3e11f786aff657f91c0280dc6a4fef0e1ae748e9|2026-10-12|Niko1221|Merge f-quants (945fee23) into f-qwen36: the K-quant CPU pool rows, libstrata_kq, the K-quant GEMV work
+3e11f786aff657f91c0280dc6a4fef0e1ae748e9|2026-10-12|Niko1221|Merge f-quants (945fee23) into f-qwen36: the K-quant CPU pool rows, libref_kq, the K-quant GEMV work
 f29e74c721fa69e950c60f957902619a2cff054e|2026-10-12|Niko1221|ref-q36: FP16 prompt attention and a column-split GDN chunk kernel
 3a639f73571fa8b3a35b10ef2bb7920677071562|2026-10-12|Niko1221|Merge branch 'f-quants' into f-intel-quants
 ae02e7db176f9f4bf0d95ebfcea7bb0766fa3052|2026-10-12|Niko1221|metal: vision - image rows in the prompt, M-RoPE (qsa_prep constant 24), setup's --vision
@@ -2929,7 +2929,7 @@ b63e38b1ae23d79a6394360b8f94b66346a974f4|2026-10-12|Niko1221|docs/QUANTS.md: Uns
 6e6d4faf5bff9990f2d90756f0ca9243cbc2e9a5|2026-10-12|Niko1221|decode: NVFP4 down on 8-lane rows (4 a warp, 32 a block) - bitwise warp_sum's tree, the whole expert at 89% of the 3060's DRAM peak
 bcc2a84454d5d2c62d455049207f7ec4135242c1|2026-10-12|Niko1221|metal engine: the routed gate/up's i-quant grids from constant memory (function constant 23 on moe_gu_*; REF_METAL_CTAB=0 off) - IQ3_S spec 2 decode +0.7-1.0%, greedy tokens unchanged
 af6738eb7466eb14589e6505820a5bcb102718ac|2026-10-12|Niko1221|metal: MM_PROBE 7 - a repacked i-quant layout's cost (one aligned 16-byte load a lane a row a 32-group): IQ3_S prompt gate/up 9.5-10.9 -> 6.8-6.9 ms a layer
-c7070a72cf2d87acc4e590d27b5b03fead4db774|2026-10-12|Niko1221|kq_cpu_bench: the CPU pool's expert rows per format on T threads in GB/s of weights; tools/quant_bound.py: decode bounds from the per-layer formats; setup copies libstrata_kq next to a compiled engine
+c7070a72cf2d87acc4e590d27b5b03fead4db774|2026-10-12|Niko1221|kq_cpu_bench: the CPU pool's expert rows per format on T threads in GB/s of weights; tools/quant_bound.py: decode bounds from the per-layer formats; setup copies libref_kq next to a compiled engine
 546d767543a33eeefe9168179aa51b65f1c76593|2026-10-12|Niko1221|decode: NVFP4 experts decode each weight part once per call for every token of the window (Split<40>), its UE4M3 scales from bits, down on 16-lane rows - bitwise the same, 1.14-2.5x
 8cc41f3ac638d83c114096d41ffc59c472333da9|2026-10-12|Niko1221|nvfp4_decode_bench: the decode experts' weight bandwidth on random blobs of any format pair, with an output hash
 de81ac91f47f2dcd93cededa81049c6d452a0f5f|2026-10-12|Niko1221|Qwen3.6 T1: SiLU-gated GDN step and a 256/8 router in the native kernels; q36ref runs on them
@@ -3844,7 +3844,7 @@ aaf99d30747bb2907a9081d88630a81a25c8ff39|2026-10-05|Niko1221|native experts: IQ3
 d4b8b6ad5cfd82d070b6f1decbc5768e7a14bb9a|2026-10-05|Francesco Albano|native experts: IQ3_S takes the AVX-2 kernel for one token too where its grid is gathered
 b211ba173a32f98f42c289aa4856ff96c37db3af|2026-10-05|Francesco Albano|cpu kernels: AVX-VNNI forms of the AVX-2 i-quant, IQ4_NL and Q2_0 rows (cpu_avxvnni_ok)
 a7336175588ea843689daa03c471fbbf1aa79486|2026-10-05|Francesco Albano|iq_avx2: the gathered IQ3_XXS / IQ3_S / IQ2_S decode on the cores where it is faster (REF_IQ256_GATHER auto)
-ac7db2e522f3c820aaf2949d2763332d6975855c|2026-10-05|Niko1221|UD-Q6_K_XL: Q6_K gate/up kernels behind -DSTRATA_Q6K_EXPERTS=ON; the Q8_0 PLE hunk is left to the #651 series
+ac7db2e522f3c820aaf2949d2763332d6975855c|2026-10-05|Niko1221|UD-Q6_K_XL: Q6_K gate/up kernels behind -DREF_Q6K_EXPERTS=ON; the Q8_0 PLE hunk is left to the #651 series
 8c4a6e1de77e5e49cc266c3d5fa263592d2fb3af|2026-10-04|Thomas Weaver|docs: record the UD-Q6_K_XL server run and register its parity pair
 87659162edc67dbf97eb5bab07a7d8af670f6f5b|2026-10-04|Thomas Weaver|Q6_K gate/up through the native expert paths (Unsloth's UD-Q6_K_XL experts)
 9227973b36dbc2230bd550ea30ed51a740dcb05e|2026-10-04|Thomas Weaver|PLE table as Q8_0 (Unsloth's UD-Q6_K_XL) + docs
@@ -5191,7 +5191,7 @@ cf73cc4cb558a80b111f2f9a4331d5fd8c7cbb7a|2026-11-01|Niko1221|DF2-SYCL engine int
 fea8a3e633c758a9d2a536ff6b5647a2ad93bc41|2026-11-01|Niko1221|Metal keeps --lookup-max-t off by default: its windows hold 8 rows and a 12-row lookup window ended the first Qwen serve request (metal window: window size out of range); the default rule is a header with a test
 12c2d740c69d4731f95137167a6e459e76f108e0|2026-11-01|Niko1221|split: the prompt ring's receive and gather steps move data to and from device memory by DMA on the copy engines (the add and output kernels read device memory, not host memory over PCIe)
 909ab78af8edc505605b1489e8bfaa9ff1f40704|2026-11-01|Niko1221|Metal serve: no default 12-row lookup window (the Metal window holds 8 rows; with the MTP the first suffix-lookup window ended the request with 'metal window: window size out of range')
-857d0e3fe9b45d51000171448b159ee365af3475|2026-11-01|Niko1221|split-hip: CMake HIP target (ref-split-N for gfx1201 with -DSTRATA_ENABLE_HIP=ON), card check by gfx name
+857d0e3fe9b45d51000171448b159ee365af3475|2026-11-01|Niko1221|split-hip: CMake HIP target (ref-split-N for gfx1201 with -DREF_ENABLE_HIP=ON), card check by gfx name
 ea2b0d9c63e14583720ce2984dc96a9a3ca6bbe5|2026-11-01|Niko1221|split-hip: first HIP gfx12 compile of the split engine: gfx12 WMMA expert prompt kernel (replaces mma.m8n8k4), nvcuda::wmma shim for attention and the QSA scores, driver stream-memory-op shim, HIP stubs for the shared-memory holder
 857e51662118c2b0ccbc8841c478c5c59f13f719|2026-11-01|Niko1221|DFlash2: --draft-fallback none (no MTP layer loaded, DFlash2 the only drafter, an error at start if it cannot run) and the DFlash2 draft head shared with the MTP's byte-identical subset (REF_DF2_SHARE_HEAD_OFF=1 keeps its own copy)
 a6fd5cfe42fd8bddd80a03c9342d27767cd35cb9|2026-11-01|Niko1221|DFlash2: the MTP chain's cost window and q lists apply only to candidates the MTP drew
@@ -5586,7 +5586,7 @@ b2c3847fc0da3dcef9741aa60110f9ce3a842d3f|2026-10-31|Niko1221|HIP: Q2_K's GEMV al
 9f86e95a3cf87086fc58f591fa36b6ba3e06ad6e|2026-10-31|Niko1221|serve: REF_DS4_RESTORE_SHARED=0 leaves the shared start out of the restore points the server asks for (for A/Bs)
 e9d9ed8bb38bd0f9e8d49e664cf18cc9b50f943a|2026-10-31|Niko1221|DeepSeek engine: a shared start a fresh prompt reaches is kept from the one read, not by stopping there (A3)
 8becec7d5c0757ffb97a7dec339c54dd87b10d89|2026-10-31|Niko1221|gfx1151 on Windows: the exact parallel-request switches are on by default for 2 or more batch slots
-b3b47b108b860e57eab31caa38d2e583e69e3549|2026-10-31|Niko1221|build_windows.bat: REF_CMAKE_EXTRA reaches the cmake configure line (for example -DSTRATA_WINDOW_MAX_T=8 builds the 8-row engine)
+b3b47b108b860e57eab31caa38d2e583e69e3549|2026-10-31|Niko1221|build_windows.bat: REF_CMAKE_EXTRA reaches the cmake configure line (for example -DREF_WINDOW_MAX_T=8 builds the 8-row engine)
 cda6463e8ee8bc86bf50ccdac7c65046c36de919|2026-10-31|Niko1221|Qwen parallel: FP16 weight cache sized by free VRAM (3 GiB kept free), no loan of cache slots when every expert fits, replica profile keeps 2500 MiB free
 169d5d6a9e41766542355143cb929c5b3e041858|2026-10-31|Niko1221|DeepSeek --parallel: the DSpark drafter in the steps of several requests (Project Maya #611, needmorevram; with mw00's 1434096, 4b2378b, 0d0f261)
 ab0ed4feabccec37be576d6639678eaef154cea1|2026-10-31|Niko1221|Launch: the Intel Arc 'cannot set up this card' message points to docs/INTEL_ARC.md and the pack tool
