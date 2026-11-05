@@ -392,6 +392,10 @@
       "modules": [
         "F16BitsRounding.lean"
       ],
+      "children": [
+        "uf9c373ce4f",
+        "u0868e10073"
+      ],
       "reason": "3 fix attempts used",
       "conv": "770863a8-b8b0-4a6f-a121-d8d3ec04f295"
     },
@@ -401,6 +405,24 @@
       "modules": [
         "DequantBlockLayouts.lean"
       ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "uf9c373ce4f",
+      "parent": "u60723386cc",
+      "modules": [
+        "F16BitsRounding.lean"
+      ],
+      "scope": "items: rneStep, rne_below_half, rne_above_half, rne_tie_even, rne_le_succ, encodeTop, finite_overflow_is_inf, nan_stays_nan, inf_stays_inf, conflation_hazard",
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "u0868e10073",
+      "parent": "u60723386cc",
+      "modules": [
+        "F16BitsRounding.lean"
+      ],
+      "scope": "items: normShift, normShift_spec, subnormal_bias, subnormal_exp_field, normal_exp_field, nat_truncation_hazard, bf16Round, bf16_exact, bf16_below_half, bf16_above_half, bf16_tie_even",
       "reason": "3 fix attempts used"
     }
   ],
@@ -481,9 +503,7 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {
-    "u60723386cc": 3
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u042aaf67ce": [
       "compile_fail",
@@ -537,13 +557,7 @@
       "existing_code_fails"
     ]
   },
-  "last_failure": {
-    "u60723386cc": {
-      "kind": "smoke_fail",
-      "text": "test.sh exit=1: == host: conversions, row dequantisers, tool library ==\nf16_host checks=11771763 failures=0\nF16 HOST TESTS PASSED\n== dequant tool (command line) ==\n== GPU: conversions (all bit patterns), activation quantisation, KV cache, QSA step ==\n-- GPU 0 --\nqsa: kv_append: position out of range\nqsa: indexer_key_append: invalid arguments\nqsa: step_upload_width: width out of range\nqsa: qsa_attend_step: invalid arguments\nqsa: qsa_gate_apply_f32: invalid arguments\ndevice 0: Iluvatar BI-V100\n-- (A) exhaustive conversions\n-- (B) activation quantisation\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  bad0 == 0\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  badk == 0\nquantise mismatches: q8_0=1 scaled=0 q8_K=1\n-- (C) paged int8 KV cache\n-- (D) QSA decode step\nf16_gpu checks=682630 failures=2\nF16 GPU TESTS FAILED\nGPU tests FAILED on GPU 0 (exit 1)\n-- GPU 1 --\nqsa: kv_append: position out of range\nqsa: indexer_key_append: invalid arguments\nqsa: step_upload_width: width out of range\nqsa: qsa_attend_step: invalid arguments\nqsa: qsa_gate_apply_f32: invalid arguments\ndevice 0: Iluvatar BI-V100\n-- (A) exhaustive conversions\n-- (B) activation quantisation\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  bad0 == 0\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  badk == 0\nquantise mismatches: q8_0=1 scaled=0 q8_K=1\n-- (C) paged int8 KV cache\n-- (D) QSA decode step\nf16_gpu checks=682630 failures=2\nF16 GPU TESTS FAILED\nGPU tests FAILED on GPU 1 (exit 1)\n-- GPU 2 --\nqsa: kv_append: position out of range\nqsa: indexer_key_append: invalid arguments\nqsa: step_upload_width: width out of range\nqsa: qsa_attend_step: invalid arguments\nqsa: qsa_gate_apply_f32: invalid arguments\ndevice 0: Iluvatar BI-V100\n-- (A) exhaustive conversions\n-- (B) activation quantisation\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  bad0 == 0\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  badk == 0\nquantise mismatches: q8_0=1 scaled=0 q8_K=1\n-- (C) paged int8 KV cache\n-- (D) QSA decode step\nf16_gpu checks=682630 failures=2\nF16 GPU TESTS FAILED\nGPU tests FAILED on GPU 2 (exit 1)\n-- GPU 3 --\nqsa: kv_append: position out of range\nqsa: indexer_key_append: invalid arguments\nqsa: step_upload_width: width out of range\nqsa: qsa_attend_step: invalid arguments\nqsa: qsa_gate_apply_f32: invalid arguments\ndevice 0: Iluvatar BI-V100\n-- (A) exhaustive conversions\n-- (B) activation quantisation\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  bad0 == 0\nFAIL tests/gpu_unit_f16/test_f16_gpu.cu:167  badk == 0\nquantise mismatches: q8_0=1 scaled=0 q8_K=1\n-- (C) paged int8 KV cache\n-- (D) QSA decode step\nf16_gpu checks=682630 failures=2\nF16 GPU TESTS FAILED\nGPU tests FAILED on GPU 3 (exit 1)\n== port table ==\nUNIT TESTS FAILED",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-u60723386cc"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
   "port_units": [
     {
