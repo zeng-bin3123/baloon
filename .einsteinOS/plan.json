@@ -495,6 +495,11 @@
       "pass": true,
       "unit_id": "u208dfb4222"
     },
+    "GdnRecurrence.lean": {
+      "hash": "1b298737ccbc",
+      "pass": true,
+      "unit_id": "u52d156705c"
+    },
     "GenerateDriver.lean": {
       "hash": "eb8f5c79eeef",
       "pass": true,
@@ -509,6 +514,11 @@
       "hash": "272e6ff6cb9c",
       "pass": true,
       "unit_id": "uc81136f4d9"
+    },
+    "NativeFlashAttn.lean": {
+      "hash": "ca680f620e76",
+      "pass": true,
+      "unit_id": "u52d156705c"
     },
     "NativeQsaScore.lean": {
       "hash": "98165629712f",
@@ -540,6 +550,11 @@
       "pass": true,
       "unit_id": "u316bd6b9ec"
     },
+    "QsaDecodeAttn.lean": {
+      "hash": "1dfb1d394e0a",
+      "pass": true,
+      "unit_id": "u52d156705c"
+    },
     "QsaSelect.lean": {
       "hash": "ded819668ab3",
       "pass": true,
@@ -565,15 +580,18 @@
       "pass": true,
       "unit_id": "u0e60a9f272"
     },
+    "VerifyWindow.lean": {
+      "hash": "5dac2b80d08a",
+      "pass": true,
+      "unit_id": "u52d156705c"
+    },
     "WeightLoader.lean": {
       "hash": "e81627089f2b",
       "pass": true,
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {
-    "u52d156705c": 2
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u02c65ed515": [
       "gpu_code_missing"
@@ -642,20 +660,8 @@
       "smoke_fail"
     ]
   },
-  "last_failure": {
-    "u52d156705c": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: 8 of the 86 definitions of the unit's reference files have no counterpart:\n  src/kernels/cuda/qsa_decode_attn.cu G → src/qsa_decode_attn.cu:G: not defined in that file\n  src/kernels/cuda/qsa_decode_attn.cu HD → src/qsa_decode_attn.cu:HD: not defined in that file\n  src/kernels/cuda/qsa_decode_attn.cu THREADS → src/qsa_decode_attn.cu:THREADS: not defined in that file\n  src/kernels/cuda/qsa_decode_attn.cu WARPS → src/qsa_decode_attn.cu:WARPS: not defined in that file\n  src/prefill/kernels.cu N → src/prefill/kernels.cu:N: not defined in that file\n  src/prefill/kernels.cu RG → src/prefill/kernels.cu:RG: not defined in that file\n  src/prefill/kernels.cu S → src/prefill/kernels.cu:S: not defined in that file\n  src/prefill/kernels.cu blocks_for → src/prefill/kernels.cu:blocks_for: not defined in that file",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-u52d156705c"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u52d156705c": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
