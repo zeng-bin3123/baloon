@@ -509,6 +509,11 @@
       "pass": true,
       "unit_id": "uc81136f4d9"
     },
+    "NativeQsaScore.lean": {
+      "hash": "98165629712f",
+      "pass": true,
+      "unit_id": "u316bd6b9ec"
+    },
     "PleDirectReader.lean": {
       "hash": "0737652f0030",
       "pass": true,
@@ -528,6 +533,16 @@
       "hash": "5aef6597d767",
       "pass": true,
       "unit_id": "uc81136f4d9"
+    },
+    "QsaCacheStep.lean": {
+      "hash": "e94687212f66",
+      "pass": true,
+      "unit_id": "u316bd6b9ec"
+    },
+    "QsaSelect.lean": {
+      "hash": "ded819668ab3",
+      "pass": true,
+      "unit_id": "u316bd6b9ec"
     },
     "ServeEngine.lean": {
       "hash": "8ee05fd8bb2b",
@@ -555,9 +570,7 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {
-    "u316bd6b9ec": 1
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u02c65ed515": [
       "gpu_code_missing"
@@ -622,20 +635,8 @@
       "smoke_fail"
     ]
   },
-  "last_failure": {
-    "u316bd6b9ec": {
-      "kind": "compile_fail",
-      "text": "build.sh exit=1: …d heads %ld)\\n\", name, err, sc, attended_heads);\n                                          ~~~~                                            ^~~\n                                          %.3f\ntests/gpu_unit7/test_ilu_qsa.cu:133:96: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    std::printf(\"  decode[%s] max_abs_err=%.3e (scale %.3f, attended heads %ld)\\n\", name, err, sc, attended_heads);\n                                                      ~~~~                                     ^~\n                                                      %.3f\ntests/gpu_unit7/test_ilu_qsa.cu:380:48: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    std::printf(\"  append max_abs_err=%.3e\\n\", worst);\n                                      ~~~~     ^~~~~\n                                      %.3f\n3 warnings generated when compiling for ivcore10.\n[cuda] tests/gpu_unit_f16bits/test_unit7_gpu.cu\n[cuda] tests/gpu_unit_f16bits_decode/test_decode_bf16_gpu.cu\n[cuda] tests/gpu_unit_f16bits_top/test_encode_top_gpu.cu\n[cuda] tests/gpu_unit_qsa_cache_step/test_qsa_cache_step_gpu.cu\ntests/gpu_unit_qsa_cache_step/test_qsa_cache_step_gpu.cu:223:163: error: no matching function for call to 'max'\n            for (int h = 0; h \u003c 4; ++h) { double dot = 0; for (int d = 0; d \u003c 128; ++d) dot += (double)q[h * 128 + d] * pooled[(size_t)b * 128 + d]; s += hw[h] * std::max(dot, 0.0); }\n                                                                                                                                                                  ^~~~~~~~\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/algorithmfwd.h:370:5: note: candidate template ignored: deduced conflicting types for parameter '_Tp' ('double' vs. 'float')\n    max(const _Tp\u0026, const _Tp\u0026);\n    ^\n/usr/local/corex-3.2.3/lib/clang/16/include/cuda_wrappers/algorithm:87:1: note: candidate template ignored: deduced conflicting types for parameter '__T' ('double' vs. 'float')\nmax(const __T \u0026__a, const __T \u0026__b) {\n^\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/stl_algo.h:3468:5: note: candidate template ignored: could not match 'initializer_list\u003c_Tp\u003e' against 'double'\n    max(initializer_list\u003c_Tp\u003e __l, _Compare __comp)\n    ^\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/stl_algo.h:3462:5: note: candidate function template not viable: requires single argument '__l', but 2 arguments were provided\n    max(initializer_list\u003c_Tp\u003e __l)\n    ^\n/usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/algorithmfwd.h:375:5: note: candidate function template not viable: requires 3 arguments, but 2 were provided\n    max(const _Tp\u0026, const _Tp\u0026, _Compare);\n    ^\n/usr/local/corex-3.2.3/lib/clang/16/include/cuda_wrappers/algorithm:80:1: note: candidate function template not viable: requires 3 arguments, but 2 were provided\nmax(const __T \u0026__a, const __T \u0026__b, __Cmp __cmp) {\n^\n1 error generated when compiling for ivcore10.",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-u316bd6b9ec"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u316bd6b9ec": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
