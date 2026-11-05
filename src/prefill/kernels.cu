@@ -5,6 +5,17 @@
 #include <cuda_runtime.h>
 #include <cmath>
 #include <cstdint>
+
+// Geometry owned by this translation unit; the API header skips these four when BALOON_PK_GEOMETRY_IN_TU is set.
+namespace baloon {
+namespace pk {
+constexpr int N = 2560;  // model width
+constexpr int S = 128;   // GDN head size
+constexpr int RG = 4;    // residual streams
+inline int64_t blocks_for(int64_t n, int64_t t) { return (n + t - 1) / t; }
+}  // namespace pk
+}  // namespace baloon
+#define BALOON_PK_GEOMETRY_IN_TU 1
 #include "baloon/prefill_kernels_api.hpp"
 
 namespace baloon {
