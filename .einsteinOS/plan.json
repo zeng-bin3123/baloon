@@ -447,7 +447,8 @@
         "F16BitsRounding.lean"
       ],
       "scope": "items: encodeTop, finite_overflow_is_inf, nan_stays_nan, inf_stays_inf, conflation_hazard",
-      "reason": "3 fix attempts used"
+      "reason": "3 fix attempts used",
+      "conv": "be53a45f-2f92-4ac1-9e87-955d4bb90a8e"
     }
   ],
   "state": {
@@ -532,8 +533,13 @@
       "unit_id": "uc81136f4d9"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u02c65ed515": 1
+  },
   "fail_history": {
+    "u02c65ed515": [
+      "gpu_code_missing"
+    ],
     "u042aaf67ce": [
       "compile_fail",
       "smoke_fail",
@@ -591,7 +597,13 @@
       "smoke_fail"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "u02c65ed515": {
+      "kind": "gpu_code_missing",
+      "text": "gpu_code_missing: the unit's modules come from CUDA sources in the reference (src/kernels/cuda/kv_q8.cu, src/kernels/cuda/qsa.cu, src/kernels/cuda/quantize_act.cu) but it wrote no .cu/.cuh file",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-u02c65ed515"
+    }
+  },
   "infra_fails": 0,
   "port_units": [
     {
