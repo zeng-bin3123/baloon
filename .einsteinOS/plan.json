@@ -473,6 +473,11 @@
       "pass": true,
       "unit_id": "u02c65ed515"
     },
+    "F16BitsRounding.lean#items: normShift, normShift_spec, subnormal_bias, subnormal_exp_field, normal_exp_field, nat_truncation_hazard, bf16Round, bf16_exact, bf16_below_half, bf16_above_half, bf16_tie_even": {
+      "hash": "7c4403b77fca",
+      "pass": true,
+      "unit_id": "u0868e10073"
+    },
     "F16BitsRounding.lean#items: rneStep, rne_below_half, rne_above_half, rne_tie_even, rne_le_succ": {
       "hash": "7c4403b77fca",
       "pass": true,
@@ -603,12 +608,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u0868e10073": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
