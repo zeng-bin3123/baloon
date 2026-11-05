@@ -12,7 +12,7 @@ constexpr uint64_t kTokenBytes = kRowsPerToken * kRowBytes;  // 1440
 
 // Table must exactly fill the file after the header.
 inline bool size_check(uint64_t rows, uint64_t file_size, uint64_t data_start) {
-    return data_start <= file_size && rows * kRowBytes == file_size - data_start;
+    return data_start <= file_size && rows <= (file_size - data_start) / kRowBytes && rows * kRowBytes == file_size - data_start;
 }
 // A 2-D tensor whose fast axis is 160.
 inline bool shape_ok(uint64_t ndims, uint64_t fast) { return ndims == 2 && fast == 160; }
