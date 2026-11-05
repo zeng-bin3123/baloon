@@ -466,6 +466,11 @@
       "pass": true,
       "unit_id": "uc81136f4d9"
     },
+    "F16BitsRounding.lean#items: rneStep, rne_below_half, rne_above_half, rne_tie_even, rne_le_succ": {
+      "hash": "7c4403b77fca",
+      "pass": true,
+      "unit_id": "uebd9b81357"
+    },
     "GenerateDriver.lean": {
       "hash": "eb8f5c79eeef",
       "pass": true,
@@ -588,12 +593,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "uebd9b81357": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
