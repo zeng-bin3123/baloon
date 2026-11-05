@@ -2,7 +2,7 @@
 ## FILE: /mnt/user-data/outputs/ExpertCache.lean
 /-!
 # MODULE: expert_cache
-SOURCES: src/core/expert_cache.cpp, include/strata/core/expert_cache.hpp
+SOURCES: src/core/expert_cache.cpp, include/ref/core/expert_cache.hpp
 The VRAM-resident expert tier: profile-file validation, slot arena sizing, the (layer, expert) → slot residency
 table, per-layer slot ranges for admission, variable-size slot offsets and bounded slot fills.
 
@@ -19,7 +19,7 @@ table, per-layer slot ranges for admission, variable-size slot offsets and bound
 - fillLen → `n = (bytes > 0 && bytes <= blob_) ? bytes : blob_`
 -/
 
-namespace Strata.ExpertCache
+namespace Ref.ExpertCache
 
 -- § profile validation
 
@@ -196,14 +196,14 @@ theorem slot_start_in_arena (slot slots blob : Nat) (h : slot < slots) : slot * 
   simp only [Nat.add_mul, Nat.one_mul] at h1
   exact h1
 
-end Strata.ExpertCache
+end Ref.ExpertCache
 
 
 
 ## FILE: /mnt/user-data/outputs/ExpertSource.lean
 /-!
 # MODULE: expert_source
-SOURCES: src/core/expert_source.cpp, include/strata/core/expert_source.hpp
+SOURCES: src/core/expert_source.cpp, include/ref/core/expert_source.hpp
 The adapter between the host loop and the CPU expert pool: file- or arena-backed blob lookup, hit/miss job
 building, the GPU/PCIe share of missed experts in verify windows, and chunked loading of expert tensors.
 
@@ -222,7 +222,7 @@ building, the GPU/PCIe share of missed experts in verify windows, and chunked lo
 - blobRegions → per[3]/at[3] ; arenaSlack → `want + blob`
 -/
 
-namespace Strata.ExpertSource
+namespace Ref.ExpertSource
 
 -- § blob addressing
 
@@ -353,14 +353,14 @@ theorem slot_copy_in_arena (off bb want mb : Nat) (h1 : off + bb ≤ want) :
 theorem reads_two (r : Nat) : r + 1 + 1 = r + 2 := by
   omega
 
-end Strata.ExpertSource
+end Ref.ExpertSource
 
 
 
 ## FILE: /mnt/user-data/outputs/LayerComposition.lean
 /-!
 # MODULE: layer_composition
-SOURCES: src/core/layer.cpp, include/strata/core/layer.hpp
+SOURCES: src/core/layer.cpp, include/ref/core/layer.hpp
 Composition of one GDN/QSA/MoE block: arena carving (16-byte aligned regions), quantized-plane layout
 checks, activation-format dispatch, stage-prefix selection of `block_layer_pre`, and the debug-dump layout.
 
@@ -379,7 +379,7 @@ checks, activation-format dispatch, stage-prefix selection of `block_layer_pre`,
 - runStage → run0..run4 ; verifyCompatible → layer_verify_compatible
 -/
 
-namespace Strata.LayerComposition
+namespace Ref.LayerComposition
 
 -- § alignment
 
@@ -667,7 +667,7 @@ theorem dump_debug_windows_intersect (n hc a nvk : Nat) (hn : 2 ≤ nvk) :
             p < (2 * n + 2 * hc + a + 2 * nvk) + nvk / 2 + 8) := by
   refine ⟨2 * n + 2 * hc + a + 2 * nvk + 8 + nvk / 2 - 1, ?_, ?_⟩ <;> constructor <;> omega
 
-end Strata.LayerComposition
+end Ref.LayerComposition
 
 
 
@@ -692,7 +692,7 @@ chain, chunked prefill and tensor lookup by name and kind.
 - effWindow → window_ ; capOf → cap_ ; chainFuel → the `for (j = 1; ...)` loop ; findTensor → f32/bf16/q8
 -/
 
-namespace Strata.MtpDrafter
+namespace Ref.MtpDrafter
 
 -- § window and capacity
 
@@ -846,14 +846,14 @@ theorem findTensor_sound (ts : List Tensor) (name kind : String) (t : Tensor)
 /-- An empty table finds nothing. -/
 theorem findTensor_nil (name kind : String) : findTensor [] name kind = none := rfl
 
-end Strata.MtpDrafter
+end Ref.MtpDrafter
 
 
 
 ## FILE: /mnt/user-data/outputs/SessionGraphs.lean
 /-!
 # MODULE: session_graphs
-SOURCES: src/core/session.cpp, include/strata/core/session.hpp
+SOURCES: src/core/session.cpp, include/ref/core/session.hpp
 One token through all 48 layers: session arena sizing/carving, per-layer GDN/QSA state indexing, the
 stage-prefix timing differences, and the dump-buffer layout of the host loop.
 
@@ -869,7 +869,7 @@ stage-prefix timing differences, and the dump-buffer layout of the host loop.
 - gdnIndex / qsaIndex → gdn_point_at / qsa_index ; stageDiffs → session_replay_stage_prefixes
 -/
 
-namespace Strata.SessionGraphs
+namespace Ref.SessionGraphs
 
 -- § alignment to 256
 
@@ -999,14 +999,14 @@ theorem spinBoundary_period (s : Nat) : spinBoundary (s + 1024) = spinBoundary s
   simp only [decide_eq_decide]
   omega
 
-end Strata.SessionGraphs
+end Ref.SessionGraphs
 
 
 
 ## FILE: /mnt/user-data/outputs/VerifyWindow.lean
 /-!
 # MODULE: verify_window
-SOURCES: src/core/verify.cpp, include/strata/core/verify.hpp
+SOURCES: src/core/verify.cpp, include/ref/core/verify.hpp
 The speculative verify window: T tokens through all layers in one captured graph, optionally split into two
 token groups pipelined against the CPU experts, with a commit step that keeps the first `n_keep` tokens.
 
@@ -1023,7 +1023,7 @@ token groups pipelined against the CPU experts, with a commit step that keeps th
 - planPtrOff → ptr_off ; raiseFlag → Verifier::raise_flag ; advance → ss.ple_prev update
 -/
 
-namespace Strata.VerifyWindow
+namespace Ref.VerifyWindow
 
 -- § token groups
 
@@ -1198,7 +1198,7 @@ theorem window_index_ok (T maxT kMax : Nat) (h1 : T ≤ maxT) (h2 : maxT ≤ kMa
     T < 9 := by
   omega
 
-end Strata.VerifyWindow
+end Ref.VerifyWindow
 
 
 
@@ -1222,7 +1222,7 @@ compacted by a skip set), and streams it plane by plane in 8 MiB chunks, convert
 - convFor → conversion selection ; mapKind → raw16 kind remap
 -/
 
-namespace Strata.WeightLoader
+namespace Ref.WeightLoader
 
 /-- 8 MiB of source per staging round. -/
 def CHUNK : Nat := 8388608
@@ -1385,7 +1385,7 @@ theorem convFor_f16 : convFor false 3 = Conv.toF16 := by
 /-- The arena check rejects exactly when the arena is smaller than the pool. -/
 def arenaOk (arena pool : Nat) : Bool := decide (pool ≤ arena)
 
-end Strata.WeightLoader
+end Ref.WeightLoader
 
 
 
@@ -1414,7 +1414,7 @@ into reasoning, content and tool calls without ever emitting a partial tag.
 * `Service.prepare` pad loop -> `expand`
 -/
 
-namespace Strata.Frontend
+namespace Ref.Frontend
 
 -- § thinking budget -> level
 
@@ -1567,7 +1567,7 @@ theorem delta_exact (textLen sent : Nat) (h : sent ≤ textLen) : sent + deltaLe
   unfold deltaLen
   omega
 
-end Strata.Frontend
+end Ref.Frontend
 
 
 
@@ -1575,7 +1575,7 @@ end Strata.Frontend
 /-!
 # MODULE: generate_driver
 SOURCES: src/program/generate.cpp
-The `strata generate` driver: validates options, runs the teacher-forced decode loop
+The `ref generate` driver: validates options, runs the teacher-forced decode loop
 (`embed -> 48 layers -> head -> sample`), the speculative verify loop, the adaptive VRAM
 expert tier, the routing trace and the `--serve` request loop (including M-RoPE positions
 for images).  This module states the arithmetic/control contracts of that driver.
@@ -1599,7 +1599,7 @@ for images).  This module states the arithmetic/control contracts of that driver
 * `prefill_until`                -> `pu`
 -/
 
-namespace Strata.Generate
+namespace Ref.Generate
 
 -- § run-size validation
 
@@ -1844,7 +1844,7 @@ theorem producedStep_progress (maxNew produced a : Nat) (h : produced < maxNew) 
   unfold producedStep
   omega
 
-end Strata.Generate
+end Ref.Generate
 
 
 
@@ -1871,7 +1871,7 @@ set-associative row cache.  Tickets track the outstanding jobs of one request.
 * `next_ticket`               -> `nextTicket`
 -/
 
-namespace Strata.PleReader
+namespace Ref.PleReader
 
 -- § page math (PAGE = 4096, ROW_BYTES = 90)
 
@@ -1993,14 +1993,14 @@ theorem pctIndex_lt (size r : Nat) (h : 0 < size) : pctIndex size r < size := by
   unfold pctIndex
   omega
 
-end Strata.PleReader
+end Ref.PleReader
 
 
 
 ## FILE: /mnt/user-data/outputs/PleNgramHash.lean
 /-!
 # MODULE: ple_ngram_hash
-SOURCES: src/kernels/ngram.cpp, include/strata/kernels/ngram.hpp
+SOURCES: src/kernels/ngram.cpp, include/ref/kernels/ngram.hpp
 The PLE n-gram hash (sixteen row indices per token from the last three token ids, XOR of
 multiplier products reduced `mod` non-power-of-two head vocab sizes plus offsets), the IQ4_NL
 row dequantization (split-half nibble order) and the `PleTable` issue/collect protocol.
@@ -2022,7 +2022,7 @@ row dequantization (split-half nibble order) and the `PleTable` issue/collect pr
 * `PleTable::issue/collect`    -> `issue`, `collect`
 -/
 
-namespace Strata.PleNgram
+namespace Ref.PleNgram
 
 -- § geometry constants
 
@@ -2188,7 +2188,7 @@ theorem issue_collect_issue :
     ((issue ⟨false⟩).bind collect).bind issue = some ⟨true⟩ := by
   simp [issue, collect]
 
-end Strata.PleNgram
+end Ref.PleNgram
 
 
 
@@ -2205,7 +2205,7 @@ decomposing a linear thread index into `(token, stream, dim)` style coordinates.
 * With `N = 2560`, `HC = 4`, `D = N*HC`, a flat index `i < T*D` decomposes as
   `t = i / D`, `c = (i % D) / N`, `d = i % N` and recomposes exactly.
 * Launch grids are ceiling divisions that cover every element.
-* The Strata expert blob is gate/up codes, down codes, gate/up scales, down scales
+* The Ref expert blob is gate/up codes, down codes, gate/up scales, down scales
   (1,382,400 bytes) and every dequant read stays inside its section.
 * The router addresses 512 experts as 32 lanes x 16 registers.
 
@@ -2215,7 +2215,7 @@ decomposing a linear thread index into `(token, stream, dim)` style coordinates.
 * `blob_dequant_kernel`                      -> `guOff`, `downOff`, `guScaleOff`, `downScaleOff`
 -/
 
-namespace Strata.PrefillKernels
+namespace Ref.PrefillKernels
 
 -- § hyper-connection indexing
 
@@ -2271,7 +2271,7 @@ theorem gdn_rows_cover : 4 * (128 / 4) = 128 := by decide
 theorem gdn_row_lt (rg r : Nat) (hrg : rg < 4) (hr : r < 32) : rg * 32 + r < 128 := by
   omega
 
--- § expert blob layout (Strata blob)
+-- § expert blob layout (Ref blob)
 
 /-- Gate/up codes: 1280 rows x 640 bytes. -/
 def guCodes : Nat := 1280 * 640
@@ -2364,7 +2364,7 @@ theorem rope_pair_in_block (pair : Nat) (h : pair < 32) : pair < pair + 32 ∧ p
 /-- Rope theta scale exponent `-2/64` corresponds to 32 frequency pairs in 64 dims. -/
 theorem rope_pairs_count : 64 / 2 = 32 := by decide
 
-end Strata.PrefillKernels
+end Ref.PrefillKernels
 
 
 
@@ -2391,7 +2391,7 @@ a bump allocator over a borrowed region (or `cudaMalloc`).
 * `gdn_floats`                -> `gdnFloats`
 -/
 
-namespace Strata.Prefill
+namespace Ref.Prefill
 
 -- § chunk partition
 
@@ -2533,7 +2533,7 @@ theorem gdn_conv_offset (idx : Nat) :
   unfold gdnFloats
   omega
 
-end Strata.Prefill
+end Ref.Prefill
 
 
 
@@ -2561,7 +2561,7 @@ bounded to 64 entries, API-key authorization and finish-reason mapping.
 * `anthropic_events` stop        -> `anthropicStop`
 -/
 
-namespace Strata.Serve
+namespace Ref.Serve
 
 -- § admission
 
@@ -2684,14 +2684,14 @@ def totalTokens (prompt completion : Nat) : Nat := prompt + completion
 /-- The reported total is the sum of its parts. -/
 theorem totalTokens_eq (p c : Nat) : totalTokens p c = p + c := rfl
 
-end Strata.Serve
+end Ref.Serve
 
 
 
 ## FILE: /mnt/user-data/outputs/SpecController.lean
 /-!
 # MODULE: spec_controller
-SOURCES: src/spec/controller.cpp, include/strata/spec/controller.hpp
+SOURCES: src/spec/controller.cpp, include/ref/spec/controller.hpp
 Speculative-decoding controller: each step it maximizes `E[tokens] / T(step)` over
 `none | lookup(k) | MTP(k)`, keeps `k = 0` unless the best beats plain decoding by `min_gain`,
 and learns per-position acceptance with an EMA.
@@ -2711,7 +2711,7 @@ and learns per-position acceptance with an EMA.
 * `Controller::observe` EMA         -> `emaUp`, `emaDown`
 -/
 
-namespace Strata.Spec
+namespace Ref.Spec
 
 -- § window clamp
 
@@ -2891,7 +2891,7 @@ theorem deepest_idx_lt (k : Nat) (h1 : 1 ≤ k) (h2 : k < K_MAX) : k - 1 < K_MAX
   unfold K_MAX at *
   omega
 
-end Strata.Spec
+end Ref.Spec
 
 
 
@@ -2918,7 +2918,7 @@ match of the current suffix and returns the tokens that followed it.
 * continuation loop           -> `contLen`
 -/
 
-namespace Strata.Suffix
+namespace Ref.Suffix
 
 -- § key nonzero
 
@@ -3048,7 +3048,7 @@ theorem contLen_reads_in_history (maxk cur e : Nat) (he : e < cur) : e + contLen
   unfold contLen
   omega
 
-end Strata.Suffix
+end Ref.Suffix
 
 
 
@@ -3507,7 +3507,7 @@ end NativeQsaScore
 ## FILE: /mnt/user-data/outputs/QsaCacheStep.lean
 /-!
 # MODULE: qsa_cache_step
-SOURCES: include/strata/kernels/qsa.hpp, src/kernels/cuda/qsa.cu
+SOURCES: include/ref/kernels/qsa.hpp, src/kernels/cuda/qsa.cu
 Per-token device step state (pos, n_kv, n_bid, width), the paged FP16 KV cache row mapping, the indexer's
 block pooling schedule and the cell_block / tail-bias mapping of the QSA decode layer.
 
@@ -4181,7 +4181,7 @@ quantize_q8_0_kernel -> quantize_q8_0_ggml_rule ; quantize_q8_0_scaled_kernel ->
 nearest_int_dev -> round_to_int_magic ; bsums -> block_partial_sums
 -/
 
-namespace Strata.ActQuant
+namespace Ref.ActQuant
 
 -- § clamps
 
@@ -4261,14 +4261,14 @@ theorem columns_as_vector (n_in c i : Nat) (h : n_in % 32 = 0) (hi : i < n_in) :
   have : 32 * m / 32 = m := by omega
   rw [this]
 
-end Strata.ActQuant
+end Ref.ActQuant
 
 
 
 ## FILE: /mnt/user-data/outputs/DequantBlockLayouts.lean
 /-!
 # MODULE: dequant_block_layouts
-SOURCES: include/strata/artifact/gguf_reader.hpp, include/strata/artifact/dequant.hpp, src/kernels/cuda/iq_kernels.cu
+SOURCES: include/ref/artifact/gguf_reader.hpp, include/ref/artifact/dequant.hpp, src/kernels/cuda/iq_kernels.cu
 Block geometry (elements, bytes) of every GGML type the engine reads, struct offsets, stride alignment,
 row-byte arithmetic, and the value ranges produced by the scalar dequantizers.
 
@@ -4282,7 +4282,7 @@ row-byte arithmetic, and the value ranges produced by the scalar dequantizers.
 block_geometry -> block_shape_of_type ; kvalues_iq4nl -> nonlinear_codebook ; get_scale_min_k4 -> unpack_scale_min
 -/
 
-namespace Strata.DequantLayouts
+namespace Ref.DequantLayouts
 
 -- § block geometry
 
@@ -4410,7 +4410,7 @@ theorem q5k_masks : ∀ u ∈ [1, 4, 16, 64], 2 * u < 256 ∧ (u &&& (2 * u)) = 
 /-- The fifth bit adds at most 16 so a Q5_K code is at most 31. -/
 theorem q5k_code_bound (n : Nat) (hn : n < 16) (b : Nat) (hb : b = 0 ∨ b = 16) : n + b ≤ 31 := by omega
 
-end Strata.DequantLayouts
+end Ref.DequantLayouts
 
 
 
@@ -4432,7 +4432,7 @@ shuffle / shared-memory tree reductions preserving the total.
 dp4a -> int8x4_dot_accumulate ; hx -> activation_sum ; warp_sum -> warp_tree_sum ; partial -> block_partials
 -/
 
-namespace Strata.DotAlgebra
+namespace Ref.DotAlgebra
 
 -- § chunked dot products
 
@@ -4561,14 +4561,14 @@ theorem block_fold (p : Nat → Int) (s : Nat) : sumTo p (2 * s) = sumTo (rstep 
   rw [this]
   exact tree_step p s
 
-end Strata.DotAlgebra
+end Ref.DotAlgebra
 
 
 
 ## FILE: /mnt/user-data/outputs/F16BitsRounding.lean
 /-!
 # MODULE: f16_bits_rounding
-SOURCES: include/strata/kernels/f16_bits.hpp, include/strata/artifact/dequant.hpp, src/kernels/cuda/ple.cu
+SOURCES: include/ref/kernels/f16_bits.hpp, include/ref/artifact/dequant.hpp, src/kernels/cuda/ple.cu
 Integer-level model of the hand-written fp16 <-> f32 and f32 -> bf16 conversions: round-to-nearest-even,
 the inf/NaN versus finite-overflow split, subnormal normalisation and the exponent re-bias.
 
@@ -4584,7 +4584,7 @@ f16_from_f32 -> round_f32_to_f16_bits ; f32_from_f16 -> widen_f16_bits ; bf16_bi
 rem -> dropped_mantissa_remainder ; rawexp -> f32_exponent_field ; man -> mantissa_field
 -/
 
-namespace Strata.F16Bits
+namespace Ref.F16Bits
 
 -- § round-to-nearest-even on the dropped remainder
 
@@ -4709,7 +4709,7 @@ theorem bf16_tie_even (i : Nat) (h : i % 65536 = 32768) : bf16Round i % 2 = 0 :=
   rw [h2]
   omega
 
-end Strata.F16Bits
+end Ref.F16Bits
 
 
 
@@ -4730,7 +4730,7 @@ the native (llama.cpp-transcribed) MMVQ kernels.
 VDR -> values_per_dot_call ; QI -> dot_calls_per_block ; BPI -> blocks_per_iteration ; ROWS -> rows_per_cuda_block
 -/
 
-namespace Strata.MmvqGeometry
+namespace Ref.MmvqGeometry
 
 -- § threads per weight block and blocks per iteration
 
@@ -4817,7 +4817,7 @@ theorem supported_in_table :
 /-- Block sizes divide `n_in` only if `n_in` is a multiple of 256, 64 or 32: all divide 256. -/
 theorem table_elems_divide_256 : ∀ e ∈ weightTable, 256 % e.2.1 = 0 := by decide
 
-end Strata.MmvqGeometry
+end Ref.MmvqGeometry
 
 
 
@@ -4841,7 +4841,7 @@ buffer-overlap predicate.
 NG_HIST -> history_rows ; NG_HC_DIM -> stream_dim ; NG_HC -> stream_count ; PLE_CONV_KERNEL -> conv_taps
 -/
 
-namespace Strata.PleGeometry
+namespace Ref.PleGeometry
 
 -- § conv taps
 
@@ -4956,7 +4956,7 @@ theorem sgn_neg (s : Int) : sgn (-s) = -sgn s := by
   simp only [sgn]
   split_ifs <;> omega
 
-end Strata.PleGeometry
+end Ref.PleGeometry
 
 
 
@@ -4980,7 +4980,7 @@ bv/best -> running_best_value/index ; sv/si -> warp_partials ; penalty_repeat ->
 keep_ids/keep_logit -> top_k_survivors ; s_taken -> taken_mask
 -/
 
-namespace Strata.RouterSampler
+namespace Ref.RouterSampler
 
 -- § the argmax combine
 
@@ -5118,7 +5118,7 @@ theorem pass_takes_lowest_on_tie (v : Int) (i j : Nat) (h : i < j) : (comb (v, i
   have := (comb_tie v i j h).2
   rw [this]
 
-end Strata.RouterSampler
+end Ref.RouterSampler
 
 
 
@@ -5142,7 +5142,7 @@ O_D_CODES -> down_codes_offset ; O_GU_SCALES -> gate_up_scales_offset ; O_D_SCAL
 slot_index -> resident_slot ; dst_index -> router_slot ; GMAX -> entries_per_group
 -/
 
-namespace Strata.S2ExpertLayout
+namespace Ref.S2ExpertLayout
 
 -- § blob geometry
 
@@ -5331,7 +5331,7 @@ theorem native_scratch_fit (f q : Nat) :
   have b := r256_props q
   omega
 
-end Strata.S2ExpertLayout
+end Ref.S2ExpertLayout
 
 
 
@@ -5354,7 +5354,7 @@ q8k_at -> q8k_element_offset ; q8_0_at -> q8_0_element_offset ; group_shift -> l
 QE -> elements_per_lane_iteration ; QW -> bytes_per_four_code_word
 -/
 
-namespace Strata.SGemv
+namespace Ref.SGemv
 
 -- § activation addressing
 
@@ -5478,7 +5478,7 @@ theorem grid_cover_128 (n : Nat) : n ≤ ((n + 127) / 128) * 128 := by omega
 /-- 8 warps per block, one row per warp: the grid covers all rows. -/
 theorem grid_cover_warps (n : Nat) : n ≤ ((n + 7) / 8) * 8 := by omega
 
-end Strata.SGemv
+end Ref.SGemv
 
 
 
@@ -5487,8 +5487,8 @@ end Strata.SGemv
 ## FILE: /mnt/user-data/outputs/ByteLevelTokenizer.lean
 /-!
 # MODULE: byte_level_tokenizer
-SOURCES: tools/strata_tokenizer.py
-The GPT-2 byte-level BPE alphabet used by Strata's tokenizer, the special-token classes, and the
+SOURCES: tools/ref_tokenizer.py
+The GPT-2 byte-level BPE alphabet used by Ref's tokenizer, the special-token classes, and the
 merge-validity conditions.
 
 ## Source semantics
@@ -5503,7 +5503,7 @@ merge-validity conditions.
 * special_tokens (types 3, 4) -> literal_token_classes
 -/
 
-namespace Strata.Tokenizer
+namespace Ref.Tokenizer
 
 -- § the byte alphabet
 /-- Code point assigned to byte `b`: itself when printable, otherwise `256 + (rank among non-printables)`. -/
@@ -5603,14 +5603,14 @@ theorem betterRank_none (r : Nat) : betterRank none r = true := rfl
 theorem betterRank_tie (r : Nat) : betterRank (some r) r = false := by
   simp [betterRank]
 
-end Strata.Tokenizer
+end Ref.Tokenizer
 
 
 
 ## FILE: /mnt/user-data/outputs/CanonicalQuantPack.lean
 /-!
 # MODULE: canonical_quant_pack
-SOURCES: tools/canonical_xcheck.py, tools/strata_pack.py, tools/mtp_pack.py
+SOURCES: tools/canonical_xcheck.py, tools/ref_pack.py, tools/mtp_pack.py
 Canonical code-plane forms of the GGUF quantization types (S2/S4/S8), bit packing of code planes,
 64-byte plane alignment, block-geometry consistency, and the MTP expert quantizer.
 
@@ -5628,7 +5628,7 @@ Canonical code-plane forms of the GGUF quantization types (S2/S4/S8), bit packin
 * pack_codes / unpack_codes -> code_plane_pack / code_plane_unpack
 -/
 
-namespace Strata.Pack
+namespace Ref.Pack
 
 -- § 2-bit and 4-bit packing
 /-- Pack four 2-bit codes LSB-first. -/
@@ -5779,14 +5779,14 @@ theorem kvIq4nl_sorted : kvIq4nl.Pairwise (· < ·) := by decide
 /-- The codebook is not an affine function of the code: second differences are not all zero. -/
 theorem kvIq4nl_nonaffine : (kvIq4nl[1]! - kvIq4nl[0]!) ≠ (kvIq4nl[2]! - kvIq4nl[1]!) := by decide
 
-end Strata.Pack
+end Ref.Pack
 
 
 
 ## FILE: /mnt/user-data/outputs/ExpertPoolScheduling.lean
 /-!
 # MODULE: expert_pool_scheduling
-SOURCES: include/strata/kernels/cpu/pool.hpp, src/kernels/cpu/pool.cpp
+SOURCES: include/ref/kernels/cpu/pool.hpp, src/kernels/cpu/pool.cpp
 The CPU expert pool: row-range splitting of experts across tasks, the flat-batch counter protocol
 (`head`/`done`/`parked`), worker-count selection and core reservation.
 
@@ -5803,7 +5803,7 @@ The CPU expert pool: row-range splitting of experts across tasks, the flat-batch
 * kMaxSplit, kMaxSplitMulti -> split_capacity
 -/
 
-namespace Strata.Pool
+namespace Ref.Pool
 
 -- § row-range splitting
 /-- Row start of task `part` out of `parts` over `total` rows (`FF * part / parts`). -/
@@ -5954,7 +5954,7 @@ def useSplit (n kMax : Nat) (oracle : Bool) : Bool := decide (n ≤ kMax) && !or
 theorem oracle_never_split (n kMax : Nat) : useSplit n kMax true = false := by
   simp [useSplit]
 
-end Strata.Pool
+end Ref.Pool
 
 
 
@@ -5978,7 +5978,7 @@ per-row slices of a 2-D tensor, with the block geometry table.
 * Gguf.expert -> expert_slice, Gguf.rows -> row_gather
 -/
 
-namespace Strata.GgufLoader
+namespace Ref.GgufLoader
 
 -- § geometry table
 /-- (elements per block, bytes per block) per type, as in `GEOM`. -/
@@ -6074,7 +6074,7 @@ def shardsComplete (found total : Nat) : Bool := found == total
 theorem shardsComplete_iff (found total : Nat) : shardsComplete found total = true ↔ found = total := by
   simp [shardsComplete]
 
-end Strata.GgufLoader
+end Ref.GgufLoader
 
 
 
@@ -6098,7 +6098,7 @@ mapping, sign application and the token-chunking loop.
 * iq512_supported -> supported_type_predicate
 -/
 
-namespace Strata.Iquant
+namespace Ref.Iquant
 
 -- § supported types and block sizes
 /-- The five supported ggml type ids. -/
@@ -6206,7 +6206,7 @@ theorem block_in_row (i nblocks bytes : Nat) (h : i < nblocks) : i * bytes + byt
   rw [Nat.add_mul, Nat.one_mul] at this
   exact this
 
-end Strata.Iquant
+end Ref.Iquant
 
 
 
@@ -6228,7 +6228,7 @@ without AVX-512: 2-bit unpack addressing, chunk/scale association, block strides
 * unpack64 -> unpack_codes_64, row_multi -> multi_token_row_dot, act_quant_q8_1_avx2 -> activation_quantizer
 -/
 
-namespace Strata.Q2Avx2
+namespace Ref.Q2Avx2
 
 /-- Byte index holding value `i`. -/
 def codeByte (i : Nat) : Nat := i / 4
@@ -6317,14 +6317,14 @@ theorem round_ties_away : roundHalfAway 5 = 3 ∧ roundHalfAway (-5) = -3 := by 
 theorem nchunks_exact (n : Nat) (h : n % 32 = 0) : (n / 32) * 32 = n := by
   omega
 
-end Strata.Q2Avx2
+end Ref.Q2Avx2
 
 
 
 ## FILE: /mnt/user-data/outputs/Q2ExpertKernelLayout.lean
 /-!
 # MODULE: q2_expert_kernel_layout
-SOURCES: include/strata/kernels/cpu/expert.hpp, src/kernels/cpu/expert.cpp
+SOURCES: include/ref/kernels/cpu/expert.hpp, src/kernels/cpu/expert.cpp
 The CPU Q2_0 routed-expert kernel: fixed geometry, the 1,382,400-byte expert blob layout, the
 activation-quantizer clamp, tail-mask arithmetic of the 512-bit row dot, the Q2_0 offset identity and
 the CPU-feature gate.
@@ -6342,7 +6342,7 @@ the CPU-feature gate.
 * ActQ -> quantized_activation, CpuFeatures -> cpu_feature_set
 -/
 
-namespace Strata.Q2Expert
+namespace Ref.Q2Expert
 
 -- § geometry (literals, with proofs that they equal the source formulas)
 def H : Nat := 2560
@@ -6494,14 +6494,14 @@ theorem no_vnni_refused (f : CpuFeatures) (h : f.avx512_vnni = false) : f.usable
   unfold CpuFeatures.usable
   simp [h]
 
-end Strata.Q2Expert
+end Ref.Q2Expert
 
 
 
 ## FILE: /mnt/user-data/outputs/VisionEncoderTool.lean
 /-!
 # MODULE: vision_encoder_tool
-SOURCES: tools/vision/strata_vision.cpp, tools/vision/CMakeLists.txt
+SOURCES: tools/vision/ref_vision.cpp, tools/vision/CMakeLists.txt
 The resident image-encoder helper: its output file header and size, the token grid, the `ENC` line
 split, and the CMake portability options.
 
@@ -6511,14 +6511,14 @@ split, and the CMake portability options.
 * The grid is recovered from the last token's decoder position: `nx = x + 1`, `ny = y + 1`; the
   encoding is accepted only when `nx * ny = n_tokens`. Row `i` sits at `(i % nx, i / nx)`.
 * `ENC <image> <out>` splits at the LAST space, so the image path may contain spaces.
-* `STRATA_PORTABLE` turns `GGML_NATIVE` off and forces the AVX2 baseline flags on.
+* `REF_PORTABLE` turns `GGML_NATIVE` off and forces the AVX2 baseline flags on.
 
 ## Form template identifiers
 * SVE1 magic -> file_magic, hdr[5] -> header_words, parse_enc -> command_line_split
-* STRATA_PORTABLE -> portable_build_flag
+* REF_PORTABLE -> portable_build_flag
 -/
 
-namespace Strata.Vision
+namespace Ref.Vision
 
 -- § file format
 /-- 'S' 'V' 'E' '1' as little-endian bytes 0x53 0x56 0x45 0x31. -/
@@ -6606,6 +6606,6 @@ def ggmlCuda (stratavisioncuda : Bool) : Bool := stratavisioncuda
 /-- The default (OFF) builds no CUDA backend. -/
 theorem cuda_default_off : ggmlCuda false = false := rfl
 
-end Strata.Vision
+end Ref.Vision
 
 
