@@ -1,6 +1,6 @@
 # infccl for BI-V100 — PM Feature Table & Build Environment Reference
 
-> **Source**: Niko1221/Strata (3377 commits, 2026-09-24 ~ 2026-10-20)
+> **Source**: reference (3377 commits, 2026-09-24 ~ 2026-10-20)
 > **Target**: Iluvatar BI-V100 (ivcore10) — zeng-bin3123/baloon & zeng-bin3123/ikun
 > **Model**: Qwen3.6-35B-A3B (MoE 256 experts, top-8, 36 layers, TP=4)
 
@@ -128,9 +128,9 @@ for i in range(5):
 
 ---
 
-## Part B: Strata Feature Table for infccl Implementation
+## Part B: Ref Feature Table for infccl Implementation
 
-Below is the PM-style feature table extracted from 3377 Strata commits. Features are organized by the engine subsystem, ordered by implementation priority for BI-V100. Each feature includes commit count, key implementation files, and relevance to our target.
+Below is the PM-style feature table extracted from 3377 Ref commits. Features are organized by the engine subsystem, ordered by implementation priority for BI-V100. Each feature includes commit count, key implementation files, and relevance to our target.
 
 ### Legend
 - 🔴 **P0 — Must Have**: Core decode/prefill path, directly impacts TPS
@@ -148,7 +148,7 @@ Below is the PM-style feature table extracted from 3377 Strata commits. Features
 | 1.2 | bf16_gemv | 11 | `src/kernels/cuda/bf16_gemv.cu`, `native_bf16.cu` (383L) | BF16 projections for hyper-connection, router, indexer. On Volta: BF16→FP16 conversion + FP16 tensor cores. | 🔴 BI-V100 has FP16 TC only, same as Volta. Copy the BF16→FP16 TC path. |
 | 1.3 | s2_expert_grouped GEMV | 3 | `src/kernels/cuda/s2_expert_grouped.cu` (1284L) | Expert-mode 8: codebook grid + group activations in shared memory, SwiGLU fused. Used on V100/gfx906. | 🔴 Routed expert compute for decode. This is the kernel Volta/gfx906 runs for VRAM-resident experts. Direct port target. |
 | 1.4 | s_gemv / s_gemv_pair | — | `src/kernels/cuda/s_gemv.cu` (694L) | General-purpose small GEMV and paired GEMV. | 🟡 Supporting kernel for various projections. |
-| 1.5 | Fused decode ops (`STRATA_FUSE_DECODE`) | V100 doc | Multiple kernels | gate/up+SwiGLU in one kernel, SwiGLU+quantizer in one, two BF16 projections in one kernel. Saves 4-16µs/token on V100. | 🟡 Opt-in on V100. Port as optimization after base path works. |
+| 1.5 | Fused decode ops (`REF_FUSE_DECODE`) | V100 doc | Multiple kernels | gate/up+SwiGLU in one kernel, SwiGLU+quantizer in one, two BF16 projections in one kernel. Saves 4-16µs/token on V100. | 🟡 Opt-in on V100. Port as optimization after base path works. |
 
 ### Category 2: DECODE PATH — MoE Routing (🔴 P0)
 
@@ -157,7 +157,7 @@ Below is the PM-style feature table extracted from 3377 Strata commits. Features
 | 2.1 | native_router + router_top10 | 7 | `src/kernels/cuda/native_router.cu`, `router_top10.cu` (497L) | Router: compute gate logits, top-k (k=8 for Qwen3.6), grouping. Combined router+shared-gate in one product. | 🔴 Every token must route through 256 experts → top-8. Our `ix_native_router.cu` (256×8 warp64) targets this. |
 | 2.2 | route_prior | — | `src/kernels/cuda/route_prior.cu` | Prior routing decisions for speculative/batched decode. | 🟡 Needed for MTP integration. |
 | 2.3 | shared_expert | — | `src/kernels/cuda/shared_expert.cu` (505L) | Shared expert (always-active) alongside top-k routed experts. | 🔴 Qwen3.6 has a shared expert per layer. Must implement. |
-| 2.4 | MoE end: 1024-thread combine + next layer q8_1 | QWEN36 doc | fused in q36_engine.cu | `k_moe_out` → combine expert outputs, produce next layer's q8_1 activation image. Old: one thread walking 256 experts (9µs). New: 1024 threads. | 🔴 This was a major bottleneck Strata optimized. Our `ix_moe_elementwise.cu` targets this. |
+| 2.4 | MoE end: 1024-thread combine + next layer q8_1 | QWEN36 doc | fused in q36_engine.cu | `k_moe_out` → combine expert outputs, produce next layer's q8_1 activation image. Old: one thread walking 256 experts (9µs). New: 1024 threads. | 🔴 This was a major bottleneck Ref optimized. Our `ix_moe_elementwise.cu` targets this. |
 
 ### Category 3: DECODE PATH — GDN (DeltaNet / SSM) (🔴 P0)
 
@@ -165,7 +165,7 @@ Below is the PM-style feature table extracted from 3377 Strata commits. Features
 |---|---------|---------|-----------|-------------|-------------------|
 | 3.1 | gdn.cu / native_gdn.cu | 72 total | `src/kernels/cuda/gdn.cu`, `native_gdn.cu`, `native_gdn_preprocess.cu` | GDN (DeltaNet) decode: SSM recurrence, short conv, norm. Fused variants available. | 🔴 Qwen3.6 has GDN in every layer. Our `ix_gdn.cu` targets this (SSM recurrence + conv + norm). |
 | 3.2 | GDN prompt tiled conv | commit 07b107403a | `src/prefill/gdn_chunk.cu` | Prompt path's GDN short conv tiled over tokens (16 tokens side by side). | 🟡 Prefill optimization. Port after decode works. |
-| 3.3 | GDN recurrence variants | V100 doc | `gdn_chunk.cu`, `gdn_rec_parity.cu` | Chain-split recurrence (`STRATA_GDN_REC_WARP=2`): +6-9% on V100. Opt-in because it changes summation order. | 🟡 Optimization for our sm_70-equivalent arch. |
+| 3.3 | GDN recurrence variants | V100 doc | `gdn_chunk.cu`, `gdn_rec_parity.cu` | Chain-split recurrence (`REF_GDN_REC_WARP=2`): +6-9% on V100. Opt-in because it changes summation order. | 🟡 Optimization for our sm_70-equivalent arch. |
 | 3.4 | fused_gr / gr (Gated Residual) | 72 | `src/kernels/cuda/fused_gr.cu` (3044L), `gr.cu` (500L) | Hyper-connection: fused_gr combines read+norm+up projection. Latency-hidden variant for V100/gfx906. | 🔴 Every layer has gated residual connection. Core path. |
 
 ### Category 4: ATTENTION (🔴 P0)
@@ -231,7 +231,7 @@ Below is the PM-style feature table extracted from 3377 Strata commits. Features
 | # | Feature | Commits | Key Files | Description | BI-V100 Relevance |
 |---|---------|---------|-----------|-------------|-------------------|
 | 11.1 | Auto-calibrate | 78 | `tools/calibrate.py` | Measure PCIe share, draft acceptance floor, CPU worker count. | 🟢 Our own tuning script once we have baseline perf. |
-| 11.2 | Benchmarking tools | 97 bench commits | `tools/strata_bench.py` | A/B engine comparison, tok/s measurement. | 🟢 Adapt benchmark methodology. |
+| 11.2 | Benchmarking tools | 97 bench commits | `tools/ref_bench.py` | A/B engine comparison, tok/s measurement. | 🟢 Adapt benchmark methodology. |
 
 ### Category 12: QUANTIZATION & FORMAT (🟢 P2)
 
@@ -242,7 +242,7 @@ Below is the PM-style feature table extracted from 3377 Strata commits. Features
 
 ---
 
-## Part C: Qwen3.6-35B-A3B Engine Architecture (from Strata q36_engine.cu)
+## Part C: Qwen3.6-35B-A3B Engine Architecture (from Ref q36_engine.cu)
 
 ### Model Structure
 - **36 decoder layers**, each containing:
@@ -265,7 +265,7 @@ Three decode optimizations (expected 87ms → ~59ms):
   3. infccl P2P AllReduce:   small tensor optimization
 ```
 
-### Key Strata Optimizations for Decode (from QWEN36.md)
+### Key Ref Optimizations for Decode (from QWEN36.md)
 What was slow (profiled on R9700, 11.25ms kernel time/token):
 1. Big Q8_0 products (attention, GDN, head = 1.9GB/token) → memory-bandwidth bound at 530 GB/s ✓
 2. Shared expert + attention k/v products: 140/token at 18µs each → **bottleneck**
@@ -274,7 +274,7 @@ What was slow (profiled on R9700, 11.25ms kernel time/token):
 5. `k_group` (one thread walking 256 experts): 9µs → **serial bottleneck**
 6. Router top-k and grouping: separate launches → **launch overhead**
 
-Strata fixes:
+Ref fixes:
 - Products: one warp per row, grid capped (2048 warps took 21µs where 1024 took 5µs on gfx12)
 - Shared gate+up+SwiGLU+q8_1 in one launch
 - MoE end: 1024 threads + next layer's q8_1 image
@@ -314,7 +314,7 @@ Strata fixes:
 
 ---
 
-## Part E: Strata Commit Statistics
+## Part E: Ref Commit Statistics
 
 | Category | Commits | Key Insight |
 |----------|---------|-------------|
@@ -338,12 +338,12 @@ Strata fixes:
 | **Total classified** | **~2300** | Remaining ~1100: docs, tests, setup, packaging, release |
 
 ### Critical AMD HIP / gfx906 Patterns (directly portable to BI-V100)
-Strata already has gfx906 (wave64) specific code paths:
+Ref already has gfx906 (wave64) specific code paths:
 - Expert mode 8 (codebook + shared mem SwiGLU) — used on V100 AND gfx906
 - Latency-hidden up kernel — used on V100 AND gfx906
 - Interleaved MMVQ with per-arch rows table — V100 variant exists
 - Router top-10 without serial parts — HIP variant
-- `dp4a` through `STRATA_DP4A` macro for sm_60/gfx906
+- `dp4a` through `REF_DP4A` macro for sm_60/gfx906
 
 These are our **primary reference** for BI-V100 ports since gfx906 is the closest arch.
 

@@ -1,5 +1,5 @@
-// vision_build_config.hpp - model of the strata-vision CMake configuration: how STRATA_PORTABLE and
-// STRATA_VISION_CUDA determine the forced ggml / llama.cpp cache settings.
+// vision_build_config.hpp - model of the ref-vision CMake configuration: how REF_PORTABLE and
+// REF_VISION_CUDA determine the forced ggml / llama.cpp cache settings.
 #pragma once
 #include <array>
 #include <cstring>

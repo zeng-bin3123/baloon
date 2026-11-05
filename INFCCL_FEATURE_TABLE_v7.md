@@ -1,9 +1,9 @@
 # infccl for BI-V100 — PM Feature Table v7 (Source-Grounded Engineering Spec)
 
-> **Source**: Niko1221/Strata (**4563 commits**, 2026-09-24 ~ 2026-10-27, HEAD `5e8a4cca`)
+> **Source**: reference (**4563 commits**, 2026-09-24 ~ 2026-10-27, HEAD `5e8a4cca`)
 > **Target**: Iluvatar BI-V100 (ivcore10) — zeng-bin3123/baloon main
 > **Model**: Qwen3.6-35B-A3B (MoE 256 experts, top-8, 36 layers, TP=4)
-> **Delta from v6**: Source-code-extracted kernel implementation specs with exact diffs. Every kernel in this table maps to an exact file:line range in Strata and includes the ivcore10 porting transform. Added: Strata 0.2.7 features (layer-major prefill default, pipelined batch default, gated MTP, Gyro-L TQP5/6/7, QFUSE parity fix, DeepSeek vision). Updated V100 reference numbers from `docs/NVIDIA_V100.md` bench data.
+> **Delta from v6**: Source-code-extracted kernel implementation specs with exact diffs. Every kernel in this table maps to an exact file:line range in Ref and includes the ivcore10 porting transform. Added: Ref 0.2.7 features (layer-major prefill default, pipelined batch default, gated MTP, Gyro-L TQP5/6/7, QFUSE parity fix, DeepSeek vision). Updated V100 reference numbers from `docs/NVIDIA_V100.md` bench data.
 
 ---
 
@@ -62,7 +62,7 @@ SOFLAGS  := -x cuda --cuda-gpu-arch=ivcore10 --cuda-path=/usr/local/corex \
 |---------|---------|
 | `libcublas.so`, `libcublasLt.so` | FP16 TC GEMM for dense prefill |
 | `libcudart.so`, `libcuda.so` | CUDA runtime |
-| `libcutlass.so` | CUTLASS (Strata `s884` for Volta TC GEMM) |
+| `libcutlass.so` | CUTLASS (Ref `s884` for Volta TC GEMM) |
 | `libixattn.so` | ixformer attention (Phase 1 baseline) |
 | `libcuinfer.so` | Inference pipeline |
 | `libibverbs.so` | RDMA (multi-node, future) |
@@ -127,17 +127,17 @@ for i in range(5):
 
 ## Part B: Compatibility Layer — `ix_compat.h`
 
-Strata uses `include/strata/hip_compat/intrinsics.hpp` (163 lines) for CUDA→HIP/wave64. On ivcore10, clang-16 natively compiles CUDA, so we need only a **thin header** for warp-width, missing intrinsics, and arch detection.
+Ref uses `include/ref/hip_compat/intrinsics.hpp` (163 lines) for CUDA→HIP/wave64. On ivcore10, clang-16 natively compiles CUDA, so we need only a **thin header** for warp-width, missing intrinsics, and arch detection.
 
-### B.1 Strata HIP Compat → ivcore10 Transform
+### B.1 Ref HIP Compat → ivcore10 Transform
 
-| Strata HIP (`intrinsics.hpp`) | ivcore10 Transform | Notes |
+| Ref HIP (`intrinsics.hpp`) | ivcore10 Transform | Notes |
 |---|---|---|
 | `__shfl_xor_sync(0xFFFFFFFFu, v, off)` → `__shfl_xor(v, off, width)` | **Same**: `__shfl_xor(v, off, 64)` | ivcore10 clang supports CUDA `__shfl_xor` directly |
 | `__shfl_down_sync(0xFFFFFFFFu, v, d)` → `__shfl_down(v, d, width)` | **Same**: `__shfl_down(v, d, 64)` | No `_sync` variant needed (wave64 is implicitly sync) |
 | `__ballot_sync(mask, pred)` → `__ballot(pred)` | **Same**: `__ballot(pred)` returns 64-bit | Must store as `unsigned long long` |
 | `__nanosleep(cycles)` → `__builtin_amdgcn_s_sleep(1)` | `__threadfence()` | ivcore10 has no sleep instruction |
-| `__dp4a(a,b,c)` → portable SWAR fallback (L46-53) | **Check ivcore10 dp4a** support; else use Strata's portable fallback | Used by i-quant decode |
+| `__dp4a(a,b,c)` → portable SWAR fallback (L46-53) | **Check ivcore10 dp4a** support; else use Ref's portable fallback | Used by i-quant decode |
 | `__byte_perm(x,y,s)` → `__builtin_amdgcn_perm(y,x,sel)` | May need emulation | Used by i-quant table lookups |
 | `__syncwarp(mask)` → fence + wave_barrier | **Not needed** (wave64 implicit) | ivcore10 has no explicit warp sync |
 | `require_full_wave_mask(mask)` guard | **Not needed** — all masks full | Safety: assert `mask == 0xFFFFFFFFFFFFFFFFull` |
@@ -146,7 +146,7 @@ Strata uses `include/strata/hip_compat/intrinsics.hpp` (163 lines) for CUDA→HI
 
 ```cuda
 // ix_compat.h — Iluvatar BI-V100 compatibility layer
-// Derived from Strata include/strata/hip_compat/intrinsics.hpp (163 lines)
+// Derived from Ref include/ref/hip_compat/intrinsics.hpp (163 lines)
 #pragma once
 #ifndef __ILUVATAR__
 #error "ix_compat.h is for Iluvatar BI-V100 only"
@@ -160,7 +160,7 @@ Strata uses `include/strata/hip_compat/intrinsics.hpp` (163 lines) for CUDA→HI
 #define ix_shfl_up(v, delta)      __shfl_up(v, delta, 64)
 #define ix_shfl(v, lane)          __shfl(v, lane, 64)
 
-// 64-lane butterfly reduction (from Strata native_mmvq.cu:2363-2365)
+// 64-lane butterfly reduction (from Ref native_mmvq.cu:2363-2365)
 template<typename T>
 __device__ __forceinline__ T ix_warp_reduce_sum(T v) {
     #pragma unroll
@@ -180,10 +180,10 @@ __device__ __forceinline__ T ix_warp_reduce_max(T v) {
 // Threadfence — NEVER use __threadfence_system()
 #define ix_threadfence()          __threadfence()
 
-// __nanosleep — NOT on ivcore10 (Strata intrinsics.hpp:161 maps to sleep)
+// __nanosleep — NOT on ivcore10 (Ref intrinsics.hpp:161 maps to sleep)
 #define ix_nanosleep(ns)          __threadfence()
 
-// Lane/warp helpers (Strata native_mmvq.cu:2341-2342)
+// Lane/warp helpers (Ref native_mmvq.cu:2341-2342)
 __device__ __forceinline__ int ix_lane_id() { return threadIdx.x & 63; }
 __device__ __forceinline__ int ix_warp_id() { return threadIdx.x >> 6; }
 
@@ -192,7 +192,7 @@ __device__ __forceinline__ unsigned long long ix_ballot(int pred) {
     return __ballot(pred);
 }
 
-// dp4a — portable signed dot4 (Strata intrinsics.hpp:46-53 fallback)
+// dp4a — portable signed dot4 (Ref intrinsics.hpp:46-53 fallback)
 __device__ __forceinline__ int ix_dp4a(int a, int b, int c) {
     // TODO: check if ivcore10 has native dp4a; if yes, use intrinsic
     const unsigned ua = (unsigned)a, ub = (unsigned)b;
@@ -208,7 +208,7 @@ __device__ __forceinline__ int ix_dp4a(int a, int b, int c) {
     return (int)sum;
 }
 
-// BF16 conversion helpers (Strata shared_expert.cu:117 uses f32_from_bf16)
+// BF16 conversion helpers (Ref shared_expert.cu:117 uses f32_from_bf16)
 __device__ __forceinline__ float ix_bf16_to_f32(uint16_t bf16) {
     uint32_t bits = (uint32_t)bf16 << 16;
     float f;
@@ -221,7 +221,7 @@ __device__ __forceinline__ float ix_bf16_to_f32(uint16_t bf16) {
 
 ## Part C: Source-Code-Grounded Kernel Specs
 
-Every entry below maps to an exact source file and line range in Strata HEAD `5e8a4cca`.
+Every entry below maps to an exact source file and line range in Ref HEAD `5e8a4cca`.
 
 ### Legend
 
@@ -241,12 +241,12 @@ Every entry below maps to an exact source file and line range in Strata HEAD `5e
 |-------|-------|
 | **Source** | `src/kernels/cuda/native_mmvq.cu:2328-2396` |
 | **Lines** | 3913 total; wave64 kernel at 2335-2368 |
-| **Guard** | `#if defined(STRATA_HIP_GFX906)` |
+| **Guard** | `#if defined(REF_HIP_GFX906)` |
 | **Kernel** | `native_mmvq_wave_kernel<F, NCOLS, R>` |
 | **Launch** | `<<<(n_out + 4*R - 1)/(4*R), 256>>>` = 4 wavefronts × 64 lanes |
 | **Effort** | L |
 
-**Source kernel** (Strata `native_mmvq.cu:2335-2368`):
+**Source kernel** (Ref `native_mmvq.cu:2335-2368`):
 ```cuda
 template<typename F, int NCOLS, int R>
 __launch_bounds__(256)
@@ -292,35 +292,35 @@ __global__ void native_mmvq_wave_kernel(
 ```
 
 **ivcore10 transform**:
-- Replace `#if defined(STRATA_HIP_GFX906)` → `#if defined(__ILUVATAR__)`
+- Replace `#if defined(REF_HIP_GFX906)` → `#if defined(__ILUVATAR__)`
 - `__shfl_xor(v, off, 64)` — **identical**, no change needed
 - `lane = threadIdx.x & 63` — **identical**
 - `warp_id = threadIdx.x >> 6` — **identical**
 - The dispatch at line 2378-2393 (`wave_launch`) switches NCOLS 1..8 — port directly
 - `SmallTraits<Weight, Qi>` template types: port Q4_K, Q6_K, Q8_0 format structs
-- `STRATA_WAVE_MMVQ` macro at line 2392 gates the dispatch — replace guard
+- `REF_WAVE_MMVQ` macro at line 2392 gates the dispatch — replace guard
 
-**MMVQ-IL rows table** (`native_mmvq.cu:2999-3103`): per-arch optimal rows. Strata has `kIlRows_70` for V100. **Must measure on ivcore10** to find optimal `R` per `(n_in, n_out)` shape.
+**MMVQ-IL rows table** (`native_mmvq.cu:2999-3103`): per-arch optimal rows. Ref has `kIlRows_70` for V100. **Must measure on ivcore10** to find optimal `R` per `(n_in, n_out)` shape.
 
 #### C.1.2 bf16_gemv
 
 | Field | Value |
 |-------|-------|
 | **Source** | `src/kernels/cuda/bf16_gemv.cu` (189 lines) |
-| **Header** | `include/strata/kernels/bf16_gemv.hpp` |
+| **Header** | `include/ref/kernels/bf16_gemv.hpp` |
 | **Purpose** | BF16→FP16 + FP16 TC for hyper-connection, router, indexer |
 | **Effort** | M |
 
-**ivcore10 transform**: Copy Volta `STRATA_BF16_TC` path (FP16 TC only). BI-V100 has FP16 tensor cores but no BF16 TC.
+**ivcore10 transform**: Copy Volta `REF_BF16_TC` path (FP16 TC only). BI-V100 has FP16 tensor cores but no BF16 TC.
 
 #### C.1.3 s2_expert_grouped
 
 | Field | Value |
 |-------|-------|
 | **Source** | `src/kernels/cuda/s2_expert_grouped.cu` (1284 lines) |
-| **Header** | `include/strata/kernels/s2_expert_grouped.hpp` |
+| **Header** | `include/ref/kernels/s2_expert_grouped.hpp` |
 | **Purpose** | Expert mode 8: codebook grid + shared mem SwiGLU. V100/gfx906 path. |
-| **Strata V100 note** | `docs/NVIDIA_V100.md`: "Routed experts in VRAM: expert mode 8" |
+| **Ref V100 note** | `docs/NVIDIA_V100.md`: "Routed experts in VRAM: expert mode 8" |
 | **Effort** | L |
 
 **ivcore10 transform**: Direct port. LDS staging of activation group. Verify shared memory limits match.
@@ -358,7 +358,7 @@ __global__ void native_mmvq_wave_kernel(
 | **Launch** | `<<<n_tokens, 64>>>` = 1 wavefront, 64×8=512 slots > 256 experts |
 | **Effort** | M |
 
-**Source kernel** (Strata `router_top10.cu:198-263`, condensed):
+**Source kernel** (Ref `router_top10.cu:198-263`, condensed):
 ```cuda
 constexpr int RW_PER = 8;  // 64 lanes × 8 = 512 > 256 experts
 __global__ void __launch_bounds__(64)
@@ -375,7 +375,7 @@ router_top10_wave(const float* logits, int n_tokens,
 - `__shfl_xor(bv, off, 64)` — **identical**
 - `__shfl_xor(bi, off, 64)` — **identical** (int version)
 - `__shared__ double s_ex[512]` — 4 KB shared memory, well within limit
-- Validate: same top-8 ids and weights as Strata ref for 256 experts, k=8
+- Validate: same top-8 ids and weights as Ref ref for 256 experts, k=8
 
 #### C.2.2 Shared expert scalar gate (wave64 rewrite)
 
@@ -387,7 +387,7 @@ router_top10_wave(const float* logits, int n_tokens,
 | **Problem** | Original was 1 thread = **26.7% of block time** (11.4 ms/tok) |
 | **Effort** | M |
 
-**Source kernel** (Strata `shared_expert.cu:107-129`):
+**Source kernel** (Ref `shared_expert.cu:107-129`):
 ```cuda
 // CUDA warp32 version:
 __device__ __forceinline__ double warp_sum_d(double v) {
@@ -462,7 +462,7 @@ __global__ void ix_scalar_gate_kernel(const uint16_t* x_bf16,
 | Field | Value |
 |-------|-------|
 | **Source** | `src/kernels/cuda/gdn.cu` (248 lines) |
-| **Header** | `include/strata/kernels/gdn.hpp` |
+| **Header** | `include/ref/kernels/gdn.hpp` |
 | **Purpose** | Short conv → delta rule recurrence → output norm |
 | **Effort** | L |
 
@@ -473,12 +473,12 @@ __global__ void ix_scalar_gate_kernel(const uint16_t* x_bf16,
 | Field | Value |
 |-------|-------|
 | **Source** | `src/kernels/cuda/fused_gr.cu:1627-1701` (3228 lines total) |
-| **Guard** | `#if defined(STRATA_HIP_GFX906)` |
+| **Guard** | `#if defined(REF_HIP_GFX906)` |
 | **Kernel** | `gr_down_split_kernel` + `gr_down_finish_kernel` |
 | **Launch** | `<<<(41 × 5), 8 × 64>>>` = 8 wavefronts per block, K-split into 5 slices of 2048 |
 | **Effort** | L |
 
-**Source kernel** (Strata `fused_gr.cu:1641-1682`, key structure):
+**Source kernel** (Ref `fused_gr.cu:1641-1682`, key structure):
 ```cuda
 constexpr int GS_SL = 2048;                   // K per slice
 constexpr int GS_S = D / GS_SL;               // 5 slices
@@ -499,7 +499,7 @@ __global__ void gr_down_finish_kernel(GrMulti m) {
 ```
 
 **ivcore10 transform**:
-- Replace `#if defined(STRATA_HIP_GFX906)` → `#if defined(__ILUVATAR__)`
+- Replace `#if defined(REF_HIP_GFX906)` → `#if defined(__ILUVATAR__)`
 - `__shfl_xor(v, off, 64)` — **identical**
 - `extern __shared__ __align__(16) float tile[]` — verify LDS capacity for `[T][2048]`
 - **Remove `__nanosleep`** at line 2802: replace with `__threadfence()` polling
@@ -535,15 +535,15 @@ __global__ void gr_down_finish_kernel(GrMulti m) {
 | Field | Value |
 |-------|-------|
 | **Source** | `src/kernels/cuda/qsa_prompt_attn.cu` |
-| **Header** | `include/strata/kernels/qsa_prompt_attn.hpp` |
-| **Strata V100 result** | `prompt_attn_v70_kernel` on `mma.m8n8k4`: 7K tok → 1164 tok/s, 28K → 1251 tok/s |
+| **Header** | `include/ref/kernels/qsa_prompt_attn.hpp` |
+| **Ref V100 result** | `prompt_attn_v70_kernel` on `mma.m8n8k4`: 7K tok → 1164 tok/s, 28K → 1251 tok/s |
 | **Effort** | M (Phase 2) |
 
 #### C.4.3 sm_60 prompt attention (no-partials)
 
 | Field | Value |
 |-------|-------|
-| **Source** | commit `a3389901`, `STRATA_PATTN_SM60=1` |
+| **Source** | commit `a3389901`, `REF_PATTN_SM60=1` |
 | **Purpose** | No-partials attention for pre-Volta. **Best reference for ivcore10.** |
 | **Effort** | M (Phase 2) |
 
@@ -561,12 +561,12 @@ __global__ void gr_down_finish_kernel(GrMulti m) {
 
 | # | Feature | Source | Effort | ivcore10 Strategy |
 |---|---------|--------|--------|-------------------|
-| 5.1 | MTP draft | `src/core/mtp.cpp` (1875L), `include/strata/core/mtp.hpp` | XL | After core decode. 1.6-1.8× speedup. |
-| 5.2 | Verify window | `include/strata/core/verify.hpp` (4254L) | XL | Multi-token verify in one pass. |
-| 5.3 | DFlash2 drafter | `src/kernels/cuda/dflash2.cu`, `include/strata/core/dflash2.hpp` | XL | GPU-forward drafter. Advanced. |
+| 5.1 | MTP draft | `src/core/mtp.cpp` (1875L), `include/ref/core/mtp.hpp` | XL | After core decode. 1.6-1.8× speedup. |
+| 5.2 | Verify window | `include/ref/core/verify.hpp` (4254L) | XL | Multi-token verify in one pass. |
+| 5.3 | DFlash2 drafter | `src/kernels/cuda/dflash2.cu`, `include/ref/core/dflash2.hpp` | XL | GPU-forward drafter. Advanced. |
 | 5.4 | PLE / n-gram | `src/kernels/cuda/ple.cu` (390L) | M | Prompt lookup: +6-11% on code. |
-| 5.5 | Gated MTP proposal | commits `f4612b1a`, `ca17d0f5` (`#3416`) | M | `STRATA_SPEC_PROB=1` confidence gate. **New in 0.2.7.** |
-| 5.6 | Pipelined MTP batching | commit `17878ac5`, `5cfa3954` (`#4121`) | M | `STRATA_PIPED_MTP=N`. **New in 0.2.7.** |
+| 5.5 | Gated MTP proposal | commits `f4612b1a`, `ca17d0f5` (`#3416`) | M | `REF_SPEC_PROB=1` confidence gate. **New in 0.2.7.** |
+| 5.6 | Pipelined MTP batching | commit `17878ac5`, `5cfa3954` (`#4121`) | M | `REF_PIPED_MTP=N`. **New in 0.2.7.** |
 | 5.7 | Head 8-col pass | commit `e4328457` | M | Head reads 8 columns/pass. Drafter 4.55→2.83 ms. |
 
 ---
@@ -579,7 +579,7 @@ __global__ void gr_down_finish_kernel(GrMulti m) {
 | 6.2 | WMMA GEMM | `src/prefill/wmma_gemm.cu` | M | FP16 TC. V100: +10%. |
 | 6.3 | **Layer-major prefill** | commits `ffe40c16`..`37e4832a` (`#3976`) | L | **Default in 0.2.7** for CUDA split. Needs `moe_shared_init`, `moe_scatter_add`. |
 | 6.4 | KVA approximate prefill | commits `f4012d63`..`750ca8c3` | L | Approximate late layers. Major TTFT. |
-| 6.5 | GP100 weight-stationary | commit `5dbd8774`, `STRATA_MMQ_WS=1` | M | Evaluate — similar compute model. |
+| 6.5 | GP100 weight-stationary | commit `5dbd8774`, `REF_MMQ_WS=1` | M | Evaluate — similar compute model. |
 
 ---
 
@@ -599,11 +599,11 @@ __global__ void gr_down_finish_kernel(GrMulti m) {
 
 | # | Feature | Source | Effort |
 |---|---------|--------|--------|
-| 8.1 | Expert cache (LRU) | `include/strata/core/expert_cache.hpp` (807L) | M |
-| 8.2 | VMM / Pinned memory | `include/strata/core/vmm.hpp`, `src/core/pinned.cu` | L |
+| 8.1 | Expert cache (LRU) | `include/ref/core/expert_cache.hpp` (807L) | M |
+| 8.2 | VMM / Pinned memory | `include/ref/core/vmm.hpp`, `src/core/pinned.cu` | L |
 | 8.3 | Copy-all experts | — | M |
-| 8.4 | RAM adapt | `STRATA_RAM_ADAPT` | M |
-| 8.5 | Conversation cache | `include/strata/core/conversation_cache.hpp` (28K) | M |
+| 8.4 | RAM adapt | `REF_RAM_ADAPT` | M |
+| 8.5 | Conversation cache | `include/ref/core/conversation_cache.hpp` (28K) | M |
 | 8.6 | RAM store spare+put | — | M |
 
 ### C.9: QUANTIZATION (🟢 P2)
@@ -621,21 +621,21 @@ __global__ void gr_down_finish_kernel(GrMulti m) {
 | # | Feature | Source | Effort |
 |---|---------|--------|--------|
 | 10.1 | Session/batch | vllm handles | — |
-| 10.2 | Graph priority | `STRATA_GRAPH_PRIO=1` | S |
+| 10.2 | Graph priority | `REF_GRAPH_PRIO=1` | S |
 | 10.3 | Cuda spill guard | commit `3a3f35c6` | S |
 
 ---
 
-## Part D: Strata 0.2.7 Changes Relevant to infccl
+## Part D: Ref 0.2.7 Changes Relevant to infccl
 
-Strata 0.2.7 (released 2026-10-26, `a42cc3d7`) brings several changes that affect our port:
+Ref 0.2.7 (released 2026-10-26, `a42cc3d7`) brings several changes that affect our port:
 
 | Change | Commits | Impact on infccl |
 |--------|---------|------------------|
 | **Layer-major prefill default** | `37e4832a` (`#3976`) | Now default for CUDA layer split. Priority for TP=4 port. |
 | **Pipelined batch groups default** | `ec8e4059` | Two NVIDIA cards pipeline by default. Port scheduling. |
-| **Gated MTP proposal** | `f4612b1a`, `ca17d0f5` (`#3416`) | `STRATA_SPEC_PROB=1` — confidence gate in proposal law. Phase 2. |
-| **Pipelined MTP batching** | `5cfa3954` (`#4121`) | `STRATA_PIPED_MTP=N`. Phase 3. |
+| **Gated MTP proposal** | `f4612b1a`, `ca17d0f5` (`#3416`) | `REF_SPEC_PROB=1` — confidence gate in proposal law. Phase 2. |
+| **Pipelined MTP batching** | `5cfa3954` (`#4121`) | `REF_PIPED_MTP=N`. Phase 3. |
 | **QFUSE parity fix** | `7d1016f3` (`#3948`) | **Correctness fix.** Apply immediately. |
 | **Gyro-L TQP5/6/7** | `38b06316` (`#3806`) | New quant types. Phase 3. |
 | **DeepSeek vision** | `9b177f30`, `1e617c3f` | Not relevant for Qwen3.6 infccl. |
@@ -662,7 +662,7 @@ Three optimizations (87 → ~59 ms):
   3. infccl P2P AllReduce:    variable
 ```
 
-### E.2 Strata V100 Reference Numbers (from `docs/NVIDIA_V100.md`)
+### E.2 Ref V100 Reference Numbers (from `docs/NVIDIA_V100.md`)
 
 | Metric | V100 (sm_70) | Measurement |
 |--------|-------------|-------------|
@@ -695,7 +695,7 @@ Three optimizations (87 → ~59 ms):
 |---|-------------|--------|--------|--------|-----------------|
 | 1 | `ix_compat.h` | Part B | S | **NEW** | Compiles. `probe_warp64` passes (sum=2016, ballot=0xFFFF…). |
 | 2 | `ix_mmvq_wave.cu` | `native_mmvq.cu:2335` | L | PORT | Bit-exact parity vs double-precision host ref. R=1 baseline. |
-| 3 | Validate `ix_native_router.cu` | `router_top10.cu:198` | M | VALIDATE | Same top-8 ids and weights as Strata ref (256 experts, k=8). |
+| 3 | Validate `ix_native_router.cu` | `router_top10.cu:198` | M | VALIDATE | Same top-8 ids and weights as Ref ref (256 experts, k=8). |
 | 4 | `ix_shared_expert.cu` | `shared_expert.cu:112` | M | NEW | 64-wide `warp_sum_d`. Scalar gate within 1e-6 of double ref. |
 | 5 | Validate `ix_moe_elementwise.cu` | `shared_expert.cu:146` | M | VALIDATE | MoE combine output matches ref. Double accumulator. |
 | 6 | Validate `ix_gdn.cu` | `gdn.cu` (248L) | L | VALIDATE | Warp64 recurrence correct. Conv+recurrence+norm chain. |
@@ -713,7 +713,7 @@ Three optimizations (87 → ~59 ms):
 |---|-------------|--------|---------------|
 | 13 | HW validate Fused Linear+AllReduce | — | **-14 ms/tok** |
 | 14 | HW validate Direct-routed MoE | — | **-13.9 ms/tok** |
-| 15 | Layer-major prefill (`moe_shared_init`, `moe_scatter_add`) | L | Major TTFT. **Now default in Strata 0.2.7.** |
+| 15 | Layer-major prefill (`moe_shared_init`, `moe_scatter_add`) | L | Major TTFT. **Now default in Ref 0.2.7.** |
 | 16 | Prefill MoE fused | L | TTFT |
 | 17 | sm_60 prompt attention (no-partials) | M | +15-18% prompt |
 | 18 | MTP speculative decoding | XL | **1.6-1.8×** |
@@ -735,8 +735,8 @@ Three optimizations (87 → ~59 ms):
 | 28 | Auto-calibration script | M |
 | 29 | Verify window (for MTP) | XL |
 | 30 | DFlash2 drafter | XL |
-| 31 | Gated MTP proposal (`STRATA_SPEC_PROB=1`) | M |
-| 32 | Pipelined MTP batching (`STRATA_PIPED_MTP`) | M |
+| 31 | Gated MTP proposal (`REF_SPEC_PROB=1`) | M |
+| 32 | Pipelined MTP batching (`REF_PIPED_MTP`) | M |
 | 33 | Expert cache tuning | M |
 | 34 | Copy-all expert strategy | M |
 | 35 | Gyro-L TQP5/6/7 | M |
@@ -790,10 +790,10 @@ Phase 2 (after Phase 1 gate):
 
 ### Next to Write (priority order)
 
-| # | File | From Strata | Exact Source | Key Porting Issue |
+| # | File | From Ref | Exact Source | Key Porting Issue |
 |---|------|-------------|-------------|-------------------|
 | 1 | `ix_compat.h` | `hip_compat/intrinsics.hpp` | 163L | Thin header: warp64, threadfence, dp4a |
-| 2 | `ix_mmvq_wave.cu` | `native_mmvq.cu:2335-2396` | 61L kernel + dispatch | Replace `STRATA_HIP_GFX906` → `__ILUVATAR__` |
+| 2 | `ix_mmvq_wave.cu` | `native_mmvq.cu:2335-2396` | 61L kernel + dispatch | Replace `REF_HIP_GFX906` → `__ILUVATAR__` |
 | 3 | `ix_shared_expert.cu` | `shared_expert.cu:107-129` | 23L kernel | 64-wide `warp_sum_d` (was 26.7% overhead) |
 | 4 | `ix_fused_gr.cu` | `fused_gr.cu:1641-1701` | 60L kernel | gfx906 K-split, **remove `__nanosleep`** |
 | 5 | `ix_bf16_gemv.cu` | `bf16_gemv.cu` | 189L | BF16→FP16 + FP16 TC (Volta path) |
@@ -803,7 +803,7 @@ Phase 2 (after Phase 1 gate):
 
 ---
 
-## Part I: Strata Commit Statistics (4563 total, HEAD `5e8a4cca` 2026-10-27)
+## Part I: Ref Commit Statistics (4563 total, HEAD `5e8a4cca` 2026-10-27)
 
 | Category | ~Commits | Key Insight |
 |----------|----------|-------------|
@@ -829,7 +829,7 @@ Phase 2 (after Phase 1 gate):
 
 ### Critical Port Sources (exact lines)
 
-| Strata File | Total Lines | Kernel | Start Line | Our Target |
+| Ref File | Total Lines | Kernel | Start Line | Our Target |
 |-------------|-------------|--------|-----------|------------|
 | `native_mmvq.cu` | 3913 | `native_mmvq_wave_kernel` | 2335 | `ix_mmvq_wave.cu` |
 | `router_top10.cu` | 497 | `router_top10_wave` | 198 | `ix_router_top10_wave.cu` |
@@ -899,7 +899,7 @@ int main() {
 }
 ```
 
-### J.3 Kernel Correctness Protocol (from Strata methodology)
+### J.3 Kernel Correctness Protocol (from Ref methodology)
 
 1. **Bit-exact parity**: output vs double-precision host reference
 2. **A/B benchmark**: 10 interleaved pairs, report medians, same compiler flags
@@ -934,4 +934,4 @@ int main() {
 
 ---
 
-*Generated from Strata HEAD `5e8a4cca` (2026-10-27) and baloon main. 4563 commits classified, source-code-grounded with exact line references and ivcore10 porting transforms. v7 adds source-extracted kernel diffs, Strata 0.2.7 delta analysis, and updated V100 bench data.*
+*Generated from Ref HEAD `5e8a4cca` (2026-10-27) and baloon main. 4563 commits classified, source-code-grounded with exact line references and ivcore10 porting transforms. v7 adds source-extracted kernel diffs, Ref 0.2.7 delta analysis, and updated V100 bench data.*

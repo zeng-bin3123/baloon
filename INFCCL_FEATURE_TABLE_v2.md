@@ -1,6 +1,6 @@
 # infccl for BI-V100 — PM Feature Table & Build Environment Reference (v2)
 
-> **Source**: Niko1221/Strata (**4196 commits**, 2026-09-24 ~ 2026-10-25, 32 active days)
+> **Source**: reference (**4196 commits**, 2026-09-24 ~ 2026-10-25, 32 active days)
 > **Target**: Iluvatar BI-V100 (ivcore10) — zeng-bin3123/baloon & zeng-bin3123/ikun
 > **Model**: Qwen3.6-35B-A3B (MoE 256 experts, top-8, 36 layers, TP=4)
 > **Delta from v1**: +819 commits scanned, new categories (DFlash2, Gyro/Trellis, NUMA, DeepSeek V4.1)
@@ -49,14 +49,14 @@ Alternate `--cuda-path` if versioned SDK: `/usr/local/corex-3.2.3`
 
 ### Known BI-V100 Limitations
 
-| Limitation | Workaround | Strata Reference |
+| Limitation | Workaround | Ref Reference |
 |------------|------------|------------------|
 | `__threadfence_system()` | Replace with `__threadfence()` (device-level) or host barriers | Used in AllReduce, must avoid |
 | `cudaIpcGetMemHandle` (CUDA IPC) | Use `cudaMemcpyPeer` instead | Multi-GPU comm |
 | Max CUDA compat 10.2 | No cooperative_groups advanced features | Limits CUDA graph features |
 | warpSize = 64 | All warp-level primitives must account for 64-wide warps | gfx906 wave64 code is primary reference |
-| No BF16 tensor cores | FP16 tensor cores only; BF16→FP16 conversion needed | Strata `STRATA_BF16_TC` path for Volta |
-| `__shfl_*` mask must be 64-bit | Use 64-lane butterfly reductions, NOT `0xffffffff` masks | Strata `__shfl_xor(v, off, 64)` pattern |
+| No BF16 tensor cores | FP16 tensor cores only; BF16→FP16 conversion needed | Ref `REF_BF16_TC` path for Volta |
+| `__shfl_*` mask must be 64-bit | Use 64-lane butterfly reductions, NOT `0xffffffff` masks | Ref `__shfl_xor(v, off, 64)` pattern |
 | No NVLink | PCIe-only; AllReduce must optimize for PCIe bandwidth | infccl P2P design |
 
 ### Available Libraries (`/usr/local/corex/lib64/`)
@@ -136,7 +136,7 @@ for i in range(5):
 
 ---
 
-## Part B: Strata Feature Table for infccl Implementation
+## Part B: Ref Feature Table for infccl Implementation
 
 **Updated from 4196 commits** (vs 3377 in v1). Features organized by engine subsystem, ordered by implementation priority for BI-V100.
 
@@ -154,10 +154,10 @@ for i in range(5):
 | # | Feature | Commits | Key Files | Description | BI-V100 Relevance |
 |---|---------|---------|-----------|-------------|-------------------|
 | 1.1 | native_mmvq GEMV | 11+ | `src/kernels/cuda/native_mmvq.cu` (3276L) | 2-8 column GEMV for dense Q8_0 projections (attention, GDN, head — 1.9 GB/token). Interleaved layout (`MMVQ_IL`) with per-arch rows table. **gfx906 wave64 kernel exists** (`native_mmvq_wave_kernel`): one wavefront per R rows, 4 wavefronts per block, 64-lane butterfly reduction. | 🔴 **Primary port target.** The gfx906 `wave_kernel` is almost directly usable: same 64-lane layout, same `__shfl_xor(v, off, 64)` reduction. Need ivcore10 rows table (measure with `--bench --emit-table`). |
-| 1.2 | bf16_gemv | 11 | `src/kernels/cuda/bf16_gemv.cu` (189L), `native_bf16.cu` (383L) | BF16 projections for hyper-connection, router, indexer. On Volta: BF16→FP16 conversion + FP16 tensor cores. | 🔴 BI-V100 has FP16 TC only, same as Volta. Copy the `STRATA_BF16_TC` path. |
+| 1.2 | bf16_gemv | 11 | `src/kernels/cuda/bf16_gemv.cu` (189L), `native_bf16.cu` (383L) | BF16 projections for hyper-connection, router, indexer. On Volta: BF16→FP16 conversion + FP16 tensor cores. | 🔴 BI-V100 has FP16 TC only, same as Volta. Copy the `REF_BF16_TC` path. |
 | 1.3 | s2_expert_grouped GEMV | 3+ | `src/kernels/cuda/s2_expert_grouped.cu` (1284L) | Expert-mode 8: codebook grid + group activations in shared memory, SwiGLU fused. Used on V100/gfx906. | 🔴 Routed expert compute for decode. The kernel V100/gfx906 runs for VRAM-resident experts. Direct port target. |
 | 1.4 | s_gemv / s_gemv_pair | — | `src/kernels/cuda/s_gemv.cu` (694L), `s_gemv_pair.cu` | General-purpose small GEMV and paired GEMV. | 🟡 Supporting kernel for various projections. |
-| 1.5 | Fused decode ops (`STRATA_FUSE_DECODE`) | V100 doc | Multiple kernels | gate/up+SwiGLU in one kernel, SwiGLU+quantizer in one, two BF16 projections in one kernel. Saves 4-16 µs/token on V100. | 🟡 Opt-in on V100. Port as optimization after base path works. |
+| 1.5 | Fused decode ops (`REF_FUSE_DECODE`) | V100 doc | Multiple kernels | gate/up+SwiGLU in one kernel, SwiGLU+quantizer in one, two BF16 projections in one kernel. Saves 4-16 µs/token on V100. | 🟡 Opt-in on V100. Port as optimization after base path works. |
 | 1.6 | Interleaved MMVQ table (`MMVQ_IL`) | docs | `docs/MMVQ_IL_TABLE.md`, `native_mmvq.cu` | Per-arch rows table (1/2/4 rows per warp) indexed by quant type, token count, row count. Cards with own tables: sm_86, sm_120, gfx12. | 🔴 Must measure ivcore10 table with `--bench --emit-table`. Start with R=1 (safe default). |
 | 1.7 | **NEW: Gyro trellis decode** | 124 | `tools/trellis/`, kernel files | Trellis codebook in shared memory, 8-lane rows for 160-dot gate/up and 40-dot down. Pascal cc 6.0 and newer. | 🟢 New quantization format. Not needed initially; HF format via vllm sufficient. |
 
@@ -168,7 +168,7 @@ for i in range(5):
 | 2.1 | native_router + router_top10 | 7+ | `src/kernels/cuda/native_router.cu` (329L), `router_top10.cu` (497L) | Router: compute gate logits, top-k (k=8 for Qwen3.6), grouping. **gfx906 wave64 kernel exists** (`router_top10_wave_kernel`): one wavefront per token, `RW_PER=8` probs per lane, 64-lane butterfly argmax, no LDS round trip. Bit-identical to block-wide kernel. | 🔴 **Direct port target.** The gfx906 wave64 router is almost identical to what we need: 64 lanes × 8 = 512 > 256 experts. Our `ix_native_router.cu` (256×8 warp64) targets this. |
 | 2.2 | route_prior | — | `src/kernels/cuda/route_prior.cu` | Prior routing decisions for speculative/batched decode. | 🟡 Needed for MTP integration. |
 | 2.3 | shared_expert | — | `src/kernels/cuda/shared_expert.cu` (505L) | Shared expert (always-active) alongside top-k routed experts. | 🔴 Qwen3.6 has a shared expert per layer. Must implement. |
-| 2.4 | MoE end: 1024-thread combine + next layer q8_1 | QWEN36 doc | fused in q36_engine.cu | `k_moe_out` → combine expert outputs, produce next layer's q8_1 activation image. Old: one thread walking 256 experts (9 µs). New: 1024 threads. | 🔴 Major bottleneck Strata optimized. Our `ix_moe_elementwise.cu` targets this. |
+| 2.4 | MoE end: 1024-thread combine + next layer q8_1 | QWEN36 doc | fused in q36_engine.cu | `k_moe_out` → combine expert outputs, produce next layer's q8_1 activation image. Old: one thread walking 256 experts (9 µs). New: 1024 threads. | 🔴 Major bottleneck Ref optimized. Our `ix_moe_elementwise.cu` targets this. |
 | 2.5 | **NEW: native_moe** | — | `src/kernels/cuda/native_moe.cu` (229L) | Native MoE dispatch/combine kernels. | 🔴 Supporting kernel for MoE path. |
 
 ### Category 3: DECODE PATH — GDN (DeltaNet / SSM) (🔴 P0)
@@ -177,10 +177,10 @@ for i in range(5):
 |---|---------|---------|-----------|-------------|-------------------|
 | 3.1 | gdn.cu / native_gdn.cu | 72 total | `src/kernels/cuda/gdn.cu` (248L), `native_gdn.cu` (124L), `native_gdn_preprocess.cu`, `fused_gdn.cu` | GDN (DeltaNet) decode: SSM recurrence, short conv, norm. Fused variants available. | 🔴 Qwen3.6 has GDN in every layer. Our `ix_gdn.cu` targets this (SSM recurrence + conv + norm). |
 | 3.2 | GDN prompt tiled conv | commit 07b107403a | `src/prefill/gdn_chunk.cu` | Prompt path's GDN short conv tiled over tokens (16 tokens side by side). | 🟡 Prefill optimization. Port after decode works. |
-| 3.3 | GDN recurrence variants | V100 doc | `gdn_chunk.cu`, `gdn_rec_parity.cu` | Chain-split recurrence (`STRATA_GDN_REC_WARP=2`): +6-9% on V100. Opt-in because it changes summation order. | 🟡 Optimization for our sm_70-equivalent arch. |
+| 3.3 | GDN recurrence variants | V100 doc | `gdn_chunk.cu`, `gdn_rec_parity.cu` | Chain-split recurrence (`REF_GDN_REC_WARP=2`): +6-9% on V100. Opt-in because it changes summation order. | 🟡 Optimization for our sm_70-equivalent arch. |
 | 3.4 | fused_gr / gr (Gated Residual) | 72+ | `src/kernels/cuda/fused_gr.cu` (3044L), `gr.cu` (552L) | Hyper-connection: fused_gr combines read+norm+up projection. Latency-hidden variant for V100/gfx906. **NEW: gr fold** — hyper-connection inject and gate/mean folded into neighbours. | 🔴 Every layer has gated residual connection. Core path. |
-| 3.5 | **NEW: gr_norm_fast** | V100 doc | `native_gr_norm.cu`, `native_gr_postops.cu` | Register-split hyper-connection norm (`STRATA_GR_NORM_FAST=1`): +0.5-0.6% on V100. | 🟡 Small optimization, port later. |
-| 3.6 | **NEW: 8-bit hyper-connection weights** | 6d4874a4 | `STRATA_HC_Q8` | 8-bit hyper-connection weights, default on gfx1151. | 🟡 Memory savings for hyper-connection. Evaluate for BI-V100. |
+| 3.5 | **NEW: gr_norm_fast** | V100 doc | `native_gr_norm.cu`, `native_gr_postops.cu` | Register-split hyper-connection norm (`REF_GR_NORM_FAST=1`): +0.5-0.6% on V100. | 🟡 Small optimization, port later. |
+| 3.6 | **NEW: 8-bit hyper-connection weights** | 6d4874a4 | `REF_HC_Q8` | 8-bit hyper-connection weights, default on gfx1151. | 🟡 Memory savings for hyper-connection. Evaluate for BI-V100. |
 
 ### Category 4: ATTENTION (🔴 P0)
 
@@ -188,7 +188,7 @@ for i in range(5):
 |---|---------|---------|-----------|-------------|-------------------|
 | 4.1 | QSA decode attention | 8+ | `src/kernels/cuda/qsa_decode_attn.cu` (1269L), `qsa.cu` (821L) | Decode attention with quantized scores. V100 uses dedicated kernel #540 with fewer shuffles. **gfx906 wave64 build exists** (checked in launch). | 🔴 Core attention for every decode step. Start with ixformer `flash_attn_func`, custom later. |
 | 4.2 | QSA prompt attention | 14 | `src/kernels/cuda/qsa_prompt_attn.cu` (2434L) | Prompt attention: V100 uses `prompt_attn_v70_kernel` on `mma.m8n8k4`. +15-18% prompt speed over old path. | 🟡 Start with ixformer `flash_attn_func`/`scaled_dot_product_attention`, optimize later. |
-| 4.3 | KV cache quantization (Q4/Q8) | 8+ | `src/kernels/cuda/kv_q4.cu`, `kv_q8.cu`, `kv_stream.cu` | Quantized KV cache (int8 default for Qwen3.6). **NEW: 8-wide int8 KV gather** (`STRATA_Q8_GATHER_WIDE`): +11% on gather. | 🟡 Int8 KV saves memory. Port after basic attention works. |
+| 4.3 | KV cache quantization (Q4/Q8) | 8+ | `src/kernels/cuda/kv_q4.cu`, `kv_q8.cu`, `kv_stream.cu` | Quantized KV cache (int8 default for Qwen3.6). **NEW: 8-wide int8 KV gather** (`REF_Q8_GATHER_WIDE`): +11% on gather. | 🟡 Int8 KV saves memory. Port after basic attention works. |
 | 4.4 | RoPE / M-RoPE | 29 | `src/kernels/cuda/rope.cu`, `native_rope.cu` | Rotary position embedding with scaling. M-RoPE for vision (rotary sections 11/11/10). | 🔴 Can use ixformer `rotary_embedding` directly. Verify correctness. |
 | 4.5 | QSA block scores + select | 8 | `src/kernels/cuda/qsa_select.cu` (2587L), `native_qsa_score.cu`, `native_qsa_indexer.cu` | Top-k selection for attention blocks. V100 uses warp kernel (tensor-core scorer needs sm_80). | 🟡 Needed for long-context efficiency. |
 | 4.6 | **NEW: native_flash_attn** | — | `src/kernels/cuda/native_flash_attn.cu` | Native flash attention implementation. | 🟡 Alternative to ixformer, may give better control. |
@@ -202,14 +202,14 @@ for i in range(5):
 | 5.3 | PLE (Prompt Lookup Extraction) / n-gram | 81 | `src/kernels/cuda/ple.cu` (390L), `src/ngram/ple_reader.cpp` | Prompt lookup: when reply repeats context (code edits), draft from earlier copy. +6-11% on code. | 🟢 Optimization. Implement last. |
 | 5.4 | Suffix drafter | — | `src/spec/suffix_drafter.cpp` | Suffix-based speculative drafting. | 🟢 Advanced spec decoding variant. |
 | 5.5 | **NEW: DFlash2 drafter** | 23 | dflash2 kernels + tools | GPU-forward drafter: conv, K/V ring, windowed attention, top-16 selector. Opt-in `--draft dflash2`. Fused conv+residual+norm+quant, q/k norm+rope, tiled Q8 GEMM. | 🟢 Advanced alternative to MTP. Not priority for initial implementation. |
-| 5.6 | **NEW: Cost-aware MTP window** | ~10 | spec/DraftPolicy | `STRATA_SPEC_COST`: cost-aware chain rule, per-context cost table, step-by-step keep/drop decisions based on measured row costs and probabilities. | 🟡 Optimization for speculative decoding throughput. |
+| 5.6 | **NEW: Cost-aware MTP window** | ~10 | spec/DraftPolicy | `REF_SPEC_COST`: cost-aware chain rule, per-context cost table, step-by-step keep/drop decisions based on measured row costs and probabilities. | 🟡 Optimization for speculative decoding throughput. |
 
 ### Category 6: PREFILL PATH (🟡 P1)
 
 | # | Feature | Commits | Key Files | Description | BI-V100 Relevance |
 |---|---------|---------|-----------|-------------|-------------------|
 | 6.1 | MoE fused prefill (MMQ) | 16+ | `src/prefill/moe_fused.cu`, `moe_mmq.cu`, `moe_f16_kq.cu` | Fused MoE experts in prefill: reads every expert once per chunk. Chunk size key: 512→4096 yields 3.4K→6.2K tok/s on R9700. | 🟡 Prefill speed directly impacts TTFT. |
-| 6.2 | WMMA GEMM (dense) | — | `src/prefill/wmma_gemm.cu` | WMMA tensor-core GEMMs for dense prefill projections. Opt-in `STRATA_PF_WMMA=1`. +10% on V100. | 🟡 BI-V100 has FP16 TCs. Can use cublas or custom WMMA. |
+| 6.2 | WMMA GEMM (dense) | — | `src/prefill/wmma_gemm.cu` | WMMA tensor-core GEMMs for dense prefill projections. Opt-in `REF_PF_WMMA=1`. +10% on V100. | 🟡 BI-V100 has FP16 TCs. Can use cublas or custom WMMA. |
 | 6.3 | Prompt chunking | QWEN36 doc | `src/prefill/prefill.cpp` | Chunk size auto-tuning (4096/2048/1024 based on VRAM). Bigger chunks = more rows per expert = faster. | 🟡 Configuration, not kernel work. |
 | 6.4 | **NEW: Prefill GEMM padded dequant** | recent | prefill.cpp | Padded activation is gfx11 only; native copies unpadded for other arches. | 🟡 Need to verify BI-V100 behaviour. |
 | 6.5 | **NEW: hipBLASLt tuning** | recent | prefill path | Per-arch tuning tables for prompt GEMM. Without tuning table, prompts read at half speed on some GPUs. | 🟡 Will need corex/cublas equivalent tuning. |
@@ -256,7 +256,7 @@ for i in range(5):
 |---|---------|---------|-----------|-------------|-------------------|
 | 11.1 | Sampler | 16+ | `src/kernels/cuda/sampler.cu` (1393L) | GPU sampling: penalty bitmap, top_p before min_p. Split stage: block-wide reduction then one-warp merge. | 🟢 vllm has its own sampler. |
 | 11.2 | Logit bias | 2 | logit_bias in sampler | Per-request logit bias with normalized long lists. | 🟢 vllm handles this. |
-| 11.3 | **NEW: Multi-block argmax** | V100 doc | `STRATA_ARGMAX_ROWS_SM70=1` | Multi-block greedy pick on sm_7x. +0.7-0.8% on V100. | 🟢 Small optimization. |
+| 11.3 | **NEW: Multi-block argmax** | V100 doc | `REF_ARGMAX_ROWS_SM70=1` | Multi-block greedy pick on sm_7x. +0.7-0.8% on V100. | 🟢 Small optimization. |
 
 ### Category 12: QUANTIZATION & FORMAT (🟢 P2)
 
@@ -279,8 +279,8 @@ for i in range(5):
 | # | Feature | Commits | Key Files | Description | BI-V100 Relevance |
 |---|---------|---------|-----------|-------------|-------------------|
 | 14.1 | Auto-calibrate | 78+ | `tools/calibrate.py` | Measure PCIe share, draft acceptance floor, CPU worker count. | 🟢 Our own tuning script once we have baseline perf. |
-| 14.2 | Benchmarking tools | 97+ bench commits | `tools/strata_bench.py` | A/B engine comparison, tok/s measurement. | 🟢 Adapt benchmark methodology. |
-| 14.3 | **NEW: Speculative cost tables** | recent | spec/DraftPolicy | Per-card row-cost tables, per-context-length buckets, seedable measurement. `STRATA_SPEC_COST_TABLE`. | 🟢 Advanced tuning for speculative decoding. |
+| 14.2 | Benchmarking tools | 97+ bench commits | `tools/ref_bench.py` | A/B engine comparison, tok/s measurement. | 🟢 Adapt benchmark methodology. |
+| 14.3 | **NEW: Speculative cost tables** | recent | spec/DraftPolicy | Per-card row-cost tables, per-context-length buckets, seedable measurement. `REF_SPEC_COST_TABLE`. | 🟢 Advanced tuning for speculative decoding. |
 
 ---
 
@@ -309,7 +309,7 @@ Three decode optimizations (expected 87 ms → ~59 ms):
   3. infccl P2P AllReduce:    small tensor optimization
 ```
 
-### Key Strata Optimizations for Decode (from QWEN36.md + v2 updates)
+### Key Ref Optimizations for Decode (from QWEN36.md + v2 updates)
 
 What was slow (profiled on R9700, 11.25 ms kernel time/token):
 
@@ -320,7 +320,7 @@ What was slow (profiled on R9700, 11.25 ms kernel time/token):
 5. `k_group` (one thread walking 256 experts): 9 µs → **serial bottleneck**
 6. Router top-k and grouping: separate launches → **launch overhead**
 
-Strata fixes:
+Ref fixes:
 
 - Products: one warp per row, grid capped (2048 warps took 21 µs where 1024 took 5 µs on gfx12)
 - Shared gate+up+SwiGLU+q8_1 in one launch
@@ -329,9 +329,9 @@ Strata fixes:
 - Router top-k + grouping in one launch
 - Router + shared gate in one product
 - **NEW**: gr fold — hyper-connection inject and gate/mean into neighbours
-- **NEW**: 8-bit hyper-connection weights (STRATA_HC_Q8) for memory savings
+- **NEW**: 8-bit hyper-connection weights (REF_HC_Q8) for memory savings
 
-### Strata V100 Performance Reference
+### Ref V100 Performance Reference
 
 | Metric | V100 Result |
 |--------|-------------|
@@ -339,15 +339,15 @@ Strata fixes:
 | Prompt 7K tokens (old → v70 kernel) | 1,010 → 1,164 tok/s (+15%) |
 | Prompt 28K tokens | 1,063 → 1,251 tok/s (+18%) |
 | Prompt 114K tokens | 973 → 1,123 tok/s (+15%) |
-| Decode kernels (STRATA_SM70_TABLE=1) | GPU work 22.8 → 21.2 ms (-7%) |
-| WMMA prompt experts (STRATA_PF_WMMA=1) | +10% prompt speed |
-| GDN recurrence (STRATA_GDN_REC_WARP=2) | +6-9% |
+| Decode kernels (REF_SM70_TABLE=1) | GPU work 22.8 → 21.2 ms (-7%) |
+| WMMA prompt experts (REF_PF_WMMA=1) | +10% prompt speed |
+| GDN recurrence (REF_GDN_REC_WARP=2) | +6-9% |
 
 ---
 
 ## Part D: Critical Warp64 Port Patterns (gfx906 → ivcore10)
 
-The gfx906 (AMD wave64) code paths in Strata are our **primary reference** because BI-V100 also has warpSize=64. Key patterns:
+The gfx906 (AMD wave64) code paths in Ref are our **primary reference** because BI-V100 also has warpSize=64. Key patterns:
 
 ### 1. Butterfly Reduction (replaces `0xffffffff` 32-lane masks)
 
@@ -431,13 +431,13 @@ cached_supported = gfx_arch_is(prop.gcnArchName, "gfx906") && prop.warpSize == 6
 
 ### Critical AMD HIP / gfx906 Patterns (directly portable to BI-V100)
 
-Strata already has gfx906 (wave64) specific code paths:
+Ref already has gfx906 (wave64) specific code paths:
 
 - Expert mode 8 (codebook + shared mem SwiGLU) — used on V100 AND gfx906
 - Latency-hidden up kernel — used on V100 AND gfx906
 - Interleaved MMVQ with 64-lane butterfly — gfx906 wave layout
 - Router top-10 in ONE wavefront — gfx906 wave kernel
-- `dp4a` through `STRATA_DP4A` macro for sm_60/gfx906
+- `dp4a` through `REF_DP4A` macro for sm_60/gfx906
 - QSA decode attention with wave64 detection
 - **NEW**: 8-bit hyper-connection weights (gfx1151)
 - **NEW**: Expert layouts compiled per HIP arch
@@ -487,7 +487,7 @@ Strata already has gfx906 (wave64) specific code paths:
 | 13 | Prefill MoE fused | `moe_fused.cu`, `moe_mmq.cu` | Time-to-first-token. |
 | 14 | Custom prompt attention | `qsa_prompt_attn.cu` (2434L) | +15-18% prompt speed on V100. |
 | 15 | MTP speculative decoding | `mtp.cpp` (1875L), `verify.cpp` (4254L) | 1.6-1.8× speedup. |
-| 16 | Fused decode ops | `STRATA_FUSE_DECODE` | 4-16 µs/token saved. |
+| 16 | Fused decode ops | `REF_FUSE_DECODE` | 4-16 µs/token saved. |
 | 17 | KV cache quantization (int8) | `kv_q8.cu`, `kv_q4.cu` | Memory savings. |
 | 18 | PCIe optimization | vmm.cpp, pinned.cu | Critical for no-NVLink TP=4. |
 | 19 | MMVQ IL rows table | Measure with `--bench --emit-table` | Per-shape tuning. |
@@ -498,7 +498,7 @@ Strata already has gfx906 (wave64) specific code paths:
 |----------|---------|-----------|-------|
 | 20 | PLE / prompt lookup | `ple.cu` (390L) | +6-11% on code tasks. |
 | 21 | Auto-calibration | `calibrate.py` | Own tuning script. |
-| 22 | GDN recurrence variants | `STRATA_GDN_REC_WARP=2` | +6-9% on V100. |
+| 22 | GDN recurrence variants | `REF_GDN_REC_WARP=2` | +6-9% on V100. |
 | 23 | Expert cache optimization | `expert_cache.cpp` | LRU tuning. |
 | 24 | Batch decode | `generate.cpp` | Multi-request serving. |
 | 25 | Conversation cache | `conversation_cache.cpp` | Follow-up turn optimization. |
@@ -507,10 +507,10 @@ Strata already has gfx906 (wave64) specific code paths:
 
 ---
 
-## Part H: Strata Source Structure Reference
+## Part H: Ref Source Structure Reference
 
 ```
-Strata/
+Ref/
 ├── src/
 │   ├── kernels/
 │   │   └── cuda/          # 54 .cu/.cuh files — ALL kernel implementations
@@ -547,11 +547,11 @@ Strata/
 │   └── ... (40+ docs)
 ├── bench/                 # 162 commits — benchmarks and results
 ├── tools/                 # 711 commits — calibrate, pack, test
-├── include/strata/        # 622 commits — headers
+├── include/ref/        # 622 commits — headers
 ├── metal/                 # 148 commits — Apple Metal (SKIP)
 └── apps/                  # 466 commits — desktop app, host
 ```
 
 ---
 
-*Generated from Strata commit 4b9e05a2 (2026-10-25) and baloon main. 4196 commits classified.*
+*Generated from Ref commit 4b9e05a2 (2026-10-25) and baloon main. 4196 commits classified.*

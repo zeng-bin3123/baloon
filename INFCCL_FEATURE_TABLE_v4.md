@@ -1,9 +1,9 @@
 # infccl for BI-V100 — PM Feature Table v4 (Source-Code-Grounded)
 
-> **Source**: Niko1221/Strata (**4196 commits**, 2026-09-24 ~ 2026-10-25, HEAD `4b9e05a2`)
+> **Source**: reference (**4196 commits**, 2026-09-24 ~ 2026-10-25, HEAD `4b9e05a2`)
 > **Target**: Iluvatar BI-V100 (ivcore10) — zeng-bin3123/baloon & zeng-bin3123/ikun
 > **Model**: Qwen3.6-35B-A3B (MoE 256 experts, top-8, 36 layers, TP=4)
-> **Delta from v3**: Source-code-grounded kernel patterns from actual Strata `.cu` files, new DFlash2/Gyro/Trellis features from latest 835 commits, precise line references, warp64→ivcore10 porting cookbook with actual tested patterns
+> **Delta from v3**: Source-code-grounded kernel patterns from actual Ref `.cu` files, new DFlash2/Gyro/Trellis features from latest 835 commits, precise line references, warp64→ivcore10 porting cookbook with actual tested patterns
 
 ---
 
@@ -46,14 +46,14 @@ SOFLAGS  := -x cuda --cuda-gpu-arch=ivcore10 --cuda-path=/usr/local/corex \
 
 ### A.3 BI-V100 Limitations & Workarounds
 
-| Limitation | Workaround | Strata gfx906 Reference |
+| Limitation | Workaround | Ref gfx906 Reference |
 |------------|------------|-------------------------|
 | `__threadfence_system()` NOT supported | `__threadfence()` (device-level) + host barriers | Used in AllReduce, must avoid |
-| `cudaIpcGetMemHandle` NOT supported | `cudaMemcpyPeer` for multi-GPU comm | Strata P2P layer |
+| `cudaIpcGetMemHandle` NOT supported | `cudaMemcpyPeer` for multi-GPU comm | Ref P2P layer |
 | Max CUDA compat 10.2 | No CUDA graphs advanced features | Limits optimization options |
 | **warpSize = 64** | All warp-level primitives → 64-wide | **gfx906 wave64 code is DIRECT reference** |
-| No BF16 tensor cores | FP16 TC only; BF16→FP16 conversion | Strata `STRATA_BF16_TC` Volta path |
-| `__shfl_*` mask must be 64-bit | Use `__shfl_xor(v, off, 64)` not `0xffffffff` | Strata wave64 butterfly pattern |
+| No BF16 tensor cores | FP16 TC only; BF16→FP16 conversion | Ref `REF_BF16_TC` Volta path |
+| `__shfl_*` mask must be 64-bit | Use `__shfl_xor(v, off, 64)` not `0xffffffff` | Ref wave64 butterfly pattern |
 | No NVLink | PCIe-only AllReduce | infccl P2P design |
 
 ### A.4 Available Libraries (`/usr/local/corex/lib64/`)
@@ -62,9 +62,9 @@ SOFLAGS  := -x cuda --cuda-gpu-arch=ivcore10 --cuda-path=/usr/local/corex \
 |---------|---------|----------|
 | `libcublas.so`, `libcublasLt.so` | BLAS (FP16 TC GEMM) | Dense prefill GEMMs |
 | `libcudart.so`, `libcuda.so` | CUDA runtime | Standard runtime |
-| `libcudnn.so` | cuDNN | Not used by Strata |
-| `libcutlass.so` | CUTLASS | Strata uses `s884` for Volta TC GEMM |
-| `libixattn.so` | ixformer attention | Replaces Strata QSA decode attn (Phase 1) |
+| `libcudnn.so` | cuDNN | Not used by Ref |
+| `libcutlass.so` | CUTLASS | Ref uses `s884` for Volta TC GEMM |
+| `libixattn.so` | ixformer attention | Replaces Ref QSA decode attn (Phase 1) |
 | `libcuinfer.so` | Inference | Custom inference pipeline |
 | `libibverbs.so` | RDMA verbs | Multi-node (future) |
 
@@ -133,7 +133,7 @@ for i in range(5):
 
 ### B.1 Design Rationale
 
-Strata uses `include/strata/platform/hip_compat/` (310+ lines) to map CUDA→HIP/wave64. Iluvatar's clang-16 natively compiles CUDA syntax (`-x cuda --cuda-gpu-arch=ivcore10`), so we do NOT need the full `#define cudaXxx hipXxx` remapping. Instead: a **thin compatibility header** for warp-width enforcement, missing intrinsics, and architecture detection.
+Ref uses `include/ref/platform/hip_compat/` (310+ lines) to map CUDA→HIP/wave64. Iluvatar's clang-16 natively compiles CUDA syntax (`-x cuda --cuda-gpu-arch=ivcore10`), so we do NOT need the full `#define cudaXxx hipXxx` remapping. Instead: a **thin compatibility header** for warp-width enforcement, missing intrinsics, and architecture detection.
 
 ```cuda
 // ix_compat.h — Iluvatar BI-V100 compatibility layer
@@ -150,7 +150,7 @@ Strata uses `include/strata/platform/hip_compat/` (310+ lines) to map CUDA→HIP
 #define ix_shfl_up(v, delta)      __shfl_up(v, delta, 64)
 #define ix_shfl(v, lane)          __shfl(v, lane, 64)
 
-// 64-lane butterfly reduction — from Strata gfx906 native_mmvq.cu:1855
+// 64-lane butterfly reduction — from Ref gfx906 native_mmvq.cu:1855
 template<typename T>
 __device__ __forceinline__ T ix_warp_reduce_sum(T v) {
     #pragma unroll
@@ -181,9 +181,9 @@ __device__ __forceinline__ unsigned long long ix_ballot(int pred) {
 }
 ```
 
-### B.2 Strata gfx906→ivcore10 Mapping
+### B.2 Ref gfx906→ivcore10 Mapping
 
-| Strata gfx906 Pattern | ivcore10 Adaptation | Source Line |
+| Ref gfx906 Pattern | ivcore10 Adaptation | Source Line |
 |------------------------|---------------------|-------------|
 | `__shfl_xor(v, off, 64)` | Same API, clang-16 emits correct instruction | `native_mmvq.cu:1855` |
 | `__launch_bounds__(64)` single wavefront | Same — 64-lane warp per block | `router_top10.cu:198` |
@@ -196,11 +196,11 @@ __device__ __forceinline__ unsigned long long ix_ballot(int pred) {
 | `hipHostMallocCoherent` | `cudaHostAlloc` + polling | HIP-specific |
 | `256` threads = 4 wavefronts | Same: 256 = 4 × 64 | `native_mmvq.cu:1865` |
 
-**CRITICAL PATTERN**: Strata's `shared_expert.cu` `warp_sum_d()` (line 107-110) uses `__shfl_down_sync(0xFFFFFFFFu, ...)` with 32-wide warps. On ivcore10 this MUST be rewritten as 64-wide butterfly. The `scalar_gate_kernel` (line 112-129) is the key example — it was 26.7% of the block time before parallelization.
+**CRITICAL PATTERN**: Ref's `shared_expert.cu` `warp_sum_d()` (line 107-110) uses `__shfl_down_sync(0xFFFFFFFFu, ...)` with 32-wide warps. On ivcore10 this MUST be rewritten as 64-wide butterfly. The `scalar_gate_kernel` (line 112-129) is the key example — it was 26.7% of the block time before parallelization.
 
 ---
 
-## Part C: Feature Table (from 4196 Strata commits, source-code-grounded)
+## Part C: Feature Table (from 4196 Ref commits, source-code-grounded)
 
 ### Legend
 
@@ -214,19 +214,19 @@ __device__ __forceinline__ unsigned long long ix_ballot(int pred) {
 
 ### C.1: DECODE — Dense Projections & GEMV (🔴 P0)
 
-| # | Feature | Effort | Strata Source (line) | Description | ivcore10 Strategy |
+| # | Feature | Effort | Ref Source (line) | Description | ivcore10 Strategy |
 |---|---------|--------|----------------------|-------------|-------------------|
-| 1.1 | **native_mmvq GEMV (wave64)** | L | `native_mmvq.cu:1827` `native_mmvq_wave_kernel` | 2-8 col GEMV. One wavefront per R rows, 4 wavefronts/block (256 threads), 64-lane butterfly. Each lane loads `blocks_per_row / (64/F::T)` weight blocks, accumulates dot products, then `__shfl_xor(v, off, 64)` reduces. Lane 0 writes result. | **DIRECT PORT.** Replace `#ifdef STRATA_HIP_GFX906` with `#ifdef __ILUVATAR__`. Template over `<F, NCOLS, R>`. Start R=1, measure ivcore10 rows table. |
-| 1.2 | **bf16_gemv** | M | `bf16_gemv.cu` (189L), `native_bf16.cu` (383L) | BF16→FP16 conversion + FP16 TC. Used for hyper-connection (w_up: D×LR BF16), router logits, indexer. Volta path: `STRATA_BF16_TC=1` converts BF16→FP16 then uses FP16 tensor cores. | BI-V100 has FP16 TC only, same as Volta. Copy `STRATA_BF16_TC` path directly. |
-| 1.3 | **s2_expert_grouped GEMV** | L | `s2_expert_grouped.cu` (1284L) | Expert mode 8: codebook grid in shared mem, group activations staged, SwiGLU fused. Used on V100 AND gfx906 (`STRATA_EXP_MODE=8`). This is the kernel V100/gfx906 runs for VRAM-resident experts in decode. | Direct port target. Key: LDS staging of activation group, codebook per expert. |
+| 1.1 | **native_mmvq GEMV (wave64)** | L | `native_mmvq.cu:1827` `native_mmvq_wave_kernel` | 2-8 col GEMV. One wavefront per R rows, 4 wavefronts/block (256 threads), 64-lane butterfly. Each lane loads `blocks_per_row / (64/F::T)` weight blocks, accumulates dot products, then `__shfl_xor(v, off, 64)` reduces. Lane 0 writes result. | **DIRECT PORT.** Replace `#ifdef REF_HIP_GFX906` with `#ifdef __ILUVATAR__`. Template over `<F, NCOLS, R>`. Start R=1, measure ivcore10 rows table. |
+| 1.2 | **bf16_gemv** | M | `bf16_gemv.cu` (189L), `native_bf16.cu` (383L) | BF16→FP16 conversion + FP16 TC. Used for hyper-connection (w_up: D×LR BF16), router logits, indexer. Volta path: `REF_BF16_TC=1` converts BF16→FP16 then uses FP16 tensor cores. | BI-V100 has FP16 TC only, same as Volta. Copy `REF_BF16_TC` path directly. |
+| 1.3 | **s2_expert_grouped GEMV** | L | `s2_expert_grouped.cu` (1284L) | Expert mode 8: codebook grid in shared mem, group activations staged, SwiGLU fused. Used on V100 AND gfx906 (`REF_EXP_MODE=8`). This is the kernel V100/gfx906 runs for VRAM-resident experts in decode. | Direct port target. Key: LDS staging of activation group, codebook per expert. |
 | 1.4 | s_gemv / s_gemv_pair | M | `s_gemv.cu` (694L) | General small GEMV. | Support kernel. Port after 1.1. |
-| 1.5 | Fused decode ops | M | `STRATA_FUSE_DECODE=1` | gate/up+SwiGLU, SwiGLU+quantizer, two BF16 projections fused. -4~16µs/tok on V100. | Optimization. Port after base path works. |
+| 1.5 | Fused decode ops | M | `REF_FUSE_DECODE=1` | gate/up+SwiGLU, SwiGLU+quantizer, two BF16 projections fused. -4~16µs/tok on V100. | Optimization. Port after base path works. |
 | 1.6 | MMVQ IL rows table | M | `native_mmvq.cu:2999-3103` | Per-arch rows table measured with `mmvq_il_parity --bench --emit-table`. Volta table at `kIlRows_70` (line 3103). | **Must measure on ivcore10.** Start with R=1, then profile. |
 
 #### Source Code Pattern: MMVQ Wave Kernel (from `native_mmvq.cu:1825-1858`)
 
 ```cuda
-// Strata's actual wave64 GEMV — 67 lines, self-contained
+// Ref's actual wave64 GEMV — 67 lines, self-contained
 // 4 wavefronts × 64 lanes = 256 threads per block
 // Each wavefront processes R rows; blocks_per_row strided over lanes
 template<typename F, int NCOLS, int R>
@@ -277,10 +277,10 @@ __global__ void native_mmvq_wave_kernel(
 
 ### C.2: DECODE — MoE Routing (🔴 P0)
 
-| # | Feature | Effort | Strata Source (line) | Description | ivcore10 Strategy |
+| # | Feature | Effort | Ref Source (line) | Description | ivcore10 Strategy |
 |---|---------|--------|----------------------|-------------|-------------------|
 | 2.1 | **router_top10 (wave64)** | M | `router_top10.cu:198` `router_top10_wave_kernel` | ONE wavefront (64 lanes) per token. Each lane holds RW_PER=8 experts → 64×8=512 slots > 256 experts. 64-lane butterfly argmax. No LDS round trip, no block barrier. **Bit-identical** to block kernel. | **DIRECT PORT.** 65 lines, self-contained. Already have `ix_native_router.cu`; validate against this. |
-| 2.2 | **shared_expert** | M | `shared_expert.cu:1-505` | Always-active expert: `silu(x @ gate.T) * (x @ up.T)`, down projection, scalar sigmoid gate. **CRITICAL INSIGHT** from Strata (lines 79-106): the scalar gate dot product was 26.7% of block time as a serial loop. Parallelized to 256-thread tree-reduce with double accumulator. | Must implement with 64-lane parallel dot. The `warp_sum_d` at line 107-110 uses 32-wide `__shfl_down_sync` — **rewrite for warp64**. |
+| 2.2 | **shared_expert** | M | `shared_expert.cu:1-505` | Always-active expert: `silu(x @ gate.T) * (x @ up.T)`, down projection, scalar sigmoid gate. **CRITICAL INSIGHT** from Ref (lines 79-106): the scalar gate dot product was 26.7% of block time as a serial loop. Parallelized to 256-thread tree-reduce with double accumulator. | Must implement with 64-lane parallel dot. The `warp_sum_d` at line 107-110 uses 32-wide `__shfl_down_sync` — **rewrite for warp64**. |
 | 2.3 | **MoE combine (1024-thread)** | M | `native_moe.cu` (229L), `shared_expert.cu:146-158` `moe_combine_kernel` | Combine expert outputs. Old: 1 thread × 256 experts = 9µs serial. New: 1024 threads, double accumulator, shared expert output added PLAIN (not weighted). | Already have `ix_moe_elementwise.cu`. Validate 1024-thread version matches `moe_combine_kernel`. |
 | 2.4 | route_prior | S | `route_prior.cu` | Prior routing for speculative/batched decode. | Phase 2. |
 
@@ -291,7 +291,7 @@ __global__ void native_mmvq_wave_kernel(
 // Original: one thread, 2560-deep double multiply-add chain (tens of µs)
 // Fixed: 256-thread tree-reduce, same double precision
 
-// STRATA's 32-wide version (lines 107-110):
+// REF's 32-wide version (lines 107-110):
 __device__ __forceinline__ double warp_sum_d(double v) {
     for (int off = 16; off > 0; off >>= 1)
         v += __shfl_down_sync(0xFFFFFFFFu, v, off);
@@ -349,13 +349,13 @@ __global__ void __launch_bounds__(64) router_top10_wave_kernel(
 
 ### C.3: DECODE — GDN (DeltaNet/SSM) (🔴 P0)
 
-| # | Feature | Effort | Strata Source (line) | Description | ivcore10 Strategy |
+| # | Feature | Effort | Ref Source (line) | Description | ivcore10 Strategy |
 |---|---------|--------|----------------------|-------------|-------------------|
 | 3.1 | **GDN decode** | L | `gdn.cu` (248L), `native_gdn.cu`, `fused_gdn.cu` | SSM recurrence + short conv + norm. Every Qwen3.6 layer has GDN block. | Already have `ix_gdn.cu`. Port recurrence for warp64. |
 | 3.2 | **fused_gr (Gated Residual)** | L | `fused_gr.cu` (3044L) | Hyper-connection: read+norm+up fused. **gfx906 path** at line 1522-1596: K-split down projection across 8 wavefronts/block, 5 slices of 2048, LDS-staged tile. Finish kernel sums slices + sigmoid. | **Key port target.** gfx906 version reads matrix at ~100GB/s (up from serial). 64-lane butterfly at line 1574. |
 | 3.3 | gr fold | M | `fused_gr.cu` (commit `aec327ee`) | Fold inject and gate/mean into neighbours. | Optimization. New since v3. |
-| 3.4 | GDN recurrence variants | S | `STRATA_GDN_REC_WARP=2` | Chain-split: +6-9% on V100. | Optimization. |
-| 3.5 | gr_norm_fast | S | `STRATA_GR_NORM_FAST=1` | Register-split norm: +0.5-0.6% V100. | Small opt. |
+| 3.4 | GDN recurrence variants | S | `REF_GDN_REC_WARP=2` | Chain-split: +6-9% on V100. | Optimization. |
+| 3.5 | gr_norm_fast | S | `REF_GR_NORM_FAST=1` | Register-split norm: +0.5-0.6% V100. | Small opt. |
 
 #### Source Code Pattern: fused_gr K-split Down (from `fused_gr.cu:1522-1596`)
 
@@ -390,7 +390,7 @@ gr_down_split_kernel(GrMulti m) {
 
 ### C.4: ATTENTION (🔴 P0)
 
-| # | Feature | Effort | Strata Source (line) | Description | ivcore10 Strategy |
+| # | Feature | Effort | Ref Source (line) | Description | ivcore10 Strategy |
 |---|---------|--------|----------------------|-------------|-------------------|
 | 4.1 | **Decode attention** | S→L | `qsa_decode_attn.cu` (1269L) | QSA with quantized scores. V100: kernel #540, fewer shuffles. gfx906: wave64 detection at build. | **Phase 1**: ixformer `flash_attn_func`. **Phase 2**: custom QSA. |
 | 4.2 | Prompt attention | M | `qsa_prompt_attn.cu` (2434L) | V100 `prompt_attn_v70_kernel` on `mma.m8n8k4`. +15-18% prompt. | Phase 1: ixformer. Phase 2: ivcore10 TC. |
@@ -401,30 +401,30 @@ gr_down_split_kernel(GrMulti m) {
 
 ### C.5: SPECULATIVE DECODING (🟡 P1)
 
-| # | Feature | Effort | Strata Source | Description | ivcore10 Strategy |
+| # | Feature | Effort | Ref Source | Description | ivcore10 Strategy |
 |---|---------|--------|---------------|-------------|-------------------|
 | 5.1 | MTP draft | XL | `mtp.cpp` (1875L) | Multi-Token Prediction: 1.6-1.8× speedup. Qwen3.6 has dedicated MTP layer. | After core decode. |
 | 5.2 | Verify window | XL | `verify.cpp` (4254L) | Multi-token verification in one pass. | Paired with MTP. |
 | 5.3 | **DFlash2 drafter** | XL | `dflash2.cu`, `tools/dflash2/` | **NEW since v3**: GPU-forward drafter with Q8_0 pack, conv, K/V ring, windowed attention, top-16 selector. Fused conv+residual+norm+quant, q/k norm+rope, K/V ring write. `--draft dflash2 --draft-model <path>`. | Advanced spec decode. Evaluate after MTP. |
 | 5.4 | PLE / n-gram | M | `ple.cu` (390L) | Prompt lookup: +6-11% on code. | Optimization. |
-| 5.5 | Cost-aware MTP | M | `STRATA_SPEC_COST` | **NEW**: keeps MTP draft only while next row pays at measured row cost (step-by-step chain rule). | Smart spec decode scheduling. |
+| 5.5 | Cost-aware MTP | M | `REF_SPEC_COST` | **NEW**: keeps MTP draft only while next row pays at measured row cost (step-by-step chain rule). | Smart spec decode scheduling. |
 | 5.6 | Spec start-up adaptation | S | commit `2ccf57ec` | **NEW**: faster start-up adaptation of expert tier (swap every 2 verify rounds for first 200). | Auto-tuning. |
 
 ---
 
 ### C.6: PREFILL PATH (🟡 P1)
 
-| # | Feature | Effort | Strata Source | Description | ivcore10 Strategy |
+| # | Feature | Effort | Ref Source | Description | ivcore10 Strategy |
 |---|---------|--------|---------------|-------------|-------------------|
 | 6.1 | MoE fused prefill | L | `moe_fused.cu`, `moe_mmq.cu` | Reads every expert once per chunk. Chunk 512→4096 = 3.4K→6.2K tok/s. | TTFT critical. |
 | 6.2 | WMMA GEMM | M | `wmma_gemm.cu` | FP16 TC GEMMs. +10% on V100. | BI-V100 FP16 TC. cuBLAS or custom WMMA. |
-| 6.3 | PF_WMMA2 | M | `STRATA_PF_WMMA2=1` | Second prompt-expert kernel for IQ2_S gate/up + IQ4_NL down. +2.5-4.3% on V100. | Advanced prefill opt. |
+| 6.3 | PF_WMMA2 | M | `REF_PF_WMMA2=1` | Second prompt-expert kernel for IQ2_S gate/up + IQ4_NL down. +2.5-4.3% on V100. | Advanced prefill opt. |
 
 ---
 
 ### C.7: MULTI-GPU & COMM — **infccl CORE** (🔴 P0)
 
-| # | Feature | Effort | Strata Source | Description | ivcore10 Strategy |
+| # | Feature | Effort | Ref Source | Description | ivcore10 Strategy |
 |---|---------|--------|---------------|-------------|-------------------|
 | 7.1 | **infccl AllReduce** | L | Multi-GPU docs | P2P ring AllReduce for TP=4 on PCIe. `__threadfence()` only. | Already have `infccl_allreduce.so`. Validate. |
 | 7.2 | **Fused Linear+AllReduce** | XL | `ix_full_bridge_fused_ar.so` | Overlap linear + AllReduce. Expected **-14ms/tok**. | Already written. HW validate. |
@@ -435,7 +435,7 @@ gr_down_split_kernel(GrMulti m) {
 
 ### C.8: MEMORY & EXPERT MANAGEMENT (🟡 P1)
 
-| # | Feature | Effort | Strata Source | Description |
+| # | Feature | Effort | Ref Source | Description |
 |---|---------|--------|---------------|-------------|
 | 8.1 | Expert cache | M | `expert_cache.cpp` (807L) | LRU expert cache in VRAM. |
 | 8.2 | VMM / Pinned | L | `vmm.cpp`, `pinned.cu` | Virtual memory, pinned for PCIe. |
@@ -446,7 +446,7 @@ gr_down_split_kernel(GrMulti m) {
 
 ### C.9: QUANTIZATION (🟢 P2)
 
-| # | Feature | Effort | Strata Source | Description |
+| # | Feature | Effort | Ref Source | Description |
 |---|---------|--------|---------------|-------------|
 | 9.1 | IQ quant kernels | L | `iq_kernels.cu` (5400L) | If switching to GGUF. |
 | 9.2 | **Gyro trellis** | L | `tools/trellis/`, commit `5f81c5dc` | **NEW**: trellis codebook experts. Decode: codebook in shared mem, 8-lane rows for 160-dot gate/up and 40-dot down. TQK4/5/6/7 types. sm_60 support added. | New quant format. Evaluate. |
@@ -459,7 +459,7 @@ gr_down_split_kernel(GrMulti m) {
 | # | Feature | Effort | Description |
 |---|---------|--------|-------------|
 | 10.1 | Session/batch | — | vllm handles. Key: dense weights read once per batch. |
-| 10.2 | Conversation cache | — | vllm prefix caching. Strata: RAM-based, 40% free after parking floor. |
+| 10.2 | Conversation cache | — | vllm prefix caching. Ref: RAM-based, 40% free after parking floor. |
 
 ---
 
@@ -468,7 +468,7 @@ gr_down_split_kernel(GrMulti m) {
 ### D.1: Router Top-10 Wave (ivcore10)
 
 ```cuda
-// ix_router_top10_wave.cu — DIRECT PORT from Strata router_top10.cu:198-263
+// ix_router_top10_wave.cu — DIRECT PORT from Ref router_top10.cu:198-263
 // Compile: clang++ -x cuda --cuda-gpu-arch=ivcore10 --cuda-path=/usr/local/corex
 //          -std=c++17 -O3 -D__ILUVATAR__ -fPIC -shared
 //          -I/usr/local/corex/include -L/usr/local/corex/lib64 -lcudart
@@ -660,7 +660,7 @@ Three planned optimizations (87→~59 ms):
   3. infccl P2P AllReduce:    variable
 ```
 
-### E.2 Strata V100 Performance Reference
+### E.2 Ref V100 Performance Reference
 
 | Metric | V100 (sm_70) | Target BI-V100 | Source |
 |--------|-------------|-----------------|--------|
@@ -676,7 +676,7 @@ Three planned optimizations (87→~59 ms):
 
 ### E.3 Key Decode Optimizations
 
-From Strata profiling (R9700, 11.25 ms kernel time/token):
+From Ref profiling (R9700, 11.25 ms kernel time/token):
 
 1. **Q8_0 products (1.9 GB/token)** → bandwidth-bound → MMVQ wave kernel
 2. **Shared expert scalar gate** → was 26.7% of block → parallelized (see D.2)
@@ -694,14 +694,14 @@ From Strata profiling (R9700, 11.25 ms kernel time/token):
 | # | Feature | Ref | Effort | Status | Notes |
 |---|---------|-----|--------|--------|-------|
 | 1 | **native_mmvq wave64** | C.1.1 | L | PORT | Dense GEMV, direct from gfx906. Measure ivcore10 rows table. |
-| 2 | **Router top-10 wave64** | C.2.1 | M | VALIDATE | Already have `ix_native_router.cu`. Validate vs Strata `router_top10_wave_kernel`. |
+| 2 | **Router top-10 wave64** | C.2.1 | M | VALIDATE | Already have `ix_native_router.cu`. Validate vs Ref `router_top10_wave_kernel`. |
 | 3 | **Shared expert (64-wide gate)** | C.2.2 | M | NEW | Must rewrite `warp_sum_d` for 64-wide. Critical: was 26.7% overhead. |
 | 4 | **MoE combine (1024-thread)** | C.2.3 | M | VALIDATE | Already have `ix_moe_elementwise.cu`. |
 | 5 | **GDN decode** | C.3.1 | L | VALIDATE | Already have `ix_gdn.cu`. Verify warp64 recurrence. |
 | 6 | **Gated residual (K-split)** | C.3.2 | L | PORT | 3044L. gfx906 K-split down at line 1522. 64-lane butterfly. |
 | 7 | **Decode attention** | C.4.1 | S | IXFORMER | `flash_attn_func` as baseline. |
 | 8 | **RoPE** | C.4.4 | S | IXFORMER | `rotary_embedding`. Verify M-RoPE. |
-| 9 | **BF16→FP16 GEMV** | C.1.2 | M | PORT | Volta `STRATA_BF16_TC` path. |
+| 9 | **BF16→FP16 GEMV** | C.1.2 | M | PORT | Volta `REF_BF16_TC` path. |
 | 10 | **infccl AllReduce** | C.7.1 | — | COMPILED | Validate on HW. |
 
 ### Phase 2: Performance (hit target TPS) 🟡
@@ -734,7 +734,7 @@ From Strata profiling (R9700, 11.25 ms kernel time/token):
 
 ---
 
-## Part G: Strata Commit Statistics (4196 total)
+## Part G: Ref Commit Statistics (4196 total)
 
 | Category | Commits | Key Insight |
 |----------|---------|-------------|
@@ -760,7 +760,7 @@ From Strata profiling (R9700, 11.25 ms kernel time/token):
 
 ### Critical gfx906→ivcore10 Port Sources (with exact line numbers)
 
-| Strata File | Lines | Wave64 Kernel | Line# | Our Target |
+| Ref File | Lines | Wave64 Kernel | Line# | Our Target |
 |-------------|-------|---------------|-------|------------|
 | `src/kernels/cuda/native_mmvq.cu` | 3276 | `native_mmvq_wave_kernel` | **1827** | `ix_mmvq_wave.cu` |
 | `src/kernels/cuda/router_top10.cu` | 497 | `router_top10_wave_kernel` | **198** | `ix_router_top10_wave.cu` |
@@ -770,7 +770,7 @@ From Strata profiling (R9700, 11.25 ms kernel time/token):
 | `src/kernels/cuda/gdn.cu` | 248 | SSM recurrence | full | `ix_gdn.cu` (exists) |
 | `src/kernels/cuda/bf16_gemv.cu` | 189 | BF16→FP16 TC | full | `ix_bf16_gemv.cu` |
 | `src/kernels/cuda/qsa_decode_attn.cu` | 1269 | V100 #540 kernel | — | Phase 2 |
-| `include/strata/platform/hip_compat/` | 310+ | **Compat layer reference** | full | `ix_compat.h` |
+| `include/ref/platform/hip_compat/` | 310+ | **Compat layer reference** | full | `ix_compat.h` |
 
 ---
 
@@ -791,10 +791,10 @@ From Strata profiling (R9700, 11.25 ms kernel time/token):
 
 ### Next to Write (ordered by priority)
 
-| # | File | From Strata | Effort | Key Change |
+| # | File | From Ref | Effort | Key Change |
 |---|------|-------------|--------|------------|
 | 1 | `ix_compat.h` | `hip_compat/` | S | Thin: warp64 macros, threadfence, lane helpers |
-| 2 | `ix_mmvq_wave.cu` | `native_mmvq.cu:1827` | L | Replace `STRATA_HIP_GFX906` guard, template over F/NCOLS/R |
+| 2 | `ix_mmvq_wave.cu` | `native_mmvq.cu:1827` | L | Replace `REF_HIP_GFX906` guard, template over F/NCOLS/R |
 | 3 | `ix_shared_expert.cu` | `shared_expert.cu:112` | M | Rewrite `warp_sum_d` for 64-wide (was 26.7% overhead!) |
 | 4 | `ix_fused_gr.cu` | `fused_gr.cu:1522` | L | gfx906 K-split down, 8 wavefronts, LDS-staged tile |
 | 5 | `ix_bf16_gemv.cu` | `bf16_gemv.cu` | M | BF16→FP16 + FP16 TC (Volta path) |
@@ -828,7 +828,7 @@ New quantization format with trellis codebooks:
 
 ### I.3 Cost-Aware Speculative Decoding
 
-- `5f49ec45`: `STRATA_SPEC_COST` — keeps MTP draft only while next row pays at measured row cost (step-by-step chain rule in `MtpDrafter`, `DraftPolicy::keep_draft`)
+- `5f49ec45`: `REF_SPEC_COST` — keeps MTP draft only while next row pays at measured row cost (step-by-step chain rule in `MtpDrafter`, `DraftPolicy::keep_draft`)
 - `2ccf57ec`: Faster start-up adaptation of expert tier (swap every 2 verify rounds for first 200)
 
 **Relevance**: Automatic spec decode tuning. Port the policy logic.
@@ -910,13 +910,13 @@ int main() {
 }
 ```
 
-### J.3 Kernel Correctness (Strata methodology)
+### J.3 Kernel Correctness (Ref methodology)
 
 1. **Bit-exact parity**: Compare output against reference (double precision host)
 2. **A/B benchmark**: 10 interleaved pairs, medians, same flags
 3. **Stress test**: Random inputs, edge cases (n_expert=1/256, k=1/8)
-4. **Strata env vars**: `STRATA_Q36_VERIFY=1` equivalent for our kernels
+4. **Ref env vars**: `REF_Q36_VERIFY=1` equivalent for our kernels
 
 ---
 
-*Generated from Strata HEAD `4b9e05a2` (2026-10-25) and baloon main. 4196 commits classified, source code grounded with exact line references. v4 adds source-code patterns from actual `.cu` files, DFlash2/Gyro/Trellis from latest 835 commits, warp64→ivcore10 porting cookbook.*
+*Generated from Ref HEAD `4b9e05a2` (2026-10-25) and baloon main. 4196 commits classified, source code grounded with exact line references. v4 adds source-code patterns from actual `.cu` files, DFlash2/Gyro/Trellis from latest 835 commits, warp64→ivcore10 porting cookbook.*

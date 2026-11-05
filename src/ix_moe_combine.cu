@@ -1,5 +1,5 @@
 // ix_moe_combine.cu - MoE block final combination: y[j] = sum_e w[e]*parts[e][j] (+ shared[j], added plain).
-// Port of Strata src/kernels/cuda/shared_expert.cu moe_combine_kernel (HEAD 46c152a1, L146, matches v9).
+// Port of Ref src/kernels/cuda/shared_expert.cu moe_combine_kernel (HEAD 46c152a1, L146, matches v9).
 // No warp/wave ops, no ivcore10 change needed: kernel body is verbatim. Double accumulator, ascending e (matches reference).
 // STATUS: NOT yet compiled or run on BI-V100.
 #pragma once

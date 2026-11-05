@@ -1,6 +1,6 @@
 // ix_router_top10_wave.cu - MoE router (softmax / top-k / renormalise), one wavefront (64 lanes) per token.
-// Port of Strata src/kernels/cuda/router_top10.cu router_top10_wave_kernel (HEAD 46c152a1, L190-263).
-// ivcore10 change: guard STRATA_HIP_GFX906 -> __ILUVATAR__. Kernel body is verbatim (already wave64).
+// Port of Ref src/kernels/cuda/router_top10.cu router_top10_wave_kernel (HEAD 46c152a1, L190-263).
+// ivcore10 change: guard REF_HIP_GFX906 -> __ILUVATAR__. Kernel body is verbatim (already wave64).
 // STATUS: NOT yet compiled or run on BI-V100 (no corex toolchain on the dev box).
 #pragma once
 #include <cuda_runtime.h>

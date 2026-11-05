@@ -1,10 +1,10 @@
-// Direct checks of the LAYER-1 statements for gguf_lazy_loader and strata_pack_builder that the other tests
+// Direct checks of the LAYER-1 statements for gguf_lazy_loader and ref_pack_builder that the other tests
 // only cover indirectly: exact byte totals, Python-form equality, arena addressing, absolute alignment.
 #include <cstdint>
 #include <random>
 #include <vector>
 #include "baloon/gguf_lazy_loader.hpp"
-#include "baloon/strata_pack_builder.hpp"
+#include "baloon/ref_pack_builder.hpp"
 #include "check.hpp"
 using namespace baloon;
 

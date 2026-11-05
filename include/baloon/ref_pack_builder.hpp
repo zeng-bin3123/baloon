@@ -1,4 +1,4 @@
-// strata_pack_builder.hpp - pack builder/verifier primitives: LSB-first 2/4/8-bit code packing, 64-byte plane
+// ref_pack_builder.hpp - pack builder/verifier primitives: LSB-first 2/4/8-bit code packing, 64-byte plane
 // alignment, the expert-blob arithmetic (1,382,400 bytes) with role rebuild (gate/up interleave inversion and
 // block-index split), scale dtype selection, and the dense/embedding/expert tensor partition.
 #pragma once

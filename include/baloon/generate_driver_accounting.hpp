@@ -1,4 +1,4 @@
-// generate_driver_accounting.hpp - position and row accounting of the `strata generate` driver: which positions produce
+// generate_driver_accounting.hpp - position and row accounting of the `ref generate` driver: which positions produce
 // tokens, the logits-dump row count, context fit, the batched-prefill split, the auto-sized expert cache, the PCIe
 // fraction clamp, profile truncation, the routing-trace layer index and serve admission. Nat subtraction in the model
 // truncates at 0; sat_sub reproduces that on unsigned values.

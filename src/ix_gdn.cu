@@ -1,11 +1,11 @@
 // ix_gdn.cu - Phase 1 #6: gated delta-net non-projection kernels for ivcore10 (wave64).
-// Port of Strata src/kernels/cuda/gdn.cu (HEAD 46c152a1): gdn_step, gdn_conv, gdn_l2_norm, gdn_beta_gate, gdn_out_norm.
+// Port of Ref src/kernels/cuda/gdn.cu (HEAD 46c152a1): gdn_step, gdn_conv, gdn_l2_norm, gdn_beta_gate, gdn_out_norm.
 // ivcore10 changes (v9 Part H):
 //   * l2_kernel and out_norm: one WAVE (64 lanes) per row/head -> block = 64 threads, shfl_down off=32..1 width 64.
 //     (Launching 32 threads with a width-64 shuffle would read inactive lanes - blockDim MUST be 64.)
-//     The reduction stays DOUBLE; its summation order changes (lane stride 64), so results differ from Strata only at ~1e-16.
+//     The reduction stays DOUBLE; its summation order changes (lane stride 64), so results differ from Ref only at ~1e-16.
 //   * step: JTHREADS 32 -> 64 (one thread per (h,j) state column; per-column arithmetic is untouched, so the recurrence is
-//     op-for-op identical to Strata - only the block packing changes).
+//     op-for-op identical to Ref - only the block packing changes).
 //   * conv, beta_gate: no warp ops, verbatim.
 // STATUS: NOT yet compiled or run on BI-V100.
 #pragma once
@@ -16,7 +16,7 @@
 
 namespace ix_gdn {
 constexpr int JTHREADS = 64;   // threads along j (state fast axis); S=128 -> 2 blocks per head
-constexpr int MAX_H = 1;       // heads per block (latency-hiding knob, see Strata comment); retune once SM count is known
+constexpr int MAX_H = 1;       // heads per block (latency-hiding knob, see Ref comment); retune once SM count is known
 constexpr int WAVE = IX_WARP_SIZE;
 
 __device__ __forceinline__ float softplus_f(float x) { return x > 20.0f ? x : log1pf(expf(x)); }
@@ -114,7 +114,7 @@ inline cudaError_t ix_gdn_step(float* state, const float* q, const float* k, con
 }
 inline cudaError_t ix_gdn_conv_step(float* conv_state, const float* x, const float* kW, float* out, int channels,
                                     int d_conv, cudaStream_t s = 0) {
-    if (channels <= 0 || d_conv < 2) return cudaErrorInvalidValue;   // d_conv==1 would index st[-1] in Strata too
+    if (channels <= 0 || d_conv < 2) return cudaErrorInvalidValue;   // d_conv==1 would index st[-1] in Ref too
     ix_gdn::gdn_conv_kernel<<<(channels + 255) / 256, 256, 0, s>>>(conv_state, x, kW, out, channels, d_conv);
     return cudaGetLastError();
 }
