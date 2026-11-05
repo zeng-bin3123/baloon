@@ -669,10 +669,14 @@
     }
   },
   "fix_attempts": {
-    "pb7e2533792": 1
+    "pb7e2533792": 1,
+    "pe1f7ca5c00": 1
   },
   "fail_history": {
     "pb7e2533792": [
+      "review_fail"
+    ],
+    "pe1f7ca5c00": [
       "review_fail"
     ],
     "u02c65ed515": [
@@ -754,15 +758,14 @@
       "kind": "review_fail",
       "text": "block_geometry/ggml_type_name map Q2_0 to private id 100 and treat id 42 as unknown, but theory DequantBlockLayouts specifies geom 42 = (64,18); the test never checks id 42",
       "base_ref": "einsteinOS/dev-c880662efd"
+    },
+    "pe1f7ca5c00": {
+      "kind": "review_fail",
+      "text": "native_flash_attn_short_step accepts up to 1024 cells (kFlashShortMaxCells=1024) but theory native_flash_attn and native_flash_attn_bounds.hpp specify max context 256; the test pins the limit only via the same constant",
+      "base_ref": "einsteinOS/dev-c880662efd"
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "pe1f7ca5c00": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
