@@ -28,6 +28,7 @@ echo "== port table =="
 TSV=.einsteinOS/port/u12d8dd5102.tsv
 n=0
 while IFS=$'\t' read -r rf rn mf mn; do
+  mn="${mn%$'\r'}"
   [ -n "$rf" ] || continue
   n=$((n+1))
   if [ ! -f "$mf" ] || ! grep -qw -- "$mn" "$mf"; then echo "port: $mn not defined in $mf"; rc=1; fi
