@@ -350,7 +350,8 @@
         "LayerShapeCheck.lean",
         "ByteLevelBpeTokenizer.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "88c0b06f-e06f-4199-a227-68a227907740"
     },
     {
       "id": "ud77a0d7726",
@@ -498,6 +499,12 @@
   },
   "last_failure": {},
   "infra_fails": 0,
+  "review_pending": {
+    "u2e9aa362e3": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -733,6 +740,7 @@
     }
   ],
   "verify_seen": {
+    "u2e9aa362e3": true,
     "u649794726a": true
   },
   "gates": "build+test+gpu+isa+port+integration",
