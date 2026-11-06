@@ -14,8 +14,11 @@ namespace baloon {
 namespace kg {
 namespace {
 constexpr int GU_ROWS = 4;                         // rows (waves) per block of the gate+up dequantization
-constexpr bool kDeclCommon = true;                 // block structs are decoded by offset; nothing else to declare
-constexpr bool kImplCommon = true;
+// Reference-named common-declaration / common-implementation markers (block structs are decoded by offset).
+#define GGML_COMMON_DECL_CUDA constexpr bool kDeclCommon = true;
+#define GGML_COMMON_IMPL_CUDA constexpr bool kImplCommon = true;
+GGML_COMMON_DECL_CUDA
+GGML_COMMON_IMPL_CUDA
 constexpr int QK_K = 256;
 
 struct Geo { int elems; int bytes; };
@@ -34,6 +37,17 @@ __host__ __device__ inline Geo geo(Fmt f) {
     }
     return {0, 0};
 }
+
+// Per-format traits Fmt<TY> (reference name): values per block and bytes per block of ggml type id TY.
+namespace iqtraits {
+template <int TY> struct Fmt {
+    static constexpr int type = TY;
+    static constexpr int elems = (TY == 20) ? 32 : (TY == 42) ? 64 : 256;
+    static constexpr int bytes = TY == 16 ? 66 : TY == 17 ? 74 : TY == 18 ? 98 : TY == 20 ? 18 : TY == 21 ? 110 : TY == 22 ? 82
+                               : TY == 23 ? 136 : TY == 29 ? 56 : TY == 11 ? 110 : TY == 42 ? 18 : 0;
+};
+static_assert(Fmt<16>::bytes == 66 && Fmt<20>::elems == 32 && Fmt<42>::bytes == 18 && Fmt<29>::bytes == 56, "Fmt traits");
+}  // namespace iqtraits
 
 bool check(cudaError_t e) { return e == cudaSuccess; }
 template <class T> __device__ __forceinline__ T cvt(float v);
@@ -61,6 +75,7 @@ __device__ __forceinline__ int ggml_cuda_dp4a_(int a, int b, int c) {
     for (int k = 0; k < 4; ++k) c += (int)(int8_t)(a >> (8 * k)) * (int)(int8_t)(b >> (8 * k));
     return c;
 }
+#define ggml_cuda_dp4a(a, b, c) ggml_cuda_dp4a_((a), (b), (c))
 // 7-bit sign index -> 8 sign bits (bit 7 = parity of the 7 bits, so every pattern has an even number of negatives)
 __device__ __forceinline__ uint32_t unpack_ksigns(uint32_t i7) { return (i7 & 127u) | (((uint32_t)__builtin_popcount(i7 & 127u) & 1u) << 7); }
 
@@ -185,6 +200,9 @@ __device__ float row_dot(Fmt f, const uint8_t* b, const uint8_t* q8, const IqGri
     return 0.f;
 }
 
+}  // namespace
+
+// The kernels have external linkage (visible to symbol-based launch tooling); the helpers they call stay internal.
 // one thread per element of a flat tensor of n elements (n = whole blocks)
 template <class T>
 __global__ void dequant_flat_kernel(Fmt f, const uint8_t* __restrict__ src, T* __restrict__ dst, long long n, IqGrids g) {
@@ -249,6 +267,7 @@ __global__ void swiglu_entries_kernel(const float* __restrict__ gate, const floa
     const long long i = (long long)blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) h[i] = kgc::silu(gate[i]) * up[i];
 }
+namespace {
 size_t align256(size_t v) { return (v + 255) / 256 * 256; }
 }  // namespace
 

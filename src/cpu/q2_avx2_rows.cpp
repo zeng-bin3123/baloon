@@ -144,5 +144,36 @@ void gguf_rows_multi(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb
     }
 }
 
+
+// One row against 1..4 tokens: the named multi-token row kernel.
+static inline void row_multi(const uint8_t* row, uint32_t nb, uint32_t n_tok, const int8_t* q, size_t q_stride,
+                             const float* xd, const int32_t* hx, size_t ch_stride, float* out) {
+    multi_token_row_dot(row, nb, n_tok, q, q_stride, xd, hx, ch_stride, out);
+}
+
+void act_quant_q8_1_avx2(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx) {
+    activation_quantizer(x, n, q, d, hx);
+}
+
+// Rows [row0, row1) against nt tokens, token groups of at most four.
+static inline void rows(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, uint32_t nt, const int8_t* q,
+                        size_t q_stride, const float* xd, const int32_t* hx, size_t ch_stride, float* out, size_t out_stride) {
+    for (uint32_t r = row0; r < row1; ++r) {
+        const uint8_t* row = w + (size_t)r * nb * BLOCK_BYTES;
+        for (uint32_t t0 = 0; t0 < nt; t0 += MAX_GROUP) {
+            const uint32_t n = group_size(nt, t0);
+            float o[MAX_GROUP];
+            row_multi(row, nb, n, q + t0 * q_stride, q_stride, xd + t0 * ch_stride, hx + t0 * ch_stride, ch_stride, o);
+            for (uint32_t t = 0; t < n; ++t) out[(size_t)(t0 + t) * out_stride + r] = o[t];
+        }
+    }
+}
+
+void q2_0_gguf_rows_multi_avx2(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, uint32_t nt, const int8_t* q,
+                               size_t q_stride, const float* xd, const int32_t* hx, size_t ch_stride, float* out,
+                               size_t out_stride) {
+    rows(w, row0, row1, nb, nt, q, q_stride, xd, hx, ch_stride, out, out_stride);
+}
+
 }  // namespace q2rows
 }  // namespace baloon

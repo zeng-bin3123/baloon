@@ -45,5 +45,13 @@ void row_range(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, cons
 void gguf_rows_multi(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, uint32_t nt, const int8_t* q,
                      size_t q_stride, const float* xd, const int32_t* hx, size_t ch_stride, float* out, size_t out_stride);
 
+
+// Reference-named entry points (same kernels, flat C++ names).
+// act_quant_q8_1_avx2: activation quantizer; q2_0_gguf_rows_multi_avx2: rows [row0,row1) x nt tokens in groups of <= 4.
+void act_quant_q8_1_avx2(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx);
+void q2_0_gguf_rows_multi_avx2(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, uint32_t nt, const int8_t* q,
+                               size_t q_stride, const float* xd, const int32_t* hx, size_t ch_stride, float* out,
+                               size_t out_stride);
+
 }  // namespace q2rows
 }  // namespace baloon
