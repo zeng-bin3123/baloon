@@ -391,7 +391,8 @@
         "SGemvSplitKernels.lean",
         "NativeMmvqDispatch.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "ad0c078a-52bb-4f39-965f-10945b7b4182"
     },
     {
       "id": "u41e2bf114f",
@@ -588,17 +589,28 @@
       "unit_id": "u2e9aa362e3"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u5c4a635e52": 1
+  },
   "fail_history": {
     "u2e9aa362e3": [
       "review_fail",
       "review_fail"
     ],
+    "u5c4a635e52": [
+      "build_toolchain_dependence_unmeasured"
+    ],
     "u649794726a": [
       "review_fail"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "u5c4a635e52": {
+      "kind": "build_toolchain_dependence_unmeasured",
+      "text": "build_toolchain_dependence_unmeasured: build.sh could not be run with /usr/local/corex/bin hidden (unshare: unshare failed: Operation not permitted), so whether it needs the toolchain is not measured",
+      "base_ref": "einsteinOS/dev-3b59928b8f-wip-u5c4a635e52"
+    }
+  },
   "infra_fails": 0,
   "port_units": [
     {
@@ -850,6 +862,7 @@
   "verify_seen": {
     "u1de28c5d58": true,
     "u2e9aa362e3": true,
+    "u5c4a635e52": true,
     "u649794726a": true,
     "ud77a0d7726": true
   },
