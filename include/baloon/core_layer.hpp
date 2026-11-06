@@ -90,6 +90,21 @@ bool block_buffers_init(BlockBuffers& b, void* base, uint64_t cap, const BlockDi
 uint64_t gdn_buffers_bytes(const GdnDims& d);
 bool gdn_buffers_init(GdnBuffers& b, void* base, uint64_t cap, const GdnDims& d);
 void gdn_buffers_zero_state(float* state, uint64_t floats);
+// ---- ArenaCarving: the model-geometry buffer sets (every region rounded up to 16 bytes, `*_bytes` == what `*_init` consumes) ----
+struct GdnGeometry { uint64_t n_embd = 0, conv_channels = 0, value_dim = 0, v_heads = 0, state_size = 0, d_conv = 0; };
+constexpr GdnGeometry kRealGdnGeometry{2560, 10240, 6144, 48, 128, 4};     // the engine's real geometry
+constexpr int kGdnArenaRegions = 16, kMoeArenaRegions = 9;
+void gdn_arena_sizes(const GdnGeometry& g, uint64_t (&s)[kGdnArenaRegions]);         // raw (unaligned) region sizes, carve order
+uint64_t gdn_arena_bytes(const GdnGeometry& g);
+// Walks the same list with a moving cursor; returns the cursor end (== gdn_arena_bytes) or UINT64_MAX when `cap` is too small.
+uint64_t gdn_arena_init(Regions<kGdnArenaRegions>& b, void* base, uint64_t cap, const GdnGeometry& g);
+void moe_arena_sizes(uint64_t n_embd, uint64_t n_expert, uint64_t k, uint64_t shared_scratch, uint64_t (&s)[kMoeArenaRegions]);
+uint64_t moe_arena_bytes(uint64_t n_embd, uint64_t n_expert, uint64_t k, uint64_t shared_scratch);
+uint64_t moe_arena_init(Regions<kMoeArenaRegions>& b, void* base, uint64_t cap, uint64_t n_embd, uint64_t n_expert, uint64_t k,
+                        uint64_t shared_scratch);
+// n QSA layers share one RoPE table: the first state owns `rope` extra bytes, the others borrow it.
+constexpr uint64_t qsa_states_total(uint64_t n, uint64_t rest, uint64_t rope) { return n == 0 ? 0 : n * rest + rope; }
+
 uint64_t moe_buffers_bytes(const MoeDims& d);
 bool moe_buffers_init(MoEBuffers& b, void* base, uint64_t cap, const MoeDims& d);
 uint64_t qsa_buffers_bytes(const QsaDims& d);

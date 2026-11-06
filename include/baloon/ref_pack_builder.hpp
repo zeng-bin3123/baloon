@@ -74,10 +74,13 @@ static_assert(3 * kRoleBytes == kBlobBytes, "three roles of 18-byte 64-weight bl
 static_assert(kFF * kScGu == kH * kScD && kFF * kScGu == kRoleBlocks, "equal block counts per role");
 
 // Plane offsets inside a blob (each plane starts 64-aligned, which holds without padding for these sizes).
+// Region order (ExpertBlobPacking theory; the same offsets the GPU kernels use): gate/up codes | down codes | gate/up scales | down scales.
 constexpr uint64_t kGuCodesOff = 0;
-constexpr uint64_t kGuScalesOff = kGuCodesOff + kGuCodes;
-constexpr uint64_t kDCodesOff = kGuScalesOff + kGuScales;
-constexpr uint64_t kDScalesOff = kDCodesOff + kDCodes;
+constexpr uint64_t kDCodesOff = kGuCodesOff + kGuCodes;
+constexpr uint64_t kGuScalesOff = kDCodesOff + kDCodes;
+constexpr uint64_t kDScalesOff = kGuScalesOff + kGuScales;
+static_assert(kDCodesOff == 819200 && kGuScalesOff == 1228800 && kDScalesOff == 1331200 && kDScalesOff + kDScales == kBlobBytes,
+              "blob regions tile the blob in the kernels' order");
 static_assert(kGuScalesOff % 64 == 0 && kDCodesOff % 64 == 0 && kDScalesOff % 64 == 0, "64-aligned planes");
 
 enum class Role { Gate, Up, Down };

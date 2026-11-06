@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "baloon/generate_driver_accounting.hpp"
+#include "baloon/gguf_lazy_loader.hpp"
 
 namespace baloon {
 namespace gencli {
@@ -89,6 +90,17 @@ struct Options {
     std::vector<int64_t> gpus;       // --gpus
     bool help = false;               // --help
 };
+
+// Resolve --model PATH to the ordered file list. A plain file is a one-element set; a "<prefix>-NNNNN-of-MMMMM.gguf" name
+// must find exactly MMMMM siblings (indices 1..MMMMM), otherwise the set is refused with a message naming the shard.
+inline bool model_shards(const std::string& path, std::vector<std::string>& out, std::string& err) {
+    out.clear();
+    if (path.empty()) { err = "empty model path"; return false; }
+    auto r = baloon::gguf::discover_shards(path);
+    if (!r || r->empty()) { err = "incomplete shard set for " + path; return false; }
+    out = *r;
+    return true;
+}
 
 inline std::string usage(const char* prog) {
     std::string p = prog && *prog ? prog : "generate";

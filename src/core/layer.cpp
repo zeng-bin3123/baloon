@@ -154,6 +154,37 @@ void gdn_buffers_zero_state(float* state, uint64_t floats) {
     if (state && floats) std::memset(state, 0, (size_t)floats * sizeof(float));
 }
 
+void gdn_arena_sizes(const GdnGeometry& g, uint64_t (&s)[kGdnArenaRegions]) {
+    const uint64_t parts[kGdnArenaRegions] = {
+        q8k_bytes(g.n_embd), g.n_embd / 32 * 34, g.n_embd * 2,
+        g.conv_channels * 4, g.conv_channels * 4, g.conv_channels * 4,
+        g.v_heads * 4, g.v_heads * 4, g.v_heads * 4,
+        g.v_heads * g.state_size * 4, g.value_dim * 4, g.value_dim * 4,
+        q8k_bytes(g.value_dim), g.value_dim / 32 * 34,
+        g.state_size * g.v_heads * g.state_size * 4, g.conv_channels * (g.d_conv > 0 ? g.d_conv - 1 : 0) * 4};
+    for (int i = 0; i < kGdnArenaRegions; ++i) s[i] = parts[i];
+}
+uint64_t gdn_arena_bytes(const GdnGeometry& g) { uint64_t s[kGdnArenaRegions]; gdn_arena_sizes(g, s); return total_of(s); }
+uint64_t gdn_arena_init(Regions<kGdnArenaRegions>& b, void* base, uint64_t cap, const GdnGeometry& g) {
+    uint64_t s[kGdnArenaRegions]; gdn_arena_sizes(g, s);
+    if (!carve(b, base, cap, s)) return UINT64_MAX;
+    return b.bytes;
+}
+void moe_arena_sizes(uint64_t n_embd, uint64_t n_expert, uint64_t k, uint64_t shared_scratch, uint64_t (&s)[kMoeArenaRegions]) {
+    const uint64_t parts[kMoeArenaRegions] = {n_embd * 2, n_embd * 2, n_expert * 4, k * 4, k * 4, n_embd * 4, shared_scratch,
+                                              n_embd / 32 * 34, q8k_bytes(n_embd)};
+    for (int i = 0; i < kMoeArenaRegions; ++i) s[i] = parts[i];
+}
+uint64_t moe_arena_bytes(uint64_t n_embd, uint64_t n_expert, uint64_t k, uint64_t shared_scratch) {
+    uint64_t s[kMoeArenaRegions]; moe_arena_sizes(n_embd, n_expert, k, shared_scratch, s); return total_of(s);
+}
+uint64_t moe_arena_init(Regions<kMoeArenaRegions>& b, void* base, uint64_t cap, uint64_t n_embd, uint64_t n_expert, uint64_t k,
+                        uint64_t shared_scratch) {
+    uint64_t s[kMoeArenaRegions]; moe_arena_sizes(n_embd, n_expert, k, shared_scratch, s);
+    if (!carve(b, base, cap, s)) return UINT64_MAX;
+    return b.bytes;
+}
+
 static void moe_sizes(const MoeDims& d, uint64_t (&s)[kMoeRegions]) {
     s[0] = d.T * d.n_expert * 4;                 // router logits
     s[1] = d.T * d.k * 4;                        // top-k ids
