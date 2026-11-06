@@ -48,8 +48,8 @@ void restore_thread_affinity();
 
 class ExpertPool {
 public:
-    static constexpr uint32_t kMaxSplit = 16;        // split capacity (single-token experts per batch)
-    static constexpr uint32_t kMaxSplitMulti = 16;   // split capacity (multi-token experts per batch)
+    static constexpr uint32_t kMaxSplit = poolsched::kSplitCap;             // split capacity (single-token experts per batch)
+    static constexpr uint32_t kMaxSplitMulti = poolsched::kSplitMultiCap;  // split capacity (multi-token experts per batch)
 
     // requested: worker count (0 = one per physical core, never fewer than one). skip_first reserves the first core for
     // the host thread. host_works: the calling thread also drains tasks during a batch.
@@ -63,12 +63,21 @@ public:
 
     // One task per expert.
     void run(const ExpertJob* jobs, uint32_t n);
-    // Each expert is cut into row ranges; returns false (nothing done) when n exceeds kMaxSplit or the oracle contract is on.
+    // Each expert is cut into row ranges; returns false (nothing done) when n exceeds kMaxSplit, the pool has a single
+    // worker, or the oracle contract is on.
     bool run_split(const ExpertJob* jobs, uint32_t n);
     // Multi-token phases over global row ranges (may span experts). Same refusal rule.
     bool run_split_multi(const ExpertJobMulti* jobs, uint32_t n);
-    // Same for experts in the native i-quant layout (every job must have gu_type != 42).
+    // Same for experts in the native i-quant layout (every job must have gu_type != 42). A layer with more than
+    // kMaxSplitMulti experts is processed in consecutive batches of at most kMaxSplitMulti (all jobs validated first).
     bool run_split_multi_native(const ExpertJobMulti* jobs, uint32_t n);
+
+    // Test hook: byte offsets of the contended words inside the pool object.
+    static size_t off_head();
+    static size_t off_done();
+    static size_t off_parked();
+    static size_t off_epoch();
+    static size_t off_stop();
 
 private:
     struct NativeScratch {
@@ -87,10 +96,13 @@ private:
     std::vector<std::thread> th_;
     std::mutex m_;
     std::condition_variable cv_work_, cv_host_;
-    bool stop_ = false;
-    uint64_t epoch_ = 0;
-    std::atomic<uint64_t> head_{0}, done_{0};
-    std::atomic<uint32_t> parked_{0};
+    // Each contended word sits alone on its own 64-byte line (no false sharing between claim / completion / park / publish).
+    alignas(64) std::atomic<uint64_t> head_{0};
+    alignas(64) std::atomic<uint64_t> done_{0};
+    alignas(64) std::atomic<uint32_t> parked_{0};
+    alignas(64) uint64_t epoch_ = 0;
+    alignas(64) bool stop_ = false;
+    [[maybe_unused]] alignas(64) char line_end_[1] = {0};   // keeps stop_ alone on its line
     // current batch descriptor (written by the host only while every worker is parked)
     uint32_t mode_ = 0, ntasks_ = 0, njobs_ = 0, parts_ = 1;
     const ExpertJob* jobs_ = nullptr;

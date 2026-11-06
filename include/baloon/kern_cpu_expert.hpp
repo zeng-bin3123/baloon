@@ -51,7 +51,7 @@ struct ExpertScratchMulti {
 struct CpuFeatures {
     bool avx2 = false, avx512f = false, avx512bw = false, avx512vl = false, avx512_vnni = false, avx512_vbmi = false;
     bool usable() const { return avx512f && avx512bw && avx512vl && avx512_vnni && avx512_vbmi; }
-    // Human-readable reason of the first missing feature ("" when usable).
+    // Human-readable reason of the first missing feature; exactly "ok" when usable.
     const char* reason() const;
 };
 CpuFeatures cpu_features();

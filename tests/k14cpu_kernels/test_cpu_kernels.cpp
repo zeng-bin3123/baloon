@@ -41,13 +41,13 @@ static bool bit_equal(const float* a, const float* b, size_t n) { return std::me
 static void test_features() {
     const CpuFeatures f = cpu_features();
     CHECK(f.usable());
-    CHECK(std::strlen(f.reason()) == 0);
+    CHECK(std::strcmp(f.reason(), "ok") == 0);
     for (int miss = 0; miss < 5; ++miss) {
         CpuFeatures g;
         g.avx512f = g.avx512bw = g.avx512vl = g.avx512_vnni = g.avx512_vbmi = true;
         (miss == 0 ? g.avx512f : miss == 1 ? g.avx512bw : miss == 2 ? g.avx512vl : miss == 3 ? g.avx512_vnni : g.avx512_vbmi) = false;
         CHECK(!g.usable());
-        CHECK(std::strlen(g.reason()) > 0);
+        CHECK(std::strcmp(g.reason(), "ok") != 0);
     }
     cpu_require_expert_support();   // aborts on an unsupported machine
 }
@@ -356,8 +356,10 @@ static void test_pool() {
             pool.run(jobs.data(), NJ);
             for (uint32_t j = 0; j < NJ; ++j) CHECK(bit_equal(out[j].data(), want[j].data(), H));
             for (auto& o : out) std::fill(o.begin(), o.end(), -1.f);
-            CHECK(pool.run_split(jobs.data(), 1 + rep % 6));
-            for (uint32_t j = 0; j < 1 + (uint32_t)(rep % 6); ++j) CHECK(bit_equal(out[j].data(), want[j].data(), H));
+            const bool split_ran = pool.run_split(jobs.data(), 1 + rep % 6);
+            CHECK(split_ran == (pool.workers() > 1));   // a single worker never takes the split path
+            if (split_ran)
+                for (uint32_t j = 0; j < 1 + (uint32_t)(rep % 6); ++j) CHECK(bit_equal(out[j].data(), want[j].data(), H));
         }
         std::vector<ExpertJob> many(ExpertPool::kMaxSplit + 1, jobs[0]);
         CHECK(!pool.run_split(many.data(), (uint32_t)many.size()));   // beyond capacity: refused, nothing done

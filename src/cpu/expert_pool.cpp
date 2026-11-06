@@ -7,6 +7,8 @@
 #endif
 #include "baloon/kern_cpu_pool.hpp"
 
+#include <cstddef>
+
 #include <algorithm>
 #include <cstdio>
 #include <fstream>
@@ -206,7 +208,7 @@ void ExpertPool::run(const ExpertJob* jobs, uint32_t n) {
 
 bool ExpertPool::run_split(const ExpertJob* jobs, uint32_t n) {
     if (n == 0) return true;
-    if (!poolsched::use_split(n, kMaxSplit, expert_oracle_q8_0_enabled())) return false;
+    if (!poolsched::use_split(n, kMaxSplit, expert_oracle_q8_0_enabled(), nw_)) return false;
     jobs_ = jobs;
     njobs_ = n;
     parts_ = parts_for(threads(), n);
@@ -219,7 +221,7 @@ bool ExpertPool::run_split(const ExpertJob* jobs, uint32_t n) {
 
 bool ExpertPool::multi_impl(const ExpertJobMulti* jobs, uint32_t n, bool native_only) {
     if (n == 0) return true;
-    if (!poolsched::use_split(n, kMaxSplitMulti, expert_oracle_q8_0_enabled())) return false;
+    if (!poolsched::use_split(n, kMaxSplitMulti, expert_oracle_q8_0_enabled(), nw_)) return false;
     const bool q2 = jobs[0].gu_type == 42;
     for (uint32_t e = 0; e < n; ++e) {   // a batch is homogeneous: all Q2_0 or all native, same geometry
         if ((jobs[e].gu_type == 42) != q2 || jobs[e].nt == 0 || jobs[e].nt > MAXT) return false;
@@ -261,7 +263,28 @@ bool ExpertPool::multi_impl(const ExpertJobMulti* jobs, uint32_t n, bool native_
 }
 
 bool ExpertPool::run_split_multi(const ExpertJobMulti* jobs, uint32_t n) { return multi_impl(jobs, n, false); }
-bool ExpertPool::run_split_multi_native(const ExpertJobMulti* jobs, uint32_t n) { return multi_impl(jobs, n, true); }
+bool ExpertPool::run_split_multi_native(const ExpertJobMulti* jobs, uint32_t n) {
+    if (n <= kMaxSplitMulti) return multi_impl(jobs, n, true);
+    // More native experts than one batch holds: validate every job up front (nothing runs unless all are acceptable),
+    // then walk consecutive batches of at most kMaxSplitMulti.
+    if (nw_ == 1 || expert_oracle_q8_0_enabled()) return false;
+    for (uint32_t e = 0; e < n; ++e) {
+        const ExpertJobMulti& j = jobs[e];
+        if (j.gu_type == 42 || j.d_type == 42 || j.nt == 0 || j.nt > MAXT) return false;
+        if (j.n_ff != jobs[0].n_ff || j.n_embd != jobs[0].n_embd || j.n_ff % 256 || j.n_embd % 256) return false;
+    }
+    for (uint32_t b0 = 0; b0 < n; b0 += kMaxSplitMulti) {
+        const uint32_t nb = n - b0 < kMaxSplitMulti ? n - b0 : kMaxSplitMulti;
+        if (!multi_impl(jobs + b0, nb, true)) return false;
+    }
+    return true;
+}
+
+size_t ExpertPool::off_head() { return offsetof(ExpertPool, head_); }
+size_t ExpertPool::off_done() { return offsetof(ExpertPool, done_); }
+size_t ExpertPool::off_parked() { return offsetof(ExpertPool, parked_); }
+size_t ExpertPool::off_epoch() { return offsetof(ExpertPool, epoch_); }
+size_t ExpertPool::off_stop() { return offsetof(ExpertPool, stop_); }
 
 }  // namespace kern
 }  // namespace baloon

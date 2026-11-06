@@ -179,7 +179,12 @@ inline std::vector<Piece> pieces(uint64_t per, uint64_t g0, uint64_t g1) {
 }
 constexpr uint32_t pool_workers(uint32_t requested, uint32_t cores) { return std::max<uint32_t>(1, requested > 0 ? requested : cores); }
 constexpr uint32_t drain_threads(uint32_t nw, bool host_works) { return nw + (host_works ? 1 : 0); }
-constexpr bool use_split(uint32_t n, uint32_t kmax, bool oracle) { return n <= kmax && !oracle; }
+constexpr bool use_split(uint32_t n, uint32_t kmax, bool oracle, uint32_t workers) { return !(n > kmax || workers == 1 || oracle); }
+constexpr bool use_split(uint32_t n, uint32_t kmax, bool oracle) { return n <= kmax && !oracle; }   // capacity + oracle only
+constexpr uint32_t kSplitCap = 16;         // run_split: experts per call
+constexpr uint32_t kSplitMultiCap = 96;    // run_split_multi: experts per call (native layers are batched at this size)
+// Batches of at most `cap` experts covering n (the last one may be short).
+constexpr uint32_t batch_count(uint32_t n, uint32_t cap) { return cap == 0 ? 0 : (n + cap - 1) / cap; }
 }  // namespace poolsched
 
 // ======================================================================================= IquantBlockDecode

@@ -3,6 +3,7 @@
 // the vector paths do their integer work in SIMD and the float accumulation in the same order as the scalar
 // reference, so results are bit-identical.
 #include "baloon/kern_cpu_expert.hpp"
+#include "baloon/expert_table.hpp"
 
 #include <immintrin.h>
 
@@ -238,7 +239,7 @@ const char* CpuFeatures::reason() const {
     if (!avx512vl) return "AVX-512VL is missing";
     if (!avx512_vnni) return "AVX-512 VNNI is missing";
     if (!avx512_vbmi) return "AVX-512 VBMI is missing";
-    return "";
+    return "ok";
 }
 
 CpuFeatures cpu_features() {
@@ -254,15 +255,15 @@ CpuFeatures cpu_features() {
         unsigned lo, hi;
         __asm__ volatile("xgetbv" : "=a"(lo), "=d"(hi) : "c"(0));
         ymm_ok = (lo & 0x6u) == 0x6u;
-        zmm_ok = (lo & 0xE6u) == 0xE6u;
+        zmm_ok = etable::xcr0_ok(lo);
     }
     __cpuid_count(7, 0, a, b, c, d);
     f.avx2 = ymm_ok && ((b >> 5) & 1u);
-    f.avx512f = zmm_ok && ((b >> 16) & 1u);
-    f.avx512bw = zmm_ok && ((b >> 30) & 1u);
-    f.avx512vl = zmm_ok && ((b >> 31) & 1u);
-    f.avx512_vnni = zmm_ok && ((c >> 11) & 1u);
-    f.avx512_vbmi = zmm_ok && ((c >> 1) & 1u);
+    f.avx512f = zmm_ok && etable::bit_set(b, 16);
+    f.avx512bw = zmm_ok && etable::bit_set(b, 30);
+    f.avx512vl = zmm_ok && etable::bit_set(b, 31);
+    f.avx512_vnni = zmm_ok && etable::bit_set(c, 11);
+    f.avx512_vbmi = zmm_ok && etable::bit_set(c, 1);
 #endif
     return f;
 }
