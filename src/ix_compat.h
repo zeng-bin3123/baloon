@@ -1,5 +1,5 @@
 // ix_compat.h — Iluvatar BI-V100 compatibility layer
-// Derived from Strata include/strata/hip_compat/intrinsics.hpp (163 lines, verified)
+// Derived from Ref include/ref/hip_compat/intrinsics.hpp (163 lines, verified)
 #pragma once
 #ifndef __ILUVATAR__
 #error "ix_compat.h is for Iluvatar BI-V100 only"
@@ -18,7 +18,7 @@
 #define ix_shfl(v, lane)          __shfl(v, lane, 64)
 
 // ========== 64-lane butterfly reductions ==========
-// From Strata native_mmvq.cu:2363-2365 (verified: for off = 32; off > 0; off >>= 1)
+// From Ref native_mmvq.cu:2363-2365 (verified: for off = 32; off > 0; off >>= 1)
 template<typename T>
 __device__ __forceinline__ T ix_warp_reduce_sum(T v) {
     #pragma unroll
@@ -46,7 +46,7 @@ __device__ __forceinline__ double ix_warp_sum_d(double v) {
 }
 
 // ========== Half-wave (32-lane) helpers ==========
-// Strata's CUDA kernels written for 32-lane warps (fused_gr.cu: lane=t&31, warp=t>>5, xor tree o=16..1) stay correct on
+// Ref's CUDA kernels written for 32-lane warps (fused_gr.cu: lane=t&31, warp=t>>5, xor tree o=16..1) stay correct on
 // wave64 ONLY if every shuffle is confined to the aligned 32-lane half. Always pass width=32 explicitly: an xor offset <32
 // never leaves the half by itself, but an ABSOLUTE source lane (__shfl(v, src)) with the default width would read the lower
 // half from the upper one. See FUSED_GR_WAVE64_AUDIT.md.
@@ -68,7 +68,7 @@ __device__ __forceinline__ T ix_halfwave_reduce_max(T v) {
 // ========== Threadfence — NEVER use __threadfence_system() ==========
 #define ix_threadfence()          __threadfence()
 
-// __nanosleep — NOT on ivcore10 (Strata intrinsics.hpp:161)
+// __nanosleep — NOT on ivcore10 (Ref intrinsics.hpp:161)
 #define ix_nanosleep(ns)          __threadfence()
 
 // ========== Lane/warp helpers ==========
@@ -80,9 +80,9 @@ __device__ __forceinline__ unsigned long long ix_ballot(int pred) {
     return __ballot(pred);
 }
 
-// ========== dp4a — portable signed dot4 (Strata intrinsics.hpp:46-53 fallback) ==========
+// ========== dp4a — portable signed dot4 (Ref intrinsics.hpp:46-53 fallback) ==========
 // The portable path is used: ivcore10 has no __builtin_amdgcn_sudot4/sdot4.
-// Verified: exact same algorithm as Strata's #else branch at lines 46-53.
+// Verified: exact same algorithm as Ref's #else branch at lines 46-53.
 namespace ix_compat_detail {
 __device__ __forceinline__ int signed_byte(uint32_t word, int lane) {
     const unsigned value = (word >> (lane * 8)) & 0xffu;
@@ -102,7 +102,7 @@ __device__ __forceinline__ int ix_dp4a(int a, int b, int c) {
 }
 
 // ========== byte_perm — software emulation ==========
-// Strata intrinsics.hpp:60-63 uses __builtin_amdgcn_perm; ivcore10 has no v_perm_b32.
+// Ref intrinsics.hpp:60-63 uses __builtin_amdgcn_perm; ivcore10 has no v_perm_b32.
 // CUDA semantics: result byte i = byte (s.nibble[i] & 7) of the pair {y:x}, x the low word.
 __device__ __forceinline__ uint32_t ix_byte_perm(uint32_t x, uint32_t y, uint32_t s) {
     const uint32_t pair[2] = {x, y};
@@ -116,19 +116,19 @@ __device__ __forceinline__ uint32_t ix_byte_perm(uint32_t x, uint32_t y, uint32_
     return result;
 }
 
-// ========== SWAR packed-byte ops (Strata intrinsics.hpp:68-96, verified) ==========
+// ========== SWAR packed-byte ops (Ref intrinsics.hpp:68-96, verified) ==========
 // Used by Q3_K/Q6_K dots and i-quant sign expansion. Pure arithmetic, no intrinsic.
 namespace ix_swar {
 constexpr uint32_t kHigh = 0x80808080u;
 
-// Packed unsigned byte subtract, wraps per lane (Strata L72-76)
+// Packed unsigned byte subtract, wraps per lane (Ref L72-76)
 __device__ __forceinline__ int vsub4(int a, int b) {
     const uint32_t ua = static_cast<uint32_t>(a);
     const uint32_t ub = static_cast<uint32_t>(b);
     return static_cast<int>(((ua | kHigh) - (ub & ~kHigh)) ^ ((ua ^ ~ub) & kHigh));
 }
 
-// Packed signed byte saturating subtract (Strata L80-88)
+// Packed signed byte saturating subtract (Ref L80-88)
 __device__ __forceinline__ int vsubss4(int a, int b) {
     const uint32_t ua = static_cast<uint32_t>(a);
     const uint32_t ub = static_cast<uint32_t>(b);
@@ -139,7 +139,7 @@ __device__ __forceinline__ int vsubss4(int a, int b) {
     return static_cast<int>((d & ~mask) | (bound & mask));
 }
 
-// Four-byte lane compare: 0xff for unequal, 0 for equal (Strata L92-96)
+// Four-byte lane compare: 0xff for unequal, 0 for equal (Ref L92-96)
 __device__ __forceinline__ int vcmpne4(int a, int b) {
     const uint32_t t = static_cast<uint32_t>(a) ^ static_cast<uint32_t>(b);
     const uint32_t nonzero = (((t & ~kHigh) + ~kHigh) | t) & kHigh;
@@ -147,7 +147,7 @@ __device__ __forceinline__ int vcmpne4(int a, int b) {
 }
 }  // namespace ix_swar
 
-// ========== Macro aliases (matching Strata's #define at L146-161) ==========
+// ========== Macro aliases (matching Ref's #define at L146-161) ==========
 #define __dp4a(a, b, c)            ix_dp4a((a), (b), (c))
 #define __byte_perm(x, y, s)      ix_byte_perm((x), (y), (s))
 #define __vsub4(a, b)             ix_swar::vsub4((a), (b))

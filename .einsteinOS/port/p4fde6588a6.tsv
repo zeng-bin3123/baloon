@@ -1,0 +1,3 @@
+include/ref/program/logits_selection.hpp	parse_stride	include/baloon/logits_selection.hpp	parse_stride
+include/ref/program/logits_selection.hpp	row_count	include/baloon/logits_selection.hpp	row_count
+include/ref/program/logits_selection.hpp	selected	include/baloon/logits_selection.hpp	selected

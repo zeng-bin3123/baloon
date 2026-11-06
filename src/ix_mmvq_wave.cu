@@ -1,11 +1,11 @@
 // ix_mmvq_wave.cu - Phase 1 #2: wave64 MMVQ (quantised weights x q8_1 activations), first format: Q8_0.
-// Port of Strata src/kernels/cuda/native_mmvq.cu native_mmvq_wave_kernel (HEAD 46c152a1, L2337-2367) and
-// SmallTraits<Q80Block,8> (L1170-1193). That kernel is Strata's own gfx906 (wave64) layout, so the lane mapping is kept
+// Port of Ref src/kernels/cuda/native_mmvq.cu native_mmvq_wave_kernel (HEAD 46c152a1, L2337-2367) and
+// SmallTraits<Q80Block,8> (L1170-1193). That kernel is Ref's own gfx906 (wave64) layout, so the lane mapping is kept
 // verbatim: one wavefront per R rows (R=1), four wavefronts per 256-thread block, the row's 32-value blocks strided over the
 // 64 lanes (kbx = lane / T, stride 64 / T), then a 64-lane butterfly (off 32..1). The SAME kernel serves ncols 1..8, so a
 // column's sum does not depend on how many columns ride along.
-// Changes vs Strata: STRATA_HIP_GFX906 guard dropped (always wave64), __shfl_xor -> ix_shfl_xor (width 64), __dp4a -> ix_dp4a
-// (software, ix_compat.h), STRATA_DP4A -> ix_dp4a, traits made local. Add more formats by adding a traits struct.
+// Changes vs Ref: REF_HIP_GFX906 guard dropped (always wave64), __shfl_xor -> ix_shfl_xor (width 64), __dp4a -> ix_dp4a
+// (software, ix_compat.h), REF_DP4A -> ix_dp4a, traits made local. Add more formats by adding a traits struct.
 // STATUS: NOT compiled or run on BI-V100. Host emulation of the lane/summation order: tests/mmvq_wave_ref.h.
 #pragma once
 #include <cuda_runtime.h>
@@ -24,7 +24,7 @@ struct Q80Block { half d;  int8_t qs[32]; };    // 34 bytes, align 2: qs is only
 static_assert(sizeof(Q81Block) == 36 && alignof(Q81Block) == 4, "q8_1 layout");
 static_assert(sizeof(Q80Block) == 34 && alignof(Q80Block) == 2, "q8_0 layout");
 
-// Strata load_int_b2: the int at int-index i of a 2-byte-aligned byte array (little endian).
+// Ref load_int_b2: the int at int-index i of a 2-byte-aligned byte array (little endian).
 __device__ __forceinline__ int load_int_b2(const int8_t* q, int i) {
     const uint16_t* p = reinterpret_cast<const uint16_t*>(q);
     return int(uint32_t(p[2 * i]) | (uint32_t(p[2 * i + 1]) << 16));
@@ -50,7 +50,7 @@ struct Q80Traits {
             sumi = ix_dp4a(r.v[i], u, sumi);
         }
         const float d1 = __low2float(x->ds);
-        return r.d0 * d1 * float(sumi);   // (d0*d1)*sumi, same association as Strata
+        return r.d0 * d1 * float(sumi);   // (d0*d1)*sumi, same association as Ref
     }
 };
 

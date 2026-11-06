@@ -1,5 +1,5 @@
 // Host reference for the router: softmax in double -> float probs -> top-k (ties: lowest index) -> renormalise.
-// Mirrors docs/semantics.md as implemented by Strata's kernel (float p = (float)(ex*inv); weights/sum in double).
+// Mirrors docs/semantics.md as implemented by Ref's kernel (float p = (float)(ex*inv); weights/sum in double).
 #pragma once
 #include <vector>
 #include <cmath>

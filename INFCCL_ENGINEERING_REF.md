@@ -1,7 +1,7 @@
 # infccl for BI-V100 — Engineering Reference
 
 > **Generated**: 2026-10-28
-> **Source repos**: zeng-bin3123/baloon (main) + Niko1221/Strata (HEAD `5e8a4cca`, 4563 commits)
+> **Source repos**: zeng-bin3123/baloon (main) + reference (HEAD `5e8a4cca`, 4563 commits)
 > **Target**: 4× Iluvatar BI-V100 (ivcore10), TP=4 PCIe, Qwen3.6-35B-A3B (MoE 256 experts, top-8, 36 layers)
 
 ---
@@ -69,7 +69,7 @@ Alternate CUDA path if versioned SDK: `/usr/local/corex-3.2.3`
   libcublas.so, libcublasLt.so    — FP16 TC GEMM (for dense prefill)
   libcudart.so, libcuda.so        — CUDA runtime
   libcudnn.so                     — cuDNN
-  libcutlass.so                   — CUTLASS (Strata uses s884 for Volta TC GEMM)
+  libcutlass.so                   — CUTLASS (Ref uses s884 for Volta TC GEMM)
   libcufft.so, libcusolver.so     — math libs
   libixattn.so                    — ixformer attention kernel
   libcuinfer.so                   — inference
@@ -89,7 +89,7 @@ rotary_embedding(...)
 scaled_dot_product_attention(query, key, value, ...)
 ```
 
-**NOT available in ixformer**: topk, moe, expert dispatch, gate, shared expert, native GEMV (mmvq), hyper-connection, GDN/SSM recurrence — all must be implemented from Strata reference.
+**NOT available in ixformer**: topk, moe, expert dispatch, gate, shared expert, native GEMV (mmvq), hyper-connection, GDN/SSM recurrence — all must be implemented from Ref reference.
 
 ### 1.6 Shell Quick-Reference
 
@@ -134,13 +134,13 @@ for i in range(5):
 
 ---
 
-## 2. Strata Source Code Map — Critical Kernel Files
+## 2. Ref Source Code Map — Critical Kernel Files
 
 ### 2.1 File Inventory (lines of code)
 
 | File | Lines | Purpose | ivcore10 Relevance |
 |------|-------|---------|--------------------|
-| `src/kernels/cuda/native_mmvq.cu` | 3913 | Dense Q8 GEMV (core decode) | **PRIMARY PORT** — has `#ifdef STRATA_HIP_GFX906` wave64 kernel at L2328 |
+| `src/kernels/cuda/native_mmvq.cu` | 3913 | Dense Q8 GEMV (core decode) | **PRIMARY PORT** — has `#ifdef REF_HIP_GFX906` wave64 kernel at L2328 |
 | `src/kernels/cuda/fused_gr.cu` | 3228 | Hyper-connection gated residual | **PRIMARY PORT** — gfx906 K-split at L1627, `__nanosleep` barrier at L2802 |
 | `src/kernels/cuda/qsa_prompt_attn.cu` | 2440 | Prompt attention FP16 TC | Phase 2 — `prompt_attn_v70_kernel`, sm_60 no-partials variant |
 | `src/kernels/cuda/verify_kernels.cu` | 1721 | Speculative verify | Phase 2 — uses `__threadfence_system()` (11 occurrences!) |
@@ -149,22 +149,22 @@ for i in range(5):
 | `src/kernels/cuda/shared_expert.cu` | 505 | Shared expert scalar gate | **PORT** — 64-wide `warp_sum_d` |
 | `src/kernels/cuda/gdn.cu` | 248 | DeltaNet/SSM recurrence | **VALIDATE** — short conv → delta rule → output norm |
 | `src/kernels/cuda/native_rope.cu` | 245 | Rotary PE | Baseline from ixformer, verify M-RoPE |
-| `src/kernels/cuda/bf16_gemv.cu` | 189 | BF16→FP16 TC GEMV | **PORT** — Volta `STRATA_BF16_TC` path |
+| `src/kernels/cuda/bf16_gemv.cu` | 189 | BF16→FP16 TC GEMV | **PORT** — Volta `REF_BF16_TC` path |
 
 ### 2.2 Platform Abstraction Layer
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `include/strata/platform/hip_compat/strata_hip.h` | 309 | **Master compat**: CUDA→HIP mapping, logical 32-lane warps, `__nanosleep`→`s_sleep`, `__dp4a`→`v_dot4_i32_i8`, `__byte_perm`→`v_perm_b32` |
-| `include/strata/hip_compat/intrinsics.hpp` | 163 | Intrinsic wrappers |
-| `include/strata/hip_compat/cuda_runtime.h` | 149 | Runtime API mapping |
-| `include/strata/kernels/gfx_arch.hpp` | 38 | Architecture detection |
+| `include/ref/platform/hip_compat/ref_hip.h` | 309 | **Master compat**: CUDA→HIP mapping, logical 32-lane warps, `__nanosleep`→`s_sleep`, `__dp4a`→`v_dot4_i32_i8`, `__byte_perm`→`v_perm_b32` |
+| `include/ref/hip_compat/intrinsics.hpp` | 163 | Intrinsic wrappers |
+| `include/ref/hip_compat/cuda_runtime.h` | 149 | Runtime API mapping |
+| `include/ref/kernels/gfx_arch.hpp` | 38 | Architecture detection |
 
 ### 2.3 Key Source Patterns: gfx906→ivcore10
 
-The table below maps exact Strata patterns to their ivcore10 equivalents. The gfx906 code is the closest reference because ivcore10 shares wave64 with AMD gfx906.
+The table below maps exact Ref patterns to their ivcore10 equivalents. The gfx906 code is the closest reference because ivcore10 shares wave64 with AMD gfx906.
 
-| Strata gfx906 Pattern | Source Location | ivcore10 Equivalent |
+| Ref gfx906 Pattern | Source Location | ivcore10 Equivalent |
 |------------------------|-----------------|---------------------|
 | `__shfl_xor(v, off, 64)` | `native_mmvq.cu:2365` | Same API — direct copy |
 | `__shfl_down(v, off, 64)` | `shared_expert.cu:108` | Same API — direct copy |
@@ -174,15 +174,15 @@ The table below maps exact Strata patterns to their ivcore10 equivalents. The gf
 | `threadIdx.x >> 6` for warp id | `native_mmvq.cu:2342` | Same |
 | `__shfl_down_sync(0xFFFFFFFFu, v, off)` | `shared_expert.cu:108` | → `__shfl_down(v, off, 64)` (drop sync/mask) |
 | `__shfl_sync(0xFFFFFFFFu, v, 0)` | `shared_expert.cu:109` | → `__shfl(v, 0, 64)` |
-| `__ballot(pred)` → 64-bit | `strata_hip.h:209` | → `__ballot(pred)` (returns `unsigned long long` on ivcore10) |
+| `__ballot(pred)` → 64-bit | `ref_hip.h:209` | → `__ballot(pred)` (returns `unsigned long long` on ivcore10) |
 | `__builtin_amdgcn_fence` | HIP-specific | → `__threadfence()` |
-| `__builtin_amdgcn_s_sleep(N)` | `strata_hip.h:226` | → `__threadfence()` (ivcore10 has no `__nanosleep`) |
-| `__builtin_amdgcn_sdot4` (dp4a) | `strata_hip.h:234` | Check ivcore10 dp4a intrinsic; else emulate |
-| `__builtin_amdgcn_perm` (byte_perm) | `strata_hip.h:304` | Check ivcore10; else emulate per-byte |
+| `__builtin_amdgcn_s_sleep(N)` | `ref_hip.h:226` | → `__threadfence()` (ivcore10 has no `__nanosleep`) |
+| `__builtin_amdgcn_sdot4` (dp4a) | `ref_hip.h:234` | Check ivcore10 dp4a intrinsic; else emulate |
+| `__builtin_amdgcn_perm` (byte_perm) | `ref_hip.h:304` | Check ivcore10; else emulate per-byte |
 
 ---
 
-## 3. Strata Commit Landscape (4563 commits, 2026-09-24 ~ 2026-10-27)
+## 3. Ref Commit Landscape (4563 commits, 2026-09-24 ~ 2026-10-27)
 
 ### 3.1 Category Breakdown
 
@@ -226,11 +226,11 @@ The table below maps exact Strata patterns to their ivcore10 equivalents. The gf
 | 10-20 | `5f81c5dc` | Gyro decode CUDA: trellis codebook, 8-lane rows | Trellis quantization reference |
 | 10-20 | `e5b4021c` | dsv41 trellis experts end-to-end | Trellis expert methodology |
 
-### 3.3 V100 Performance Numbers (from Strata docs/NVIDIA_V100.md)
+### 3.3 V100 Performance Numbers (from Ref docs/NVIDIA_V100.md)
 
 | Metric | V100 (sm_70) | Notes |
 |--------|-------------|-------|
-| Decode (MTP, spec 2) | 38-51 tok/s | With `STRATA_SM70_TABLE=1` |
+| Decode (MTP, spec 2) | 38-51 tok/s | With `REF_SM70_TABLE=1` |
 | Prompt 7K tokens | 1,164 tok/s | `prompt_attn_v70_kernel` |
 | Prompt 28K tokens | 1,251 tok/s | Same kernel |
 | Prompt 114K tokens | 1,123 tok/s | Same kernel |
@@ -241,16 +241,16 @@ The table below maps exact Strata patterns to their ivcore10 equivalents. The gf
 
 ---
 
-## 4. Strata HIP Compat Layer — Design for ivcore10
+## 4. Ref HIP Compat Layer — Design for ivcore10
 
-Strata's `strata_hip.h` (309 lines) maps CUDA APIs onto HIP for gfx906. For ivcore10, Iluvatar's clang-16 natively compiles CUDA (`-x cuda --cuda-gpu-arch=ivcore10`), so we need only a **thin header** — not the full CUDA→HIP mapping.
+Ref's `ref_hip.h` (309 lines) maps CUDA APIs onto HIP for gfx906. For ivcore10, Iluvatar's clang-16 natively compiles CUDA (`-x cuda --cuda-gpu-arch=ivcore10`), so we need only a **thin header** — not the full CUDA→HIP mapping.
 
-### 4.1 What Strata Does (and what we keep/skip)
+### 4.1 What Ref Does (and what we keep/skip)
 
-**Strata's approach (gfx906):**
+**Ref's approach (gfx906):**
 - CUDA runtime API → HIP runtime API (309 #defines)
 - Logical 32-lane warps inside 64-lane wavefronts (width=32 default)
-- wave64-native rewrites as "separate, measured changes" under `#ifdef STRATA_HIP_GFX906`
+- wave64-native rewrites as "separate, measured changes" under `#ifdef REF_HIP_GFX906`
 
 **ivcore10 approach:**
 - No API remapping needed (clang-16 compiles CUDA natively)
@@ -261,7 +261,7 @@ Strata's `strata_hip.h` (309 lines) maps CUDA APIs onto HIP for gfx906. For ivco
 
 ```cuda
 // ix_compat.h — Iluvatar BI-V100 compatibility layer
-// Unlike Strata's strata_hip.h (309 lines of CUDA→HIP remapping), ivcore10's
+// Unlike Ref's ref_hip.h (309 lines of CUDA→HIP remapping), ivcore10's
 // clang-16 compiles CUDA natively. We only need warp-width, missing intrinsics,
 // and arch detection.
 #pragma once
@@ -277,7 +277,7 @@ Strata's `strata_hip.h` (309 lines) maps CUDA APIs onto HIP for gfx906. For ivco
 #define ix_shfl_up(v, delta)      __shfl_up(v, delta, 64)
 #define ix_shfl(v, lane)          __shfl(v, lane, 64)
 
-// 64-lane butterfly reduction (from Strata native_mmvq.cu:2365)
+// 64-lane butterfly reduction (from Ref native_mmvq.cu:2365)
 template<typename T>
 __device__ __forceinline__ T ix_warp_reduce_sum(T v) {
     #pragma unroll
@@ -297,7 +297,7 @@ __device__ __forceinline__ T ix_warp_reduce_max(T v) {
 // Threadfence — NEVER use __threadfence_system()
 #define ix_threadfence()          __threadfence()
 
-// __nanosleep — NOT on ivcore10 (Strata guards to sm_70+, commit f1dadd17)
+// __nanosleep — NOT on ivcore10 (Ref guards to sm_70+, commit f1dadd17)
 #define ix_nanosleep(ns)          __threadfence()
 
 // Lane/warp helpers
@@ -318,11 +318,11 @@ __device__ __forceinline__ unsigned long long ix_ballot(int pred) {
 
 **What**: Dense Q8 GEMV — the core decode operation. 4 wavefronts × 64 lanes = 256 threads/block. Each wavefront processes R rows in parallel.
 
-**Strata source**: Under `#ifdef STRATA_HIP_GFX906`, lines 2328-2396. Template `<typename F, int NCOLS, int R>`. Switch for ncols 1-8.
+**Ref source**: Under `#ifdef REF_HIP_GFX906`, lines 2328-2396. Template `<typename F, int NCOLS, int R>`. Switch for ncols 1-8.
 
 **Port plan**:
 1. Copy the `native_mmvq_wave_kernel` template verbatim
-2. Replace `#ifdef STRATA_HIP_GFX906` with `#ifdef __ILUVATAR__`
+2. Replace `#ifdef REF_HIP_GFX906` with `#ifdef __ILUVATAR__`
 3. All `__shfl_xor(v, off, 64)` calls are already correct (width=64)
 4. Need the type traits (F::Block, F::T, F::DIV, F::KBY, F::W, F::kqs, F::load, F::apply) — these encode the quantization format
 5. Need Q81Block struct and QK/Q8K constants
@@ -337,7 +337,7 @@ __device__ __forceinline__ unsigned long long ix_ballot(int pred) {
 
 **What**: Single wavefront (64 lanes), 256 experts → top-8. 64 × 8 = 512 slots > 256 experts.
 
-**Strata source**: `router_top10_wave_kernel`, L198-452. Uses shared memory double array for softmax.
+**Ref source**: `router_top10_wave_kernel`, L198-452. Uses shared memory double array for softmax.
 
 **Port plan**:
 1. Direct copy — already written for wave64
@@ -350,7 +350,7 @@ __device__ __forceinline__ unsigned long long ix_ballot(int pred) {
 
 **What**: Always-active expert + scalar gate. Was 26.7% of block time before optimization.
 
-**Strata source**: `scalar_gate_kernel`, 4 wavefronts × 64 lanes = 256 threads.
+**Ref source**: `scalar_gate_kernel`, 4 wavefronts × 64 lanes = 256 threads.
 
 **Port plan**:
 1. Port `warp_sum_d` with 64-wide butterfly (`__shfl_down(v, off, 64)`)
@@ -362,7 +362,7 @@ __device__ __forceinline__ unsigned long long ix_ballot(int pred) {
 
 **What**: Hyper-connection down projection. gfx906: 8 wavefronts × 64 lanes per block, K-split along 2048-element slices.
 
-**Strata source**: `gr_down_split_kernel` (L1641) + `gr_down_finish_kernel` (L1683). Uses device-scope `g_gr_part[]` array.
+**Ref source**: `gr_down_split_kernel` (L1641) + `gr_down_finish_kernel` (L1683). Uses device-scope `g_gr_part[]` array.
 
 **Port plan**:
 1. Copy K-split approach: 5 slices of 2048, each block processes 8 rows of one slice
@@ -387,9 +387,9 @@ __device__ __forceinline__ unsigned long long ix_ballot(int pred) {
 **What**: Short conv → delta rule recurrence → output norm. DeltaNet/SSM block.
 
 **Port plan**:
-1. Validate existing `ix_gdn.cu` against Strata reference
+1. Validate existing `ix_gdn.cu` against Ref reference
 2. Check warp64 recurrence correctness (summation order matters for bit-exact)
-3. Variants: chunked (`STRATA_GDN_CHUNK=1`), chain-split (`STRATA_GDN_REC_WARP=2`)
+3. Variants: chunked (`REF_GDN_CHUNK=1`), chain-split (`REF_GDN_REC_WARP=2`)
 
 ### 5.7 verify_kernels.cu — `__threadfence_system()` Audit
 
@@ -406,7 +406,7 @@ The verify kernel (1721 lines) uses `__threadfence_system()` **11 times**. On iv
 | 1336 | Error reporting | `__threadfence()` |
 | 1481 | Window completion | `__threadfence()` |
 
-**Note**: Strata's gfx906 path uses fine-grained coherent memory (`hipHostMallocCoherent`) for mapped host memory. ivcore10 may not support this — need to test `cudaHostAlloc` with mapped flag and verify CPU-GPU visibility.
+**Note**: Ref's gfx906 path uses fine-grained coherent memory (`hipHostMallocCoherent`) for mapped host memory. ivcore10 may not support this — need to test `cudaHostAlloc` with mapped flag and verify CPU-GPU visibility.
 
 ---
 
@@ -429,9 +429,9 @@ TP=4 PCIe, Qwen3.6-35B-A3B, BI-V100:
 | Direct-routed MoE (`corex_moe_direct_routed.so`) | **-13.9 ms** | **Compiled**, needs HW test |
 | infccl P2P AllReduce (`infccl_allreduce.so`) | variable | **Compiled**, needs HW test |
 
-### 6.3 Strata Reference Targets
+### 6.3 Ref Reference Targets
 
-| Metric | Strata V100 | Strata gfx12 | Target BI-V100 |
+| Metric | Ref V100 | Ref gfx12 | Target BI-V100 |
 |--------|-------------|-------------|-----------------|
 | Decode (MTP) | 38-51 tok/s | 24.5→27.6 tok/s | ≥35 tok/s |
 | Prompt 7K | 1,164 tok/s | — | ≥1,000 tok/s |
@@ -445,7 +445,7 @@ TP=4 PCIe, Qwen3.6-35B-A3B, BI-V100:
 
 | # | Deliverable | From | Effort | Accept Criteria |
 |---|-------------|------|--------|-----------------|
-| 1 | `ix_compat.h` | Strata `hip_compat/` + §4.2 | S | Compiles. `probe_warp64` passes (sum=2016, ballot=0xFFFF…FFFF). |
+| 1 | `ix_compat.h` | Ref `hip_compat/` + §4.2 | S | Compiles. `probe_warp64` passes (sum=2016, ballot=0xFFFF…FFFF). |
 | 2 | `ix_mmvq_wave.cu` | `native_mmvq.cu:2328` | L | Bit-exact parity vs double-precision host ref. R=1 baseline. |
 | 3 | Validate `ix_native_router.cu` | `router_top10.cu:198` | M | Same top-8 ids and weights (256 experts, k=8). |
 | 4 | `ix_shared_expert.cu` | `shared_expert.cu:112` | M | 64-wide `warp_sum_d`. Gate within 1e-6 of double ref. |
@@ -531,7 +531,7 @@ int main() {
 }
 ```
 
-### 9.2 Kernel Correctness Protocol (from Strata methodology)
+### 9.2 Kernel Correctness Protocol (from Ref methodology)
 
 1. **Bit-exact parity**: output vs double-precision host reference
 2. **A/B benchmark**: 10 interleaved pairs, report medians, same compiler flags
@@ -595,4 +595,4 @@ clean:
 
 ---
 
-*Generated from Strata HEAD `5e8a4cca` (2026-10-27) and baloon main. Source-code-grounded with exact line references and commit hashes.*
+*Generated from Ref HEAD `5e8a4cca` (2026-10-27) and baloon main. Source-code-grounded with exact line references and commit hashes.*
