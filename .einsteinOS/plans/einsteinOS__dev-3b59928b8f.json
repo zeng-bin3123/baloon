@@ -459,15 +459,22 @@
     }
   ],
   "state": {},
-  "fix_attempts": {},
-  "last_failure": {},
-  "infra_fails": 0,
-  "review_pending": {
+  "fix_attempts": {
+    "u649794726a": 1
+  },
+  "fail_history": {
+    "u649794726a": [
+      "review_fail"
+    ]
+  },
+  "last_failure": {
     "u649794726a": {
-      "compile": "pass",
-      "smoke": "pass"
+      "kind": "review_fail",
+      "text": "ActivationContract's embed_row (bit-field code decode) is ported as an FP32 row memcpy, and nothing run by this unit's test.sh checks plane_ptrs, activation dispatch or embedding decode",
+      "base_ref": "einsteinOS/dev-3b59928b8f"
     }
   },
+  "infra_fails": 0,
   "port_units": [
     {
       "id": "pfcccb31b26",
