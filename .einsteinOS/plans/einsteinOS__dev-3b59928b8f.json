@@ -336,7 +336,8 @@
         "ActivationContract.lean",
         "NgramHashIq4nl.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "27d809ca-10a2-47b2-8a7c-ae7c22224eaf"
     },
     {
       "id": "u2e9aa362e3",
@@ -461,6 +462,12 @@
   "fix_attempts": {},
   "last_failure": {},
   "infra_fails": 0,
+  "review_pending": {
+    "u649794726a": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -695,6 +702,9 @@
       ]
     }
   ],
+  "verify_seen": {
+    "u649794726a": true
+  },
   "gates": "build+test+gpu+isa+port+integration",
   "integration_unit": {
     "id": "uintegration6801c77ff6f7",
