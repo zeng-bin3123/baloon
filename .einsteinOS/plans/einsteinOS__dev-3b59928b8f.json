@@ -497,6 +497,31 @@
       "pass": true,
       "unit_id": "ud77a0d7726"
     },
+    "ExpertGeometry.lean": {
+      "hash": "2107cb1fd9f8",
+      "pass": true,
+      "unit_id": "u1de28c5d58"
+    },
+    "ExpertLayoutTable.lean": {
+      "hash": "75277343dccd",
+      "pass": true,
+      "unit_id": "u1de28c5d58"
+    },
+    "ExpertPoolContract.lean": {
+      "hash": "27b11f311ac4",
+      "pass": true,
+      "unit_id": "u1de28c5d58"
+    },
+    "ExpertPoolScheduling.lean": {
+      "hash": "3ffea6cb73f5",
+      "pass": true,
+      "unit_id": "u1de28c5d58"
+    },
+    "ExpertResidencyCache.lean": {
+      "hash": "09ebdacf6077",
+      "pass": true,
+      "unit_id": "u1de28c5d58"
+    },
     "ExpertSourceDispatch.lean": {
       "hash": "89e316077dfa",
       "pass": true,
@@ -575,12 +600,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u1de28c5d58": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
