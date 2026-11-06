@@ -460,5 +460,12 @@
   "state": {},
   "fix_attempts": {},
   "last_failure": {},
-  "infra_fails": 0
+  "infra_fails": 0,
+  "gates": "build+test+gpu+isa+port+integration",
+  "integration_unit": {
+    "id": "uintegration6801c77ff6f7",
+    "modules": null,
+    "reason": "integration: the reference's registered tests",
+    "integration": true
+  }
 }
