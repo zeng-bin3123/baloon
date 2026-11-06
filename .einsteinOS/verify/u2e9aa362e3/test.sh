@@ -1,0 +1,68 @@
+#!/bin/bash
+# Unit u2e9aa362e3 tests. (1) port table: all 64 reference definitions have a counterpart defined in the named file (a mutation
+# proves a missing definition is caught); (2) the LAYER 1 invariants of the seven modules on the real code (tests/k41_u2e9);
+# (3) the earlier suites that exercise the same code (GGUF reader, GGUF CLI, file loader, BPE/dequant/writer unit suites).
+# Exits non-zero if any check fails.
+set -uo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+cd "$ROOT"
+OUT="${BALOON_U2E9_TEST_DIR:-/tmp/baloon_u2e9_test}"
+rm -rf "$OUT"; mkdir -p "$OUT"
+COREX=/usr/local/corex
+CLANG="$COREX/bin/clang++"
+HOSTCXX=""
+for c in "$CLANG" g++ clang++ c++; do
+  if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then HOSTCXX="$c"; break; fi
+done
+[ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
+HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread -Iinclude"
+rc=0
+
+echo "== port table =="
+TSV=.einsteinOS/port/u2e9aa362e3.tsv
+check_tsv() {  # check_tsv <file>
+  local n=0 bad=0
+  while IFS=$'\t' read -r rf rn lf ln; do
+    n=$((n+1)); short="${ln##*::}"; short="${short#\~}"
+    if [ -z "$ln" ] || [ ! -f "$lf" ] || ! grep -qw -- "$short" "$lf"; then echo "port MISSING: $rn -> $lf:$ln"; bad=$((bad+1)); fi
+  done < "$1"
+  [ "$n" -eq 64 ] || { echo "port table has $n lines, expected 64"; bad=$((bad+1)); }
+  return $((bad>0))
+}
+check_tsv "$TSV" || rc=1
+sed '1s/\t[^\t]*$/\tno_such_definition_xyz/' "$TSV" > "$OUT/mut.tsv"
+if check_tsv "$OUT/mut.tsv" >/dev/null 2>&1; then echo "PORT MUTANT SURVIVED"; rc=1; else echo "port mutant detected"; fi
+for rf in include/ref/artifact/gguf_reader.hpp include/ref/core/layout.hpp src/core/layout.cpp src/core/session.cpp src/platform/direct_file.cpp; do
+  cut -f1 "$TSV" | grep -qx -- "$rf" || { echo "no rows for $rf"; rc=1; }
+done
+
+echo "== unit invariants (7 modules) =="
+if $HOSTCXX $HF tests/k41_u2e9/test_u2e9.cpp -o "$OUT/test_u2e9" 2>"$OUT/u2e9.err"; then
+  (cd "$OUT" && timeout 900 ./test_u2e9) >"$OUT/u2e9.log" 2>&1
+  r=$?; tail -5 "$OUT/u2e9.log"
+  [ $r -eq 0 ] || { echo "u2e9 invariants FAILED"; rc=1; }
+  grep -q "U2E9 TESTS PASSED" "$OUT/u2e9.log" || { echo "u2e9 suite did not report PASSED"; rc=1; }
+else echo "BUILD FAILED (test_u2e9)"; head -20 "$OUT/u2e9.err"; rc=1; fi
+
+echo "== mutation: a broken shape check must be caught =="
+mkdir -p "$OUT/mut/baloon" && cp include/baloon/*.hpp "$OUT/mut/baloon/"
+sed -i 's/if (!form_ok(d.form, r.form)) return/if (false) return/' "$OUT/mut/baloon/layer_shape_check.hpp"
+if $HOSTCXX -std=c++17 -O2 -pthread -I"$OUT/mut" -Iinclude tests/k41_u2e9/test_u2e9.cpp -o "$OUT/test_u2e9_mut" 2>/dev/null; then
+  if (cd "$OUT" && ./test_u2e9_mut >/dev/null 2>&1); then echo "SHAPE MUTANT SURVIVED"; rc=1; else echo "shape mutant detected"; fi
+else echo "mutant build failed"; rc=1; fi
+
+echo "== earlier suites on the same code =="
+runhost() {  # runhost <name> <pass-regex> <flags/srcs...>
+  local name="$1" pat="$2"; shift 2
+  $HOSTCXX $HF "$@" -o "$OUT/$name" 2>"$OUT/$name.err" || { echo "BUILD FAILED ($name)"; tail -5 "$OUT/$name.err"; rc=1; return; }
+  if (cd "$OUT" && timeout 900 "./$name") >"$OUT/$name.log" 2>&1 && grep -Eq "$pat" "$OUT/$name.log" && ! grep -q "FAIL" "$OUT/$name.log"; then echo "[PASS] $name"
+  else echo "[FAIL] $name"; tail -15 "$OUT/$name.log"; rc=1; fi
+}
+runhost k17_gguf_reader "GGUF READER UNIT TESTS PASSED" tests/k17_gguf_reader/test_gguf_reader.cpp
+runhost k28_gguf_cli "UNIT 28 TESTS PASSED" tests/k28_gguf_cli/test_gguf_cli.cpp
+runhost k26_gguf_file "UNIT 26 TESTS PASSED" tests/k26_gguf_file/test_gguf_file.cpp
+runhost unit1 "UNIT1 TESTS PASSED" -Itests/unit1 tests/unit1/*.cpp
+runhost unit2 "UNIT2 TESTS PASSED" -Itests/unit2 tests/unit2/*.cpp
+
+[ $rc -eq 0 ] && echo "ALL UNIT TESTS PASSED" || echo "UNIT TESTS FAILED"
+exit $rc

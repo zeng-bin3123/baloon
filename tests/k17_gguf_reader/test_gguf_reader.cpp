@@ -52,7 +52,12 @@ int main() {
     CHECK(std::strcmp(ggml_type_name(12), "Q4_K") == 0);
     CHECK(std::strcmp(ggml_type_name(42), "Q2_0") == 0);
     CHECK(std::strcmp(ggml_type_name(77), "UNKNOWN") == 0);
-    for (uint32_t t = 0; t < 31; ++t) CHECK((block_geometry(t).el == 0) == (std::strcmp(ggml_type_name(t), "UNKNOWN") == 0) || t == 4 || t == 5);
+    // named but unsized types (refused by the parser): Q8_K (15), IQ1_S (19) and the plain integer/F64 ids 24..28
+    for (uint32_t t = 0; t < 31; ++t) {
+        const bool named_unsized = t == 15 || t == 19 || (t >= 24 && t <= 28);
+        CHECK((block_geometry(t).el == 0) == (std::strcmp(ggml_type_name(t), "UNKNOWN") == 0 || named_unsized) || t == 4 || t == 5);
+        if (named_unsized) CHECK(block_geometry(t).el == 0 && std::strcmp(ggml_type_name(t), "UNKNOWN") != 0);
+    }
 
     // cursor bounds
     { uint8_t d[3] = {1, 2, 3}; Cursor c(d, 3); CHECK(c.u16() == 0x0201); CHECK(c.ok); (void)c.u16(); CHECK(!c.ok); CHECK(c.u32() == 0); }

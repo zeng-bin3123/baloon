@@ -59,6 +59,10 @@ struct Cursor {
     }
 };
 
+constexpr uint64_t kMaxArrayElems = 1ull << 24;   // array length cap (16,777,216)
+constexpr uint64_t kArraySample = 64;             // items a summary of an array shows
+inline uint64_t array_sample_count(uint64_t count) { return count < kArraySample ? count : kArraySample; }
+
 // A decoded metadata value. Scalars are widened: integers into i (signed) / u (unsigned), floats into f.
 struct MetaValue {
     MetaType type = MetaType::U8;
@@ -66,6 +70,7 @@ struct MetaValue {
     std::string s;
     MetaType elem = MetaType::U8;          // array element type
     std::vector<MetaValue> arr;            // array elements (kept for all element types)
+    uint64_t sample_count() const { return array_sample_count(arr.size()); }   // at most 64
     bool is_integer() const {
         switch (type) { case MetaType::U8: case MetaType::I8: case MetaType::U16: case MetaType::I16:
                         case MetaType::U32: case MetaType::I32: case MetaType::U64: case MetaType::I64: return true;
@@ -73,7 +78,6 @@ struct MetaValue {
     }
 };
 
-constexpr uint64_t kMaxArrayElems = 1ull << 28;
 constexpr int kMaxNesting = 4;
 
 // Decode one value of type `t` from the cursor. On malformed data c.ok becomes false.
@@ -115,14 +119,12 @@ struct BlockGeometry { uint64_t el = 0, by = 0; };  // el == 0 means unknown typ
 inline BlockGeometry block_geometry(uint32_t type) {
     switch (type) {
         case 0: return {1, 4};      case 1: return {1, 2};     case 30: return {1, 2};
-        case 24: return {1, 1};     case 25: return {1, 2};    case 26: return {1, 4};
-        case 27: return {1, 8};     case 28: return {1, 8};
         case 2: return {32, 18};    case 3: return {32, 20};   case 6: return {32, 22};
         case 7: return {32, 24};    case 8: return {32, 34};   case 9: return {32, 36};
         case 10: return {256, 84};  case 11: return {256, 110}; case 12: return {256, 144};
-        case 13: return {256, 176}; case 14: return {256, 210}; case 15: return {256, 292};
+        case 13: return {256, 176}; case 14: return {256, 210};
         case 16: return {256, 66};  case 17: return {256, 74}; case 18: return {256, 98};
-        case 19: return {256, 50};  case 20: return {32, 18};  case 21: return {256, 110};
+        case 20: return {32, 18};  case 21: return {256, 110};
         case 22: return {256, 82};  case 23: return {256, 136}; case 29: return {256, 56};
         case 42: return {64, 18};   // Q2_0 (theory geom 42)
         default: return {0, 0};
@@ -196,7 +198,7 @@ struct GgufFile {
         for (uint64_t i = 0; i < nt; ++i) {
             TensorInfo ti; ti.name = c.str();
             const uint32_t nd = c.u32();
-            if (!c.ok || nd == 0 || nd > 8) return std::nullopt;
+            if (!c.ok || nd == 0 || nd > 4) return std::nullopt;   // 1..4 dimensions
             for (uint32_t d = 0; d < nd; ++d) ti.shape.push_back(c.u64());
             ti.type = c.u32(); ti.offset = c.u64();
             if (!c.ok) return std::nullopt;
