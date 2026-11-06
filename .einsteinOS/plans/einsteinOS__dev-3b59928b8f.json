@@ -458,29 +458,46 @@
       "reason": "initial plan"
     }
   ],
-  "state": {},
-  "fix_attempts": {
-    "u649794726a": 1
+  "state": {
+    "ActivationContract.lean": {
+      "hash": "ed5afde7c732",
+      "pass": true,
+      "unit_id": "u649794726a"
+    },
+    "ActivationQuantizeBlocks.lean": {
+      "hash": "a994c89c0cdb",
+      "pass": true,
+      "unit_id": "u649794726a"
+    },
+    "F16Bits.lean": {
+      "hash": "a24e9dc4a69a",
+      "pass": true,
+      "unit_id": "u649794726a"
+    },
+    "KvQ8Quant.lean": {
+      "hash": "558100bfb04b",
+      "pass": true,
+      "unit_id": "u649794726a"
+    },
+    "NgramHashIq4nl.lean": {
+      "hash": "354b54e53f28",
+      "pass": true,
+      "unit_id": "u649794726a"
+    },
+    "ScalarDequantizers.lean": {
+      "hash": "57309fe4227d",
+      "pass": true,
+      "unit_id": "u649794726a"
+    }
   },
+  "fix_attempts": {},
   "fail_history": {
     "u649794726a": [
       "review_fail"
     ]
   },
-  "last_failure": {
-    "u649794726a": {
-      "kind": "review_fail",
-      "text": "ActivationContract's embed_row (bit-field code decode) is ported as an FP32 row memcpy, and nothing run by this unit's test.sh checks plane_ptrs, activation dispatch or embedding decode",
-      "base_ref": "einsteinOS/dev-3b59928b8f"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u649794726a": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
