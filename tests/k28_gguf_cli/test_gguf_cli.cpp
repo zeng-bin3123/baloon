@@ -15,10 +15,13 @@ static void kv_u32(Bytes& b, const std::string& k, uint32_t v) { pstr(b, k); put
 
 // arch qwen3moe-like file: 2 tensors (F32 [4] at 0, Q2_0 [64,2] at 32 -> 36 bytes), alignment 32.
 static Bytes build(const std::string& arch, uint32_t experts, uint32_t used) {
-    Bytes b; put(b, kMagic, 4); put(b, 3, 4); put(b, 2, 8); put(b, 6, 8);
+    Bytes b; put(b, kMagic, 4); put(b, 3, 4); put(b, 2, 8); put(b, 9, 8);
     kv_str(b, "general.architecture", arch);
     kv_u32(b, arch + ".expert_count", experts);
     kv_u32(b, arch + ".expert_used_count", used);
+    kv_u32(b, arch + ".attention.head_count", 24);
+    kv_u32(b, arch + ".attention.head_count_kv", 2);
+    kv_u32(b, arch + ".block_count", 48);
     pstr(b, "tok.scores"); put(b, 9, 4); put(b, 6, 4); put(b, 10, 8);   // 10 floats -> truncated display
     for (int i = 0; i < 10; ++i) put(b, 0x3f800000u, 4);
     kv_str(b, "note", "a\"b\\c\nd");
@@ -48,13 +51,13 @@ static std::string write_file(const std::string& name, const Bytes& b) {
 }
 
 int main() {
-    const std::string good = write_file("good.gguf", build("qwen3moe", 4, 2));
+    const std::string good = write_file("good.gguf", build("qwen3moe", 512, 10));
     // info: layout invariants (data_start aligned, counts, tensor byte total = 16 + 36)
     Res r = call({"x", good, "info"});
     CK(r.rc == 0);
     CK(r.out.find("version: 3\n") == 0);
     CK(r.out.find("alignment: 32\n") != std::string::npos);
-    CK(r.out.find("metadata: 6\n") != std::string::npos && r.out.find("tensors: 2\n") != std::string::npos);
+    CK(r.out.find("metadata: 9\n") != std::string::npos && r.out.find("tensors: 2\n") != std::string::npos);
     CK(r.out.find("architecture: qwen3moe\n") != std::string::npos);
     CK(r.out.find("tensor_bytes: 52\n") != std::string::npos);
     {   // data_start printed is a multiple of the alignment
@@ -66,13 +69,13 @@ int main() {
     r = call({"x", good, "meta"});
     CK(r.rc == 0);
     CK(r.out.find("general.architecture [string] = \"qwen3moe\"\n") == 0);
-    CK(r.out.find("qwen3moe.expert_count [u32] = 4\n") != std::string::npos);
+    CK(r.out.find("qwen3moe.expert_count [u32] = 512\n") != std::string::npos);
     CK(r.out.find("tok.scores [array] = [1, 1, 1, 1, 1, 1, 1, 1, ...] (10 elements of f32)\n") != std::string::npos);
     CK(r.out.find("note [string] = \"a\\\"b\\\\c\\nd\"\n") != std::string::npos);
     CK(r.out.find("flag [bool] = true\n") != std::string::npos);
     CK(r.out.find("expert_used_count") < r.out.find("tok.scores") && r.out.find("tok.scores") < r.out.find("note"));
     // get
-    r = call({"x", good, "get", "qwen3moe.expert_used_count"}); CK(r.rc == 0 && r.out == "2\n");
+    r = call({"x", good, "get", "qwen3moe.expert_used_count"}); CK(r.rc == 0 && r.out == "10\n");
     r = call({"x", good, "get", "nope"}); CK(r.rc == 1 && r.out.empty() && !r.err.empty());
     // tensors: Q2_0 is type 42 with 64-element/18-byte blocks, offsets are relative to the data section
     r = call({"x", good, "tensors"});
@@ -81,17 +84,17 @@ int main() {
     // check
     r = call({"x", good, "check", "qwen3moe"}); CK(r.rc == 0 && r.out == "ok\n");
     r = call({"x", good, "check", "llama"}); CK(r.rc == 1 && r.out.empty());
-    const std::string bad_experts = write_file("e8.gguf", build("qwen3moe", 8, 2));
+    const std::string bad_experts = write_file("e8.gguf", build("qwen3moe", 8, 10));
     r = call({"x", bad_experts, "check", "qwen3moe"}); CK(r.rc == 1 && r.err.find("expert_count mismatch") != std::string::npos);
-    const std::string bad_used = write_file("u5.gguf", build("qwen3moe", 4, 5));
+    const std::string bad_used = write_file("u5.gguf", build("qwen3moe", 512, 513));
     r = call({"x", bad_used, "check", "qwen3moe"}); CK(r.rc == 1 && r.err.find("expert_used_count") != std::string::npos);
     const std::string llama = write_file("llama.gguf", build("llama", 0, 0));
     r = call({"x", llama, "check", "llama"}); CK(r.rc == 0);   // the qwen guard applies only to qwen*
     // malformed inputs exit 1, usage errors exit 2
     r = call({"x", "/nonexistent/k28.gguf", "info"}); CK(r.rc == 1 && r.err.find("cannot open") != std::string::npos);
-    Bytes magic = build("qwen3moe", 4, 2); magic[0] ^= 1;
+    Bytes magic = build("qwen3moe", 512, 10); magic[0] ^= 1;
     r = call({"x", write_file("magic.gguf", magic), "info"}); CK(r.rc == 1 && r.err.find("not a valid GGUF") != std::string::npos);
-    Bytes cut = build("qwen3moe", 4, 2); cut.resize(cut.size() - 1);
+    Bytes cut = build("qwen3moe", 512, 10); cut.resize(cut.size() - 1);
     r = call({"x", write_file("cut.gguf", cut), "tensors"}); CK(r.rc == 1);   // last tensor no longer fits
     r = call({"x", write_file("empty.gguf", Bytes()), "info"}); CK(r.rc == 1);
     r = call({"x"}); CK(r.rc == 2);

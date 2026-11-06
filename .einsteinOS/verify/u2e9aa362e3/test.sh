@@ -61,6 +61,27 @@ mutate shape2 's/it->second.ne0 != g.v(w.ne0) || it->second.ne1 != g.v(w.ne1)/it
 mutate length 's/if (d.ne0 != g.v(w.ne0)) return/if (false) return/'
 mutate family 's/if (!applies(w.qsa_only, w.gdn_only, g.is_qsa(layer))) return true;/if (false) return true;/'
 
+echo "== mutation: a weakened qwen4exp guard must be caught =="
+gmutate() {  # gmutate <name> <sed-expr>  (edits a copy of include/baloon/gguf_reader.hpp)
+  local name="$1" expr="$2" M="$OUT/gmut_$1"
+  rm -rf "$M"; mkdir -p "$M/include/baloon"; cp -r include/baloon/. "$M/include/baloon/"
+  sed -i "$expr" "$M/include/baloon/gguf_reader.hpp"
+  if cmp -s include/baloon/gguf_reader.hpp "$M/include/baloon/gguf_reader.hpp"; then echo "mutation $name did not apply"; rc=1; return; fi
+  if $HOSTCXX -std=c++17 -O2 -Wall -Wextra -pthread -I"$M/include" tests/k41_u2e9/test_u2e9.cpp src/rt/layout_check.cpp -o "$M/t" 2>/dev/null; then
+    if (cd "$OUT" && "$M/t" >/dev/null 2>&1); then echo "MUTANT SURVIVED: $name"; rc=1; else echo "mutant detected: $name"; fi
+  else echo "mutant build failed: $name"; rc=1; fi
+}
+gmutate g_experts 's/expected_experts = kGuardExperts;/expected_experts = 4;/'
+gmutate g_topk 's/expected_used = kGuardTopK;/expected_used = 9;/'
+gmutate g_heads 's/expected_heads = kGuardHeads;/expected_heads = 32;/'
+gmutate g_kv 's/expected_kv_heads = kGuardKvHeads;/expected_kv_heads = 1;/'
+gmutate g_layers 's/expected_layers = kGuardLayers;/expected_layers = 40;/'
+gmutate g_usedchk 's/if (\*used != expected_used) return fail("expert_used_count mismatch");//'
+gmutate g_headchk 's/if (\*nh != expected_heads) return fail("head_count mismatch");//'
+gmutate g_kvchk 's/if (\*nkv != expected_kv_heads) return fail("head_count_kv mismatch");//'
+gmutate g_layerchk 's/if (\*nl != expected_layers) return fail("block_count mismatch");//'
+gmutate g_reqused 's/if (!used) return fail("missing expert_used_count");/if (!used) return true;/'
+
 echo "== earlier suites on the same code =="
 runhost() {  # runhost <name> <pass-regex> <flags/srcs...>
   local name="$1" pat="$2"; shift 2

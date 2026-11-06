@@ -224,10 +224,21 @@ inline bool check_architecture(const GgufFile& f, const std::string& expected) {
     return a && *a == expected;
 }
 
-// Guard for the Qwen family mixture-of-experts layout: architecture must start with "qwen" and its
-// "<arch>.expert_count" must equal the expected count (default 4), with 0 < expert_used_count <= expert_count.
+// Architecture guard constants of the qwen4exp layout (theory: arch_guard_consistent).
+constexpr uint64_t kGuardExperts = 512, kGuardTopK = 10, kGuardHeads = 24, kGuardKvHeads = 2, kGuardLayers = 48;
+static_assert(kGuardTopK <= kGuardExperts && kGuardHeads % kGuardKvHeads == 0 && kGuardHeads / kGuardKvHeads == 12 &&
+              kGuardLayers > 0, "guard constants must be mutually consistent");
+
+// Guard for the Qwen family mixture-of-experts layout: the architecture must start with "qwen" and the
+// "<arch>.*" keys must carry exactly the guard constants: expert_count 512, expert_used_count 10,
+// attention.head_count 24, attention.head_count_kv 2, block_count 48. All five keys are required.
+// The fields default to the constants; tests may override them to exercise other fixtures.
 struct Qwen4ExpGuard {
-    uint64_t expected_experts = 4;
+    uint64_t expected_experts = kGuardExperts;
+    uint64_t expected_used = kGuardTopK;
+    uint64_t expected_heads = kGuardHeads;
+    uint64_t expected_kv_heads = kGuardKvHeads;
+    uint64_t expected_layers = kGuardLayers;
     bool check(const GgufFile& f, std::string* why = nullptr) const {
         auto fail = [&](const char* m) { if (why) *why = m; return false; };
         auto arch = f.get_string("general.architecture");
@@ -236,9 +247,20 @@ struct Qwen4ExpGuard {
         auto ne = f.get_uint(*arch + ".expert_count");
         if (!ne) return fail("missing expert_count");
         if (*ne != expected_experts) return fail("expert_count mismatch");
-        if (auto used = f.get_uint(*arch + ".expert_used_count")) {
-            if (*used == 0 || *used > *ne) return fail("expert_used_count out of range");
-        }
+        auto used = f.get_uint(*arch + ".expert_used_count");
+        if (!used) return fail("missing expert_used_count");
+        if (*used == 0 || *used > *ne) return fail("expert_used_count out of range");
+        if (*used != expected_used) return fail("expert_used_count mismatch");
+        auto nh = f.get_uint(*arch + ".attention.head_count");
+        if (!nh) return fail("missing head_count");
+        if (*nh != expected_heads) return fail("head_count mismatch");
+        auto nkv = f.get_uint(*arch + ".attention.head_count_kv");
+        if (!nkv) return fail("missing head_count_kv");
+        if (*nkv != expected_kv_heads) return fail("head_count_kv mismatch");
+        if (*nkv == 0 || *nh % *nkv != 0) return fail("heads do not group over kv heads");
+        auto nl = f.get_uint(*arch + ".block_count");
+        if (!nl) return fail("missing block_count");
+        if (*nl != expected_layers) return fail("block_count mismatch");
         return true;
     }
 };

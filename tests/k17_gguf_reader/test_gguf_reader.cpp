@@ -19,12 +19,17 @@ static void kv_u32(Bytes& b, const std::string& k, uint32_t v) { pstr(b, k); put
 
 struct Img { Bytes b; uint64_t nkv = 0; };
 
-static Bytes build(const std::string& arch, uint32_t experts, uint32_t used, bool dup = false, uint32_t ttype = 8) {
+// drop: bit0 expert_used_count, bit1 head_count, bit2 head_count_kv, bit3 block_count are omitted.
+static Bytes build(const std::string& arch, uint32_t experts, uint32_t used, bool dup = false, uint32_t ttype = 8,
+                   uint32_t heads = 24, uint32_t kvh = 2, uint32_t layers = 48, uint32_t drop = 0) {
     Bytes b; put(b, kMagic, 4); put(b, 3, 4); put(b, 1, 8);
-    put(b, 4 + (dup ? 1 : 0), 8);
+    put(b, 7 + (dup ? 1 : 0) - __builtin_popcount(drop), 8);
     kv_str(b, "general.architecture", arch);
     kv_u32(b, arch + ".expert_count", experts);
-    kv_u32(b, arch + ".expert_used_count", used);
+    if (!(drop & 1)) kv_u32(b, arch + ".expert_used_count", used);
+    if (!(drop & 2)) kv_u32(b, arch + ".attention.head_count", heads);
+    if (!(drop & 4)) kv_u32(b, arch + ".attention.head_count_kv", kvh);
+    if (!(drop & 8)) kv_u32(b, arch + ".block_count", layers);
     pstr(b, "tok.scores"); put(b, 9, 4); put(b, 6, 4); put(b, 2, 8);
     uint32_t f1 = 0x3fc00000u, f2 = 0xc0000000u; put(b, f1, 4); put(b, f2, 4);
     if (dup) kv_u32(b, arch + ".expert_count", 9);
@@ -34,6 +39,8 @@ static Bytes build(const std::string& arch, uint32_t experts, uint32_t used, boo
     b.resize(b.size() + (g.el ? 128 / g.el * g.by : 0), 0xAB);
     return b;
 }
+
+static Qwen4ExpGuard fix4() { Qwen4ExpGuard g; g.expected_experts = 4; g.expected_used = 2; return g; }
 
 int main() {
     // geometry facts
@@ -83,18 +90,50 @@ int main() {
         CHECK(f->get_uint("qwen35moe.expert_count").value_or(0) == 4);
         auto sc = f->find_meta("tok.scores");
         CHECK(sc && sc->arr.size() == 2 && sc->arr[0].f == 1.5 && sc->arr[1].f == -2.0);
-        CHECK(f->meta_order.size() == 4 && f->meta_order[0] == "general.architecture");
+        CHECK(f->meta_order.size() == 7 && f->meta_order[0] == "general.architecture");
         CHECK(!f->get_string("nope") && !f->get_uint("general.architecture"));
         CHECK(check_architecture(*f, "qwen35moe") && !check_architecture(*f, "llama"));
-        Qwen4ExpGuard g; std::string why;
+        Qwen4ExpGuard g = fix4(); std::string why;
         CHECK(g.check(*f, &why));
+        CHECK(!Qwen4ExpGuard().check(*f, &why) && why == "expert_count mismatch");   // default is the 512-expert guard
         Qwen4ExpGuard g8; g8.expected_experts = 8; CHECK(!g8.check(*f, &why) && why == "expert_count mismatch");
     }
     // guard rejections
-    { Bytes i2 = build("llama", 4, 2); auto g = GgufFile::parse(i2.data(), i2.size()); CHECK(g && !check_architecture(*g, "qwen35moe")); Qwen4ExpGuard q; CHECK(!q.check(*g)); }
-    { Bytes i2 = build("qwen2moe", 4, 5); auto g = GgufFile::parse(i2.data(), i2.size()); CHECK(g && !Qwen4ExpGuard().check(*g)); }
-    { Bytes i2 = build("qwen2moe", 4, 0); auto g = GgufFile::parse(i2.data(), i2.size()); CHECK(g && !Qwen4ExpGuard().check(*g)); }
-    { Bytes i2 = build("qwen2moe", 3, 1); auto g = GgufFile::parse(i2.data(), i2.size()); CHECK(g && !Qwen4ExpGuard().check(*g)); }
+    { Bytes i2 = build("llama", 4, 2); auto g = GgufFile::parse(i2.data(), i2.size()); CHECK(g && !check_architecture(*g, "qwen35moe")); Qwen4ExpGuard q = fix4(); CHECK(!q.check(*g)); }
+    { Bytes i2 = build("qwen2moe", 4, 5); auto g = GgufFile::parse(i2.data(), i2.size()); CHECK(g && !fix4().check(*g)); }
+    { Bytes i2 = build("qwen2moe", 4, 0); auto g = GgufFile::parse(i2.data(), i2.size()); CHECK(g && !fix4().check(*g)); }
+    { Bytes i2 = build("qwen2moe", 3, 1); auto g = GgufFile::parse(i2.data(), i2.size()); CHECK(g && !fix4().check(*g)); }
+    // the guard constants: defaults are 512 experts / top-10 / 24 heads over 2 kv heads / 48 layers
+    { Qwen4ExpGuard d; CHECK(d.expected_experts == 512 && d.expected_used == 10 && d.expected_heads == 24 &&
+                              d.expected_kv_heads == 2 && d.expected_layers == 48);
+      CHECK(kGuardExperts == 512 && kGuardTopK == 10 && kGuardHeads == 24 && kGuardKvHeads == 2 && kGuardLayers == 48); }
+    auto gchk = [&](Bytes im, std::string* why) { auto g = GgufFile::parse(im.data(), im.size()); return g && Qwen4ExpGuard().check(*g, why); };
+    { std::string w; CHECK(gchk(build("qwen4exp", 512, 10), &w)); CHECK(gchk(build("qwen35moe", 512, 10), &w)); }
+    { std::string w; CHECK(!gchk(build("qwen4exp", 4, 2), &w) && w == "expert_count mismatch");
+      CHECK(!gchk(build("qwen4exp", 511, 10), &w) && w == "expert_count mismatch");
+      CHECK(!gchk(build("qwen4exp", 513, 10), &w) && w == "expert_count mismatch");
+      CHECK(!gchk(build("qwen4exp", 512, 9), &w) && w == "expert_used_count mismatch");
+      CHECK(!gchk(build("qwen4exp", 512, 11), &w) && w == "expert_used_count mismatch");
+      CHECK(!gchk(build("qwen4exp", 512, 0), &w) && w == "expert_used_count out of range");
+      CHECK(!gchk(build("qwen4exp", 512, 513), &w) && w == "expert_used_count out of range");
+      CHECK(!gchk(build("qwen4exp", 512, 10, false, 8, 23, 2, 48), &w) && w == "head_count mismatch");
+      CHECK(!gchk(build("qwen4exp", 512, 10, false, 8, 25, 2, 48), &w) && w == "head_count mismatch");
+      CHECK(!gchk(build("qwen4exp", 512, 10, false, 8, 24, 1, 48), &w) && w == "head_count_kv mismatch");
+      CHECK(!gchk(build("qwen4exp", 512, 10, false, 8, 24, 3, 48), &w) && w == "head_count_kv mismatch");
+      CHECK(!gchk(build("qwen4exp", 512, 10, false, 8, 24, 2, 47), &w) && w == "block_count mismatch");
+      CHECK(!gchk(build("qwen4exp", 512, 10, false, 8, 24, 2, 49), &w) && w == "block_count mismatch");
+      CHECK(!gchk(build("llama", 512, 10), &w) && w == "not a qwen architecture");
+      CHECK(!gchk(build("qwen4exp", 512, 10, false, 8, 24, 2, 48, 1), &w) && w == "missing expert_used_count");
+      CHECK(!gchk(build("qwen4exp", 512, 10, false, 8, 24, 2, 48, 2), &w) && w == "missing head_count");
+      CHECK(!gchk(build("qwen4exp", 512, 10, false, 8, 24, 2, 48, 4), &w) && w == "missing head_count_kv");
+      CHECK(!gchk(build("qwen4exp", 512, 10, false, 8, 24, 2, 48, 8), &w) && w == "missing block_count"); }
+    // each field of the guard is individually effective on a conforming image
+    { Bytes im = build("qwen4exp", 512, 10); auto g = GgufFile::parse(im.data(), im.size()); CHECK(g);
+      if (g) { std::string w; Qwen4ExpGuard x;
+        x = Qwen4ExpGuard(); x.expected_used = 9; CHECK(!x.check(*g, &w));
+        x = Qwen4ExpGuard(); x.expected_heads = 12; CHECK(!x.check(*g, &w));
+        x = Qwen4ExpGuard(); x.expected_kv_heads = 4; CHECK(!x.check(*g, &w));
+        x = Qwen4ExpGuard(); x.expected_layers = 24; CHECK(!x.check(*g, &w)); } }
     // malformed inputs are rejected
     { Bytes bad = img; bad[0] ^= 1; CHECK(!GgufFile::parse(bad.data(), bad.size())); }
     { Bytes bad = img; bad[4] = 1; CHECK(!GgufFile::parse(bad.data(), bad.size())); }

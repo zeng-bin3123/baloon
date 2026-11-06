@@ -299,18 +299,36 @@ static void test_gguf() {
     // magic
     CHECK(0x46 * 16777216u + 0x55 * 65536u + 0x47 * 256u + 0x47 == 0x46554747u && kMagic == 0x46554747u);
 
-    // architecture guard constants: 10 <= 512, 24 % 2 == 0, 24 / 2 == 12, 48 > 0
-    { Bytes b; put(b, kMagic, 4); put(b, 3, 4); put(b, 0, 8); put(b, 3, 8);
+    // architecture guard constants: 512 experts / top-10, 24 heads over 2 kv heads, 48 layers (all required)
+    auto guard_img_d = [&](uint32_t ex, uint32_t used, uint32_t nh, uint32_t nkv, uint32_t nl, uint32_t drop) {
+      Bytes b; put(b, kMagic, 4); put(b, 3, 4); put(b, 0, 8); put(b, 6 - __builtin_popcount(drop), 8);
       pstr(b, "general.architecture"); put(b, 8, 4); pstr(b, "qwen4exp");
-      pstr(b, "qwen4exp.expert_count"); put(b, 4, 4); put(b, 4, 4);
-      pstr(b, "qwen4exp.expert_used_count"); put(b, 4, 4); put(b, 2, 4);
+      auto kv = [&](const char* k, uint32_t v) { pstr(b, k); put(b, 4, 4); put(b, v, 4); };
+      kv("qwen4exp.expert_count", ex);
+      if (!(drop & 1)) kv("qwen4exp.expert_used_count", used);
+      if (!(drop & 2)) kv("qwen4exp.attention.head_count", nh);
+      if (!(drop & 4)) kv("qwen4exp.attention.head_count_kv", nkv);
+      if (!(drop & 8)) kv("qwen4exp.block_count", nl);
       while (b.size() % 32) b.push_back(0);
-      auto f = GgufFile::parse(b.data(), b.size());
-      CHECK(f.has_value()); if (f) {
-          CHECK(check_architecture(*f, "qwen4exp") && !check_architecture(*f, "llama"));
-          Qwen4ExpGuard g; std::string why; CHECK(g.check(*f, &why));
-          Qwen4ExpGuard g8; g8.expected_experts = 8; CHECK(!g8.check(*f, &why) && why == "expert_count mismatch");
-      } }
+      return b; };
+    auto guard_img = [&](uint32_t ex, uint32_t used, uint32_t nh, uint32_t nkv, uint32_t nl) { return guard_img_d(ex, used, nh, nkv, nl, 0); };
+    auto guard_ok = [&](Bytes b, std::string* why) { auto f = GgufFile::parse(b.data(), b.size()); return f && Qwen4ExpGuard().check(*f, why); };
+    { std::string why; Qwen4ExpGuard d;
+      CHECK(d.expected_experts == 512 && d.expected_used == 10 && d.expected_heads == 24 && d.expected_kv_heads == 2 && d.expected_layers == 48);
+      CHECK(guard_ok(guard_img(512, 10, 24, 2, 48), &why));
+      CHECK(!guard_ok(guard_img(4, 2, 24, 2, 48), &why) && why == "expert_count mismatch");
+      CHECK(!guard_ok(guard_img(512, 4, 24, 2, 48), &why) && why == "expert_used_count mismatch");
+      CHECK(!guard_ok(guard_img(512, 10, 32, 2, 48), &why) && why == "head_count mismatch");
+      CHECK(!guard_ok(guard_img(512, 10, 24, 4, 48), &why) && why == "head_count_kv mismatch");
+      CHECK(!guard_ok(guard_img(512, 10, 24, 2, 40), &why) && why == "block_count mismatch");
+      CHECK(!guard_ok(guard_img_d(512, 10, 24, 2, 48, 1), &why) && why == "missing expert_used_count");
+      CHECK(!guard_ok(guard_img_d(512, 10, 24, 2, 48, 2), &why) && why == "missing head_count");
+      CHECK(!guard_ok(guard_img_d(512, 10, 24, 2, 48, 4), &why) && why == "missing head_count_kv");
+      CHECK(!guard_ok(guard_img_d(512, 10, 24, 2, 48, 8), &why) && why == "missing block_count");
+      }
+    { Bytes img = guard_img(512, 10, 24, 2, 48); auto f = GgufFile::parse(img.data(), img.size());
+      CHECK(f.has_value()); if (f) { CHECK(check_architecture(*f, "qwen4exp") && !check_architecture(*f, "llama"));
+        Qwen4ExpGuard g8; g8.expected_experts = 8; std::string why; CHECK(!g8.check(*f, &why) && why == "expert_count mismatch"); } }
     CHECK(10 <= 512 && 24 % 2 == 0 && 24 / 2 == 12 && 48 > 0);
 }
 
