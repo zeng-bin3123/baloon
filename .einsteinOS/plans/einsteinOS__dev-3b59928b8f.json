@@ -832,6 +832,19 @@
         "tools/strata_pack.py",
         "tools/strata_tokenizer.py"
       ]
+    },
+    {
+      "id": "pb675020e77",
+      "modules": null,
+      "reason": "port: reference files of src/core no theory unit covers",
+      "sources": [
+        "src/core/device.cu",
+        "src/core/graph.cpp",
+        "src/core/load_main.cpp",
+        "src/core/native_dense.cpp",
+        "src/core/native_head.cpp",
+        "src/core/overlap_main.cpp"
+      ]
     }
   ],
   "verify_seen": {
