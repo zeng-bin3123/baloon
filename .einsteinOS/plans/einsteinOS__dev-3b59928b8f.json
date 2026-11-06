@@ -470,30 +470,63 @@
       "pass": true,
       "unit_id": "u649794726a"
     },
+    "ByteLevelBpeTokenizer.lean": {
+      "hash": "1296b36ea3b7",
+      "pass": true,
+      "unit_id": "u2e9aa362e3"
+    },
+    "CanonicalFormRoundtrip.lean": {
+      "hash": "19e34e8ae15c",
+      "pass": true,
+      "unit_id": "u2e9aa362e3"
+    },
+    "DirectFileIo.lean": {
+      "hash": "6a0f33fb5396",
+      "pass": true,
+      "unit_id": "u2e9aa362e3"
+    },
     "F16Bits.lean": {
       "hash": "a24e9dc4a69a",
       "pass": true,
       "unit_id": "u649794726a"
+    },
+    "GgufReaderGeometry.lean": {
+      "hash": "01491e5edc21",
+      "pass": true,
+      "unit_id": "u2e9aa362e3"
     },
     "KvQ8Quant.lean": {
       "hash": "558100bfb04b",
       "pass": true,
       "unit_id": "u649794726a"
     },
+    "LayerShapeCheck.lean": {
+      "hash": "3b0401f1ada6",
+      "pass": true,
+      "unit_id": "u2e9aa362e3"
+    },
     "NgramHashIq4nl.lean": {
       "hash": "354b54e53f28",
       "pass": true,
       "unit_id": "u649794726a"
     },
+    "Q2_0GgufWriter.lean": {
+      "hash": "275745520eb5",
+      "pass": true,
+      "unit_id": "u2e9aa362e3"
+    },
     "ScalarDequantizers.lean": {
       "hash": "57309fe4227d",
       "pass": true,
       "unit_id": "u649794726a"
+    },
+    "WeightPackLoader.lean": {
+      "hash": "52ac19c43e8f",
+      "pass": true,
+      "unit_id": "u2e9aa362e3"
     }
   },
-  "fix_attempts": {
-    "u2e9aa362e3": 2
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u2e9aa362e3": [
       "review_fail",
@@ -503,20 +536,8 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "u2e9aa362e3": {
-      "kind": "review_fail",
-      "text": "Qwen4ExpGuard defaults to expected_experts=4 and omits the theory's guard constants (512 experts/top-10, 24 heads over 2 KV heads, 48 layers); tests only confirm the 4-expert fixture",
-      "base_ref": "einsteinOS/dev-3b59928b8f"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u2e9aa362e3": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
