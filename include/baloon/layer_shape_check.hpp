@@ -133,40 +133,21 @@ inline std::vector<Requirement> required_for_layer(const Geometry& g, int layer)
     return r;
 }
 
-inline bool shape_fail(std::string* why, const std::string& m) { if (why) *why = m; return false; }
+// ---- the checks themselves are production code: src/rt/layout_check.cpp defines them ------------------------------
+// Records `m` in *why (when given) and returns false.
+bool shape_fail(std::string* why, const std::string& m);
 
 // The layer-kind count check of check_all: counted kinds equal the geometry's (and thereby cover every layer).
 constexpr bool split_ok(int n_qsa, int n_gdn, int g_qsa, int g_gdn) { return n_qsa == g_qsa && n_gdn == g_gdn; }
 constexpr bool layer_in_range(int layer, int n_layers) { return layer >= 0 && layer < n_layers; }
 
-inline bool check_layer(const TensorIndex& idx, const Geometry& g, int layer, std::string* why = nullptr) {
-    if (!layer_in_range(layer, g.n_layers)) return shape_fail(why, "layer out of range");
-    for (const auto& r : required_for_layer(g, layer)) {
-        auto it = idx.find(r.name);
-        if (it == idx.end()) return shape_fail(why, "missing " + r.name);
-        const TensorDesc& d = it->second;
-        if (r.one_d) {
-            if (d.ne1 != 0) return shape_fail(why, r.name + " must be one-D");
-            if (d.ne0 != r.ne0) return shape_fail(why, r.name + " has wrong length");
-            if (!form_ok(d.form, r.form)) return shape_fail(why, r.name + " has wrong engine form (byte count differs)");
-        } else {
-            if (d.ne0 != r.ne0 || d.ne1 != r.ne1) return shape_fail(why, r.name + " has wrong shape");
-        }
-    }
-    return true;
-}
-
-inline bool check_all(const TensorIndex& idx, const Geometry& g, std::string* why = nullptr) {
-    if (g.n_layers <= 0) return shape_fail(why, "no layers");
-    int nq = 0, ng = 0;
-    for (int l = 0; l < g.n_layers; ++l) {
-        if (!check_layer(idx, g, l, why)) return false;
-        (g.is_qsa(l) ? nq : ng)++;
-    }
-    if (nq + ng != g.n_layers) return shape_fail(why, "layer kinds do not cover the layers");
-    if (!split_ok(nq, ng, g.expect_qsa, g.expect_gdn)) return shape_fail(why, "layer kind counts differ from geometry");
-    return true;
-}
+// One requirement of one layer: presence, exact (ne0, ne1) for two-D, exact length + engine form for one-D.
+bool check_one(const TensorIndex& idx, const Geometry& g, int layer, const Want2& w, std::string* why = nullptr);
+bool check_one(const TensorIndex& idx, const Geometry& g, int layer, const Want1& w, std::string* why = nullptr);
+// Every requirement that applies to the layer's family (16 two-D + 6/7 one-D); a layer outside 0..n_layers-1 is refused.
+bool check_layer(const TensorIndex& idx, const Geometry& g, int layer, std::string* why = nullptr);
+// Every layer, then the QSA/GDN split: kinds cover all layers and equal the geometry's (12 QSA, 36 GDN).
+bool check_all(const TensorIndex& idx, const Geometry& g, std::string* why = nullptr);
 
 }  // namespace shape
 }  // namespace baloon

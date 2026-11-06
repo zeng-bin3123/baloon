@@ -1,4 +1,5 @@
 // layout_check.cpp - implementation of rt_layout.hpp.
+#include "baloon/layer_shape_check.hpp"
 #include "baloon/rt_layout.hpp"
 
 namespace baloon {
@@ -57,4 +58,51 @@ bool check_all(const LayoutIndex& idx, const LayoutGeometry& g, std::string* why
 }
 
 }  // namespace rt
+// ---- LayerShapeCheck: the dense weight table pre-flight (16 two-D, 6/7 one-D with engine form, 12/36 split) ---------
+namespace shape {
+
+bool shape_fail(std::string* why, const std::string& m) { if (why) *why = m; return false; }
+
+bool check_one(const TensorIndex& idx, const Geometry& g, int layer, const Want2& w, std::string* why) {
+    if (!applies(w.qsa_only, w.gdn_only, g.is_qsa(layer))) return true;
+    const std::string n = tensor_name(layer, w.suffix);
+    auto it = idx.find(n);
+    if (it == idx.end()) return shape_fail(why, "missing " + n);
+    if (it->second.ne0 != g.v(w.ne0) || it->second.ne1 != g.v(w.ne1)) return shape_fail(why, n + " has wrong shape");
+    return true;
+}
+
+bool check_one(const TensorIndex& idx, const Geometry& g, int layer, const Want1& w, std::string* why) {
+    if (!applies(w.qsa_only, w.gdn_only, g.is_qsa(layer))) return true;
+    const std::string n = tensor_name(layer, w.suffix);
+    auto it = idx.find(n);
+    if (it == idx.end()) return shape_fail(why, "missing " + n);
+    const TensorDesc& d = it->second;
+    if (d.ne1 != 0) return shape_fail(why, n + " must be one-D");
+    if (d.ne0 != g.v(w.ne0)) return shape_fail(why, n + " has wrong length");
+    if (!form_ok(d.form, w.form)) return shape_fail(why, n + " has wrong engine form (byte count differs)");
+    return true;
+}
+
+bool check_layer(const TensorIndex& idx, const Geometry& g, int layer, std::string* why) {
+    if (!layer_in_range(layer, g.n_layers)) return shape_fail(why, "layer out of range");
+    for (const auto& w : kWant2) if (!check_one(idx, g, layer, w, why)) return false;
+    for (const auto& w : kWant1) if (!check_one(idx, g, layer, w, why)) return false;
+    return true;
+}
+
+bool check_all(const TensorIndex& idx, const Geometry& g, std::string* why) {
+    if (g.n_layers <= 0) return shape_fail(why, "no layers");
+    int nq = 0, ng = 0;
+    for (int l = 0; l < g.n_layers; ++l) {
+        if (!check_layer(idx, g, l, why)) return false;
+        (g.is_qsa(l) ? nq : ng)++;
+    }
+    if (nq + ng != g.n_layers) return shape_fail(why, "layer kinds do not cover the layers");
+    if (!split_ok(nq, ng, g.expect_qsa, g.expect_gdn)) return shape_fail(why, "layer kind counts differ from geometry");
+    return true;
+}
+
+}  // namespace shape
+
 }  // namespace baloon

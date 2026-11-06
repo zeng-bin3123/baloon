@@ -1,6 +1,6 @@
 #!/bin/bash
 # Unit u2e9aa362e3 (GgufReaderGeometry, CanonicalFormRoundtrip, Q2_0GgufWriter, DirectFileIo, WeightPackLoader, LayerShapeCheck,
-# ByteLevelBpeTokenizer). Adds include/baloon/layer_shape_check.hpp, tests/k41_u2e9, .einsteinOS/port/u2e9aa362e3.tsv and aligns
+# ByteLevelBpeTokenizer). Adds include/baloon/layer_shape_check.hpp (spec tables) whose checks are defined in src/rt/layout_check.cpp, tests/k41_u2e9, .einsteinOS/port/u2e9aa362e3.tsv and aligns
 # include/baloon/gguf_reader.hpp with the theory (geometry table, 1..4 dimensions, array cap 2^24, 64-item array sample).
 # (1) builds the WHOLE project through the previous unit's full build (headers, libraries, every host/CUDA test, CLIs, python checks);
 # (2) builds this unit's invariant test and checks the port table syntax. Exits 0 only if everything builds.
@@ -29,7 +29,7 @@ for h in layer_shape_check gguf_reader byte_level_bpe_tokenizer canonical_form_r
 done
 
 echo "== unit invariant test =="
-$HOSTCXX $HF tests/k41_u2e9/test_u2e9.cpp -o "$OUT/test_u2e9"
+$HOSTCXX $HF tests/k41_u2e9/test_u2e9.cpp src/rt/layout_check.cpp -o "$OUT/test_u2e9"
 
 echo "== port table syntax =="
 TSV=.einsteinOS/port/u2e9aa362e3.tsv

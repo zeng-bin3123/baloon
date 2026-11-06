@@ -37,19 +37,29 @@ for rf in include/ref/artifact/gguf_reader.hpp include/ref/core/layout.hpp src/c
 done
 
 echo "== unit invariants (7 modules) =="
-if $HOSTCXX $HF tests/k41_u2e9/test_u2e9.cpp -o "$OUT/test_u2e9" 2>"$OUT/u2e9.err"; then
+if $HOSTCXX $HF tests/k41_u2e9/test_u2e9.cpp src/rt/layout_check.cpp -o "$OUT/test_u2e9" 2>"$OUT/u2e9.err"; then
   (cd "$OUT" && timeout 900 ./test_u2e9) >"$OUT/u2e9.log" 2>&1
   r=$?; tail -5 "$OUT/u2e9.log"
   [ $r -eq 0 ] || { echo "u2e9 invariants FAILED"; rc=1; }
   grep -q "U2E9 TESTS PASSED" "$OUT/u2e9.log" || { echo "u2e9 suite did not report PASSED"; rc=1; }
 else echo "BUILD FAILED (test_u2e9)"; head -20 "$OUT/u2e9.err"; rc=1; fi
 
-echo "== mutation: a broken shape check must be caught =="
-mkdir -p "$OUT/mut/baloon" && cp include/baloon/*.hpp "$OUT/mut/baloon/"
-sed -i 's/if (!form_ok(d.form, r.form)) return/if (false) return/' "$OUT/mut/baloon/layer_shape_check.hpp"
-if $HOSTCXX -std=c++17 -O2 -pthread -I"$OUT/mut" -Iinclude tests/k41_u2e9/test_u2e9.cpp -o "$OUT/test_u2e9_mut" 2>/dev/null; then
-  if (cd "$OUT" && ./test_u2e9_mut >/dev/null 2>&1); then echo "SHAPE MUTANT SURVIVED"; rc=1; else echo "shape mutant detected"; fi
-else echo "mutant build failed"; rc=1; fi
+echo "== mutation: a broken PRODUCTION shape check must be caught =="
+mutate() {  # mutate <name> <sed-expr>  (edits a copy of src/rt/layout_check.cpp)
+  local name="$1" expr="$2"
+  cp src/rt/layout_check.cpp "$OUT/mut_$name.cpp"
+  sed -i "$expr" "$OUT/mut_$name.cpp"
+  if cmp -s src/rt/layout_check.cpp "$OUT/mut_$name.cpp"; then echo "mutation $name did not apply"; rc=1; return; fi
+  if $HOSTCXX $HF -Isrc/rt tests/k41_u2e9/test_u2e9.cpp "$OUT/mut_$name.cpp" -o "$OUT/test_mut_$name" 2>/dev/null; then
+    if (cd "$OUT" && ./test_mut_$name >/dev/null 2>&1); then echo "MUTANT SURVIVED: $name"; rc=1; else echo "mutant detected: $name"; fi
+  else echo "mutant build failed: $name"; rc=1; fi
+}
+mutate form 's/if (!form_ok(d.form, w.form)) return/if (false) return/'
+mutate split 's/if (!split_ok(nq, ng, g.expect_qsa, g.expect_gdn)) return/if (false) return/'
+mutate range 's/if (!layer_in_range(layer, g.n_layers)) return/if (false) return/'
+mutate shape2 's/it->second.ne0 != g.v(w.ne0) || it->second.ne1 != g.v(w.ne1)/it->second.ne0 != g.v(w.ne0)/'
+mutate length 's/if (d.ne0 != g.v(w.ne0)) return/if (false) return/'
+mutate family 's/if (!applies(w.qsa_only, w.gdn_only, g.is_qsa(layer))) return true;/if (false) return true;/'
 
 echo "== earlier suites on the same code =="
 runhost() {  # runhost <name> <pass-regex> <flags/srcs...>
