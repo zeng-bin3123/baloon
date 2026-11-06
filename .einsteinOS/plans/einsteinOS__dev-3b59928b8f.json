@@ -491,20 +491,25 @@
       "unit_id": "u649794726a"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u2e9aa362e3": 1
+  },
   "fail_history": {
+    "u2e9aa362e3": [
+      "review_fail"
+    ],
     "u649794726a": [
       "review_fail"
     ]
   },
-  "last_failure": {},
-  "infra_fails": 0,
-  "review_pending": {
+  "last_failure": {
     "u2e9aa362e3": {
-      "compile": "pass",
-      "smoke": "pass"
+      "kind": "review_fail",
+      "text": "LayerShapeCheck is not implemented in the production counterparts src/rt/layout_check.cpp check_all/check_layer/check_one (no 16 two-D/6-7 one-D set, no engine-form check, no 12/36 split check); the spec lives only in an unused header include/baloon/layer_shape_check.hpp that only the test exercises",
+      "base_ref": "einsteinOS/dev-3b59928b8f"
     }
   },
+  "infra_fails": 0,
   "port_units": [
     {
       "id": "pfcccb31b26",
