@@ -287,6 +287,24 @@ bool embed_row(const float* table, int64_t vocab, int64_t n, int64_t token, floa
     std::memcpy(out, table + (size_t)(token * n), (size_t)n * sizeof(float));
     return true;
 }
+int embed_code_per_byte(int code_bits) {
+    switch (code_bits) { case 2: return 4; case 4: return 2; case 8: return 1; default: return 0; }
+}
+bool embed_code(const uint8_t* row, int code_bits, int64_t i, uint32_t* code) {
+    const int per = embed_code_per_byte(code_bits);
+    if (!row || !code || per == 0 || i < 0) return false;
+    const unsigned shift = (unsigned)(i % per) * (unsigned)code_bits;
+    const unsigned mask = (1u << code_bits) - 1u;
+    *code = ((unsigned)row[(size_t)(i / per)] >> shift) & mask;
+    return true;
+}
+bool embed_row(const uint8_t* table, int code_bits, int64_t vocab, int64_t n, int64_t token, uint32_t* out) {
+    const int per = embed_code_per_byte(code_bits);
+    if (!table || !out || per == 0 || token < 0 || token >= vocab || n <= 0 || n % per != 0) return false;
+    const uint8_t* row = table + (size_t)token * (size_t)(n / per);
+    for (int64_t i = 0; i < n; ++i) if (!embed_code(row, code_bits, i, &out[(size_t)i])) return false;
+    return true;
+}
 void project_bf16(const uint16_t* w, const float* x, int64_t rows, int64_t cols, float* out) {
     for (int64_t r = 0; r < rows; ++r) {
         double a = 0;

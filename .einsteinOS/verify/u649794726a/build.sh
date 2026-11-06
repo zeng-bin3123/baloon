@@ -25,6 +25,15 @@ done
 echo "[link] $OUT/test_u649_quant_gpu"
 "$CLANG" "${objs[@]}" -o "$OUT/test_u649_quant_gpu" -L"$COREX/lib64" -lcudart -lpthread
 
+echo "== embed-codes GPU test =="
+eobjs=()
+for f in src/ilu_embed_codes.cu tests/k40_u649/test_embed_codes_gpu.cu; do
+  o="$OUT/$(echo "$f" | sed 's#/#__#g').o"
+  echo "[cuda] $f"; "$CLANG" $CUFLAGS -c "$f" -o "$o"; eobjs+=("$o")
+done
+"$CLANG" -std=c++17 -O2 -Iinclude -c src/core/layer.cpp -o "$OUT/layer.o"
+"$CLANG" "${eobjs[@]}" "$OUT/layer.o" -o "$OUT/test_u649_embed_gpu" -L"$COREX/lib64" -lcudart -lpthread
+
 echo "== port table syntax =="
 TSV=.einsteinOS/port/u649794726a.tsv
 [ -f "$TSV" ] || { echo "missing $TSV"; exit 1; }

@@ -56,6 +56,21 @@ if [ ! -x "$CLANG" ]; then echo "corex toolchain missing"; rc=1; else
   grep -q "U649 QUANT GPU TESTS PASSED" "$OUT/quant_gpu.log" || { echo "quant GPU suite did not report PASSED"; rc=1; }
 fi
 
+echo "== GPU invariants: embedding bit-field decode =="
+if [ -x "$CLANG" ]; then
+  eobjs=()
+  for f in src/ilu_embed_codes.cu tests/k40_u649/test_embed_codes_gpu.cu; do
+    o="$OUT/$(echo "$f" | sed 's#/#__#g').o"
+    "$CLANG" $CUFLAGS -c "$f" -o "$o" || { echo "BUILD FAILED ($f)"; exit 1; }
+    eobjs+=("$o")
+  done
+  "$CLANG" -std=c++17 -O2 -Iinclude -c src/core/layer.cpp -o "$OUT/layer_e.o" || { echo "BUILD FAILED (layer.cpp)"; exit 1; }
+  "$CLANG" "${eobjs[@]}" "$OUT/layer_e.o" -o "$OUT/t_embed_gpu" -L"$COREX/lib64" -lcudart -lpthread || { echo "LINK FAILED (embed)"; exit 1; }
+  timeout 900 "$OUT/t_embed_gpu" | tee "$OUT/embed_gpu.log"
+  [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "embed GPU tests FAILED"; rc=1; }
+  grep -q "U649 EMBED CODES GPU TESTS PASSED" "$OUT/embed_gpu.log" || { echo "embed GPU suite did not report PASSED"; rc=1; }
+else echo "corex toolchain missing"; rc=1; fi
+
 echo "== earlier suites for the same modules (F16Bits, dequantizers, KV/QSA/quantize kernels) =="
 if bash .einsteinOS/verify/u02c65ed515/test.sh >"$OUT/u02c65.log" 2>&1; then echo "u02c65ed515 suite passed"
 else echo "u02c65ed515 suite FAILED"; tail -25 "$OUT/u02c65.log"; rc=1; fi
@@ -69,6 +84,7 @@ runhost() {  # runhost <name> <pass-regex> <srcs...>
 }
 runhost k30_ple_table "[1-9][0-9]* checks, 0 failed" tests/k30_ple_table/test_ple_table.cpp
 runhost k18_core "PASS|passed|ok" tests/k18_core/test_core.cpp src/core/layer.cpp src/core/session.cpp src/core/weights.cpp
+runhost k40_activation_contract "U649 ACTIVATION CONTRACT TESTS PASSED" tests/k40_u649/test_activation_contract.cpp src/core/layer.cpp
 runhost k21_ple_reader "PASS|passed|ok" tests/k21_ple_reader/test_ple_reader_theory.cpp src/ngram/ple_reader.cpp
 
 [ $rc -eq 0 ] && echo "ALL UNIT TESTS PASSED" || echo "UNIT TESTS FAILED"

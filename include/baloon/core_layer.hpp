@@ -143,7 +143,13 @@ bool moe_layer(const float* logits, int n_expert, int k, const std::function<voi
                const float* shared, float shared_gate, const float* resid, int n, float* out);
 
 // ---- embedding, projections, head ---------------------------------------------------------------------------------------
-bool embed_row(const float* table, int64_t vocab, int64_t n, int64_t token, float* out);
+bool embed_row(const float* table, int64_t vocab, int64_t n, int64_t token, float* out);   // native FP32 table
+// Bit-field decode: code of element i is the code_bits-wide field at bit (i % perbyte) * code_bits of byte i / perbyte, where
+// perbyte = 8 / code_bits (low field first). code_bits must be 2, 4 or 8.
+int embed_code_per_byte(int code_bits);                                                   // 0 for an illegal width
+bool embed_code(const uint8_t* row, int code_bits, int64_t i, uint32_t* code);
+// Decodes one row of a quantized table (rows are n / perbyte bytes; n must be a multiple of perbyte) into integer codes.
+bool embed_row(const uint8_t* table, int code_bits, int64_t vocab, int64_t n, int64_t token, uint32_t* out);
 void project_bf16(const uint16_t* w, const float* x, int64_t rows, int64_t cols, float* out);
 void lm_head(const float* w, const float* x, int64_t vocab, int64_t n, float* logits);
 void lm_head_mix(const float* w, const float* resid, const float* mix, int64_t hc, int64_t vocab, int64_t n, float* logits);
