@@ -471,6 +471,11 @@
       "pass": true,
       "unit_id": "u649794726a"
     },
+    "ArenaCarving.lean": {
+      "hash": "539ee6e45378",
+      "pass": true,
+      "unit_id": "ud77a0d7726"
+    },
     "ByteLevelBpeTokenizer.lean": {
       "hash": "1296b36ea3b7",
       "pass": true,
@@ -485,6 +490,16 @@
       "hash": "6a0f33fb5396",
       "pass": true,
       "unit_id": "u2e9aa362e3"
+    },
+    "ExpertBlobPacking.lean": {
+      "hash": "af8a3c3ba27f",
+      "pass": true,
+      "unit_id": "ud77a0d7726"
+    },
+    "ExpertSourceDispatch.lean": {
+      "hash": "89e316077dfa",
+      "pass": true,
+      "unit_id": "ud77a0d7726"
     },
     "F16Bits.lean": {
       "hash": "a24e9dc4a69a",
@@ -506,10 +521,30 @@
       "pass": true,
       "unit_id": "u2e9aa362e3"
     },
+    "LazyExpertLoader.lean": {
+      "hash": "313ba54cc5fb",
+      "pass": true,
+      "unit_id": "ud77a0d7726"
+    },
+    "MemoryPlanner.lean": {
+      "hash": "88edf4d49096",
+      "pass": true,
+      "unit_id": "ud77a0d7726"
+    },
     "NgramHashIq4nl.lean": {
       "hash": "354b54e53f28",
       "pass": true,
       "unit_id": "u649794726a"
+    },
+    "PinnedArenaLoader.lean": {
+      "hash": "3a8c7d2e7c31",
+      "pass": true,
+      "unit_id": "ud77a0d7726"
+    },
+    "PleReaderPaging.lean": {
+      "hash": "226b33084cf4",
+      "pass": true,
+      "unit_id": "ud77a0d7726"
     },
     "Q2_0GgufWriter.lean": {
       "hash": "275745520eb5",
@@ -539,12 +574,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "ud77a0d7726": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
