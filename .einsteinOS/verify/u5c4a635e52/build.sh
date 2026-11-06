@@ -9,7 +9,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
-COREX=/usr/local/corex
+COREX="${COREX:-/usr/local/corex}"   # override point: the toolchain location is a real input of this build
 CLANG="$COREX/bin/clang++"
 [ -x "$CLANG" ] || { echo "corex toolchain missing at $CLANG"; exit 2; }
 HOSTCXX="$CLANG"
@@ -72,7 +72,7 @@ for f in src/kernels/gpu/*.cu src/cu/s_gemv.cu src/cu/native_mmvq.cu; do
   [ -f "$f" ] || continue
   o="$OUT/cuda/$(echo "$f" | sed 's#/#__#g').o"
   echo "[cuda] $f"; "$CLANG" $CUFLAGS -c "$f" -o "$o"
-  case "$f" in src/kernels/gpu/*|src/cu/s_gemv.cu) OBJS="$OBJS $o";; esac
+  case "$f" in src/kernels/gpu/*|src/cu/s_gemv.cu|src/cu/native_mmvq.cu) OBJS="$OBJS $o";; esac
 done
 echo "[cuda] tests/k44_u5c4/test_u5c4_gpu.cu"
 "$CLANG" $CUFLAGS -c tests/k44_u5c4/test_u5c4_gpu.cu -o "$OUT/cuda/test_u5c4_gpu.o"

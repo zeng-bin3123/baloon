@@ -2,6 +2,9 @@
 //   S2GemvFastTreeReduce -> kg::s2_gemv_fast equals the exact sum (c-1)*f16(x)*scale for every row, whatever n_in / n_out
 //   SGemvSplitKernels    -> s_gemv (fp activation), s_gemv_split (Q8_K / Q8_0) against a double reference for widths 2/4/8,
 //                           split-K deterministic and independent of the split count; the refusal cases (Q8_K needs n_in % 256 == 0)
+//   NativeMmvqDispatch   -> kern::native_mmvq (Q8_0 / Q4_0) equals the double-precision dot of the weight blocks with the Q8_1 image,
+//                           a column's result does not depend on how many columns ride along, the Q8_1 quantizer error is <= d/2,
+//                           refusal cases (0 or > 8 columns, n_in % 32 != 0, null pointers) and the weight/activation byte counts
 //   IqQuantizedDotKernels-> kg::iq_row_bytes / block geometry / is_iq / native_expert_layout against the theory formulas
 // Prints "U5C4 GPU TESTS PASSED" and exits 0 only if everything held.
 #include <cuda_runtime.h>
@@ -15,7 +18,9 @@
 
 #include "baloon/f16_bits.hpp"
 #include "baloon/kern_cuda_misc.hpp"
+#include "baloon/kern_native_mmvq.hpp"
 #include "baloon/kg_kernels.hpp"
+#include "baloon/mmvq_oracle.hpp"
 
 static int g_fail = 0, g_checks = 0;
 #define CHECK(c)                                                                  \
@@ -417,6 +422,126 @@ static void test_iq_launch() {
     }
 }
 
+// ---- NativeMmvqDispatch ------------------------------------------------------------------------------------------------
+static void test_native_mmvq() {
+    namespace kn = baloon::kern;
+    cudaStream_t none = 0;
+    CHECK(kn::native_mmvq_supported(8) && kn::native_mmvq_supported(2) && !kn::native_mmvq_supported(99));
+    CHECK(kn::native_q8_1_bytes(3, 256) == (size_t)3 * 8 * 36);
+    CHECK(kn::native_mmvq_weight_bytes(8, 256, 5) == (size_t)5 * 8 * 34);
+    CHECK(kn::native_mmvq_weight_bytes(2, 256, 5) == (size_t)5 * 8 * 18);
+    CHECK(kn::native_mmvq_weight_bytes(8, 100, 5) == 0);                       // not whole blocks
+    CHECK(baloon::kg::mmvq_oracle_supported(8) && baloon::kg::mmvq_oracle_supported(2) && !baloon::kg::mmvq_oracle_supported(20));
+    {
+        Dev<uint8_t> a(64), b(64); Dev<float> c(4);
+        CHECK(baloon::kg::mmvq_oracle(20, a, b, c, 32, 1, 1, 0) != cudaSuccess);
+        CHECK(baloon::kg::mmvq_oracle(8, a, b, c, 33, 1, 1, 0) != cudaSuccess);
+        CHECK(baloon::kg::mmvq_oracle(8, a, b, c, 32, 1, 0, 0) != cudaSuccess);
+        CHECK(baloon::kg::mmvq_oracle(8, nullptr, b, c, 32, 1, 1, 0) != cudaSuccess);
+        (void)cudaGetLastError();
+    }
+    std::uniform_real_distribution<float> ux(-2.f, 2.f), ud(0.01f, 0.5f);
+    std::uniform_int_distribution<int> ub(0, 255), uq(-127, 127);
+    for (int type : {8, 2}) {
+        const int bytes_per = type == 8 ? 34 : 18;
+        for (int n_in : {32, 256, 1024}) {
+            const int n_out = 9, nb = n_in / 32;
+            std::vector<uint8_t> w((size_t)n_out * nb * bytes_per);
+            for (int r = 0; r < n_out; ++r)
+                for (int b = 0; b < nb; ++b) {
+                    uint8_t* blk = &w[((size_t)r * nb + b) * bytes_per];
+                    const uint16_t d = fb::f16_from_f32(ud(rng));
+                    std::memcpy(blk, &d, 2);
+                    if (type == 8) for (int i = 0; i < 32; ++i) blk[2 + i] = (uint8_t)(int8_t)uq(rng);
+                    else for (int i = 0; i < 16; ++i) blk[2 + i] = (uint8_t)ub(rng);
+                }
+            Dev<uint8_t> dw(w);
+            std::vector<float> ycol0;
+            for (int ncols : {1, 2, 4}) {
+                std::vector<float> x((size_t)ncols * n_in);
+                for (auto& v : x) v = ux(rng);
+                Dev<float> dx(x), dy((size_t)ncols * n_out);
+                Dev<uint8_t> dq(kn::native_q8_1_bytes(ncols, n_in));
+                CHECK(kn::native_quantize_q8_1(dx, dq, (int64_t)ncols * n_in, none) == cudaSuccess && sync_ok());
+                CHECK(kn::native_mmvq(type, dw, dq, dy, n_in, n_out, ncols, none) == cudaSuccess && sync_ok());
+                const std::vector<uint8_t> q = dq.get();
+                const std::vector<float> y = dy.get();
+                bool ok = true;
+                std::vector<double> refv((size_t)ncols * n_out), magv((size_t)ncols * n_out);
+                for (int c = 0; c < ncols; ++c)
+                    for (int r = 0; r < n_out; ++r) {
+                        double ref = 0, mag = 0;
+                        for (int b = 0; b < nb; ++b) {
+                            const uint8_t* wb = &w[((size_t)r * nb + b) * bytes_per];
+                            const uint8_t* xb = &q[((size_t)c * nb + b) * 36];
+                            uint16_t dwh, dxh; std::memcpy(&dwh, wb, 2); std::memcpy(&dxh, xb, 2);
+                            long isum = 0;
+                            for (int i = 0; i < 32; ++i) {
+                                const int wv = type == 8 ? (int)(int8_t)wb[2 + i]
+                                                         : (int)((i < 16 ? (wb[2 + i] & 15) : (wb[2 + i - 16] >> 4)) - 8);
+                                isum += (long)wv * (int)(int8_t)xb[4 + i];
+                            }
+                            const double term = (double)fb::f32_from_f16(dwh) * fb::f32_from_f16(dxh) * (double)isum;
+                            ref += term; mag += std::fabs(term);
+                        }
+                        refv[(size_t)c * n_out + r] = ref; magv[(size_t)c * n_out + r] = mag;
+                        ok &= std::fabs(ref - y[(size_t)c * n_out + r]) <= 1e-4 * mag + 1e-5;
+                    }
+                CHECK(ok);
+                // the device-side oracle kernel (plain one thread per output) agrees with the host reference and the tuned kernel
+                {
+                    Dev<float> dor((size_t)ncols * n_out);
+                    CHECK(baloon::kg::mmvq_oracle(type, dw, dq, dor, n_in, n_out, ncols, none) == cudaSuccess && sync_ok());
+                    const std::vector<float> orc = dor.get();
+                    // both are float-accumulated, so the bound is relative to the sum of the term magnitudes
+                    bool same = true, near_host = true;
+                    for (size_t i = 0; i < orc.size(); ++i) {
+                        same &= std::fabs((double)orc[i] - (double)y[i]) <= 2e-4 * magv[i] + 1e-5;
+                        near_host &= std::fabs(refv[i] - (double)orc[i]) <= 1e-4 * magv[i] + 1e-5;
+                    }
+                    CHECK(same);
+                    CHECK(near_host);
+                }
+                // the Q8_1 quantizer: |x - d*q| <= d/2 (+ f16 rounding of d), and the block sum field is d * sum(q)
+                bool qok = true;
+                for (int c = 0; c < ncols; ++c)
+                    for (int b = 0; b < nb; ++b) {
+                        const uint8_t* xb = &q[((size_t)c * nb + b) * 36];
+                        uint16_t dh; std::memcpy(&dh, xb, 2);
+                        const double d = fb::f32_from_f16(dh);
+                        for (int i = 0; i < 32; ++i)
+                            qok &= std::fabs((double)x[(size_t)c * n_in + b * 32 + i] - d * (int)(int8_t)xb[4 + i]) <= d * 0.51 + 1e-3;
+                    }
+                CHECK(qok);
+                // a column's result does not depend on how many columns ride along (bit-identical)
+                if (ncols == 1) ycol0 = y;
+                else {
+                    std::vector<float> x1(x.begin(), x.begin() + n_in);
+                    Dev<float> dx1(x1), dy1(n_out);
+                    Dev<uint8_t> dq1(kn::native_q8_1_bytes(1, n_in));
+                    CHECK(kn::native_quantize_q8_1(dx1, dq1, n_in, none) == cudaSuccess);
+                    CHECK(kn::native_mmvq(type, dw, dq1, dy1, n_in, n_out, 1, none) == cudaSuccess && sync_ok());
+                    const std::vector<float> a = dy1.get();
+                    CHECK(std::memcmp(a.data(), y.data(), (size_t)n_out * 4) == 0);
+                }
+            }
+            // refusal cases
+            Dev<float> dxx(n_in), dyy((size_t)9 * n_out);
+            Dev<uint8_t> dqq(kn::native_q8_1_bytes(8, n_in) + 4096);
+            CHECK(kn::native_mmvq(type, dw, dqq, dyy, n_in, n_out, 0, none) != cudaSuccess);
+            (void)cudaGetLastError();
+            CHECK(kn::native_mmvq(type, dw, dqq, dyy, n_in, n_out, 9, none) != cudaSuccess);
+            (void)cudaGetLastError();
+            CHECK(kn::native_mmvq(type, dw, dqq, dyy, n_in + 7, n_out, 1, none) != cudaSuccess);
+            (void)cudaGetLastError();
+            CHECK(kn::native_mmvq(type, nullptr, dqq, dyy, n_in, n_out, 1, none) != cudaSuccess);
+            (void)cudaGetLastError();
+            CHECK(kn::native_quantize_q8_1(dxx, dqq, n_in - 1, none) != cudaSuccess);
+            (void)cudaGetLastError();
+        }
+    }
+}
+
 int main() {
     int ndev = 0;
     if (cudaGetDeviceCount(&ndev) != cudaSuccess || ndev <= 0) { std::printf("no GPU\n"); return 2; }
@@ -428,6 +553,7 @@ int main() {
     test_iq_launch();
     test_s2_gemv_fast();
     test_s_gemv();
+    test_native_mmvq();
     std::printf("%d checks, %d failed\n", g_checks, g_fail);
     if (g_fail) { std::printf("U5C4 GPU TESTS FAILED\n"); return 1; }
     std::printf("U5C4 GPU TESTS PASSED\n");
