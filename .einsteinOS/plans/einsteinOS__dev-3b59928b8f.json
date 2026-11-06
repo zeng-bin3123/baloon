@@ -2,7 +2,7 @@
   "version": 1,
   "ref": "Niko1221/Strata",
   "ref_sha": "6801c77ff6f7a1e08fe78820d3043f469f6f3f6f",
-  "theory_hash": "a84caaa82c5e",
+  "theory_hash": "4f0498ae2206",
   "modules": {
     "ActivationContract.lean": {
       "name": "ActivationContract.lean",
@@ -81,8 +81,8 @@
     },
     "F16Bits.lean": {
       "name": "F16Bits.lean",
-      "hash": "e6e5f70119a6",
-      "bytes": 9700
+      "hash": "a24e9dc4a69a",
+      "bytes": 7133
     },
     "FusedGdnDecodeKernels.lean": {
       "name": "FusedGdnDecodeKernels.lean",
@@ -151,8 +151,8 @@
     },
     "MtpDraftBlockQuantizer.lean": {
       "name": "MtpDraftBlockQuantizer.lean",
-      "hash": "1a7a72ce47b9",
-      "bytes": 9203
+      "hash": "3ae0c62875af",
+      "bytes": 4820
     },
     "MtpDraftLayer.lean": {
       "name": "MtpDraftLayer.lean",
@@ -196,8 +196,8 @@
     },
     "NgramHashIq4nl.lean": {
       "name": "NgramHashIq4nl.lean",
-      "hash": "e0898a71bc50",
-      "bytes": 10045
+      "hash": "354b54e53f28",
+      "bytes": 9424
     },
     "PinnedArenaLoader.lean": {
       "name": "PinnedArenaLoader.lean",
@@ -221,8 +221,8 @@
     },
     "PrefillKernels.lean": {
       "name": "PrefillKernels.lean",
-      "hash": "b0a000b2353b",
-      "bytes": 23754
+      "hash": "b7ccf6410e7a",
+      "bytes": 12204
     },
     "Q2Avx2Rows.lean": {
       "name": "Q2Avx2Rows.lean",
@@ -281,8 +281,8 @@
     },
     "ServeFrontend.lean": {
       "name": "ServeFrontend.lean",
-      "hash": "4de2f52c44b1",
-      "bytes": 5847
+      "hash": "ae6325bf7cfe",
+      "bytes": 5423
     },
     "SessionSchedule.lean": {
       "name": "SessionSchedule.lean",
@@ -311,13 +311,13 @@
     },
     "VerifyWindowKernels.lean": {
       "name": "VerifyWindowKernels.lean",
-      "hash": "2b6e6e15c74e",
-      "bytes": 7837
+      "hash": "1216f62f4265",
+      "bytes": 7273
     },
     "VisionEncoderTool.lean": {
       "name": "VisionEncoderTool.lean",
-      "hash": "22dae0a56dad",
-      "bytes": 13357
+      "hash": "510b8f6710c2",
+      "bytes": 5809
     },
     "WeightPackLoader.lean": {
       "name": "WeightPackLoader.lean",
