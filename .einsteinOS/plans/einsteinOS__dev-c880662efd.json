@@ -776,6 +776,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "uintegration01529aaa82b9": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
