@@ -492,10 +492,11 @@
     }
   },
   "fix_attempts": {
-    "u2e9aa362e3": 1
+    "u2e9aa362e3": 2
   },
   "fail_history": {
     "u2e9aa362e3": [
+      "review_fail",
       "review_fail"
     ],
     "u649794726a": [
@@ -505,17 +506,11 @@
   "last_failure": {
     "u2e9aa362e3": {
       "kind": "review_fail",
-      "text": "LayerShapeCheck is not implemented in the production counterparts src/rt/layout_check.cpp check_all/check_layer/check_one (no 16 two-D/6-7 one-D set, no engine-form check, no 12/36 split check); the spec lives only in an unused header include/baloon/layer_shape_check.hpp that only the test exercises",
+      "text": "Qwen4ExpGuard defaults to expected_experts=4 and omits the theory's guard constants (512 experts/top-10, 24 heads over 2 KV heads, 48 layers); tests only confirm the 4-expert fixture",
       "base_ref": "einsteinOS/dev-3b59928b8f"
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "u2e9aa362e3": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
