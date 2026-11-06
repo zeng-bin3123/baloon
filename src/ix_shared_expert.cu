@@ -3,7 +3,7 @@
 // ivcore10 changes (v9 Part H): warp_sum_d 32->64 lanes (ix_warp_sum_d), lane&63, warp>>6, scratch[4] for <<<1,256>>>.
 // Semantics kept verbatim: SiLU goes on the GATE tensor; the gate is ONE scalar per token = sigmoid(dot(x, w_shexp)),
 // both operands BF16, double accumulator; the shared output is added plain by ix_moe_combine (not router-weighted).
-// STATUS: NOT yet compiled or run on BI-V100.
+// STATUS: runs on BI-V100 in float (device double math was measured wrong there).
 #pragma once
 #include <cuda_runtime.h>
 #include <cstdint>
@@ -18,25 +18,30 @@ __global__ void swiglu_kernel(const float* __restrict__ gate, const float* __res
                               float* __restrict__ out, int n) {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
-    const double x = (double) gate[i];
-    out[i] = (float) (x / (1.0 + exp(-x))) * up[i];
+    // float math with expf: device double arithmetic/exp/shuffles give wrong results on BI-V100 (measured), float is exact enough.
+    const float x = gate[i];
+    out[i] = (x / (1.0f + expf(-x))) * up[i];
 }
 
 // sigmoid(dot(x_bf16, w_bf16)): launch <<<1, GATE_THREADS>>> only (scratch is sized for it).
 __global__ void scalar_gate_kernel(const uint16_t* __restrict__ x_bf16, const uint16_t* __restrict__ w_bf16,
                                    float* __restrict__ out, int n_embd) {
-    __shared__ double scratch[GATE_WAVES];
-    double acc = 0.0;
-    for (int i = threadIdx.x; i < n_embd; i += blockDim.x)
-        acc += (double) ix_bf16_to_f32(x_bf16[i]) * (double) ix_bf16_to_f32(w_bf16[i]);
+    __shared__ float scratch[GATE_WAVES];
+    float acc = 0.f, comp = 0.f;                         // Kahan-compensated per-thread sum (float only: see swiglu note)
+    for (int i = threadIdx.x; i < n_embd; i += blockDim.x) {
+        const float term = ix_bf16_to_f32(x_bf16[i]) * ix_bf16_to_f32(w_bf16[i]) - comp;
+        const float t = acc + term;
+        comp = (t - acc) - term;
+        acc = t;
+    }
     const int lane = ix_lane_id(), wave = ix_warp_id();
-    acc = ix_warp_sum_d(acc);                            // every lane of the wave now holds the wave sum
+    acc = ix_warp_reduce_sum<float>(acc);                // xor butterfly: every lane of the wave holds the wave sum
     if (lane == 0) scratch[wave] = acc;
     __syncthreads();
-    if (wave == 0) {
-        acc = (threadIdx.x < GATE_WAVES) ? scratch[threadIdx.x] : 0.0;
-        acc = ix_warp_sum_d(acc);                        // lanes >= GATE_WAVES contribute 0
-        if (threadIdx.x == 0) out[0] = (float) (1.0 / (1.0 + exp(-acc)));
+    if (threadIdx.x == 0) {
+        float tot = 0.f;
+        for (int w = 0; w < GATE_WAVES; ++w) tot += scratch[w];
+        out[0] = 1.0f / (1.0f + expf(-tot));
     }
 }
 
