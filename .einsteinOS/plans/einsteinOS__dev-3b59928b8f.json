@@ -558,6 +558,11 @@
       "pass": true,
       "unit_id": "u1de28c5d58"
     },
+    "ExpertRowDot.lean": {
+      "hash": "f57e95f9555e",
+      "pass": true,
+      "unit_id": "u12a4d2fa9e"
+    },
     "ExpertSourceDispatch.lean": {
       "hash": "89e316077dfa",
       "pass": true,
@@ -617,6 +622,11 @@
       "hash": "275745520eb5",
       "pass": true,
       "unit_id": "u2e9aa362e3"
+    },
+    "S2ExpertGroupedHits.lean": {
+      "hash": "9d14ee4b3867",
+      "pass": true,
+      "unit_id": "u12a4d2fa9e"
     },
     "S2GemvFastTreeReduce.lean": {
       "hash": "e8314797eb9c",
