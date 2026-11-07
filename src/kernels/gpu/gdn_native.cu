@@ -57,6 +57,7 @@ void native_gdn_set_enabled(bool on) { g_enabled = on; }
 
 cudaError_t native_gdn_step(float* state, const float* q, const float* k, const float* v, const float* gate, const float* beta, float* o,
                             int S_, int h_k, int h_v, cudaStream_t s) {
+    if (s == nullptr) return cudaErrorInvalidValue;                     // launch precondition: stream non-null
     if (S_ != S || h_k <= 0 || h_v <= 0) return cudaErrorInvalidValue;
     if (h_v % h_k != 0 || h_v > 65535) return cudaErrorInvalidValue;     // modulo head pairing needs h_k | h_v; grid.x limit
     const size_t st = (size_t)S * h_v * S * 4, hq = (size_t)h_k * S * 4, hv = (size_t)h_v * S * 4, hs = (size_t)h_v * 4;

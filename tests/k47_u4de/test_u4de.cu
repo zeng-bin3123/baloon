@@ -25,6 +25,7 @@
 #include "baloon/kg_kernels.hpp"
 
 using namespace baloon::kg;
+static cudaStream_t g_s = nullptr;   // explicit non-null stream for native_gdn_* (null is rejected)
 namespace fb = baloon::f16bits;
 
 static int g_fail = 0, g_checks = 0;
@@ -104,7 +105,7 @@ static void test_gdn_step() {
             Dev<float> dq(vf((size_t)h_k * S, -1, 1)), dk(vf((size_t)h_k * S, -1, 1)), dv(vf((size_t)h_v * S, -1, 1)), dg(gate), db(beta), o((size_t)h_v * S);
             Dev<float> sa(st0), sb(st0), sc(st0), od((size_t)h_v * S), oe((size_t)h_v * S), of((size_t)h_v * S);
             ok(gdn_step(sa, dq, dk, dv, dg, db, od, S, h_k, h_v) == cudaSuccess, "gdn_step launch (ownership)");
-            ok(native_gdn_step(sb, dq, dk, dv, dg, db, oe, S, h_k, h_v) == cudaSuccess, "native_gdn_step launch (ownership)");
+            ok(native_gdn_step(sb, dq, dk, dv, dg, db, oe, S, h_k, h_v, g_s) == cudaSuccess, "native_gdn_step launch (ownership)");
             ok(sync_ok(), "ownership kernels run");
             for (int w = 0; w < 2; ++w) {
                 const auto got = (w == 0 ? sa : sb).get();
@@ -127,7 +128,7 @@ static void test_gdn_step() {
                 std::vector<double> oref;
                 ref_step(sref, q, k, v, gate, beta, oref, S, h_k, h_v);
                 ok(gdn_step(sa, dq, dk, dv, dg, db, od, S, h_k, h_v) == cudaSuccess, "gdn_step launch");
-                ok(native_gdn_step(sb, dq, dk, dv, dg, db, oe, S, h_k, h_v) == cudaSuccess, "native_gdn_step launch");
+                ok(native_gdn_step(sb, dq, dk, dv, dg, db, oe, S, h_k, h_v, g_s) == cudaSuccess, "native_gdn_step launch");
                 // fused: y = gated RMS norm of the read-out; checked against the host norm of oref
                 std::vector<float> z = vf((size_t)h_v * S, -2, 2), nw = vf(S, 0.5f, 1.5f);
                 Dev<float> dz(z), dnw(nw), dy((size_t)h_v * S);
@@ -152,24 +153,25 @@ static void test_gdn_step() {
 static void test_gdn_validation() {
     const int S = 128, h_k = 2, h_v = 4;
     Dev<float> st((size_t)S * h_v * S), q((size_t)4 * S), k((size_t)4 * S), v((size_t)h_v * S), g(8), b(8), o((size_t)h_v * S);   // q,k,g,b padded so a wrongly accepted call stays in bounds
-    ok(native_gdn_step(st, q, k, v, g, b, o, S, h_k, h_v) == cudaSuccess && sync_ok(), "native_gdn_step accepts a valid call");
-    ok(native_gdn_step(st, q, k, v, g, b, o, 64, h_k, h_v) != cudaSuccess, "native_gdn_step rejects S != 128");
-    ok(native_gdn_step(st, q, k, v, g, b, o, S, 0, h_v) != cudaSuccess, "native_gdn_step rejects h_k = 0");
-    ok(native_gdn_step(st, q, k, v, g, b, o, S, 3, 4) != cudaSuccess, "native_gdn_step rejects h_v % h_k != 0");
-    ok(native_gdn_step(st, q, k, v, g, b, o, S, 1, 65536) != cudaSuccess, "native_gdn_step rejects h_v > 65535 (before touching memory)");
-    ok(native_gdn_step(nullptr, q, k, v, g, b, o, S, h_k, h_v) != cudaSuccess, "native_gdn_step rejects a null span");
-    ok(native_gdn_step((float*)((char*)(float*)st + 1), q, k, v, g, b, o, S, h_k, h_v) != cudaSuccess, "native_gdn_step rejects a misaligned state span");
-    ok(native_gdn_step(st, (const float*)((const char*)(float*)q + 2), k, v, g, b, o, S, h_k, h_v) != cudaSuccess, "native_gdn_step rejects a misaligned q span");
-    ok(native_gdn_step((float*)(UINTPTR_MAX - 3), q, k, v, g, b, o, S, h_k, h_v) != cudaSuccess, "native_gdn_step rejects a wrapping span");
-    ok(native_gdn_step(st, st, k, v, g, b, o, S, h_k, h_v) != cudaSuccess, "native_gdn_step rejects state overlapping q");
-    ok(native_gdn_step(st, q, k, v, g, b, g, S, h_k, h_v) != cudaSuccess, "native_gdn_step rejects output overlapping gate");
-    ok(native_gdn_step(st, q, k, v, g, b, v, S, h_k, h_v) != cudaSuccess, "native_gdn_step rejects output overlapping v");
+    ok(native_gdn_step(st, q, k, v, g, b, o, S, h_k, h_v, g_s) == cudaSuccess && sync_ok(), "native_gdn_step accepts a valid call");
+    ok(native_gdn_step(st, q, k, v, g, b, o, S, h_k, h_v, nullptr) == cudaErrorInvalidValue, "native_gdn_step rejects a null stream (otherwise valid call)");
+    ok(native_gdn_step(st, q, k, v, g, b, o, 64, h_k, h_v, g_s) != cudaSuccess, "native_gdn_step rejects S != 128");
+    ok(native_gdn_step(st, q, k, v, g, b, o, S, 0, h_v, g_s) != cudaSuccess, "native_gdn_step rejects h_k = 0");
+    ok(native_gdn_step(st, q, k, v, g, b, o, S, 3, 4, g_s) != cudaSuccess, "native_gdn_step rejects h_v % h_k != 0");
+    ok(native_gdn_step(st, q, k, v, g, b, o, S, 1, 65536, g_s) != cudaSuccess, "native_gdn_step rejects h_v > 65535 (before touching memory)");
+    ok(native_gdn_step(nullptr, q, k, v, g, b, o, S, h_k, h_v, g_s) != cudaSuccess, "native_gdn_step rejects a null span");
+    ok(native_gdn_step((float*)((char*)(float*)st + 1), q, k, v, g, b, o, S, h_k, h_v, g_s) != cudaSuccess, "native_gdn_step rejects a misaligned state span");
+    ok(native_gdn_step(st, (const float*)((const char*)(float*)q + 2), k, v, g, b, o, S, h_k, h_v, g_s) != cudaSuccess, "native_gdn_step rejects a misaligned q span");
+    ok(native_gdn_step((float*)(UINTPTR_MAX - 3), q, k, v, g, b, o, S, h_k, h_v, g_s) != cudaSuccess, "native_gdn_step rejects a wrapping span");
+    ok(native_gdn_step(st, st, k, v, g, b, o, S, h_k, h_v, g_s) != cudaSuccess, "native_gdn_step rejects state overlapping q");
+    ok(native_gdn_step(st, q, k, v, g, b, g, S, h_k, h_v, g_s) != cudaSuccess, "native_gdn_step rejects output overlapping gate");
+    ok(native_gdn_step(st, q, k, v, g, b, v, S, h_k, h_v, g_s) != cudaSuccess, "native_gdn_step rejects output overlapping v");
     // adjacent (non-overlapping) spans are fine: split one buffer
     Dev<float> big((size_t)S * h_v * S + (size_t)h_k * S * 2 + (size_t)h_v * S * 2 + 2 * h_v);
     float* bp = big;
     float* s2 = bp; float* q2 = s2 + (size_t)S * h_v * S; float* k2 = q2 + (size_t)h_k * S; float* v2 = k2 + (size_t)h_k * S;
     float* g2 = v2 + (size_t)h_v * S; float* b2 = g2 + h_v; float* o2 = b2 + h_v;
-    ok(native_gdn_step(s2, q2, k2, v2, g2, b2, o2, S, h_k, h_v) == cudaSuccess && sync_ok(), "native_gdn_step accepts tightly packed disjoint spans");
+    ok(native_gdn_step(s2, q2, k2, v2, g2, b2, o2, S, h_k, h_v, g_s) == cudaSuccess && sync_ok(), "native_gdn_step accepts tightly packed disjoint spans");
 }
 
 static void test_gdn_conv() {
@@ -196,7 +198,7 @@ static void test_gdn_conv() {
         }
         Dev<float> c1(hist), c2(hist), c3(hist), dw(w), dx(x), o1(C), o2(C), o3(C);
         ok(gdn_conv_step(c1, dx, dw, o1, C, dc) == cudaSuccess, "conv plain launch");
-        ok(native_gdn_conv_silu(c2, dx, dw, o2, C, dc) == cudaSuccess, "native conv+silu launch");
+        ok(native_gdn_conv_silu(c2, dx, dw, o2, C, dc, g_s) == cudaSuccess, "native conv+silu launch");
         const int h_k = 2, h_v = 2;     // channels = (2*h_k + h_v) * 128 = 768 = C
         ok(fused_gdn_conv_l2(c3, dx, dw, o3, h_k, h_v, dc, 1e-12f) == cudaSuccess, "fused conv+L2 launch");
         ok(sync_ok(), "conv variants run");
@@ -216,12 +218,13 @@ static void test_gdn_conv() {
     // validation of the native conv
     {
         Dev<float> cs((size_t)C * 3), x(C), w((size_t)C * dc), out(C);
-        ok(native_gdn_conv_silu(cs, x, w, out, C, dc) == cudaSuccess && sync_ok(), "native conv accepts a valid call");
-        ok(native_gdn_conv_silu(cs, x, w, x, C, dc) != cudaSuccess, "native conv rejects output overlapping the input");
-        ok(native_gdn_conv_silu(cs, x, w, out, 0, dc) != cudaSuccess, "native conv rejects zero channels");
-        ok(native_gdn_conv_silu(cs, x, w, out, 65536, dc) != cudaSuccess, "native conv rejects a count above 65535");
-        ok(native_gdn_conv_silu(cs, x, w, out, C, 1) != cudaSuccess, "native conv rejects d_conv < 2");
-        ok(native_gdn_conv_silu(nullptr, x, w, out, C, dc) != cudaSuccess, "native conv rejects a null history");
+        ok(native_gdn_conv_silu(cs, x, w, out, C, dc, g_s) == cudaSuccess && sync_ok(), "native conv accepts a valid call");
+        ok(native_gdn_conv_silu(cs, x, w, x, C, dc, g_s) != cudaSuccess, "native conv rejects output overlapping the input");
+        ok(native_gdn_conv_silu(cs, x, w, out, 0, dc, g_s) != cudaSuccess, "native conv rejects zero channels");
+        ok(native_gdn_conv_silu(cs, x, w, out, 65536, dc, g_s) != cudaSuccess, "native conv rejects a count above 65535");
+        ok(native_gdn_conv_silu(cs, x, w, out, C, 1, g_s) != cudaSuccess, "native conv rejects d_conv < 2");
+        ok(native_gdn_conv_silu(nullptr, x, w, out, C, dc, g_s) != cudaSuccess, "native conv rejects a null history");
+        ok(native_gdn_conv_silu(cs, x, w, out, C, dc, nullptr) == cudaErrorInvalidValue, "native conv rejects a null stream (otherwise valid call)");
     }
 }
 
@@ -235,19 +238,20 @@ static void test_gdn_norms() {
             for (int i = 0; i < 128; ++i) ref[r * 128 + i] = x[r * 128 + i] / std::sqrt(ss + 1e-6);
         }
         Dev<float> a(x), b(x);
-        ok(gdn_l2_norm(a, rows, 128, 1e-6f) == cudaSuccess && native_gdn_l2_norm(b, rows, 128, 1e-6f) == cudaSuccess && sync_ok(), "l2 launches");
+        ok(gdn_l2_norm(a, rows, 128, 1e-6f) == cudaSuccess && native_gdn_l2_norm(b, rows, 128, 1e-6f, g_s) == cudaSuccess && sync_ok(), "l2 launches");
         near(a.get(), ref, 1e-4, 1e-6, "gdn_l2_norm equals host");
         near(b.get(), ref, 1e-4, 1e-6, "native_gdn_l2_norm equals host");
-        ok(native_gdn_l2_norm(b, rows, 127, 1e-6f) != cudaSuccess, "native l2 rejects width != 128");
-        ok(native_gdn_l2_norm(b, rows, 256, 1e-6f) != cudaSuccess, "native l2 rejects width 256");
-        ok(native_gdn_l2_norm(b, 0, 128, 1e-6f) != cudaSuccess, "native l2 rejects zero rows");
-        ok(native_gdn_l2_norm(b, 65536, 128, 1e-6f) != cudaSuccess, "native l2 rejects more than 65535 rows");
-        ok(native_gdn_l2_norm(b, rows, 128, std::numeric_limits<float>::quiet_NaN()) != cudaSuccess, "native l2 rejects NaN epsilon");
-        ok(native_gdn_l2_norm(b, rows, 128, std::numeric_limits<float>::infinity()) != cudaSuccess, "native l2 rejects infinite epsilon");
-        ok(native_gdn_l2_norm(b, rows, 128, -1e-6f) != cudaSuccess, "native l2 rejects negative epsilon");
-        ok(native_gdn_l2_norm(b, rows, 128, 0.f) == cudaSuccess && sync_ok(), "native l2 accepts zero epsilon");
-        ok(native_gdn_l2_norm((float*)((char*)(float*)b + 1), rows, 128, 1e-6f) != cudaSuccess, "native l2 rejects a misaligned span");
-        ok(native_gdn_l2_norm(nullptr, rows, 128, 1e-6f) != cudaSuccess, "native l2 rejects null");
+        ok(native_gdn_l2_norm(b, rows, 127, 1e-6f, g_s) != cudaSuccess, "native l2 rejects width != 128");
+        ok(native_gdn_l2_norm(b, rows, 256, 1e-6f, g_s) != cudaSuccess, "native l2 rejects width 256");
+        ok(native_gdn_l2_norm(b, 0, 128, 1e-6f, g_s) != cudaSuccess, "native l2 rejects zero rows");
+        ok(native_gdn_l2_norm(b, 65536, 128, 1e-6f, g_s) != cudaSuccess, "native l2 rejects more than 65535 rows");
+        ok(native_gdn_l2_norm(b, rows, 128, std::numeric_limits<float>::quiet_NaN(), g_s) != cudaSuccess, "native l2 rejects NaN epsilon");
+        ok(native_gdn_l2_norm(b, rows, 128, std::numeric_limits<float>::infinity(), g_s) != cudaSuccess, "native l2 rejects infinite epsilon");
+        ok(native_gdn_l2_norm(b, rows, 128, -1e-6f, g_s) != cudaSuccess, "native l2 rejects negative epsilon");
+        ok(native_gdn_l2_norm(b, rows, 128, 0.f, g_s) == cudaSuccess && sync_ok(), "native l2 accepts zero epsilon");
+        ok(native_gdn_l2_norm((float*)((char*)(float*)b + 1), rows, 128, 1e-6f, g_s) != cudaSuccess, "native l2 rejects a misaligned span");
+        ok(native_gdn_l2_norm(nullptr, rows, 128, 1e-6f, g_s) != cudaSuccess, "native l2 rejects null");
+        ok(native_gdn_l2_norm(b, rows, 128, 1e-6f, nullptr) == cudaErrorInvalidValue, "native l2 rejects a null stream (otherwise valid call)");
     }
     // output norm
     {
@@ -259,14 +263,15 @@ static void test_gdn_norms() {
             for (int i = 0; i < 128; ++i) ref[h * 128 + i] = o[h * 128 + i] * inv * nw[i] * sigm(z[h * 128 + i]);
         }
         Dev<float> d_o(o), d_z(z), d_w(nw), y1(o.size()), y2(o.size());
-        ok(gdn_out_norm(d_o, d_z, d_w, y1, h_v, 128, 1e-6f) == cudaSuccess && native_gdn_out_norm(d_o, d_z, d_w, y2, h_v, 1e-6f) == cudaSuccess && sync_ok(), "out_norm launches");
+        ok(gdn_out_norm(d_o, d_z, d_w, y1, h_v, 128, 1e-6f) == cudaSuccess && native_gdn_out_norm(d_o, d_z, d_w, y2, h_v, 1e-6f, g_s) == cudaSuccess && sync_ok(), "out_norm launches");
         near(y1.get(), ref, 1e-4, 1e-6, "gdn_out_norm equals host");
         near(y2.get(), ref, 1e-4, 1e-6, "native_gdn_out_norm equals host");
-        ok(native_gdn_out_norm(d_o, d_z, d_w, d_o, h_v, 1e-6f) != cudaSuccess, "native out_norm rejects y aliasing o");
-        ok(native_gdn_out_norm(d_o, d_z, d_w, y2, 0, 1e-6f) != cudaSuccess, "native out_norm rejects zero heads");
-        ok(native_gdn_out_norm(d_o, d_z, d_w, y2, 65536, 1e-6f) != cudaSuccess, "native out_norm rejects more than 65535 heads");
-        ok(native_gdn_out_norm(d_o, d_z, d_w, y2, h_v, std::numeric_limits<float>::quiet_NaN()) != cudaSuccess, "native out_norm rejects NaN epsilon");
-        ok(native_gdn_out_norm(d_o, d_z, d_w, y2, h_v, -1.f) != cudaSuccess, "native out_norm rejects negative epsilon");
+        ok(native_gdn_out_norm(d_o, d_z, d_w, d_o, h_v, 1e-6f, g_s) != cudaSuccess, "native out_norm rejects y aliasing o");
+        ok(native_gdn_out_norm(d_o, d_z, d_w, y2, 0, 1e-6f, g_s) != cudaSuccess, "native out_norm rejects zero heads");
+        ok(native_gdn_out_norm(d_o, d_z, d_w, y2, 65536, 1e-6f, g_s) != cudaSuccess, "native out_norm rejects more than 65535 heads");
+        ok(native_gdn_out_norm(d_o, d_z, d_w, y2, h_v, std::numeric_limits<float>::quiet_NaN(), g_s) != cudaSuccess, "native out_norm rejects NaN epsilon");
+        ok(native_gdn_out_norm(d_o, d_z, d_w, y2, h_v, -1.f, g_s) != cudaSuccess, "native out_norm rejects negative epsilon");
+        ok(native_gdn_out_norm(d_o, d_z, d_w, y2, h_v, 1e-6f, nullptr) == cudaErrorInvalidValue, "native out_norm rejects a null stream (otherwise valid call)");
     }
     // beta sigmoid, gate softplus, ab
     {
@@ -275,18 +280,20 @@ static void test_gdn_norms() {
         std::vector<double> rb(n), rg(n);
         for (int i = 0; i < n; ++i) { rb[i] = sigm(bt[i]); rg[i] = -std::exp((double)alog[i]) * softplus((double)al[i] + dt[i]); }
         Dev<float> b1(bt), b2(bt), d_a(al), d_dt(dt), d_al(alog), g1(n), g2(n), ab_beta(n), ab_g(n), d_b(bt);
-        ok(gdn_beta_gate(b1, n) == cudaSuccess && native_gdn_beta_gate(b2, n) == cudaSuccess && sync_ok(), "beta gates launch");
+        ok(gdn_beta_gate(b1, n) == cudaSuccess && native_gdn_beta_gate(b2, n, g_s) == cudaSuccess && sync_ok(), "beta gates launch");
         near(b1.get(), rb, 1e-5, 1e-7, "gdn_beta_gate = sigmoid");
         near(b2.get(), rb, 1e-5, 1e-7, "native_gdn_beta_gate = sigmoid");
-        ok(native_gdn_gate(d_a, d_dt, d_al, g1, n) == cudaSuccess && sync_ok(), "native gate launches");
+        ok(native_gdn_gate(d_a, d_dt, d_al, g1, n, g_s) == cudaSuccess && sync_ok(), "native gate launches");
         near(g1.get(), rg, 1e-4, 1e-6, "native_gdn_gate = -exp(a_log) * softplus(alpha + dt_bias)");
         ok(fused_gdn_ab(d_a, d_b, d_al, d_dt, ab_beta, ab_g, n) == cudaSuccess && sync_ok(), "fused ab launches");
         near(ab_beta.get(), rb, 1e-5, 1e-7, "fused_gdn_ab beta = sigmoid(b)");
         near(ab_g.get(), rg, 1e-4, 1e-6, "fused_gdn_ab gate = -exp(a_log) * softplus(a + dt_bias)");
-        ok(native_gdn_beta_gate(b2, 0) != cudaSuccess, "native beta gate rejects zero count");
-        ok(native_gdn_beta_gate(b2, 65536) != cudaSuccess, "native beta gate rejects a count above 65535");
-        ok(native_gdn_gate(d_a, d_dt, d_al, d_a, n) != cudaSuccess, "native gate rejects output overlapping an input");
-        ok(native_gdn_gate(d_a, d_dt, d_al, g1, 0) != cudaSuccess, "native gate rejects zero count");
+        ok(native_gdn_beta_gate(b2, 0, g_s) != cudaSuccess, "native beta gate rejects zero count");
+        ok(native_gdn_beta_gate(b2, 65536, g_s) != cudaSuccess, "native beta gate rejects a count above 65535");
+        ok(native_gdn_gate(d_a, d_dt, d_al, d_a, n, g_s) != cudaSuccess, "native gate rejects output overlapping an input");
+        ok(native_gdn_gate(d_a, d_dt, d_al, g1, 0, g_s) != cudaSuccess, "native gate rejects zero count");
+        ok(native_gdn_beta_gate(b2, n, nullptr) == cudaErrorInvalidValue, "native beta gate rejects a null stream (otherwise valid call)");
+        ok(native_gdn_gate(d_a, d_dt, d_al, g1, n, nullptr) == cudaErrorInvalidValue, "native gate rejects a null stream (otherwise valid call)");
         // coverage of every element across a launch that is not a multiple of the block size
         const int n2 = 1000;
         auto big = vf(n2, -5, 5); std::vector<double> rbig(n2); for (int i = 0; i < n2; ++i) rbig[i] = sigm(big[i]);
@@ -488,6 +495,7 @@ int main() {
     int ndev = 0;
     if (cudaGetDeviceCount(&ndev) != cudaSuccess || ndev < 1) { std::printf("NO GPU DEVICE\n"); return 2; }
     cudaSetDevice(0);
+    if (cudaStreamCreate(&g_s) != cudaSuccess) { std::printf("stream create failed\n"); return 2; }
     test_gdn_step();
     test_gdn_validation();
     test_gdn_conv();

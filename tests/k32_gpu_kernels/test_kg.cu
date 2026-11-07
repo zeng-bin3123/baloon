@@ -18,6 +18,7 @@
 
 using namespace baloon;
 using namespace baloon::kg;
+static cudaStream_t g_s = nullptr;   // explicit non-null stream for native_gdn_* (null is rejected)
 namespace fb = baloon::f16bits;
 
 static int g_fail = 0, g_checks = 0;
@@ -184,10 +185,10 @@ static void test_gdn() {
     }
     near_vec(oA.get(), ro, 1e-4, 1e-4, "gdn_step output = decay, contract, rank-1 update, read with updated state");
     near_vec_f(sA.get(), rst, 1e-4, 1e-4, "gdn_step updated state");
-    ok(native_gdn_step(sB, dq, dk, dv, dgate, dbeta, oB, S, h_k, h_v) == cudaSuccess && sync_ok(), "native_gdn_step launch");
+    ok(native_gdn_step(sB, dq, dk, dv, dgate, dbeta, oB, S, h_k, h_v, g_s) == cudaSuccess && sync_ok(), "native_gdn_step launch");
     ok(sB.get() == sA.get() && oB.get() == oA.get(), "native_gdn_step is bit-identical to gdn_step");
-    ok(native_gdn_step(sB, sB, dk, dv, dgate, dbeta, oB, S, h_k, h_v) != cudaSuccess, "native_gdn_step rejects state overlapping q");
-    ok(native_gdn_step(sB, dq, dk, dv, dgate, dbeta, oB, 64, h_k, h_v) != cudaSuccess, "native_gdn_step rejects S != 128");
+    ok(native_gdn_step(sB, sB, dk, dv, dgate, dbeta, oB, S, h_k, h_v, g_s) != cudaSuccess, "native_gdn_step rejects state overlapping q");
+    ok(native_gdn_step(sB, dq, dk, dv, dgate, dbeta, oB, 64, h_k, h_v, g_s) != cudaSuccess, "native_gdn_step rejects S != 128");
     Dev<float> yF((size_t)h_v * S), yU((size_t)h_v * S);
     ok(fused_gdn_step_norm(sC, dq, dk, dv, dgate, dbeta, dz, dnw, yF, h_k, h_v, 1e-6f) == cudaSuccess && sync_ok(), "fused_gdn_step_norm launch");
     ok(gdn_out_norm(oA, dz, dnw, yU, h_v, S, 1e-6f) == cudaSuccess && sync_ok(), "gdn_out_norm launch");
@@ -210,26 +211,26 @@ static void test_gdn() {
     for (int h = 0; h < h_v; ++h) { rb[h] = sigmoid_d(b_[h]); const double zz = (double)a_[h] + dtb[h]; rg[h] = -std::exp((double)alog[h]) * (zz > 20 ? zz : std::log1p(std::exp(zz))); }
     near_vec(be.get(), rb, 1e-5, 1e-6, "fused ab: beta = sigmoid(b)"); near_vec(ga.get(), rg, 1e-5, 1e-6, "fused ab: gate");
     Dev<float> bb(b_);
-    ok(gdn_beta_gate(bb, h_v) == cudaSuccess && native_gdn_beta_gate(db, h_v) == cudaSuccess && sync_ok(), "beta gate launches");
+    ok(gdn_beta_gate(bb, h_v) == cudaSuccess && native_gdn_beta_gate(db, h_v, g_s) == cudaSuccess && sync_ok(), "beta gate launches");
     ok(bb.get() == db.get(), "native beta gate = plain beta gate");
     // native pre/post
     Dev<float> ng(h_v);
-    ok(native_gdn_gate(da, dd, dl, ng, h_v) == cudaSuccess && sync_ok(), "native_gdn_gate launch");
+    ok(native_gdn_gate(da, dd, dl, ng, h_v, g_s) == cudaSuccess && sync_ok(), "native_gdn_gate launch");
     near_vec(ng.get(), rg, 1e-5, 1e-6, "native_gdn_gate");
-    ok(native_gdn_gate(da, dd, dl, da, h_v) != cudaSuccess, "native_gdn_gate rejects output overlapping an input");
+    ok(native_gdn_gate(da, dd, dl, da, h_v, g_s) != cudaSuccess, "native_gdn_gate rejects output overlapping an input");
     Dev<float> c3(cs0), o3(C);
-    ok(native_gdn_conv_silu(c3, dx, dW, o3, C, dc) == cudaSuccess && sync_ok(), "native_gdn_conv_silu launch");
+    ok(native_gdn_conv_silu(c3, dx, dW, o3, C, dc, g_s) == cudaSuccess && sync_ok(), "native_gdn_conv_silu launch");
     std::vector<double> rc(C);
     for (int c = 0; c < C; ++c) { double a = 0; for (int i = 0; i < dc - 1; ++i) a += (double)cs0[(size_t)c * (dc - 1) + i] * kW[(size_t)c * dc + i]; a += (double)xin[c] * kW[(size_t)c * dc + dc - 1]; rc[c] = silu_d(a); }
     near_vec(o3.get(), rc, 1e-4, 1e-5, "native_gdn_conv_silu");
     auto xl = vf(3 * 128, -2, 2); Dev<float> dxl(xl);
-    ok(native_gdn_l2_norm(dxl, 3, 128, 1e-12f) == cudaSuccess && sync_ok(), "native_gdn_l2_norm launch");
+    ok(native_gdn_l2_norm(dxl, 3, 128, 1e-12f, g_s) == cudaSuccess && sync_ok(), "native_gdn_l2_norm launch");
     { auto o = dxl.get(); bool unit = true; for (int r = 0; r < 3; ++r) { double s = 0; for (int i = 0; i < 128; ++i) s += (double)o[r * 128 + i] * o[r * 128 + i]; if (std::fabs(s - 1) > 1e-4) unit = false; } ok(unit, "native_gdn_l2_norm gives unit rows"); }
     Dev<float> yn((size_t)h_v * S);
-    ok(native_gdn_out_norm(oA, dz, dnw, yn, h_v, 1e-6f) == cudaSuccess && sync_ok(), "native_gdn_out_norm launch");
+    ok(native_gdn_out_norm(oA, dz, dnw, yn, h_v, 1e-6f, g_s) == cudaSuccess && sync_ok(), "native_gdn_out_norm launch");
     near_vec_f(yn.get(), yU.get(), 1e-4, 1e-5, "native_gdn_out_norm equals gdn_out_norm");
-    ok(native_gdn_out_norm(oA, dz, dnw, oA, h_v, 1e-6f) != cudaSuccess, "native_gdn_out_norm rejects y aliasing o");
-    ok(native_gdn_l2_norm(nullptr, 3, 200, 1e-6f) != cudaSuccess, "native_gdn_l2_norm rejects null");
+    ok(native_gdn_out_norm(oA, dz, dnw, oA, h_v, 1e-6f, g_s) != cudaSuccess, "native_gdn_out_norm rejects y aliasing o");
+    ok(native_gdn_l2_norm(nullptr, 3, 200, 1e-6f, g_s) != cudaSuccess, "native_gdn_l2_norm rejects null");
     native_gdn_set_enabled(false); ok(!native_gdn_enabled(), "native gdn switch off"); native_gdn_set_enabled(true); ok(native_gdn_enabled(), "native gdn switch on");
 }
 
@@ -611,6 +612,7 @@ static void test_formats() {
 int main() {
     int n = 0; if (cudaGetDeviceCount(&n) != cudaSuccess || n < 1) { std::printf("no GPU\n"); return 2; }
     cudaSetDevice(0);
+    if (cudaStreamCreate(&g_s) != cudaSuccess) { std::printf("stream create failed\n"); return 2; }
     test_dense(); test_gdn(); test_gr(); test_moe(); test_s2(); test_rope_qsa_ple(); test_formats();
     std::printf("%d checks, %d failed\n", g_checks, g_fail);
     if (g_fail) { std::printf("UNIT 32 TESTS FAILED\n"); return 1; }

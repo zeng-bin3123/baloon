@@ -61,12 +61,13 @@ cudaError_t fused_gdn_step_norm(float* state, const float* q, const float* k, co
                                 const float* ssm_norm, float* y, int h_k, int h_v, float eps, cudaStream_t s = 0);
 bool native_gdn_enabled();
 void native_gdn_set_enabled(bool on);
-cudaError_t native_gdn_step(float* state, const float* q, const float* k, const float* v, const float* gate, const float* beta, float* o, int S, int h_k, int h_v, cudaStream_t s = 0);
-cudaError_t native_gdn_beta_gate(float* beta, int n, cudaStream_t s = 0);
-cudaError_t native_gdn_gate(const float* alpha, const float* dt_bias, const float* a_log, float* g, int n, cudaStream_t s = 0);
-cudaError_t native_gdn_conv_silu(float* conv_state, const float* x, const float* kW, float* out, int C, int dc, cudaStream_t s = 0);
-cudaError_t native_gdn_l2_norm(float* x, int rows, int cols, float eps, cudaStream_t s = 0);
-cudaError_t native_gdn_out_norm(const float* o, const float* z, const float* norm_w, float* y, int h_v, float eps, cudaStream_t s = 0);
+// native_gdn_*: the stream must be non-null (explicit stream required; the legacy default stream is rejected)
+cudaError_t native_gdn_step(float* state, const float* q, const float* k, const float* v, const float* gate, const float* beta, float* o, int S, int h_k, int h_v, cudaStream_t s);
+cudaError_t native_gdn_beta_gate(float* beta, int n, cudaStream_t s);
+cudaError_t native_gdn_gate(const float* alpha, const float* dt_bias, const float* a_log, float* g, int n, cudaStream_t s);
+cudaError_t native_gdn_conv_silu(float* conv_state, const float* x, const float* kW, float* out, int C, int dc, cudaStream_t s);
+cudaError_t native_gdn_l2_norm(float* x, int rows, int cols, float eps, cudaStream_t s);
+cudaError_t native_gdn_out_norm(const float* o, const float* z, const float* norm_w, float* y, int h_v, float eps, cudaStream_t s);
 
 // ---- gated residual --------------------------------------------------------------------------------------------------------------
 size_t gr_workspace_bytes(const GrDims& d);

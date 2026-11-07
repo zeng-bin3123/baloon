@@ -79,6 +79,10 @@ PY
 
 echo "== mutations: broken PRODUCTION code must be caught =="
 mutate gdn_native     ratio      "if (h_v % h_k != 0 || h_v > 65535) return cudaErrorInvalidValue;" "if (h_v > 65535) return cudaErrorInvalidValue;"
+mutate gdn_native     nullstream "if (s == nullptr) return cudaErrorInvalidValue;" "if (false) return cudaErrorInvalidValue;"
+mutate gdn_native_pre nullstream_count "return s != nullptr && n >= 1 && n <= 65535;" "return n >= 1 && n <= 65535;"
+mutate gdn_native_pre nullstream_l2 "if (s == nullptr || !rows_ok(rows, cols)" "if (!rows_ok(rows, cols)"
+mutate gdn_native_pre nullstream_outnorm "if (s == nullptr || !rows_ok(h_v, S)" "if (!rows_ok(h_v, S)"
 mutate gdn_native_pre epsneg     "std::isfinite(e) && e >= 0.f" "std::isfinite(e) && e >= -1.f"
 mutate gdn_native_pre width      "cols == 128; }" "cols <= 128; }"
 mutate gdn_native_pre convalias  "|| !disjoint(os, xs) || !disjoint(os, ws)) return cudaErrorInvalidValue;" "|| !disjoint(os, ws)) return cudaErrorInvalidValue;"

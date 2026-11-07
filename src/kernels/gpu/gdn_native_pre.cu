@@ -22,7 +22,7 @@ bool disjoint(const Span& a, const Span& b) {
     return !(pa < pb + b.bytes && pb < pa + a.bytes);
 }
 cudaError_t check_launch() { return cudaGetLastError(); }
-bool count_and_stream(long long n, cudaStream_t) { return n >= 1 && n <= 65535; }
+bool count_and_stream(long long n, cudaStream_t s) { return s != nullptr && n >= 1 && n <= 65535; }   // stream non-null, count in [1, 65535]
 // threads of a norm block for `cols` values: a multiple of the wave, at most 256
 int norm_geometry(int cols) { int t = 64; while (t < 256 && t < cols) t <<= 1; return t; }
 
@@ -102,13 +102,13 @@ cudaError_t native_gdn_conv_silu(float* conv_state, const float* x, const float*
     return check_launch();
 }
 cudaError_t native_gdn_l2_norm(float* x, int rows, int cols, float eps, cudaStream_t s) {
-    if (!rows_ok(rows, cols) || !eps_ok(eps) || !valid({x, (size_t)rows * cols * 4})) return cudaErrorInvalidValue;
+    if (s == nullptr || !rows_ok(rows, cols) || !eps_ok(eps) || !valid({x, (size_t)rows * cols * 4})) return cudaErrorInvalidValue;
     const int t = norm_geometry(cols);
     l2_norm<<<rows, t, (size_t)(t / 64) * sizeof(float), s>>>(x, cols, eps);
     return check_launch();
 }
 cudaError_t native_gdn_out_norm(const float* o, const float* z, const float* norm_w, float* y, int h_v, float eps, cudaStream_t s) {
-    if (!rows_ok(h_v, S) || !eps_ok(eps)) return cudaErrorInvalidValue;
+    if (s == nullptr || !rows_ok(h_v, S) || !eps_ok(eps)) return cudaErrorInvalidValue;
     const size_t hb = (size_t)h_v * S * 4;
     const Span os{o, hb}, zs{z, hb}, ws{norm_w, (size_t)S * 4}, ys{y, hb};
     if (!valid(os) || !valid(zs) || !valid(ws) || !valid(ys)) return cudaErrorInvalidValue;
