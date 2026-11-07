@@ -96,6 +96,10 @@ mutate gdn_core       pairing    "src = h % h_k;    // modulo head pairing" "src
 mutate gdn_core       slide      "for (int i = 0; i < dc - 2; ++i) st[i] = st[i + 1];" "for (int i = 0; i < dc - 3; ++i) st[i] = st[i + 1];"
 mutate gdn_fused      l2heads    "if (head < 2 * h_k) {" "if (head < h_k) {"
 mutate gdn_fused      fpairing   "const int lane = threadIdx.x & 63, src = h % h_k;" "const int lane = threadIdx.x & 63, src = (h + 1) % h_k;"
+mutate gdn_fused      abrow      "(is_beta ? w_beta : w_alpha) + (size_t)h * n_embd" "w_alpha + (size_t)h * n_embd"
+mutate gdn_fused      abstride   "for (int j = lane; j < n_embd / 8; j += 64) {" "for (int j = lane; j < n_embd / 8; j += 32) {"
+mutate gdn_fused      abhigh     "__uint_as_float(words[e] & 0xffff0000u) * x[j * 8 + 2 * e + 1]" "__uint_as_float(words[e] & 0xffff0000u) * x[j * 8 + 2 * e]"
+mutate gdn_fused      abgate     "else g[h] = -expf(a_log[h]) * kgc::softplus(acc + dt_bias[h]);" "else g[h] = -expf(a_log[h]) * kgc::softplus(acc);"
 mutate moe_native     moew       "acc += w[e] * parts[(size_t)e * n + j];" "acc += w[0] * parts[(size_t)e * n + j];"
 
 if [ $rc -eq 0 ]; then echo "ALL U4DE CHECKS PASSED"; else echo "U4DE CHECKS FAILED"; fi

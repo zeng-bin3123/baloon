@@ -288,6 +288,39 @@ static void test_gdn_norms() {
         ok(fused_gdn_ab(d_a, d_b, d_al, d_dt, ab_beta, ab_g, n) == cudaSuccess && sync_ok(), "fused ab launches");
         near(ab_beta.get(), rb, 1e-5, 1e-7, "fused_gdn_ab beta = sigmoid(b)");
         near(ab_g.get(), rg, 1e-4, 1e-6, "fused_gdn_ab gate = -exp(a_log) * softplus(a + dt_bias)");
+        {   // decode_ab_proj: projection of x by bf16 [w_alpha; w_beta] rows, then gate / sigmoid
+            for (int cfg = 0; cfg < 3; ++cfg) {
+                const int hv = cfg == 0 ? 32 : (cfg == 1 ? 7 : 33), ne = cfg == 0 ? 2560 : (cfg == 1 ? 8 : 520);   // 2*hv not a multiple of 8; n_embd/8 < 64 and not a multiple of 64
+                auto wa = vbf((size_t)hv * ne, 0.5f), wb = vbf((size_t)hv * ne, 0.5f);
+                auto px = vf(ne, -1, 1), pal = vf(hv, -1, 1), pdt = vf(hv, -1, 1);
+                std::vector<double> rbeta(hv), rgate(hv);
+                for (int h = 0; h < hv; ++h) {
+                    double da = 0, db = 0;
+                    for (int k = 0; k < ne; ++k) { da += (double)bf(wa[(size_t)h * ne + k]) * px[k]; db += (double)bf(wb[(size_t)h * ne + k]) * px[k]; }
+                    rgate[h] = -std::exp((double)pal[h]) * softplus(da + pdt[h]);
+                    rbeta[h] = sigm(db);
+                }
+                Dev<uint16_t> dwa(wa), dwb(wb); Dev<float> dx(px), dal(pal), ddt(pdt), pb(hv), pg(hv);
+                ok(fused_gdn_ab(dwa, dwb, dx, dal, ddt, pb, pg, hv, ne) == cudaSuccess && sync_ok(), "fused_gdn_ab projection launches");
+                near(pg.get(), rgate, 1e-4, 1e-5, "fused_gdn_ab projection: g[h] from row h of w_alpha (all 2*h_v rows covered, none twice)");
+                near(pb.get(), rbeta, 1e-4, 1e-5, "fused_gdn_ab projection: beta[h] from row h_v + h of the beta weights");
+            }
+            // each weight row is read by exactly one wave: a one-hot row pattern isolates the row index and the chunk/lane mapping
+            const int hv = 5, ne = 4096; std::vector<uint16_t> wa((size_t)hv * ne, 0), wb((size_t)hv * ne, 0); std::vector<float> px(ne);
+            for (int k = 0; k < ne; ++k) px[k] = 0.001f * (float)(k % 97 + 1);
+            for (int h = 0; h < hv; ++h) { wa[(size_t)h * ne + 8 * h + 3] = fb::round_f32_to_bf16_bits(1.f); wb[(size_t)h * ne + ne - 1 - h] = fb::round_f32_to_bf16_bits(1.f); }
+            std::vector<float> zero(hv, 0.f), one(hv, 0.f);
+            std::vector<double> rbeta(hv), rgate(hv);
+            for (int h = 0; h < hv; ++h) { rgate[h] = -std::exp(0.0) * softplus((double)px[8 * h + 3]); rbeta[h] = sigm((double)px[ne - 1 - h]); }
+            Dev<uint16_t> dwa(wa), dwb(wb); Dev<float> dx(px), dal(zero), ddt(zero), pb(hv), pg(hv);
+            ok(fused_gdn_ab(dwa, dwb, dx, dal, ddt, pb, pg, hv, ne) == cudaSuccess && sync_ok(), "fused_gdn_ab one-hot launches");
+            near(pg.get(), rgate, 1e-4, 1e-6, "fused_gdn_ab one-hot: alpha row h selects x[8h+3]");
+            near(pb.get(), rbeta, 1e-4, 1e-6, "fused_gdn_ab one-hot: beta row selects x[n_embd-1-h] (last chunk, high half)");
+            ok(fused_gdn_ab(dwa, dwb, dx, dal, ddt, pb, pg, 0, ne) != cudaSuccess, "fused_gdn_ab projection rejects h_v = 0");
+            ok(fused_gdn_ab(dwa, dwb, dx, dal, ddt, pb, pg, hv, ne - 4) != cudaSuccess, "fused_gdn_ab projection rejects n_embd % 8 != 0");
+            ok(fused_gdn_ab(dwa, dwb, dx, dal, ddt, pb, nullptr, hv, ne) != cudaSuccess, "fused_gdn_ab projection rejects null output");
+            ok(fused_gdn_ab((const uint16_t*)((const char*)dwa.p + 2), dwb, dx, dal, ddt, pb, pg, hv, ne) != cudaSuccess, "fused_gdn_ab projection rejects misaligned weights");
+        }
         ok(native_gdn_beta_gate(b2, 0, g_s) != cudaSuccess, "native beta gate rejects zero count");
         ok(native_gdn_beta_gate(b2, 65536, g_s) != cudaSuccess, "native beta gate rejects a count above 65535");
         ok(native_gdn_gate(d_a, d_dt, d_al, d_a, n, g_s) != cudaSuccess, "native gate rejects output overlapping an input");

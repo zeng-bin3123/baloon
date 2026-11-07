@@ -56,6 +56,8 @@ cudaError_t gdn_l2_norm(float* x, int rows, int cols, float eps, cudaStream_t s 
 cudaError_t gdn_beta_gate(float* beta, int n, cudaStream_t s = 0);
 cudaError_t gdn_out_norm(const float* o, const float* z, const float* ssm_norm, float* y, int h_v, int S, float eps, cudaStream_t s = 0);
 cudaError_t fused_gdn_ab(const float* a, const float* b, const float* a_log, const float* dt_bias, float* beta, float* g, int n, cudaStream_t s = 0);
+// decode_ab_proj: one wave per row of [w_alpha; w_beta] (bf16 bits, h_v rows each, row length n_embd % 8 == 0, 16-byte aligned); g from alpha rows, beta from beta rows.
+cudaError_t fused_gdn_ab(const uint16_t* w_alpha, const uint16_t* w_beta, const float* x, const float* a_log, const float* dt_bias, float* beta, float* g, int h_v, int n_embd, cudaStream_t s = 0);
 cudaError_t fused_gdn_conv_l2(float* conv_state, const float* x, const float* kW, float* out, int h_k, int h_v, int d_conv, float eps, cudaStream_t s = 0);
 cudaError_t fused_gdn_step_norm(float* state, const float* q, const float* k, const float* v, const float* gate, const float* beta, const float* z,
                                 const float* ssm_norm, float* y, int h_k, int h_v, float eps, cudaStream_t s = 0);
