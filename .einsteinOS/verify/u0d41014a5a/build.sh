@@ -7,9 +7,11 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
-COREX=/usr/local/corex
+COREX="${COREX:-/usr/local/corex}"
 CLANG="$COREX/bin/clang++"
-[ -x "$CLANG" ] || { echo "corex toolchain missing at $CLANG"; exit 2; }
+[ -x "$CLANG" ] || { echo "corex toolchain missing at $CLANG (every .cu here is compiled with it)"; exit 2; }
+"$CLANG" --version >/dev/null 2>&1 || { echo "corex clang++ at $CLANG does not run"; exit 2; }
+ls "$COREX"/lib64/libcudart* >/dev/null 2>&1 || { echo "corex runtime library missing under $COREX/lib64"; exit 2; }
 OUT="${BALOON_U0D4_BUILD_DIR:-/tmp/baloon_u0d4_build}"
 TMP="${TMPDIR:-/tmp}"
 HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread -Iinclude"
