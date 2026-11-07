@@ -581,6 +581,26 @@
       "pass": true,
       "unit_id": "u649794726a"
     },
+    "FusedGdnDecodeKernels.lean": {
+      "hash": "b5a1a28309e9",
+      "pass": true,
+      "unit_id": "u4decb4e657"
+    },
+    "FusedGrReadKernels.lean": {
+      "hash": "bdb0f08fca07",
+      "pass": true,
+      "unit_id": "u4decb4e657"
+    },
+    "GatedResidualReadWrite.lean": {
+      "hash": "d77e34093138",
+      "pass": true,
+      "unit_id": "u4decb4e657"
+    },
+    "GdnReferenceKernels.lean": {
+      "hash": "3639c3d31754",
+      "pass": true,
+      "unit_id": "u4decb4e657"
+    },
     "GgufReaderGeometry.lean": {
       "hash": "01491e5edc21",
       "pass": true,
@@ -615,6 +635,16 @@
       "hash": "88edf4d49096",
       "pass": true,
       "unit_id": "ud77a0d7726"
+    },
+    "NativeGdnPreprocess.lean": {
+      "hash": "3b2766307575",
+      "pass": true,
+      "unit_id": "u4decb4e657"
+    },
+    "NativeGdnStep.lean": {
+      "hash": "dd4c4c38ccd5",
+      "pass": true,
+      "unit_id": "u4decb4e657"
     },
     "NativeMmvqDispatch.lean": {
       "hash": "1e5f7fbcd97a",
@@ -682,9 +712,7 @@
       "unit_id": "u2e9aa362e3"
     }
   },
-  "fix_attempts": {
-    "u4decb4e657": 2
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u0d41014a5a": [
       "build_toolchain_dependence_unmeasured"
@@ -712,20 +740,8 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "u4decb4e657": {
-      "kind": "review_fail",
-      "text": "fused_gdn_ab (src/kernels/gpu/gdn_fused.cu) is an elementwise sigmoid/softplus gate on precomputed a,b, not the bf16 w_alpha/w_beta row-per-warp projection that FusedGdnDecodeKernels.lean (decode_ab_proj) specifies, and no test checks the projection invariants",
-      "base_ref": "einsteinOS/dev-3b59928b8f"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u4decb4e657": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
