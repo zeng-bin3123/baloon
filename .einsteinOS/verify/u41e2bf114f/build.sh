@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unit u41e2bf114f (PrefillKernels, PrefillChunking, BlockStagePrefix). Adds Prefill::bytes_needed_padded, tests/k46_u41e and
+# Unit u41e2bf114f (PrefillKernels, PrefillChunking, BlockStagePrefix). Adds Prefill::counted_bytes (bytes_needed now includes the 8 MiB slack), tests/k46_u41e and
 # .einsteinOS/port/u41e2bf114f.tsv. (1) builds the WHOLE project through the previous unit's build script; (2) builds the host
 # test on production layer.cpp / prefill_host.cpp; (3) builds the GPU test against production src/prefill/kernels.cu;
 # (4) checks the port table syntax. Exits 0 only if everything builds.

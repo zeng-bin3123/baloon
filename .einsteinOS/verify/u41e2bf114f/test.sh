@@ -89,7 +89,7 @@ mutate host qsaKind   include/baloon/core_layer.hpp "constexpr bool is_qsa_layer
 mutate host roundb    include/baloon/core_prefill.hpp "(b + 256 + 255) / 256 * 256" "(b + 255) / 256 * 256"
 mutate host offsets   src/prefill/prefill_host.cpp "g.off[e + 1] = g.off[e] + cnt[e];" "g.off[e + 1] = g.off[e] + cnt[e] + 1;"
 mutate host idrange   src/prefill/prefill_host.cpp "if (e >= n_experts) return false;" "if (e > n_experts) return false;"
-mutate host slack     src/prefill/prefill_host.cpp "bytes_needed() + kPrefillSlackBytes" "bytes_needed()"
+mutate host slack     src/prefill/prefill_host.cpp "counted_bytes() + kPrefillSlackBytes" "counted_bytes()"
 mutate host chunkmin  src/prefill/prefill_host.cpp "std::min<uint64_t>(c_.T, n_tokens - c0)" "c_.T"
 mutate gpu  gtie      src/prefill/kernels.cu "(cv[l] > bv || (cv[l] == bv && ci[l] < bi))" "(cv[l] > bv)"
 mutate gpu  gclamp    src/prefill/kernels.cu "q = fminf(127.f, fmaxf(-127.f, q));" "q = fminf(126.f, fmaxf(-127.f, q));"

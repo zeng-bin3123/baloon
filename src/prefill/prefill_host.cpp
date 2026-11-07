@@ -92,13 +92,14 @@ Prefill::Prefill(const PrefillConfig& c) : c_(c) {
 
 Prefill::~Prefill() = default;
 
-uint64_t Prefill::bytes_needed() const {
+uint64_t Prefill::counted_bytes() const {
     prefill_impl::Alloc a;                       // counting mode
     for (uint64_t b : seq_) a.take(b);
     return a.used;
 }
 
-uint64_t Prefill::bytes_needed_padded() const { return bytes_needed() + kPrefillSlackBytes; }
+// Theory bytesNeeded: the counted total plus 8 MiB of alignment slack.
+uint64_t Prefill::bytes_needed() const { return counted_bytes() + kPrefillSlackBytes; }
 
 bool Prefill::init(void* region, uint64_t cap) {
     inited_ = false; offs_.clear(); used_ = 0; owned_.clear();
@@ -106,7 +107,7 @@ bool Prefill::init(void* region, uint64_t cap) {
     if (region) {
         a.mode = prefill_impl::Alloc::Bump; a.cap = cap;
     } else {
-        owned_.assign((size_t)bytes_needed(), 0);       // owned mode sized by the preceding count
+        owned_.assign((size_t)counted_bytes(), 0);      // owned mode sized by the exact count
         a.mode = prefill_impl::Alloc::Owned; a.cap = owned_.size();
     }
     for (uint64_t b : seq_) offs_.push_back(a.take(b));

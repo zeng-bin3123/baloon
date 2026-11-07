@@ -179,8 +179,9 @@ void test_prefill() {
         Prefill p(c);
         uint64_t sum = 0;
         for (uint64_t b : p.alloc_sequence()) sum += round_bytes(b);
-        const uint64_t need = p.bytes_needed();
-        CHECK(need == sum);                                                    // counting mode replays the sequence exactly
+        const uint64_t need = p.counted_bytes();
+        CHECK(need == sum);
+        CHECK(p.bytes_needed() == need + 8ull * 1048576);                                                    // counting mode replays the sequence exactly
         std::vector<uint8_t> region((size_t)need + 8);
         CHECK(p.init(region.data(), need) && p.used() == need && p.initialized());
         for (size_t i = 0; i < p.offsets().size(); ++i) { CHECK(p.offsets()[i] % 256 == 0); CHECK(p.offsets()[i] + p.alloc_sequence()[i] + 256 <= need); }

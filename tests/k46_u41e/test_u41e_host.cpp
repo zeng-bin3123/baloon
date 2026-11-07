@@ -88,13 +88,13 @@ static void test_alloc_and_chunks() {
         c.blob_bytes = rng.below(500); c.dq_bytes = rng.below(900); c.gemm_scratch = 1 + rng.below(3000); c.gemm_ws = 1 + rng.below(3000);
         Prefill p(c);
         uint64_t sum = 0; for (uint64_t b : p.alloc_sequence()) sum += round_bytes(b);
-        const uint64_t need = p.bytes_needed();
+        const uint64_t need = p.counted_bytes();
         CHECK(need == sum);
-        CHECK(p.bytes_needed_padded() == need + 8ull * 1048576 && p.bytes_needed_padded() >= need);
+        CHECK(p.bytes_needed() == need + 8ull * 1048576 && p.bytes_needed() >= need);
         std::vector<uint8_t> region((size_t)need + 8);
         CHECK(p.init(region.data(), need) && p.used() == need);
         CHECK(!p.init(region.data(), need - 1) && !p.initialized());          // overflow by one byte fails exactly
-        CHECK(p.init(region.data(), p.bytes_needed_padded()) && p.used() == need);
+        CHECK(p.init(region.data(), p.bytes_needed()) && p.used() == need);
         for (size_t i = 0; i < p.offsets().size(); ++i) {
             CHECK(p.offsets()[i] % 256 == 0);
             CHECK(p.offsets()[i] + round_bytes(p.alloc_sequence()[i]) <= need);
