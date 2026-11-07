@@ -391,6 +391,11 @@
         "SGemvSplitKernels.lean",
         "NativeMmvqDispatch.lean"
       ],
+      "children": [
+        "u0d41014a5a",
+        "u12a4d2fa9e",
+        "u5e0736f9b8"
+      ],
       "reason": "initial plan",
       "conv": "be6ab5a4-2288-4354-b5e8-f6fe4c48240a"
     },
@@ -460,6 +465,35 @@
         "VisionEncoderTool.lean"
       ],
       "reason": "initial plan"
+    },
+    {
+      "id": "u0d41014a5a",
+      "parent": "u5c4a635e52",
+      "modules": [
+        "S2GemvFastTreeReduce.lean",
+        "SGemvSplitKernels.lean",
+        "NativeMmvqDispatch.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "u12a4d2fa9e",
+      "parent": "u5c4a635e52",
+      "modules": [
+        "ExpertRowDot.lean",
+        "S2ExpertGroupedHits.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "u5e0736f9b8",
+      "parent": "u5c4a635e52",
+      "modules": [
+        "Q2Avx2Rows.lean",
+        "IqAvx512Rows.lean",
+        "IqQuantizedDotKernels.lean"
+      ],
+      "reason": "3 fix attempts used"
     }
   ],
   "state": {
@@ -589,9 +623,7 @@
       "unit_id": "u2e9aa362e3"
     }
   },
-  "fix_attempts": {
-    "u5c4a635e52": 3
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u2e9aa362e3": [
       "review_fail",
@@ -606,13 +638,7 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "u5c4a635e52": {
-      "kind": "build_toolchain_dependence_unmeasured",
-      "text": "build_toolchain_dependence_unmeasured: build.sh could not be run with /usr/local/corex/bin hidden (unshare -m --propagation private: unshare: unshare failed: Operation not permitted; unshare -U -r -m --propagation unchanged: mount: /usr/local/corex-3.2.3/bin: cannot mount none read-only.), so whether it needs the toolchain is not measured",
-      "base_ref": "einsteinOS/dev-3b59928b8f-wip-u5c4a635e52"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
   "port_units": [
     {
