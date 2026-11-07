@@ -682,7 +682,9 @@
       "unit_id": "u2e9aa362e3"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u4decb4e657": 1
+  },
   "fail_history": {
     "u0d41014a5a": [
       "build_toolchain_dependence_unmeasured"
@@ -692,6 +694,9 @@
       "review_fail"
     ],
     "u41e2bf114f": [
+      "review_fail"
+    ],
+    "u4decb4e657": [
       "review_fail"
     ],
     "u5c4a635e52": [
@@ -706,14 +711,14 @@
       "review_fail"
     ]
   },
-  "last_failure": {},
-  "infra_fails": 0,
-  "review_pending": {
+  "last_failure": {
     "u4decb4e657": {
-      "compile": "pass",
-      "smoke": "pass"
+      "kind": "review_fail",
+      "text": "count_and_stream (gdn_native_pre.cu) and native_gdn_step (gdn_native.cu) never enforce the theory's launch precondition \"stream non-null\", and no test or mutant could detect it",
+      "base_ref": "einsteinOS/dev-3b59928b8f"
     }
   },
+  "infra_fails": 0,
   "port_units": [
     {
       "id": "pfcccb31b26",
