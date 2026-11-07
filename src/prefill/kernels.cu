@@ -355,6 +355,14 @@ __global__ void to_f16_kernel(const float* x, uint16_t* out, int64_t n) {
     out[i] = f16_bits(x[i]);
 }
 
+// Counts routed expert ids outside [0, kExperts): the device-side form of the host counting sort's id check.
+__global__ void route_ids_bad_kernel(const int32_t* ids, int64_t n, int* bad) {
+    const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    const int32_t e = ids[i];
+    if (e < 0 || e >= kExperts) atomicAdd(bad, 1);
+}
+
 int check() {
     const cudaError_t e = cudaGetLastError();
     return e == cudaSuccess ? 0 : (int)e;
@@ -489,6 +497,12 @@ int to_bf16(const float* x, uint16_t* out, int64_t n) {
 int to_f16(const float* x, uint16_t* out, int64_t n) {
     if (!x || !out || n <= 0) return -1;
     to_f16_kernel<<<grid(n), TH>>>(x, out, n);
+    return check();
+}
+
+int route_ids_bad(const int32_t* ids, int64_t n, int* bad_count) {
+    if (!ids || !bad_count || n <= 0) return -1;
+    route_ids_bad_kernel<<<grid(n), TH>>>(ids, n, bad_count);
     return check();
 }
 

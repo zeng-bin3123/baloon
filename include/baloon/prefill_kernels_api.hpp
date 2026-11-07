@@ -63,5 +63,8 @@ int kv_append(const float* k, int8_t* kq, float* ks, int64_t base_row, int T);  
 int to_bf16(const float* x, uint16_t* out, int64_t n);
 int to_f16(const float* x, uint16_t* out, int64_t n);
 
+// Adds to *bad_count (device int, caller-zeroed) the number of ids outside [0, kExperts).
+int route_ids_bad(const int32_t* ids, int64_t n, int* bad_count);
+
 }  // namespace pk
 }  // namespace baloon

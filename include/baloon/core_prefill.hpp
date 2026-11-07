@@ -15,6 +15,7 @@ namespace core {
 constexpr uint64_t kPrefillStageRing = 8;       // STAGE
 constexpr uint64_t kPrefillDqRing = 2;          // DQ
 constexpr uint64_t kPrefillLookahead = 7;
+constexpr uint64_t kPrefillSlackBytes = 8ull << 20;   // alignment slack added by bytes_needed_padded
 constexpr uint64_t gdn_floats_per_layer() { return 128ull * 48 * 128 + 10240ull * 3; }   // 817152
 
 constexpr uint64_t round_bytes(uint64_t b) { return (b + 256 + 255) / 256 * 256; }
@@ -55,6 +56,7 @@ public:
     ~Prefill();
 
     uint64_t bytes_needed() const;                          // counting-mode replay of the allocation sequence
+    uint64_t bytes_needed_padded() const;                   // bytes_needed() + 8 MiB: the size to reserve for a borrowed region
     // Bump mode over a borrowed region; region == nullptr: own a buffer sized by bytes_needed. false when it does not fit.
     bool init(void* region, uint64_t cap);
     bool initialized() const { return inited_; }

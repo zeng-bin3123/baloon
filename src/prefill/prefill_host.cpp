@@ -98,6 +98,8 @@ uint64_t Prefill::bytes_needed() const {
     return a.used;
 }
 
+uint64_t Prefill::bytes_needed_padded() const { return bytes_needed() + kPrefillSlackBytes; }
+
 bool Prefill::init(void* region, uint64_t cap) {
     inited_ = false; offs_.clear(); used_ = 0; owned_.clear();
     prefill_impl::Alloc a;
