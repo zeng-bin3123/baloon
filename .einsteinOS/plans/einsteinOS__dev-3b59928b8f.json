@@ -666,13 +666,18 @@
       "unit_id": "u2e9aa362e3"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u41e2bf114f": 1
+  },
   "fail_history": {
     "u0d41014a5a": [
       "build_toolchain_dependence_unmeasured"
     ],
     "u2e9aa362e3": [
       "review_fail",
+      "review_fail"
+    ],
+    "u41e2bf114f": [
       "review_fail"
     ],
     "u5c4a635e52": [
@@ -687,14 +692,14 @@
       "review_fail"
     ]
   },
-  "last_failure": {},
-  "infra_fails": 0,
-  "review_pending": {
+  "last_failure": {
     "u41e2bf114f": {
-      "compile": "pass",
-      "smoke": "pass"
+      "kind": "review_fail",
+      "text": "Prefill::bytes_needed (src/prefill/prefill_host.cpp) returns the counted total without the 8 MiB slack that PrefillChunking's bytesNeeded requires; the slack exists only in the non-reference bytes_needed_padded",
+      "base_ref": "einsteinOS/dev-3b59928b8f"
     }
   },
+  "infra_fails": 0,
   "port_units": [
     {
       "id": "pfcccb31b26",
