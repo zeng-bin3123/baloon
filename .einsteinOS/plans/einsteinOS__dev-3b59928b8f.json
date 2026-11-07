@@ -515,6 +515,11 @@
       "pass": true,
       "unit_id": "ud77a0d7726"
     },
+    "BlockStagePrefix.lean": {
+      "hash": "6e32429b6ccf",
+      "pass": true,
+      "unit_id": "u41e2bf114f"
+    },
     "ByteLevelBpeTokenizer.lean": {
       "hash": "1296b36ea3b7",
       "pass": true,
@@ -630,6 +635,16 @@
       "pass": true,
       "unit_id": "ud77a0d7726"
     },
+    "PrefillChunking.lean": {
+      "hash": "55989bb7793d",
+      "pass": true,
+      "unit_id": "u41e2bf114f"
+    },
+    "PrefillKernels.lean": {
+      "hash": "b7ccf6410e7a",
+      "pass": true,
+      "unit_id": "u41e2bf114f"
+    },
     "Q2Avx2Rows.lean": {
       "hash": "fb147d6219f2",
       "pass": true,
@@ -666,9 +681,7 @@
       "unit_id": "u2e9aa362e3"
     }
   },
-  "fix_attempts": {
-    "u41e2bf114f": 1
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u0d41014a5a": [
       "build_toolchain_dependence_unmeasured"
@@ -692,20 +705,8 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "u41e2bf114f": {
-      "kind": "review_fail",
-      "text": "Prefill::bytes_needed (src/prefill/prefill_host.cpp) returns the counted total without the 8 MiB slack that PrefillChunking's bytesNeeded requires; the slack exists only in the non-reference bytes_needed_padded",
-      "base_ref": "einsteinOS/dev-3b59928b8f"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u41e2bf114f": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
