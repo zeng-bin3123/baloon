@@ -35,6 +35,12 @@ echo "[object avx2]   src/cpu/q2_avx2_rows.cpp";   $CLANG $HF -mavx2 -mf16c -mfm
 echo "[object isa512] tests/k45_u5e0/test_u5e0.cpp"; $CLANG $HF $ISA512 -c tests/k45_u5e0/test_u5e0.cpp -o "$OUT/test_u5e0.o"
 $CLANG "$OUT/test_u5e0.o" "$OUT/iq_rows_avx512.o" "$OUT/q2_avx2_rows.o" -o "$OUT/test_u5e0" -pthread
 
+echo "== production grouped-expert launcher (src/kernels/gpu/iq_quant.cu) + its GPU test =="
+CUF="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Isrc -Isrc/cu -Isrc/kernels/gpu -Itests -Iinclude -O2"
+echo "[cuda] src/kernels/gpu/iq_quant.cu";          $CLANG $CUF -c src/kernels/gpu/iq_quant.cu -o "$OUT/iq_quant.o"
+echo "[cuda] tests/k45_u5e0/test_iq_prod.cu";       $CLANG $CUF -c tests/k45_u5e0/test_iq_prod.cu -o "$OUT/test_iq_prod.o"
+$CLANG "$OUT/test_iq_prod.o" "$OUT/iq_quant.o" -o "$OUT/test_iq_prod" -L"$COREX/lib64" -lcudart -lpthread
+
 echo "== port table syntax =="
 TSV=.einsteinOS/port/u5e0736f9b8.tsv
 [ -f "$TSV" ] || { echo "missing $TSV"; exit 1; }

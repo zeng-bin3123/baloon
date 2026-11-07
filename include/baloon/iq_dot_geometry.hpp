@@ -73,6 +73,13 @@ constexpr uint64_t grouped_scratch_bytes(uint64_t cap, uint64_t n_ff) {
     return 3 * align256(cap * n_ff * 4) + align256(cap * (n_ff / 32) * 36);
 }
 
+// Single-token native expert (cap = 1) as carved by the production launcher: the q8_1 image of the input hidden vector
+// (n_embd / 32 blocks of 36 bytes), then the three float planes (gate, up, h) and the q8_1 image of h, i.e. exactly
+// grouped_scratch_bytes(1, n_ff). Nothing follows the last region.
+constexpr uint64_t native_scratch_bytes(uint64_t n_embd, uint64_t n_ff) {
+    return align256((n_embd / 32) * 36) + grouped_scratch_bytes(1, n_ff);
+}
+
 // ---- dequantizer thread maps ------------------------------------------------------------------------------
 constexpr uint32_t dq8_offset(uint32_t tid) { return 32 * (tid % 8) + 8 * (tid / 8); }       // iq2_xxs / iq2_xs / iq2_s
 constexpr uint32_t dq_q2_0_offset(uint32_t tid) { return (tid / 8) * 64 + (tid % 8) * 8; }   // == 8 * tid

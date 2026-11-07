@@ -8,6 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
 OUT="${BALOON_U5E0_TEST_DIR:-/tmp/baloon_u5e0_test}"
 rm -rf "$OUT"; mkdir -p "$OUT"
+COREX="${COREX:-/usr/local/corex}"
 CLANG=/usr/local/corex/bin/clang++
 [ -x "$CLANG" ] || { echo "corex toolchain missing at $CLANG"; exit 2; }
 ISA512="${EINSTEINOS_ISA_FLAGS:--mavx512bw -mavx512dq -mavx512f -mavx512vbmi -mavx512vl -mavx512vnni -mf16c -mfma}"
@@ -48,6 +49,25 @@ else
   tail -4 "$OUT/base/run.log"
   [ $r -eq 0 ] || { echo "u5e0 invariants FAILED"; rc=1; }
   grep -q "U5E0 TESTS PASSED" "$OUT/base/run.log" || { echo "u5e0 suite did not report PASSED"; rc=1; }
+fi
+
+build_run_gpu() {  # build_run_gpu <root> <dir>: compile production iq_quant.cu + the GPU test of <root>, link, run on the GPU; 3 = build failure
+  local r="$1" d="$2"
+  mkdir -p "$d"
+  local CUF="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -I$r/src -I$r/src/cu -I$r/src/kernels/gpu -I$r/tests -I$r/include -O2"
+  $CLANG $CUF -c "$r/src/kernels/gpu/iq_quant.cu" -o "$d/iqq.o" 2>"$d/ccg.log" || return 3
+  $CLANG $CUF -c "$r/tests/k45_u5e0/test_iq_prod.cu" -o "$d/tg.o" 2>>"$d/ccg.log" || return 3
+  $CLANG "$d/tg.o" "$d/iqq.o" -o "$d/tg" -L"$COREX/lib64" -lcudart -lpthread 2>>"$d/ccg.log" || return 3
+  timeout 900 "$d/tg" >"$d/rung.log" 2>&1
+}
+
+echo "== production iq_quant.cu: scratch formula, carve and result (GPU) =="
+build_run_gpu "$ROOT" "$OUT/gbase"; r=$?
+if [ $r -eq 3 ]; then echo "BUILD FAILED (iq_quant production test)"; head -30 "$OUT/gbase/ccg.log"; rc=1
+else
+  tail -4 "$OUT/gbase/rung.log"
+  [ $r -eq 0 ] || { echo "iq_quant production invariants FAILED"; rc=1; }
+  grep -q "U5E0 PROD TESTS PASSED" "$OUT/gbase/rung.log" || { echo "production suite did not report PASSED"; rc=1; }
 fi
 
 echo "== mutations: broken PRODUCTION code must be caught =="
@@ -97,6 +117,33 @@ mutant dglayout    include/baloon/iq_dot_geometry.hpp "2 * (n_ff * row_bytes(gu_
 mutant dgscratch   include/baloon/iq_dot_geometry.hpp "3 * align256(cap * n_ff * 4)" "2 * align256(cap * n_ff * 4)"
 mutant dgdq        include/baloon/iq_dot_geometry.hpp "return 32 * (tid % 8) + 8 * (tid / 8); }" "return 32 * (tid % 8) + 4 * (tid / 8); }"
 mutant dgtraits    include/baloon/iq_dot_geometry.hpp "case 29: return {256, 8, 1, true};" "case 29: return {256, 8, 2, true};"
+
+gmutant() {  # gmutant <name> <file> <old> <new>: mutate PRODUCTION iq_quant.cu, the GPU test must fail
+  local name="$1" file="$2" old="$3" new="$4"
+  local m="$OUT/gm_$name"
+  rm -rf "$m"; mkdir -p "$m"
+  cp -r include src tests "$m/" 2>/dev/null
+  if ! python3 - "$m/$file" "$old" "$new" <<'PY'
+import sys
+p, old, new = sys.argv[1:4]
+s = open(p).read()
+if old not in s: sys.exit(1)
+open(p, "w").write(s.replace(old, new, 1))
+PY
+  then echo "mutation $name did not apply"; rc=1; return; fi
+  build_run_gpu "$m" "$m/b"; local r=$?
+  if [ $r -eq 3 ]; then echo "mutant $name failed to build"; head -20 "$m/b/ccg.log"; rc=1; return; fi
+  if [ $r -eq 0 ]; then echo "MUTANT SURVIVED: $name"; rc=1; else echo "mutant detected: $name"; fi
+}
+IQC=src/kernels/gpu/iq_quant.cu
+gmutant gplanes   $IQC "return align256((size_t)(n_embd / 32) * 36) + 3 * align256" "return align256((size_t)(n_embd / 32) * 36) + 2 * align256"
+gmutant gnoxq     $IQC "return align256((size_t)(n_embd / 32) * 36) + 3 * align256" "return 3 * align256"
+gmutant gtrail    $IQC "3 * align256((size_t)n_ff * 4) + align256((size_t)(n_ff / 32) * 36);" "3 * align256((size_t)n_ff * 4) + align256((size_t)(n_ff / 32) * 36) + 256;"
+gmutant gbound    $IQC "scratch_bytes < native_expert_scratch_bytes(n_embd, n_ff)" "scratch_bytes + 1 < native_expert_scratch_bytes(n_embd, n_ff)"
+gmutant ghqshift  $IQC "uint8_t* hq = p;" "uint8_t* hq = p + 256;"
+gmutant gswiglu   $IQC "h[i] = kgc::silu(gate[i]) * up[i];" "h[i] = kgc::silu(up[i]) * gate[i];"
+gmutant gq81round $IQC "(int)roundf(v * id)" "(int)truncf(v * id)"
+gmutant gupoff    $IQC "out->up_off = (size_t)rb_in * n_ff;" "out->up_off = (size_t)rb_in * n_ff + 18;"
 
 if [ $rc -eq 0 ]; then echo "ALL U5E0 CHECKS PASSED"; else echo "U5E0 CHECKS FAILED"; fi
 exit $rc

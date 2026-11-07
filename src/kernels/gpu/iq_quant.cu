@@ -318,7 +318,8 @@ bool native_expert_layout(Fmt f, int n_embd, int n_ff, ExpertLayout* out) {
     return true;
 }
 size_t native_expert_scratch_bytes(int n_embd, int n_ff) {
-    return align256((size_t)(n_embd / 32) * 36) + 3 * align256((size_t)n_ff * 4) + align256((size_t)(n_ff / 32) * 36) + align256((size_t)n_embd * 4);
+    // q8_1 image of x, three float planes (gate, up, h), q8_1 image of h: exactly the regions native_expert_grouped carves, nothing after hq.
+    return align256((size_t)(n_embd / 32) * 36) + 3 * align256((size_t)n_ff * 4) + align256((size_t)(n_ff / 32) * 36);
 }
 cudaError_t native_expert_grouped(Fmt f, const uint8_t* blob, const float* x, int n_embd, int n_ff, float* out, void* scratch, size_t scratch_bytes,
                                   const IqGrids& g, cudaStream_t s) {
