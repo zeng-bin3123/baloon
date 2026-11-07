@@ -392,7 +392,7 @@
         "NativeMmvqDispatch.lean"
       ],
       "reason": "initial plan",
-      "conv": "2a379561-3daa-4b8a-806c-8f41b81078af"
+      "conv": "be6ab5a4-2288-4354-b5e8-f6fe4c48240a"
     },
     {
       "id": "u41e2bf114f",
@@ -590,7 +590,7 @@
     }
   },
   "fix_attempts": {
-    "u5c4a635e52": 2
+    "u5c4a635e52": 3
   },
   "fail_history": {
     "u2e9aa362e3": [
@@ -598,6 +598,7 @@
       "review_fail"
     ],
     "u5c4a635e52": [
+      "build_toolchain_dependence_unmeasured",
       "build_toolchain_dependence_unmeasured",
       "build_toolchain_dependence_unmeasured"
     ],
@@ -608,7 +609,7 @@
   "last_failure": {
     "u5c4a635e52": {
       "kind": "build_toolchain_dependence_unmeasured",
-      "text": "build_toolchain_dependence_unmeasured: build.sh could not be run with /usr/local/corex/bin hidden (unshare: unshare failed: Operation not permitted), so whether it needs the toolchain is not measured",
+      "text": "build_toolchain_dependence_unmeasured: build.sh could not be run with /usr/local/corex/bin hidden (unshare -m --propagation private: unshare: unshare failed: Operation not permitted; unshare -U -r -m --propagation unchanged: mount: /usr/local/corex-3.2.3/bin: cannot mount none read-only.), so whether it needs the toolchain is not measured",
       "base_ref": "einsteinOS/dev-3b59928b8f-wip-u5c4a635e52"
     }
   },
