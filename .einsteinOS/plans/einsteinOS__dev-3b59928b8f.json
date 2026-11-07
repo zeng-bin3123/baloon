@@ -579,6 +579,16 @@
       "pass": true,
       "unit_id": "u2e9aa362e3"
     },
+    "IqAvx512Rows.lean": {
+      "hash": "fbc52076565c",
+      "pass": true,
+      "unit_id": "u5e0736f9b8"
+    },
+    "IqQuantizedDotKernels.lean": {
+      "hash": "351a2376c5b3",
+      "pass": true,
+      "unit_id": "u5e0736f9b8"
+    },
     "KvQ8Quant.lean": {
       "hash": "558100bfb04b",
       "pass": true,
@@ -619,6 +629,11 @@
       "pass": true,
       "unit_id": "ud77a0d7726"
     },
+    "Q2Avx2Rows.lean": {
+      "hash": "fb147d6219f2",
+      "pass": true,
+      "unit_id": "u5e0736f9b8"
+    },
     "Q2_0GgufWriter.lean": {
       "hash": "275745520eb5",
       "pass": true,
@@ -650,9 +665,7 @@
       "unit_id": "u2e9aa362e3"
     }
   },
-  "fix_attempts": {
-    "u5e0736f9b8": 1
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u0d41014a5a": [
       "build_toolchain_dependence_unmeasured"
@@ -673,20 +686,8 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "u5e0736f9b8": {
-      "kind": "review_fail",
-      "text": "IqQuantizedDotKernels is tested only against the unused iq_dot_geometry.hpp, so no test touches production iq_quant.cu, whose native_expert_scratch_bytes differs from the theory's formula",
-      "base_ref": "einsteinOS/dev-3b59928b8f"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u5e0736f9b8": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
