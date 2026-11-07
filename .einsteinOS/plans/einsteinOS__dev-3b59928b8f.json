@@ -650,7 +650,9 @@
       "unit_id": "u2e9aa362e3"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u5e0736f9b8": 1
+  },
   "fail_history": {
     "u0d41014a5a": [
       "build_toolchain_dependence_unmeasured"
@@ -664,18 +666,21 @@
       "build_toolchain_dependence_unmeasured",
       "build_toolchain_dependence_unmeasured"
     ],
+    "u5e0736f9b8": [
+      "review_fail"
+    ],
     "u649794726a": [
       "review_fail"
     ]
   },
-  "last_failure": {},
-  "infra_fails": 0,
-  "review_pending": {
+  "last_failure": {
     "u5e0736f9b8": {
-      "compile": "pass",
-      "smoke": "pass"
+      "kind": "review_fail",
+      "text": "IqQuantizedDotKernels is tested only against the unused iq_dot_geometry.hpp, so no test touches production iq_quant.cu, whose native_expert_scratch_bytes differs from the theory's formula",
+      "base_ref": "einsteinOS/dev-3b59928b8f"
     }
   },
+  "infra_fails": 0,
   "port_units": [
     {
       "id": "pfcccb31b26",
