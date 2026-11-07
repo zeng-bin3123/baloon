@@ -9,7 +9,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
-COREX="${COREX:-/usr/local/corex}"   # override point: the toolchain location is a real input of this build
+COREX=/usr/local/corex   # fixed: this build needs the corex toolchain at exactly this path (no override)
 CLANG="$COREX/bin/clang++"
 [ -x "$CLANG" ] || { echo "corex toolchain missing at $CLANG"; exit 2; }
 HOSTCXX="$CLANG"

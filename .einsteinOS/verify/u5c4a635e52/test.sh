@@ -129,11 +129,18 @@ mut_gpu q81bytes   src/cu/native_mmvq.cu         's|(size_t)(n_in / 32) \* 36;|(
 mut_gpu oraclenib  src/kernels/gpu/mmvq_oracle.cu 's|(wb\[2 + i - 16\] >> 4)) - 8)|(wb[2 + i - 16] >> 4)) - 7)|'
 
 echo "== toolchain dependence: build.sh must fail without the corex toolchain =="
+# No namespace privileges needed: run a copy of build.sh whose toolchain path points at an empty directory.
 EMPTY_TC="$(mktemp -d)"
-if COREX="$EMPTY_TC" bash .einsteinOS/verify/u5c4a635e52/build.sh >"$OUT/nobuild.log" 2>&1; then
-  echo "BUILD SUCCEEDED WITHOUT THE TOOLCHAIN"; rc=1
+sed "s|^COREX=/usr/local/corex |COREX=$EMPTY_TC |" .einsteinOS/verify/u5c4a635e52/build.sh > "$OUT/build_notc.sh"
+if cmp -s "$OUT/build_notc.sh" .einsteinOS/verify/u5c4a635e52/build.sh; then echo "toolchain-path substitution did not apply"; rc=1
 else
-  grep -q 'toolchain missing' "$OUT/nobuild.log" && echo "build needs the toolchain: detected" || { echo "build failed for an unexpected reason"; cat "$OUT/nobuild.log"; rc=1; }
+  mkdir -p "$OUT/notc/.einsteinOS/verify/u5c4a635e52"; cp "$OUT/build_notc.sh" "$OUT/notc/.einsteinOS/verify/u5c4a635e52/build.sh"
+  ln -sfn "$ROOT/include" "$OUT/notc/include"; ln -sfn "$ROOT/src" "$OUT/notc/src"; ln -sfn "$ROOT/tests" "$OUT/notc/tests"
+  if bash "$OUT/notc/.einsteinOS/verify/u5c4a635e52/build.sh" >"$OUT/nobuild.log" 2>&1; then
+    echo "BUILD SUCCEEDED WITHOUT THE TOOLCHAIN"; rc=1
+  else
+    grep -q 'toolchain missing' "$OUT/nobuild.log" && echo "build needs the toolchain: detected" || { echo "build failed for an unexpected reason"; cat "$OUT/nobuild.log"; rc=1; }
+  fi
 fi
 rmdir "$EMPTY_TC" 2>/dev/null
 
