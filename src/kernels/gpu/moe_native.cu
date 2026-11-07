@@ -7,7 +7,10 @@ namespace baloon {
 namespace kg {
 namespace {
 bool g_enabled = true;
-bool valid_span(const void* p, size_t bytes) { return p != nullptr && bytes > 0; }
+bool valid_span(const void* p, size_t bytes) {
+    const uint64_t a = (uint64_t)(uintptr_t)p;
+    return p != nullptr && bytes > 0 && a % 4 == 0 && (uint64_t)bytes <= UINT64_MAX - a;   // float-aligned, cannot wrap
+}
 bool overlap(const void* a, size_t an, const void* b, size_t bn) {
     const char* pa = (const char*)a; const char* pb = (const char*)b;
     return pa < pb + bn && pb < pa + an;

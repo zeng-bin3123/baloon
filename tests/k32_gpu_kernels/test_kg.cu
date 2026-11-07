@@ -222,9 +222,9 @@ static void test_gdn() {
     std::vector<double> rc(C);
     for (int c = 0; c < C; ++c) { double a = 0; for (int i = 0; i < dc - 1; ++i) a += (double)cs0[(size_t)c * (dc - 1) + i] * kW[(size_t)c * dc + i]; a += (double)xin[c] * kW[(size_t)c * dc + dc - 1]; rc[c] = silu_d(a); }
     near_vec(o3.get(), rc, 1e-4, 1e-5, "native_gdn_conv_silu");
-    auto xl = vf(3 * 200, -2, 2); Dev<float> dxl(xl);
-    ok(native_gdn_l2_norm(dxl, 3, 200, 1e-12f) == cudaSuccess && sync_ok(), "native_gdn_l2_norm launch");
-    { auto o = dxl.get(); bool unit = true; for (int r = 0; r < 3; ++r) { double s = 0; for (int i = 0; i < 200; ++i) s += (double)o[r * 200 + i] * o[r * 200 + i]; if (std::fabs(s - 1) > 1e-4) unit = false; } ok(unit, "native_gdn_l2_norm gives unit rows"); }
+    auto xl = vf(3 * 128, -2, 2); Dev<float> dxl(xl);
+    ok(native_gdn_l2_norm(dxl, 3, 128, 1e-12f) == cudaSuccess && sync_ok(), "native_gdn_l2_norm launch");
+    { auto o = dxl.get(); bool unit = true; for (int r = 0; r < 3; ++r) { double s = 0; for (int i = 0; i < 128; ++i) s += (double)o[r * 128 + i] * o[r * 128 + i]; if (std::fabs(s - 1) > 1e-4) unit = false; } ok(unit, "native_gdn_l2_norm gives unit rows"); }
     Dev<float> yn((size_t)h_v * S);
     ok(native_gdn_out_norm(oA, dz, dnw, yn, h_v, 1e-6f) == cudaSuccess && sync_ok(), "native_gdn_out_norm launch");
     near_vec_f(yn.get(), yU.get(), 1e-4, 1e-5, "native_gdn_out_norm equals gdn_out_norm");

@@ -1,5 +1,7 @@
 // gdn_native_pre.cu - span-validated GDN pre/post operators: beta sigmoid, softplus gate, causal conv + SiLU, per-row L2 norm and
 // the gated output RMS norm (S = 128 per head). Every operand span must be valid; mutated operands must not overlap read operands.
+#include <cmath>
+#include <cstdint>
 #include "kg_common.cuh"
 #include "baloon/kg_kernels.hpp"
 
@@ -9,20 +11,25 @@ namespace {
 constexpr int S = 128;
 struct Span { const void* p; size_t bytes; };
 
-bool valid(const Span& s) { return s.p != nullptr && s.bytes > 0 && s.bytes < ((size_t)1 << 48); }
+bool valid(const Span& s) {
+    const uint64_t a = (uint64_t)(uintptr_t)s.p;
+    return s.p != nullptr && s.bytes > 0 && a % 4 == 0 && (uint64_t)s.bytes <= UINT64_MAX - a;   // aligned, cannot wrap
+}
+bool eps_ok(float e) { return std::isfinite(e) && e >= 0.f; }
+bool rows_ok(long long rows, int cols) { return rows >= 1 && rows <= 65535 && cols == 128; }
 bool disjoint(const Span& a, const Span& b) {
     const char* pa = (const char*)a.p; const char* pb = (const char*)b.p;
     return !(pa < pb + b.bytes && pb < pa + a.bytes);
 }
 cudaError_t check_launch() { return cudaGetLastError(); }
-bool count_and_stream(long long n, cudaStream_t) { return n > 0 && n <= 2147483647ll * 256; }
+bool count_and_stream(long long n, cudaStream_t) { return n >= 1 && n <= 65535; }
 // threads of a norm block for `cols` values: a multiple of the wave, at most 256
 int norm_geometry(int cols) { int t = 64; while (t < 256 && t < cols) t <<= 1; return t; }
 
 __device__ __forceinline__ float warp_sum(float v) { return kgc::wave_sum(v); }
 __device__ __forceinline__ float sigmoid(float x) { return kgc::sigmoid(x); }
-__device__ __forceinline__ float beta_sigmoid(float x) { return sigmoid(x); }
-__device__ __forceinline__ float gate_softplus(float a, float dt, float a_log) { return -expf(a_log) * kgc::softplus(a + dt); }
+__device__ __forceinline__ float beta_sigmoid_f(float x) { return sigmoid(x); }
+__device__ __forceinline__ float gate_softplus_f(float a, float dt, float a_log) { return -expf(a_log) * kgc::softplus(a + dt); }
 // block-wide sum for the norm kernels; sh has blockDim/64 entries
 __device__ __forceinline__ float norm_sum(float v, float* sh) {
     v = warp_sum(v);
@@ -34,10 +41,10 @@ __device__ __forceinline__ float norm_sum(float v, float* sh) {
     return t;
 }
 
-__global__ void beta_kernel(float* __restrict__ b, int n) { const int i = blockIdx.x * blockDim.x + threadIdx.x; if (i < n) b[i] = beta_sigmoid(b[i]); }
-__global__ void gate_kernel(const float* __restrict__ a, const float* __restrict__ dt, const float* __restrict__ al, float* __restrict__ g, int n) {
+__global__ void beta_sigmoid(float* __restrict__ b, int n) { const int i = blockIdx.x * blockDim.x + threadIdx.x; if (i < n) b[i] = beta_sigmoid_f(b[i]); }
+__global__ void gate_softplus(const float* __restrict__ a, const float* __restrict__ dt, const float* __restrict__ al, float* __restrict__ g, int n) {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) g[i] = gate_softplus(a[i], dt[i], al[i]);
+    if (i < n) g[i] = gate_softplus_f(a[i], dt[i], al[i]);
 }
 // cs (C, dc-1), kW (C, dc): conv step, then SiLU on the output; history shifts left.
 __global__ void conv_silu(float* __restrict__ cs, const float* __restrict__ x, const float* __restrict__ kW, float* __restrict__ out, int C, int dc) {
@@ -74,19 +81,20 @@ __global__ void out_norm(const float* __restrict__ o, const float* __restrict__ 
 
 cudaError_t native_gdn_beta_gate(float* beta, int n, cudaStream_t s) {
     if (!valid({beta, (size_t)(n > 0 ? n : 0) * 4}) || !count_and_stream(n, s)) return cudaErrorInvalidValue;
-    beta_kernel<<<(n + 127) / 128, 128, 0, s>>>(beta, n);
+    beta_sigmoid<<<(n + 127) / 128, 128, 0, s>>>(beta, n);
     return check_launch();
 }
 cudaError_t native_gdn_gate(const float* alpha, const float* dt_bias, const float* a_log, float* g, int n, cudaStream_t s) {
-    const size_t nb = (size_t)(n > 0 ? n : 0) * 4;
+    if (!count_and_stream(n, s)) return cudaErrorInvalidValue;
+    const size_t nb = (size_t)n * 4;
     const Span sp[4] = {{alpha, nb}, {dt_bias, nb}, {a_log, nb}, {g, nb}};
     for (int i = 0; i < 4; ++i) if (!valid(sp[i])) return cudaErrorInvalidValue;
     for (int i = 0; i < 3; ++i) if (!disjoint(sp[i], sp[3])) return cudaErrorInvalidValue;
-    gate_kernel<<<(n + 127) / 128, 128, 0, s>>>(alpha, dt_bias, a_log, g, n);
+    gate_softplus<<<(n + 127) / 128, 128, 0, s>>>(alpha, dt_bias, a_log, g, n);
     return check_launch();
 }
 cudaError_t native_gdn_conv_silu(float* conv_state, const float* x, const float* kW, float* out, int C, int dc, cudaStream_t s) {
-    if (C <= 0 || dc < 2) return cudaErrorInvalidValue;
+    if (!count_and_stream(C, s) || dc < 2) return cudaErrorInvalidValue;
     const Span st{conv_state, (size_t)C * (dc - 1) * 4}, xs{x, (size_t)C * 4}, ws{kW, (size_t)C * dc * 4}, os{out, (size_t)C * 4};
     if (!valid(st) || !valid(xs) || !valid(ws) || !valid(os)) return cudaErrorInvalidValue;
     if (!disjoint(st, xs) || !disjoint(st, ws) || !disjoint(st, os) || !disjoint(os, xs) || !disjoint(os, ws)) return cudaErrorInvalidValue;
@@ -94,13 +102,13 @@ cudaError_t native_gdn_conv_silu(float* conv_state, const float* x, const float*
     return check_launch();
 }
 cudaError_t native_gdn_l2_norm(float* x, int rows, int cols, float eps, cudaStream_t s) {
-    if (rows <= 0 || cols <= 0 || !valid({x, (size_t)rows * cols * 4})) return cudaErrorInvalidValue;
+    if (!rows_ok(rows, cols) || !eps_ok(eps) || !valid({x, (size_t)rows * cols * 4})) return cudaErrorInvalidValue;
     const int t = norm_geometry(cols);
     l2_norm<<<rows, t, (size_t)(t / 64) * sizeof(float), s>>>(x, cols, eps);
     return check_launch();
 }
 cudaError_t native_gdn_out_norm(const float* o, const float* z, const float* norm_w, float* y, int h_v, float eps, cudaStream_t s) {
-    if (h_v <= 0) return cudaErrorInvalidValue;
+    if (!rows_ok(h_v, S) || !eps_ok(eps)) return cudaErrorInvalidValue;
     const size_t hb = (size_t)h_v * S * 4;
     const Span os{o, hb}, zs{z, hb}, ws{norm_w, (size_t)S * 4}, ys{y, hb};
     if (!valid(os) || !valid(zs) || !valid(ws) || !valid(ys)) return cudaErrorInvalidValue;
