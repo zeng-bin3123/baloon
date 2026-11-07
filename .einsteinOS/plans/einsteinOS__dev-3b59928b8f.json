@@ -683,7 +683,7 @@
     }
   },
   "fix_attempts": {
-    "u4decb4e657": 1
+    "u4decb4e657": 2
   },
   "fail_history": {
     "u0d41014a5a": [
@@ -697,6 +697,7 @@
       "review_fail"
     ],
     "u4decb4e657": [
+      "review_fail",
       "review_fail"
     ],
     "u5c4a635e52": [
@@ -714,17 +715,11 @@
   "last_failure": {
     "u4decb4e657": {
       "kind": "review_fail",
-      "text": "count_and_stream (gdn_native_pre.cu) and native_gdn_step (gdn_native.cu) never enforce the theory's launch precondition \"stream non-null\", and no test or mutant could detect it",
+      "text": "fused_gdn_ab (src/kernels/gpu/gdn_fused.cu) is an elementwise sigmoid/softplus gate on precomputed a,b, not the bf16 w_alpha/w_beta row-per-warp projection that FusedGdnDecodeKernels.lean (decode_ab_proj) specifies, and no test checks the projection invariants",
       "base_ref": "einsteinOS/dev-3b59928b8f"
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "u4decb4e657": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
