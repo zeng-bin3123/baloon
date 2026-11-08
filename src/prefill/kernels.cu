@@ -324,8 +324,9 @@ __global__ void gate_attn_kernel(const float* attn, const float* gate, float* ou
     out[i] = attn[i] * sigm(gate[i]);
 }
 
-// grid (4, T), block 64: one quantisation group of 64 channels of one row; scale = amax/127, codes clamped to +-127
-__global__ void kv_append_kernel(const float* k, int8_t* kq, float* ks, int64_t base_row) {
+// grid (4, T), block 64: one quantisation group of 64 channels of one row; stored scale = fp16(amax/127), codes =
+// clamp(round(x / scale), +-127) against the stored (rounded) scale; a zero scale gives code 0
+__global__ void kv_append_kernel(const float* k, int8_t* kq, uint16_t* ks, int64_t base_row) {
     __shared__ float sh[64];
     const int g = blockIdx.x, tid = threadIdx.x;
     const int64_t t = blockIdx.y, row = base_row + t;
@@ -337,11 +338,12 @@ __global__ void kv_append_kernel(const float* k, int8_t* kq, float* ks, int64_t 
         __syncthreads();
     }
     const float amax = sh[0];
-    const float scale = amax > 0.f ? amax / 127.0f : 1.0f;
-    float q = rintf(v / scale);
+    const uint16_t sbits = f16_bits(amax / 127.0f);
+    const float scale = hf(sbits);
+    float q = scale > 0.f ? rintf(v / scale) : 0.f;
     q = fminf(127.f, fmaxf(-127.f, q));
     kq[row * 256 + g * 64 + tid] = (int8_t)q;
-    if (tid == 0) ks[row * 4 + g] = scale;
+    if (tid == 0) ks[row * 4 + g] = sbits;
 }
 
 __global__ void to_bf16_kernel(const float* x, uint16_t* out, int64_t n) {
@@ -484,7 +486,7 @@ int gate_attn(const float* attn, const float* gate, float* out, int T) {
     gate_attn_kernel<<<grid(n), TH>>>(attn, gate, out, n);
     return check();
 }
-int kv_append(const float* k, int8_t* kq, float* ks, int64_t base_row, int T) {
+int kv_append(const float* k, int8_t* kq, uint16_t* ks, int64_t base_row, int T) {
     if (!k || !kq || !ks || base_row < 0 || T <= 0) return -1;
     kv_append_kernel<<<dim3(4, (unsigned)T), 64>>>(k, kq, ks, base_row);
     return check();

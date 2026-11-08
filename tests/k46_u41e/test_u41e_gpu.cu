@@ -1,6 +1,7 @@
 // GPU invariants of unit u41e2bf114f on the PRODUCTION kernels of src/prefill/kernels.cu (PrefillKernels theory):
 // stream broadcast indexing, GDN conv history carried across chunks, router tie-break to the lower id, 2-bit blob layout and
 // dequantisation, int8 K/V append clamp and scale indexing, grid coverage. Exit 2 when no device can be opened.
+#include "baloon/f16_bits.hpp"
 #include <cuda_runtime.h>
 #include <algorithm>
 #include <cmath>
@@ -188,23 +189,24 @@ static void test_kv_append() {
     for (int t = 0; t < T; ++t) for (int i = 0; i < 256; ++i) {
         const int g = i / 64;
         float v = frand(-4.f, 4.f);
-        if (t == 0) v = (g == 0) ? 0.f : v;                          // all-zero group: scale 1, codes 0
+        if (t == 0) v = (g == 0) ? 0.f : v;                          // all-zero group: scale 0, codes 0
         if (t == 1 && i % 64 == 7) v = -1000.f * (g + 1);            // extreme negative in each group
         if (t == 2 && i % 64 == 9) v = 1e-3f;
         if (t == 2 && i % 64 == 11) v = 500.f * (g + 1);           // extreme positive in each group
         k[(size_t)t * 256 + i] = v;
     }
-    float* dk = upv(k); int8_t* kq = dal<int8_t>((size_t)(base + T) * 256); float* ks = dal<float>((size_t)(base + T) * 4);
+    float* dk = upv(k); int8_t* kq = dal<int8_t>((size_t)(base + T) * 256); uint16_t* ks = dal<uint16_t>((size_t)(base + T) * 4);
     CHECK(pk::kv_append(dk, kq, ks, base, T) == 0);
     auto q = dn(kq, (size_t)(base + T) * 256); auto s = dn(ks, (size_t)(base + T) * 4);
     size_t bad = 0, below = 0;
     for (int64_t r = 0; r < base; ++r) for (int i = 0; i < 256; ++i) bad += q[(size_t)(r * 256 + i)] != 0;   // rows before base untouched
     for (int t = 0; t < T; ++t) for (int g = 0; g < 4; ++g) {
         float amax = 0; for (int i = 0; i < 64; ++i) amax = std::max(amax, std::fabs(k[(size_t)t * 256 + g * 64 + i]));
-        const float scale = amax > 0.f ? amax / 127.0f : 1.0f;
-        bad += s[(size_t)((base + t) * 4 + g)] != scale;
+        const uint16_t sbits = baloon::f16bits::f16_from_f32(amax / 127.0f);
+        const float scale = baloon::f16bits::f32_from_f16(sbits);
+        bad += s[(size_t)((base + t) * 4 + g)] != sbits;
         for (int i = 0; i < 64; ++i) {
-            const int e = (int)std::max(-127.f, std::min(127.f, std::nearbyint(k[(size_t)t * 256 + g * 64 + i] / scale)));
+            const int e = scale > 0.f ? (int)std::max(-127.f, std::min(127.f, std::nearbyint(k[(size_t)t * 256 + g * 64 + i] / scale))) : 0;
             const int got = q[(size_t)((base + t) * 256 + g * 64 + i)];
             bad += got != e; below += got < -127;
         }

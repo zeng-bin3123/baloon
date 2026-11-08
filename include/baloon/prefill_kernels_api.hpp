@@ -58,7 +58,7 @@ int rms_rows(const float* x, const float* w, float* out, int rows, int width, fl
 int rope(float* x, const int32_t* pos, int T, int heads, int head_dim, float theta);
 int split_q(const float* qfull, float* q, float* gate, int T);
 int gate_attn(const float* attn, const float* gate, float* out, int T);
-int kv_append(const float* k, int8_t* kq, float* ks, int64_t base_row, int T);              // int8 rows + 4 scales per row
+int kv_append(const float* k, int8_t* kq, uint16_t* ks, int64_t base_row, int T);           // int8 rows + 4 fp16 scale bits per row
 
 int to_bf16(const float* x, uint16_t* out, int64_t n);
 int to_f16(const float* x, uint16_t* out, int64_t n);

@@ -172,16 +172,17 @@ int main() {
               nrm &= std::fabs(a0 * a0 + b0 * b0 - a1 * a1 - b1 * b1) < 1e-4; }
           for (int d = 64; d < hd; ++d) tail &= hr[b + d] == xr[b + d]; }
       ok(id0, "rope: position 0 is the identity"); ok(nrm, "rope: rotation preserves each (p, p+32) pair norm"); ok(tail, "rope: dims >= 64 untouched");
-      // kv_append: int8 groups of 64, scale = amax/127, |code| <= 127, zero group has scale 1
+      // kv_append: int8 groups of 64, scale = fp16(amax/127), code = clamp(round(x/scale)), |code| <= 127, zero group has scale 0 and codes 0
       auto k = vf((size_t)T * 256, -5, 5); for (int i = 64; i < 128; ++i) k[i] = 0.f;   // token 0, group 1 all zero
-      Dev<float> dk(k); const int64_t base = 2; Dev<int8_t> kq((size_t)(base + T) * 256); Dev<float> ks((size_t)(base + T) * 4);
+      Dev<float> dk(k); const int64_t base = 2; Dev<int8_t> kq((size_t)(base + T) * 256); Dev<uint16_t> ks((size_t)(base + T) * 4);
       ok(kv_append(dk, kq, ks, base, T) == 0 && sync_ok(), "kv_append launch");
       auto hq8 = kq.get(); auto hs = ks.get(); bool sc = true, bound = true, recon = true, untouched = true;
-      for (int t = 0; t < T; ++t) for (int g = 0; g < 4; ++g) { float am = 0; for (int i = 0; i < 64; ++i) am = std::max(am, std::fabs(k[(size_t)t * 256 + g * 64 + i])); float want = am > 0 ? am / 127.f : 1.f;
-          sc &= std::fabs(hs[(size_t)(base + t) * 4 + g] - want) <= 1e-6f * want;
-          for (int i = 0; i < 64; ++i) { int c = hq8[(size_t)(base + t) * 256 + g * 64 + i]; bound &= c >= -127 && c <= 127; recon &= std::fabs(c * want - k[(size_t)t * 256 + g * 64 + i]) <= want * 0.5f + 1e-6f; } }
+      for (int t = 0; t < T; ++t) for (int g = 0; g < 4; ++g) { float am = 0; for (int i = 0; i < 64; ++i) am = std::max(am, std::fabs(k[(size_t)t * 256 + g * 64 + i])); uint16_t wb = fb::f16_from_f32(am / 127.f); float want = fb::f32_from_f16(wb);
+          sc &= hs[(size_t)(base + t) * 4 + g] == wb;
+          for (int i = 0; i < 64; ++i) { int c = hq8[(size_t)(base + t) * 256 + g * 64 + i]; float x = k[(size_t)t * 256 + g * 64 + i]; bound &= c >= -127 && c <= 127;
+              int e = want > 0 ? (int)std::max(-127.f, std::min(127.f, std::nearbyint(x / want))) : 0; recon &= c == e; } }
       for (size_t i = 0; i < (size_t)base * 256; ++i) untouched &= hq8[i] == 0;
-      ok(sc, "kv_append: scale = amax/127 (1 for an all-zero group)"); ok(bound, "kv_append: codes within +-127"); ok(recon, "kv_append: reconstruction error <= scale/2"); ok(untouched, "kv_append: rows before base_row untouched");
+      ok(sc, "kv_append: scale = fp16(amax/127) (0 for an all-zero group)"); ok(bound, "kv_append: codes within +-127"); ok(recon, "kv_append: code = clamp(round(x / stored scale)), 0 when scale is 0"); ok(untouched, "kv_append: rows before base_row untouched");
     }
 
     // ---- gated delta net ----

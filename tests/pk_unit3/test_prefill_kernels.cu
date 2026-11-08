@@ -10,6 +10,7 @@
 #include <vector>
 #include "baloon/f16_conversion.hpp"
 #include "baloon/prefill_kernels_api.hpp"
+#include "baloon/f16_bits.hpp"
 #include "check.hpp"
 using namespace baloon;
 
@@ -359,20 +360,22 @@ static void test_qsa_helpers() {
         const int T = 4; const int64_t base = 3, rows = base + T + 2;
         auto k = rvec((size_t)T * 256, -5.f, 5.f);
         for (int g = 0; g < 4; ++g) k[(size_t)g * 256 + 3] = 0.f;     // zeros stay zeros
-        for (int j = 0; j < 64; ++j) k[(size_t)1 * 256 + 64 + j] = 0.f;  // an all-zero group keeps a positive scale
-        float *dk = upv(k), *dks = dal<float>((size_t)rows * 4);
+        for (int j = 0; j < 64; ++j) k[(size_t)1 * 256 + 64 + j] = 0.f;  // an all-zero group gets scale 0 and codes 0
+        float* dk = upv(k); uint16_t* dks = dal<uint16_t>((size_t)rows * 4);
         int8_t* dq = dal<int8_t>((size_t)rows * 256);
         CHECK(kv_append(dk, dq, dks, base, T) == 0);
-        auto q = dn(dq, (size_t)rows * 256); auto ks = dn(dks, (size_t)rows * 4);
+        auto q = dn(dq, (size_t)rows * 256); auto ksb = dn(dks, (size_t)rows * 4);
         for (int t = 0; t < T; ++t) for (int g = 0; g < 4; ++g) {
             float amax = 0; for (int j = 0; j < 64; ++j) amax = std::max(amax, std::fabs(k[(size_t)t * 256 + g * 64 + j]));
-            const float sc = ks[(size_t)(base + t) * 4 + g];
-            CHECK(sc > 0.f);
-            if (amax > 0.f) CHECK(near(sc, amax / 127.f, 1e-4f, 1e-8f));
+            const uint16_t sb = ksb[(size_t)(base + t) * 4 + g];
+            const float sc = baloon::f16bits::f32_from_f16(sb);
+            CHECK(sb == baloon::f16bits::f16_from_f32(amax / 127.f));
+            if (amax == 0.f) CHECK(sb == 0);
+            if (amax > 0.f) CHECK(sc > 0.f);
             for (int j = 0; j < 64; ++j) {
                 const int8_t v = q[(size_t)(base + t) * 256 + g * 64 + j];
                 CHECK(v >= -127 && v <= 127);
-                CHECK(std::fabs((float)v * sc - k[(size_t)t * 256 + g * 64 + j]) <= sc * 0.5f + 1e-6f);
+                if (sc > 0.f) CHECK(std::fabs((float)v * sc - k[(size_t)t * 256 + g * 64 + j]) <= sc * 0.5f + 1e-6f + std::fabs(k[(size_t)t * 256 + g * 64 + j]) * 1e-3f); else CHECK(v == 0);
             }
         }
         size_t untouched = 0;
