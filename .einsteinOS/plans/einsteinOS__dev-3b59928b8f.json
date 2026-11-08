@@ -638,6 +638,16 @@
       "pass": true,
       "unit_id": "ud77a0d7726"
     },
+    "MtpDraftBlockQuantizer.lean": {
+      "hash": "3ae0c62875af",
+      "pass": true,
+      "unit_id": "u25c78c49e6"
+    },
+    "MtpDraftLayer.lean": {
+      "hash": "1645c09157e0",
+      "pass": true,
+      "unit_id": "u25c78c49e6"
+    },
     "NativeFlashAttnStep.lean": {
       "hash": "929f08f6bfe6",
       "pass": true,
@@ -748,6 +758,26 @@
       "pass": true,
       "unit_id": "u649794726a"
     },
+    "SpecController.lean": {
+      "hash": "d909e89dbd41",
+      "pass": true,
+      "unit_id": "u25c78c49e6"
+    },
+    "SuffixDrafter.lean": {
+      "hash": "b4d12c43b3b8",
+      "pass": true,
+      "unit_id": "u25c78c49e6"
+    },
+    "VerifyWindow.lean": {
+      "hash": "6293a9498304",
+      "pass": true,
+      "unit_id": "u25c78c49e6"
+    },
+    "VerifyWindowKernels.lean": {
+      "hash": "1216f62f4265",
+      "pass": true,
+      "unit_id": "u25c78c49e6"
+    },
     "WeightPackLoader.lean": {
       "hash": "52ac19c43e8f",
       "pass": true,
@@ -787,12 +817,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u25c78c49e6": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
