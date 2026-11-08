@@ -637,6 +637,11 @@
       "pass": true,
       "unit_id": "ud77a0d7726"
     },
+    "NativeFlashAttnStep.lean": {
+      "hash": "929f08f6bfe6",
+      "pass": true,
+      "unit_id": "u293ad55355"
+    },
     "NativeGdnPreprocess.lean": {
       "hash": "3b2766307575",
       "pass": true,
@@ -652,6 +657,21 @@
       "pass": true,
       "unit_id": "u0d41014a5a"
     },
+    "NativePlePostops.lean": {
+      "hash": "4d5ed38e4edf",
+      "pass": true,
+      "unit_id": "u293ad55355"
+    },
+    "NativeQsaIndexerAppend.lean": {
+      "hash": "187180370aa8",
+      "pass": true,
+      "unit_id": "u293ad55355"
+    },
+    "NativeQsaScoreTiles.lean": {
+      "hash": "971435ff8e37",
+      "pass": true,
+      "unit_id": "u293ad55355"
+    },
     "NgramHashIq4nl.lean": {
       "hash": "354b54e53f28",
       "pass": true,
@@ -661,6 +681,11 @@
       "hash": "3a8c7d2e7c31",
       "pass": true,
       "unit_id": "ud77a0d7726"
+    },
+    "PleBlockKernels.lean": {
+      "hash": "4ed33707d2c3",
+      "pass": true,
+      "unit_id": "u293ad55355"
     },
     "PleReaderPaging.lean": {
       "hash": "226b33084cf4",
@@ -686,6 +711,21 @@
       "hash": "275745520eb5",
       "pass": true,
       "unit_id": "u2e9aa362e3"
+    },
+    "QsaDecodeChunking.lean": {
+      "hash": "04049f55dbad",
+      "pass": true,
+      "unit_id": "u293ad55355"
+    },
+    "QsaStepGeometry.lean": {
+      "hash": "8a5c778e5bca",
+      "pass": true,
+      "unit_id": "u293ad55355"
+    },
+    "QsaTopkOrderKey.lean": {
+      "hash": "ab13f627b70a",
+      "pass": true,
+      "unit_id": "u293ad55355"
     },
     "S2ExpertGroupedHits.lean": {
       "hash": "9d14ee4b3867",
@@ -713,9 +753,7 @@
       "unit_id": "u2e9aa362e3"
     }
   },
-  "fix_attempts": {
-    "u293ad55355": 1
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u0d41014a5a": [
       "build_toolchain_dependence_unmeasured"
@@ -746,20 +784,8 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "u293ad55355": {
-      "kind": "review_fail",
-      "text": "port entry ple.cu gate_kernel -\u003e src/cu/ple_block.cu gate_kernel computes plain sigmoid(dot(gate_w,hidden)) but PleBlockKernels theory specifies signed_sqrt_gate (sigmoid(sgn(s)*sqrt(max(|s|,1e-6)))), and no test launches ple_block.cu kernels",
-      "base_ref": "einsteinOS/dev-3b59928b8f"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u293ad55355": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
