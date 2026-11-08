@@ -872,6 +872,13 @@
     }
   },
   "infra_fails": 0,
+  "deferred": {
+    "pf7b804cf95": {
+      "kind": "review_fail",
+      "text": "gr_norm normalizes jointly over all 4 streams (D=10240) but theory/decode reference norm each stream row (N=2560) separately, and the unit test cannot detect it",
+      "base_ref": "einsteinOS/dev-3b59928b8f"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
