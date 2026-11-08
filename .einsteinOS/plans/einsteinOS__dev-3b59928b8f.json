@@ -815,6 +815,11 @@
       "pass": true,
       "unit_id": "u25c78c49e6"
     },
+    "VisionEncoderTool.lean": {
+      "hash": "510b8f6710c2",
+      "pass": true,
+      "unit_id": "u8d6745405d"
+    },
     "WeightPackLoader.lean": {
       "hash": "52ac19c43e8f",
       "pass": true,
@@ -854,12 +859,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u8d6745405d": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
