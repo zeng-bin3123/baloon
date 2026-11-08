@@ -61,14 +61,19 @@ __global__ void gnorm_kernel(const float* __restrict__ x, const float* __restric
     for (uint32_t i = threadIdx.x; i < NE; i += blockDim.x) out[s * NE + i] = x[s * NE + i] * r * nw[i];
 }
 
-// gate[s] = sigmoid(dot(gate_w[s], hidden)); one block per stream.
+// gate[s] = sigmoid(sgn(t) * sqrt(max(|t|, 1e-6))) with t = dot(gate_w[s], hidden); one block per stream.
 __global__ void gate_kernel(const uint16_t* __restrict__ gw, const float* __restrict__ hidden, float* __restrict__ gate) {
     __shared__ float sh[THREADS];
     const uint32_t s = blockIdx.x;
     float acc = 0.f;
     for (uint32_t j = threadIdx.x; j < NE; j += blockDim.x) acc += bf16_float(gw[(size_t)s * NE + j]) * hidden[j];
     acc = block_sum(acc, sh);
-    if (threadIdx.x == 0) gate[s] = 1.f / (1.f + expf(-acc));
+    if (threadIdx.x == 0) {
+        const float a = fabsf(acc);
+        const float m = a > 1e-6f ? a : 1e-6f;
+        const float sg = acc > 0.f ? 1.f : (acc < 0.f ? -1.f : 0.f);
+        gate[s] = 1.f / (1.f + expf(-(sg * sqrtf(m))));
+    }
 }
 
 // Broadcast: element i < hc_dim reads hidden[i % n_embd] and gate[i / n_embd].

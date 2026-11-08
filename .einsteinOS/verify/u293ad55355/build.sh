@@ -34,6 +34,10 @@ done
 $CLANG $CUF -c tests/k48_u293/test_u293.cu -o "$OUT/test_u293.o"
 $CLANG "$OUT/test_u293.o" $OBJS -o "$OUT/test_u293" -L"$COREX/lib64" -lcudart -lpthread
 
+$CLANG $CUF -c src/cu/ple_block.cu -o "$OUT/ple_block.o"
+$CLANG $CUF -c tests/k48_u293/test_ple_block_u293.cu -o "$OUT/test_ple_block_u293.o"
+$CLANG "$OUT/test_ple_block_u293.o" "$OUT/ple_block.o" -o "$OUT/test_ple_block_u293" -L"$COREX/lib64" -lcudart -lpthread
+
 echo "== port table syntax =="
 TSV=.einsteinOS/port/u293ad55355.tsv
 [ -f "$TSV" ] || { echo "missing $TSV"; exit 1; }

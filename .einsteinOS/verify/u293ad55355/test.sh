@@ -113,5 +113,45 @@ mutate $T sel_relu       "s += hw[h] * fmaxf(dot, 0.f);" "s += hw[h] * dot;"
 mutate $T sel_tailbias   "if (b == n_bid && tail > 0) s += kTailBias;" ";"
 mutate $T sel_over       "if (overlaps(in, ids) || overlaps(in, no) || overlaps(ids, no)) return cudaErrorInvalidValue;" ";"
 
+
+echo "== PLE block kernels (src/cu/ple_block.cu) against the host model =="
+ple_run() {  # ple_run <root> <dir>: 3 = build failure, else test exit code
+  local r="$1" d="$2"; mkdir -p "$d"
+  local CUF="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -I$r/src -I$r/tests -I$r/include -O2"
+  $CLANG $CUF -c "$r/src/cu/ple_block.cu" -o "$d/pb.o" 2>>"$d/cc.log" || return 3
+  $CLANG $CUF -c "$r/tests/k48_u293/test_ple_block_u293.cu" -o "$d/pt.o" 2>>"$d/cc.log" || return 3
+  $CLANG "$d/pt.o" "$d/pb.o" -o "$d/pt" -L"$COREX/lib64" -lcudart -lpthread 2>>"$d/cc.log" || return 3
+  timeout 900 "$d/pt" >"$d/run.log" 2>&1
+}
+ple_run "$ROOT" "$OUT/ple"; r=$?
+if [ $r -eq 3 ]; then echo "BUILD FAILED (ple block)"; head -30 "$OUT/ple/cc.log"; rc=1
+else
+  grep "^FAIL" "$OUT/ple/run.log" | head -20; tail -3 "$OUT/ple/run.log"
+  [ $r -eq 0 ] || { echo "ple block checks FAILED (exit $r)"; rc=1; }
+  grep -q "U293 PLE BLOCK TESTS PASSED" "$OUT/ple/run.log" || { echo "ple suite did not report PASSED"; rc=1; }
+fi
+ple_mutate() {  # ple_mutate <label> <old> <new>
+  local name="$1" old="$2" new="$3" m="$OUT/pm_$1"
+  rm -rf "$m"; mkdir -p "$m"; cp -r include src tests "$m/"
+  if ! python3 - "$m/src/cu/ple_block.cu" "$old" "$new" <<'PYEOF'
+import sys
+p, old, new = sys.argv[1:4]
+s = open(p).read()
+if old not in s: sys.exit(1)
+open(p, "w").write(s.replace(old, new, 1))
+PYEOF
+  then echo "mutation $name did not apply"; rc=1; return; fi
+  ple_run "$m" "$m/b"; local x=$?
+  if [ $x -eq 3 ]; then echo "mutant $name failed to build"; rc=1; return; fi
+  if [ $x -eq 0 ]; then echo "MUTANT SURVIVED: $name"; rc=1; else echo "mutant detected: $name"; fi
+  rm -rf "$m"
+}
+ple_mutate ple_plain_sigmoid "gate[s] = 1.f / (1.f + expf(-(sg * sqrtf(m))));" "gate[s] = 1.f / (1.f + expf(-acc));"
+ple_mutate ple_gate_nosign   "const float sg = acc > 0.f ? 1.f : (acc < 0.f ? -1.f : 0.f);" "const float sg = 1.f;"
+ple_mutate ple_gate_nosqrt   "expf(-(sg * sqrtf(m)))" "expf(-(sg * m))"
+ple_mutate ple_conv_tap      "const uint32_t row = plegeo::tap_row(NH, plegeo::CONV_KERNEL, plegeo::CONV_DIL, k);" "const uint32_t row = k * 2;"
+ple_mutate ple_bcast         "out[i] = hidden[i % NE] * gate[i / NE];" "out[i] = hidden[i % NE] * gate[0];"
+ple_mutate ple_hist          "col[NH - 1] = new_row[c];" "col[NH - 1] = col[NH - 2];"
+
 if [ $rc -eq 0 ]; then echo "ALL U293 CHECKS PASSED"; else echo "U293 CHECKS FAILED"; fi
 exit $rc

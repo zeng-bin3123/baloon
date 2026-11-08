@@ -500,7 +500,7 @@ static void test_ple() {
         const double rr = 1.0 / std::sqrt(ss / NE_ + 1e-6);
         for (int i = 0; i < NE_; ++i) nrm[s * NE_ + i] = conv[s * NE_ + i] * rr * normw[i];
         double lg = 0; for (int j = 0; j < NE_; ++j) lg += (double)baloon::f16bits::bf16_bits_to_f32(gatew[(size_t)s * NE_ + j]) * hidden[j];
-        gate[s] = 1.0 / (1.0 + std::exp(-lg));
+        { const double m = std::fabs(lg) > 1e-6 ? std::fabs(lg) : 1e-6; const double sg = lg > 0 ? 1.0 : (lg < 0 ? -1.0 : 0.0); gate[s] = 1.0 / (1.0 + std::exp(-sg * std::sqrt(m))); }
     }
     for (int i = 0; i < HCD; ++i) s3[i] = (hidden[i % NE_] * gate[i / NE_] + nrm[i]) + newrow[i];
     std::vector<double> act(NE_);
