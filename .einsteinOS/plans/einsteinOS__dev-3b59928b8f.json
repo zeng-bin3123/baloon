@@ -827,10 +827,11 @@
     }
   },
   "fix_attempts": {
-    "pf7b804cf95": 1
+    "pf7b804cf95": 2
   },
   "fail_history": {
     "pf7b804cf95": [
+      "review_fail",
       "review_fail"
     ],
     "u0d41014a5a": [
@@ -865,17 +866,11 @@
   "last_failure": {
     "pf7b804cf95": {
       "kind": "review_fail",
-      "text": "gdn_recurrence state layout is [head][row][col] but the theory's rec_state_addr requires [row][head][col], and the unit test only checks chunk-invariance so it cannot catch this",
+      "text": "kv_append writes f32 scales (float* ks, unrounded amax/127) but theory prefill_kernels/kv_q8_quant specify an f16 scale (fp16(amax/127)); the unit test pins the f32 behavior",
       "base_ref": "einsteinOS/dev-3b59928b8f"
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "pf7b804cf95": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
