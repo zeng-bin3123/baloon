@@ -872,12 +872,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "p150f8257d5": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "deferred": {
     "pf7b804cf95": {
       "kind": "review_fail",
@@ -1133,6 +1127,7 @@
     }
   ],
   "port_pass": {
+    "p150f8257d5": true,
     "p29442642b2": true,
     "p3798e66f3c": true,
     "p3ff4aef2d0": true,
