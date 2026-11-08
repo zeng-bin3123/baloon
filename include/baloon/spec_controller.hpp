@@ -87,8 +87,8 @@ public:
     double lookup_q[4];
 
     Controller() {
-        for (uint64_t i = 0; i < K_MAX; ++i) mtp_p[i] = 0.5;
-        const double q[4] = {0.3, 0.5, 0.7, 0.85};
+        for (uint64_t i = 0; i < K_MAX; ++i) mtp_p[i] = 0.86;   // prior per MTP position
+        const double q[4] = {0.35, 0.6, 0.8, 0.92};   // lookup prior by match-length bucket
         for (int i = 0; i < 4; ++i) lookup_q[i] = q[i];
     }
 
