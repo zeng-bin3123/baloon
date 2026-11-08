@@ -34,13 +34,20 @@ inline std::vector<uint64_t> top_k(const std::vector<double>& v, uint64_t k) {
 }
 
 // Renormalisation divisor max(sum, 2^-14).
-inline double clamp_divisor(double sum) { return std::max(sum, 1.0 / 16384.0); }
+inline double clamp_divisor(double sum) { const double eps = 1.0 / 16384.0; return sum > eps ? sum : eps; }
 
 constexpr uint64_t round32(uint64_t t) { return (t + 31) / 32 * 32; }
 constexpr uint64_t round16(uint64_t n) { return (n + 15) / 16 * 16; }
-constexpr uint64_t launch_threads(uint64_t n_expert) { return round32(n_expert < 512 ? n_expert : 512); }
+constexpr uint64_t kMaxThreads = 512;   // RT_MAX_THREADS
+constexpr uint64_t launch_threads(uint64_t n_expert) { return round32(n_expert < kMaxThreads ? n_expert : kMaxThreads); }
+// Taken-mask size padded to 16 bytes so the following double array stays 16-byte aligned.
+constexpr uint64_t taken_bytes(uint64_t n_expert) { return round16(n_expert); }
+// Native path: 512 experts as 32 lanes x 16 values, expert = lane + 32 * i.
+constexpr uint64_t expert_of(uint64_t lane, uint64_t i) { return lane + 32 * i; }
+constexpr uint64_t lane_of(uint64_t expert) { return expert % 32; }
+constexpr uint64_t slot_of(uint64_t expert) { return expert / 32; }
 // Shared bytes: 16-byte-rounded taken mask, n doubles, n floats.
-constexpr uint64_t smem_bytes(uint64_t n_expert) { return round16(n_expert) + n_expert * 8 + n_expert * 4; }
+constexpr uint64_t smem_bytes(uint64_t n_expert) { return taken_bytes(n_expert) + n_expert * 8 + n_expert * 4; }
 
 }  // namespace router_topk
 }  // namespace baloon

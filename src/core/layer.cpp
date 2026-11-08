@@ -274,7 +274,7 @@ bool qsa_layer(const BlockCall& c, const BlockHooks& h, BlockResult* r) {
 
 // ---- MoE ------------------------------------------------------------------------------------------------------------------------
 bool moe_route(const float* logits, int n_expert, int k, int32_t* idx, float* w) {
-    if (!logits || !idx || !w || n_expert <= 0 || k <= 0 || k > n_expert) return false;
+    if (!logits || !idx || !w || n_expert <= 0 || k <= 0 || k > n_expert || k > 64) return false;   // k in 1..64 (moe_split::k_valid)
     std::vector<int32_t> order((size_t)n_expert);
     for (int i = 0; i < n_expert; ++i) order[(size_t)i] = i;
     std::stable_sort(order.begin(), order.end(), [&](int32_t a, int32_t b) { return logits[a] > logits[b]; });

@@ -2,9 +2,12 @@
 //   h = silu(gate_w x) * (up_w x);  h is rounded to f16 (default) or to bf16 (native mode) before the down projection;
 //   y = down_w h;  g = sigmoid(dot(x, w_gate_scalar));  out = y * g   (one scalar gate per token).
 //   moe_combine: y[j] = sum_e w[e] * parts[e][j] (+ shared[j] added plain, not router-weighted), double accumulation, ascending e.
+//   scratch (shared_expert_layout.hpp): gate | up | q8_0 image | q8_K image | gate slots, 16-byte aligned regions + 32 B tail;
+//   h is written over the gate region; the q8 image regions are reserved for the quantised projection forms (n_tok <= 8).
 // All matrices are bf16 bits; activations f32.
 #include "kg_common.cuh"
 #include "baloon/kg_kernels.hpp"
+#include "baloon/shared_expert_layout.hpp"
 
 namespace baloon {
 namespace kg {
@@ -26,18 +29,19 @@ __global__ void rows_dot_kernel(const uint16_t* __restrict__ w, const float* __r
     acc = kgc::wave_sum(acc);
     if (lane == 0) y[(size_t)blockIdx.y * rows + o] = acc;
 }
-__global__ void swiglu_kernel(const float* __restrict__ gate, const float* __restrict__ up, float* __restrict__ out, long long n) {
+// h = silu(gate) * up, written over `gate` (element-wise, so in place is exact)
+__global__ void swiglu_kernel(float* gate, const float* __restrict__ up, long long n) {
     const long long i = (long long)blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
     const float g = gate[i];
-    out[i] = (g / (1.0f + expf(-g))) * up[i];
+    gate[i] = (g / (1.0f + expf(-g))) * up[i];
 }
 // same value, then rounded to bf16 precision (native mode): the stored float is exactly representable in bf16
-__global__ void native_swiglu_kernel(const float* __restrict__ gate, const float* __restrict__ up, float* __restrict__ out, long long n) {
+__global__ void native_swiglu_kernel(float* gate, const float* __restrict__ up, long long n) {
     const long long i = (long long)blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= n) return;
     const float g = gate[i];
-    out[i] = kgc::bf16_to_f(kgc::f_to_bf16((g / (1.0f + expf(-g))) * up[i]));
+    gate[i] = kgc::bf16_to_f(kgc::f_to_bf16((g / (1.0f + expf(-g))) * up[i]));
 }
 __global__ void to_f16_kernel(float* __restrict__ x, long long n) {      // round in place to f16 precision
     const long long i = (long long)blockIdx.x * blockDim.x + threadIdx.x;
@@ -96,26 +100,31 @@ __global__ void moe_combine_kernel(const float* __restrict__ parts, const float*
 void shared_expert_set_native_bf16(bool on) { native_bf16 = on; }
 size_t shared_expert_scratch_bytes(int n_tok, int n_embd, int n_ff) {
     (void)n_embd;
-    return (size_t)n_tok * ((size_t)n_ff * 3 + 1) * sizeof(float);          // gate | up | h | g
+    if (n_tok <= 0 || n_ff <= 0) return 0;
+    return (size_t)shared_expert::scratch_bytes((uint64_t)n_tok, (uint64_t)n_ff);
 }
 cudaError_t shared_expert_multi(const float* x, int n_tok, int n_embd, int n_ff, const uint16_t* gate_w, const uint16_t* up_w,
                                 const uint16_t* down_w, const uint16_t* gate_scalar_w, float* out, void* scratch, size_t scratch_bytes,
                                 cudaStream_t s) {
-    if (!x || !gate_w || !up_w || !down_w || !gate_scalar_w || !out || !scratch || n_tok <= 0 || n_embd <= 0 || n_ff <= 0 || n_tok > 65535)
-        return cudaErrorInvalidValue;
+    if (!x || !gate_w || !up_w || !down_w || !gate_scalar_w || !out || !scratch || n_embd <= 0 || n_ff <= 0) return cudaErrorInvalidValue;
+    if (n_tok < 1 || n_tok > (int)shared_expert::kMaxTokens) return cudaErrorInvalidValue;      // 1..8 tokens
     if (scratch_bytes < shared_expert_scratch_bytes(n_tok, n_embd, n_ff)) return cudaErrorInvalidValue;
-    float* gt = (float*)scratch; float* up = gt + (size_t)n_tok * n_ff; float* h = up + (size_t)n_tok * n_ff; float* g = h + (size_t)n_tok * n_ff;
+    if (((uintptr_t)scratch & 15) != 0) return cudaErrorInvalidValue;                            // regions are 16-byte aligned from here
+    unsigned char* base = (unsigned char*)scratch;
+    float* gt = (float*)(base + shared_expert::off_gate(n_tok, n_ff));
+    float* up = (float*)(base + shared_expert::off_up(n_tok, n_ff));
+    float* g = (float*)(base + shared_expert::off_gate_slots(n_tok, n_ff));
     const long long nf = (long long)n_tok * n_ff;
     rows_dot_kernel<<<dim3((n_ff + 3) / 4, n_tok), THREADS, 0, s>>>(gate_w, x, gt, n_ff, n_embd);
     rows_dot_kernel<<<dim3((n_ff + 3) / 4, n_tok), THREADS, 0, s>>>(up_w, x, up, n_ff, n_embd);
-    if (native_bf16) native_swiglu_kernel<<<(unsigned)((nf + 255) / 256), 256, 0, s>>>(gt, up, h, nf);
-    else { swiglu_kernel<<<(unsigned)((nf + 255) / 256), 256, 0, s>>>(gt, up, h, nf); to_f16_kernel<<<(unsigned)((nf + 255) / 256), 256, 0, s>>>(h, nf); }
-    // down projection: out[t][o] = dot(down_w[o][0..ff), h[t])
-    rows_dot_kernel<<<dim3((n_embd + 3) / 4, n_tok), THREADS, 0, s>>>(down_w, h, out, n_embd, n_ff);
+    if (native_bf16) native_swiglu_kernel<<<(unsigned)((nf + 255) / 256), 256, 0, s>>>(gt, up, nf);
+    else { swiglu_kernel<<<(unsigned)((nf + 255) / 256), 256, 0, s>>>(gt, up, nf); to_f16_kernel<<<(unsigned)((nf + 255) / 256), 256, 0, s>>>(gt, nf); }
+    // down projection: out[t][o] = dot(down_w[o][0..ff), h[t]), h lives in the gate region
+    rows_dot_kernel<<<dim3((n_embd + 3) / 4, n_tok), THREADS, 0, s>>>(down_w, gt, out, n_embd, n_ff);
     if (native_bf16) native_scalar_sigmoid_kernel<<<n_tok, THREADS, 0, s>>>(x, gate_scalar_w, g, n_embd);
     else scalar_gate_kernel<<<n_tok, THREADS, 0, s>>>(x, gate_scalar_w, g, n_embd);
     const long long total = (long long)n_tok * n_embd;
-    scale_rows_kernel<<<(unsigned)((total + 255) / 256), 256, 0, s>>>(out, g, n_embd, total);
+    scale_rows_kernel<<<(unsigned)((total + 127) / 128), 128, 0, s>>>(out, g, n_embd, total);
     return cudaGetLastError();
 }
 cudaError_t shared_expert(const float* x, int n_embd, int n_ff, const uint16_t* gate_w, const uint16_t* up_w, const uint16_t* down_w,
@@ -123,8 +132,8 @@ cudaError_t shared_expert(const float* x, int n_embd, int n_ff, const uint16_t* 
     return shared_expert_multi(x, 1, n_embd, n_ff, gate_w, up_w, down_w, gate_scalar_w, out, scratch, scratch_bytes, s);
 }
 cudaError_t moe_combine(const float* parts, const float* weights, const float* shared, float* y, int n_embd, int k, int has_shared, cudaStream_t s) {
-    if (!parts || !weights || !y || n_embd <= 0 || k <= 0 || (has_shared && !shared)) return cudaErrorInvalidValue;
-    moe_combine_kernel<<<(n_embd + 255) / 256, 256, 0, s>>>(parts, weights, shared, y, n_embd, k, has_shared);
+    if (!parts || !weights || !y || n_embd <= 0 || !shared_expert::valid_combine_k((uint64_t)(k > 0 ? k : 0)) || (has_shared && !shared)) return cudaErrorInvalidValue;
+    moe_combine_kernel<<<(unsigned)shared_expert::grid_blocks_128((uint64_t)n_embd), 128, 0, s>>>(parts, weights, shared, y, n_embd, k, has_shared);
     return cudaGetLastError();
 }
 }  // namespace kg

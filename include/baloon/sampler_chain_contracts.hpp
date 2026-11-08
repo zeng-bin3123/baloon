@@ -53,5 +53,16 @@ inline uint64_t rng_counter(uint64_t counter, uint64_t t) { return counter + t; 
 
 inline int effective_top_k(int k) { return k < kMaxTopK ? k : kMaxTopK; }
 
+// Number of selection passes of the sampled path: the top-k clamp (0 when top_k <= 0, which the sampled path refuses).
+inline int k_passes(int top_k) { return top_k > 0 ? (top_k < kMaxTopK ? top_k : kMaxTopK) : 0; }
+// Presence is a boolean, not the count.
+inline uint32_t presence(uint32_t count) { return count > 0 ? 1u : 0u; }
+// Total subtraction of the penalties for a token seen `count` times.
+inline double penalty_sub(uint32_t count, double freq, double present) { return (double)count * freq + (double)presence(count) * present; }
+// top-p cut after the min_keep floor, capped at the survivor count.
+inline size_t cut_after(size_t cut, size_t min_keep, size_t n_keep) { return cut < min_keep ? (min_keep < n_keep ? min_keep : n_keep) : cut; }
+// Philox draw: the top 24 bits of a 32-bit word over 2^24, strictly below 1.
+inline float philox_unit(uint32_t word) { return (float)(word >> 8) * (1.0f / 16777216.0f); }
+
 }  // namespace sampler
 }  // namespace baloon
