@@ -827,10 +827,11 @@
     }
   },
   "fix_attempts": {
-    "pf7b804cf95": 2
+    "pf7b804cf95": 3
   },
   "fail_history": {
     "pf7b804cf95": [
+      "review_fail",
       "review_fail",
       "review_fail"
     ],
@@ -866,17 +867,11 @@
   "last_failure": {
     "pf7b804cf95": {
       "kind": "review_fail",
-      "text": "kv_append writes f32 scales (float* ks, unrounded amax/127) but theory prefill_kernels/kv_q8_quant specify an f16 scale (fp16(amax/127)); the unit test pins the f32 behavior",
+      "text": "gr_norm normalizes jointly over all 4 streams (D=10240) but theory/decode reference norm each stream row (N=2560) separately, and the unit test cannot detect it",
       "base_ref": "einsteinOS/dev-3b59928b8f"
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "pf7b804cf95": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
