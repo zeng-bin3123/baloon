@@ -23,6 +23,22 @@ struct QsaArgs {
     const int32_t* ids; const int32_t* n_ids; float* scratch; float* out;
     int nq, n_kv, cap, page_size, n_cells; bool q8; float scale;
 };
+// The K/V side of QsaArgs: where the selected cells live and how rows are addressed. One pools value serves any number of
+// queries; per_call() supplies the rest (q, ids, scratch, out) and yields the QsaArgs the kernels take.
+struct QsaAttnPools {
+    const void* k = nullptr; const void* v = nullptr;
+    const float* k_scale = nullptr; const float* v_scale = nullptr;   // only read when q8
+    int n_kv = 0, page_size = 0, n_cells = 0; bool q8 = false;
+    // Row of cell c, kv head h (cells are page-major): (page * n_kv + h) * page_size + slot.
+    int64_t row(int cell, int head) const {
+        return ((int64_t)(cell / page_size) * n_kv + head) * page_size + (cell % page_size);
+    }
+    bool valid() const { return k && v && n_kv > 0 && page_size > 0 && n_cells >= 0 && (!q8 || (k_scale && v_scale)); }
+    QsaArgs per_call(const float* q, const int32_t* ids, const int32_t* n_ids, float* scratch, float* out,
+                     int nq, int cap, float scale) const {
+        return QsaArgs{q, k, v, k_scale, v_scale, ids, n_ids, scratch, out, nq, n_kv, cap, page_size, n_cells, q8, scale};
+    }
+};
 int qsa_decode_attn_batch(const QsaArgs& a, void* stream);
 int qsa_decode_attn_step(const QsaArgs& a, void* stream);   // nq must be 1
 
