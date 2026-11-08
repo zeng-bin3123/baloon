@@ -1,9 +1,10 @@
 // vision_tool.cpp - resident image-encoder command loop. Reads `ENC <image> <output>` / `QUIT` lines on stdin; with the
 // synthetic encoder (--synthetic NX NY EMBD) writes a deterministic embedding file in the wire format and answers
-// `OK <n_tokens>`; a malformed command answers `ERR`.
+// `OK <n_tokens> <nx> <ny> <ms>`; a malformed command or a failed write answers `ERR <msg>`.
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include <chrono>
 #include <cstring>
 #include <iostream>
 #include <string>
@@ -33,18 +34,20 @@ int main(int argc, char** argv) {
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line == "QUIT") break;
-        if (line.rfind("ENC ", 0) != 0) { std::puts("ERR"); std::fflush(stdout); continue; }
+        auto reply = [](const std::string& r) { std::puts(r.c_str()); std::fflush(stdout); };
+        const auto t0 = std::chrono::steady_clock::now();
+        if (line.rfind("ENC ", 0) != 0) { reply(err_reply("unknown command")); continue; }
         const Command c = parse_enc(line.substr(4));
-        if (!c.ok) { std::puts("ERR"); std::fflush(stdout); continue; }
+        if (!c.ok) { reply(err_reply("bad ENC line")); continue; }
         std::vector<float> emb((size_t)(nx * ny * embd));
         for (size_t i = 0; i < emb.size(); ++i) emb[i] = (float)(i % 251) * 0.5f;
         const std::vector<uint8_t> b = build_file((int32_t)nx, (int32_t)ny, (int32_t)embd, emb);
         FILE* f = std::fopen(c.output.c_str(), "wb");
-        if (!f || std::fwrite(b.data(), 1, b.size(), f) != b.size()) { if (f) std::fclose(f); std::puts("ERR"); std::fflush(stdout); continue; }
+        if (!f || std::fwrite(b.data(), 1, b.size(), f) != b.size()) { if (f) std::fclose(f); reply(err_reply("cannot write output")); continue; }
         std::fclose(f);
         quiet_log("encoded %s -> %s\n", c.image.c_str(), c.output.c_str());
-        std::printf("OK %ld\n", nx * ny);
-        std::fflush(stdout);
+        const long ms = (long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
+        reply(ok_reply(nx * ny, nx, ny, ms));
     }
     return 0;
 }

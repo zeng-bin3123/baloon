@@ -57,6 +57,16 @@ inline void grid_from_last(int32_t x, int32_t y, int32_t& nx, int32_t& ny) { nx 
 inline bool grid_ok(uint64_t nx, uint64_t ny, uint64_t n) { return nx * ny == n; }
 inline void row_pos(uint64_t i, uint64_t nx, uint64_t& x, uint64_t& y) { x = i % nx; y = i / nx; }
 
+
+// Reply lines. Success: "OK n nx ny ms"; failure: "ERR msg" (msg never empty).
+inline std::string ok_reply(int64_t n, int64_t nx, int64_t ny, int64_t ms) {
+    return "OK " + std::to_string(n) + " " + std::to_string(nx) + " " + std::to_string(ny) + " " + std::to_string(ms);
+}
+inline std::string err_reply(const std::string& msg) { return "ERR " + (msg.empty() ? std::string("error") : msg); }
+
+// Index of the last token on a rectangular grid, and the grid recovered from that token's position.
+inline uint64_t last_index(uint64_t nx, uint64_t ny) { return nx * ny - 1; }
+
 // Numeric option overrides the default only when positive.
 inline int64_t effective(int64_t req, int64_t dflt) { return req > 0 ? req : dflt; }
 inline bool width_ok(int64_t n_embd) { return n_embd > 0; }

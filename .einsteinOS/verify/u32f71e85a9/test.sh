@@ -23,6 +23,7 @@ $HOSTCXX $HF src/tools/vision_tool.cpp -o "$OUT/vision_tool" || { echo "BUILD FA
 V="$OUT/vision_tool"; D="$OUT/vt"; mkdir -p "$D"; rm -f "$D"/*
 expect_eq() { [ "$2" = "$3" ] || { echo "TOOL FAIL ($1): got [$2] want [$3]"; rc=1; }; }
 r="$(printf 'ENC my dir/a b.png %s/o.bin\nENC nospace\nENC  \nBOGUS\nQUIT\nENC x %s/never.bin\n' "$D" "$D" | "$V" --quiet --synthetic 3 2 5)"
+r="$(printf '%s\n' "$r" | sed -E 's/^OK 6 3 2 [0-9]+$/OK 6/; s/^ERR .+$/ERR/')"
 expect_eq replies "$r" "$(printf 'OK 6\nERR\nERR\nERR')"
 expect_eq size "$(stat -c %s "$D/o.bin")" "$((20 + 6 * 5 * 4))"
 expect_eq magic "$(head -c 4 "$D/o.bin" | od -An -c | tr -d ' ')" "SVE1"

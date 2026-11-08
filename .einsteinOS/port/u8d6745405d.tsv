@@ -1,0 +1,3 @@
+tools/vision/ref_vision.cpp	main	src/tools/vision_tool.cpp	main
+tools/vision/ref_vision.cpp	parse_enc	include/baloon/vision_encoder_protocol.hpp	parse_enc
+tools/vision/ref_vision.cpp	quiet_log	src/tools/vision_tool.cpp	quiet_log
