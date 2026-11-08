@@ -872,6 +872,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "p74b6dab221": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "deferred": {
     "pf7b804cf95": {
       "kind": "review_fail",
@@ -1149,6 +1155,7 @@
     "p45808a8a9c": true,
     "p4fde6588a6": true,
     "p5a693eb464": true,
+    "p74b6dab221": true,
     "p8ce7113562": true,
     "p984d0d954f": true,
     "pd8e380f419": true,
