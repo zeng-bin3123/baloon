@@ -859,12 +859,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "p5a693eb464": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -1114,6 +1108,7 @@
   ],
   "port_pass": {
     "p42b0ab780a": true,
+    "p5a693eb464": true,
     "pfcccb31b26": true
   },
   "verify_seen": {
