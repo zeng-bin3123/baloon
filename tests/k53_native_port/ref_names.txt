@@ -1,0 +1,12 @@
+iq512_gu_rows func
+iq512_rows func
+iq512_supported func
+NativeFmt type
+kNativeActBytes const
+kNativeHBytes const
+native_down_rows func
+native_experts_available func
+native_fmt func
+native_gu_rows func
+native_quant_act func
+native_quant_h func
