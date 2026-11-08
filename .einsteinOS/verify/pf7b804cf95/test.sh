@@ -55,6 +55,7 @@ mutate gates_sign    $K 's|g\[i\] = -expf(a_log\[h\]) \* sp;|g[i] = expf(a_log[h
 mutate gather_idx    $K 's|dst\[i\] = src\[(int64_t)idx\[r\] \* per_row + j\];|dst[i] = src[(int64_t)(idx[r] ^ 1) * per_row + j];|'
 mutate rope_tail     $K 's|v\[p + 32\] = a \* sn + b \* cs;|v[p + 32] = a * sn - b * cs;|'
 mutate rms_weight    $K 's|x\[r \* width + i\] \* inv \* w\[i\];|x[r * width + i] * inv;|'
+mutate rec_layout   $K 's|float\* st = state + ((int64_t)row \* HV + h) \* S;|float* st = state + ((int64_t)h * S + row) * S;|'
 mutate combine_w     $K 's|acc += wts\[t \* kRoutedK + k\] \* eo|acc += eo|'
 [ $rc -eq 0 ] && echo "ALL UNIT TESTS PASSED" || echo "UNIT TESTS FAILED"
 exit $rc

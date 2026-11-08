@@ -218,6 +218,20 @@ int main() {
       auto ho = oa.get(); bool fin = true; for (float v : ho) fin &= std::isfinite(v);
       ok(fin, "gdn_recurrence: finite outputs"); ok(ho == ob.get(), "gdn_recurrence: chunked == whole (state carries)"); ok(sa.get() == sb.get(), "gdn_recurrence: final state equal after chunking");
       bool nz = false; for (float v : ho) nz |= v != 0.f; ok(nz, "gdn_recurrence: outputs not identically zero");
+      // layout: nonzero initial state in [row][head][col]; compare outputs and final state with a double-precision host reference
+      { const int TL = 2; auto s0 = vf((size_t)S * HV * S, -0.5f, 0.5f); Dev<float> ds(s0), dol((size_t)TL * HV * S);
+        ok(gdn_recurrence(dq2, dg, dbt, ds, dol, TL) == 0 && sync_ok(), "gdn_recurrence layout launch");
+        std::vector<double> rs(s0.begin(), s0.end()), ro((size_t)TL * HV * S);
+        auto at = [&](int row, int h, int col) -> size_t { return ((size_t)row * HV + h) * S + col; };
+        for (int t = 0; t < TL; ++t) for (int h = 0; h < HV; ++h) { const int hk = h % HK; const float* base = &q2[(size_t)t * C];
+            double gt = std::exp((double)gg[(size_t)t * HV + h]), bt = bb[(size_t)t * HV + h];
+            for (int row = 0; row < S; ++row) { double kv = 0; for (int c = 0; c < S; ++c) { rs[at(row, h, c)] *= gt; kv += rs[at(row, h, c)] * base[HK * S + hk * S + c]; }
+                double dl = bt * (base[2 * HK * S + h * S + row] - kv), o = 0;
+                for (int c = 0; c < S; ++c) { rs[at(row, h, c)] += dl * base[HK * S + hk * S + c]; o += rs[at(row, h, c)] * base[hk * S + c]; }
+                ro[((size_t)t * HV + h) * S + row] = o / std::sqrt((double)S); } }
+        auto gsd = ds.get(), god = dol.get();
+        near(god, ro, 1e-3, 1e-4, "gdn_recurrence: outputs match host reference");
+        near(gsd, rs, 1e-3, 1e-4, "gdn_recurrence: state layout is [row][head][col]"); }
     }
 
     std::printf("%d checks, %d failed\n", g_checks, g_fail);

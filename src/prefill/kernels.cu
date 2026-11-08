@@ -168,11 +168,11 @@ __global__ void gdn_l2_kernel(float* qkv, float eps) {
     p[tid] = v * rsqrtf(tot + eps);
 }
 
-// one block per value head, thread = state row. state[h][row][col]; q/k use head h % HK.
+// one block per value head, thread = state row. state[row][head][col] (row stride HV*S, head stride S); q/k use head h % HK.
 __global__ void __launch_bounds__(128) gdn_rec_kernel(const float* qkv, const float* g, const float* beta, float* state, float* out, int T) {
     __shared__ float qs[S], ks[S];
     const int h = blockIdx.x, row = threadIdx.x;
-    float* st = state + ((int64_t)h * S + row) * S;
+    float* st = state + ((int64_t)row * HV + h) * S;
     const float scale = rsqrtf((float)S);
     for (int t = 0; t < T; ++t) {
         const float* base = qkv + (int64_t)t * C;
