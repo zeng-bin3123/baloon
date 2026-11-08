@@ -604,6 +604,11 @@
       "pass": true,
       "unit_id": "u4decb4e657"
     },
+    "GenerateDriver.lean": {
+      "hash": "c49456240576",
+      "pass": true,
+      "unit_id": "ucbadf2af54"
+    },
     "GgufReaderGeometry.lean": {
       "hash": "01491e5edc21",
       "pass": true,
@@ -638,6 +643,11 @@
       "hash": "88edf4d49096",
       "pass": true,
       "unit_id": "ud77a0d7726"
+    },
+    "MoeSplitProtocol.lean": {
+      "hash": "cf178a3409bf",
+      "pass": true,
+      "unit_id": "ucbadf2af54"
     },
     "MtpDraftBlockQuantizer.lean": {
       "hash": "3ae0c62875af",
@@ -739,6 +749,11 @@
       "pass": true,
       "unit_id": "u293ad55355"
     },
+    "RouterTop10Selection.lean": {
+      "hash": "97452907fbdd",
+      "pass": true,
+      "unit_id": "ucbadf2af54"
+    },
     "S2ExpertGroupedHits.lean": {
       "hash": "9d14ee4b3867",
       "pass": true,
@@ -754,10 +769,30 @@
       "pass": true,
       "unit_id": "u0d41014a5a"
     },
+    "SamplerChain.lean": {
+      "hash": "7d662d334ab5",
+      "pass": true,
+      "unit_id": "ucbadf2af54"
+    },
     "ScalarDequantizers.lean": {
       "hash": "57309fe4227d",
       "pass": true,
       "unit_id": "u649794726a"
+    },
+    "ServeFrontend.lean": {
+      "hash": "ae6325bf7cfe",
+      "pass": true,
+      "unit_id": "ucbadf2af54"
+    },
+    "SessionSchedule.lean": {
+      "hash": "d6191bb1821b",
+      "pass": true,
+      "unit_id": "ucbadf2af54"
+    },
+    "SharedExpertCombine.lean": {
+      "hash": "555ab6b6f2b5",
+      "pass": true,
+      "unit_id": "ucbadf2af54"
     },
     "SpecController.lean": {
       "hash": "d909e89dbd41",
@@ -818,12 +853,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "ucbadf2af54": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
