@@ -15,7 +15,7 @@ bool overlaps(const void* a, size_t an, const void* b, size_t bn) {
     return pa < pb + bn && pb < pa + an;
 }
 
-__device__ __forceinline__ void apply(float* p, int i, int half, int rot, float theta, int pos) {
+__device__ __forceinline__ void rotate_pair(float* p, int i, int half, int rot, float theta, int pos) {
     const float freq = powf(theta, -2.0f * (float)i / (float)rot);
     const float a = (float)pos * freq;
     const float c = cosf(a), sn = sinf(a);
@@ -24,7 +24,7 @@ __device__ __forceinline__ void apply(float* p, int i, int half, int rot, float 
     p[i + half] = x0 * sn + x1 * c;
 }
 // sel[i] = component of frequency i (int8, filled on the host)
-__global__ void native_rope_kernel(float* __restrict__ x, const int32_t* __restrict__ pos3, const int8_t* __restrict__ sel, int n_tok,
+__global__ void apply(float* __restrict__ x, const int32_t* __restrict__ pos3, const int8_t* __restrict__ sel, int n_tok,
                                    int n_heads, int head_dim, int rot, float theta) {
     const int half = rot / 2;
     const long long e = (long long)blockIdx.x * blockDim.x + threadIdx.x;
@@ -32,7 +32,7 @@ __global__ void native_rope_kernel(float* __restrict__ x, const int32_t* __restr
     const int i = (int)(e % half);
     const long long th = e / half;
     const int t = (int)(th / n_heads);
-    apply(x + th * head_dim, i, half, rot, theta, pos3[(size_t)t * 3 + sel[i]]);
+    rotate_pair(x + th * head_dim, i, half, rot, theta, pos3[(size_t)t * 3 + sel[i]]);
 }
 }  // namespace
 
@@ -62,7 +62,7 @@ cudaError_t native_rope_apply(float* x, const int32_t* pos3, int n_tok, int n_he
     for (int i = 0; i < half; ++i) h[i] = (int8_t)mrope_table(i, half);
     e = cudaMemcpyAsync(sel, h, (size_t)half, cudaMemcpyHostToDevice, s);
     if (e == cudaSuccess) {
-        native_rope_kernel<<<kgc::grid_for_n((long long)n_tok * n_heads * half, 256), 256, 0, s>>>(x, pos3, sel, n_tok, n_heads, head_dim, rot, theta);
+        apply<<<kgc::grid_for_n((long long)n_tok * n_heads * half, 256), 256, 0, s>>>(x, pos3, sel, n_tok, n_heads, head_dim, rot, theta);
         e = cudaGetLastError();
     }
     if (e == cudaSuccess) e = cudaStreamSynchronize(s);      // the staging buffers are freed below

@@ -50,6 +50,15 @@ struct FlashArgs {
     int width, n_kv, pos, n_bid, max_ctx;
 };
 int native_flash_attn_step(const FlashArgs& a, void* stream);
+// An address range [addr, addr + bytes) of one buffer of a step.
+struct Span { uint64_t addr; uint64_t bytes; };
+// Valid iff every span is non-null, non-empty and aligned to `align` (a power of two), and no `outs` span overlaps another
+// `outs` span or any `ins` span (input spans may alias each other).
+bool validate_spans(const Span* ins, int n_in, const Span* outs, int n_out, uint64_t align);
+// Same step, but a malformed step (shape facts, null/misaligned/overlapping buffers) is rejected on the host with -1 and nothing launches.
+int native_flash_attn_short_step(const FlashArgs& a, void* stream);
+// Row-wise max (mode 0) or sum (mode 1) of x [rows][cols], one 64-lane wave per row. 0 ok, -1 bad arguments, >0 cudaError_t.
+int flash_wave_reduce(const float* x, float* out, int rows, int cols, int mode, void* stream);
 uint64_t qsa_decode_attn_scratch_floats(int cap, int n_head);
 
 }  // namespace attn_kernels

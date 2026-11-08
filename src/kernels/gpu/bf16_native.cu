@@ -31,18 +31,18 @@ __global__ void bf16_f32_mmvf_kernel(const uint16_t* __restrict__ w, const float
 }
 }  // namespace
 
-#define MMVF_CASE(BS) case BS: bf16_f32_mmvf_kernel<BS><<<(unsigned)rows, BS, 0, s>>>(w, x, y, cols); break;
+#define REF_MMVF_CASE(BS) case BS: bf16_f32_mmvf_kernel<BS><<<(unsigned)rows, BS, 0, s>>>(w, x, y, cols); break;
 
 cudaError_t bf16_gemv_fp32_mmvf(const uint16_t* w, const float* x, float* y, long long rows, long long cols, cudaStream_t s) {
     if (!w || !x || !y || rows <= 0 || cols <= 0 || rows > 2147483647ll) return cudaErrorInvalidValue;
     switch (mmvf_block_size(cols)) {
-        MMVF_CASE(64)
-        MMVF_CASE(128)
-        MMVF_CASE(256)
+        REF_MMVF_CASE(64)
+        REF_MMVF_CASE(128)
+        REF_MMVF_CASE(256)
         default: return cudaErrorInvalidValue;
     }
     return cudaGetLastError();
 }
-#undef MMVF_CASE
+#undef REF_MMVF_CASE
 }  // namespace kg
 }  // namespace baloon

@@ -18,11 +18,11 @@ bool elements(long long rows, long long cols) { return rows > 0 && cols > 0 && r
 bool buffers(const void* a, const void* b, size_t bytes) { return valid(a, bytes) && valid(b, bytes) && !overlap(a, bytes, b, bytes); }
 cudaError_t check_launch() { return cudaGetLastError(); }
 __device__ __forceinline__ float warp_sum(float v) { return kgc::wave_sum(v); }
-__device__ __forceinline__ float gate(float g) { return kgc::sigmoid(g); }
+__device__ __forceinline__ float gate_value(float g) { return kgc::sigmoid(g); }
 
-__global__ void gate_apply_kernel(float* __restrict__ out, const float* __restrict__ g, long long n) {
+__global__ void gate(float* __restrict__ out, const float* __restrict__ g, long long n) {
     const long long i = (long long)blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) out[i] *= gate(g[i]);
+    if (i < n) out[i] *= gate_value(g[i]);
 }
 // 4 rows per block (one wave each)
 __global__ void norm(float* __restrict__ x, const float* __restrict__ w, int rows, int cols, float eps) {
@@ -44,7 +44,7 @@ void native_qsa_set_enabled(bool on) { g_enabled = on; }
 cudaError_t native_qsa_gate_apply(float* out, const float* gate_v, long long n, cudaStream_t s) {
     if (n <= 0) return cudaErrorInvalidValue;
     if (!buffers(out, gate_v, (size_t)n * 4)) return cudaErrorInvalidValue;
-    gate_apply_kernel<<<(unsigned)((n + 255) / 256), 256, 0, s>>>(out, gate_v, n);
+    gate<<<(unsigned)((n + 255) / 256), 256, 0, s>>>(out, gate_v, n);
     return check_launch();
 }
 cudaError_t native_qsa_rms_norm_weighted(float* x, const float* w, int rows, int cols, float eps, cudaStream_t s) {
