@@ -713,10 +713,15 @@
       "unit_id": "u2e9aa362e3"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u293ad55355": 1
+  },
   "fail_history": {
     "u0d41014a5a": [
       "build_toolchain_dependence_unmeasured"
+    ],
+    "u293ad55355": [
+      "review_fail"
     ],
     "u2e9aa362e3": [
       "review_fail",
@@ -741,14 +746,14 @@
       "review_fail"
     ]
   },
-  "last_failure": {},
-  "infra_fails": 0,
-  "review_pending": {
+  "last_failure": {
     "u293ad55355": {
-      "compile": "pass",
-      "smoke": "pass"
+      "kind": "review_fail",
+      "text": "port entry ple.cu gate_kernel -\u003e src/cu/ple_block.cu gate_kernel computes plain sigmoid(dot(gate_w,hidden)) but PleBlockKernels theory specifies signed_sqrt_gate (sigmoid(sgn(s)*sqrt(max(|s|,1e-6)))), and no test launches ple_block.cu kernels",
+      "base_ref": "einsteinOS/dev-3b59928b8f"
     }
   },
+  "infra_fails": 0,
   "port_units": [
     {
       "id": "pfcccb31b26",
