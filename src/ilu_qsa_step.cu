@@ -43,7 +43,9 @@ bool validate(const Shape& s, const void* a, const void* b, const void* table) {
 __device__ __forceinline__ float h2f(uint16_t h) { return f16bits::f32_from_f16(h); }
 
 __device__ __forceinline__ uint32_t order_key(float f) {
-    const uint32_t u = __float_as_uint(f);
+    uint32_t u = __float_as_uint(f);
+    if ((u & 0x7F800000u) == 0x7F800000u && (u & 0x007FFFFFu) != 0u) return 0u;  // NaN -> reserved key 0, below every finite/inf score
+    if ((u << 1) == 0u) u = 0u;                                                    // -0 ties +0
     return (u & 0x80000000u) ? ~u : (u | 0x80000000u);
 }
 

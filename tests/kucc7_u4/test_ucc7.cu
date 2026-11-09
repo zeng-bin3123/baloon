@@ -417,13 +417,59 @@ static void gpu_geometry() {
     cudaFree(d_p); cudaFree(d_o); cudaFree(d_b); cudaFree(d_k); cudaFree(d_bu); cudaFree(d_be); cudaFree(d_eq); cudaFree(d_q);
 }
 
+
+// order_key of the cache-step top-k: -0 ties +0, NaN -> 0 (strictly below everything else). Exercised through the real kernel
+// with raw -0.0f / NaN bit patterns (no pre-folding).
+static uint32_t ref_step_key(uint32_t u) {
+    if ((u & 0x7F800000u) == 0x7F800000u && (u & 0x007FFFFFu) != 0u) return 0u;
+    if ((u << 1) == 0u) u = 0u;
+    return (u & 0x80000000u) ? ~u : (u | 0x80000000u);
+}
+static void test_step_topk_negzero_nan() {
+    const int n = 700;
+    std::vector<uint32_t> bits(n);
+    Rng r(77);
+    int i = 0;
+    for (; i < 50; ++i) { float f = 1.0f + (float)i; std::memcpy(&bits[i], &f, 4); }
+    for (int k = 0; k < 300; ++k, ++i) bits[i] = (k & 1) ? 0x80000000u : 0u;
+    for (int k = 0; k < 100; ++k, ++i) bits[i] = (k & 1) ? 0xFFC00000u : 0x7FC00001u;
+    for (int k = 0; k < 250; ++k, ++i) { float f = -1.0f - (float)(r.below(1000)) * 0.5f; std::memcpy(&bits[i], &f, 4); }
+    CHECK(i == n);
+    // shuffle positions so ties are not grouped
+    for (int a = n - 1; a > 0; --a) std::swap(bits[a], bits[r.below(a + 1)]);
+    std::vector<float> sc(n); std::memcpy(sc.data(), bits.data(), n * 4);
+    float* d_s = dup(sc); int32_t* d_ids = dalloc<int32_t>(512); int32_t* d_n = dalloc<int32_t>(1);
+    for (int width : {64, 200, 349, 350, 351, 512}) {
+        CHECK(qsa_step::topk_512_step(d_s, n, width, d_ids, d_n, nullptr) == 0);
+        CUOK(cudaDeviceSynchronize());
+        const auto cnt = fetch(d_n, 1); const auto ids = fetch(d_ids, width);
+        std::vector<int> idx(n); for (int a = 0; a < n; ++a) idx[a] = a;
+        std::stable_sort(idx.begin(), idx.end(), [&](int a, int b) { return ref_step_key(bits[a]) > ref_step_key(bits[b]); });
+        idx.resize(width); std::sort(idx.begin(), idx.end());
+        CHECK(cnt[0] == width);
+        for (int a = 0; a < width; ++a) CHECK(ids[a] == idx[a]);
+        for (int a = 0; a < width && a < cnt[0]; ++a) {   // NaN is never selected while enough non-NaN cells exist
+            const uint32_t b = bits[ids[a]]; CHECK(!((b & 0x7F800000u) == 0x7F800000u && (b & 0x007FFFFFu)));
+        }
+    }
+    // zero ties: width 200 cuts inside the zero group => lowest-id zeros win regardless of sign
+    CHECK(qsa_step::topk_512_step(d_s, n, 200, d_ids, d_n, nullptr) == 0); CUOK(cudaDeviceSynchronize());
+    const auto ids = fetch(d_ids, 200); int pos = 0, zeros = 0, firstz_ok = 1, maxz = -1;
+    for (int a = 0; a < 200; ++a) { const uint32_t b = bits[ids[a]]; if (b == 0u || b == 0x80000000u) { ++zeros; maxz = std::max(maxz, (int)ids[a]); } else ++pos; }
+    CHECK(pos == 50 && zeros == 150);
+    int below_max_unselected = 0;
+    for (int a = 0; a < maxz; ++a) { const uint32_t b = bits[a]; if ((b == 0u || b == 0x80000000u) && !std::binary_search(ids.begin(), ids.end(), a)) ++below_max_unselected; }
+    CHECK(firstz_ok && below_max_unselected == 0);
+    cudaFree(d_s); cudaFree(d_ids); cudaFree(d_n);
+}
+
 int main() {
     int ndev = 0;
     CUOK(cudaGetDeviceCount(&ndev));
     if (ndev < 1) { std::printf("no GPU device\n"); return 2; }
     CUOK(cudaSetDevice(0));
     host_flash_facts(); host_qsa_facts(); host_select_facts();
-    gpu_flash(); gpu_block_select(); gpu_indexer(); gpu_attend_and_gate(); gpu_geometry();
+    gpu_flash(); gpu_block_select(); gpu_indexer(); gpu_attend_and_gate(); gpu_geometry(); test_step_topk_negzero_nan();
     CUOK(cudaDeviceSynchronize());
     std::printf("%ld checks, %ld failures\n", g_checks, g_fail);
     if (g_fail) { std::printf("UCC7 UNIT TESTS FAILED\n"); return 1; }
