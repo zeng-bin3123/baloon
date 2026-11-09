@@ -59,6 +59,12 @@ static float H(uint16_t h) { return f16bits::f32_from_f16(h); }
 
 static void test_arch_guard() {
     std::string w;
+    // only GGUF version 3 is handled: every other version is refused by the reader
+    for (uint32_t ver : {0u, 1u, 2u, 4u, 0x03000000u, 0xFFFFFFFFu}) {
+        auto im = make_guard_img("qwen4exp", 512, 10, 24, 2, 48, 2560);
+        for (int i = 0; i < 4; ++i) im[4 + i] = (uint8_t)(ver >> (8 * i));
+        CHECK(!gguf_reader::GgufFile::parse(im.data(), im.size()));
+    }
     CHECK(guard_check(make_guard_img("qwen4exp", 512, 10, 24, 2, 48, 2560), &w));
     // any other architecture string is refused, even qwen-prefixed ones with identical constants
     for (const char* a : {"qwen35moe", "qwen2moe", "qwen3moe", "qwen", "qwen4exp2", "qwen4ex", "Qwen4exp", "llama", ""})

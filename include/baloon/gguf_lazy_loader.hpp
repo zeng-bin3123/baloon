@@ -185,7 +185,7 @@ inline std::optional<Index> parse_header(const uint8_t* data, uint64_t size) {
     if (c.u32() != kMagic) return std::nullopt;
     Index ix;
     ix.version = c.u32();
-    if (ix.version < 2 || ix.version > 3) return std::nullopt;
+    if (ix.version != 3) return std::nullopt;
     const uint64_t nt = c.u64(), nkv = c.u64();
     if (!c.ok || nt > (1u << 24) || nkv > (1u << 24)) return std::nullopt;
     for (uint64_t i = 0; i < nkv && c.ok; ++i) {

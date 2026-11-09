@@ -178,7 +178,7 @@ struct GgufFile {
         Cursor c(data, size);
         if (c.u32() != kMagic) return std::nullopt;
         GgufFile f; f.version = c.u32();
-        if (f.version < 2 || f.version > 3) return std::nullopt;
+        if (f.version != 3) return std::nullopt;
         const uint64_t nt = c.u64(), nkv = c.u64();
         if (!c.ok || nt > (1u << 24) || nkv > (1u << 24)) return std::nullopt;
         for (uint64_t i = 0; i < nkv; ++i) {
