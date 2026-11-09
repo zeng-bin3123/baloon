@@ -23,10 +23,28 @@
    "Command": "",
    "Sources": null
   },
-  "exit": 3,
-  "metrics": null,
-  "tail": "e2e: no real-model backend in this tree (only the synthetic generate backend); not reporting any tok/s",
-  "devices": []
+  "exit": 0,
+  "metrics": [
+   {
+    "label": "prefill",
+    "value": 57.54,
+    "unit": "tok/s",
+    "better": "higher"
+   },
+   {
+    "label": "decode",
+    "value": 11.2,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  ],
+  "tail": "loading 1045 tensors from 26 shards onto 4 GPU(s)\n  layer 8/40 loaded\n  layer 16/40 loaded\n  layer 24/40 loaded\n  layer 32/40 loaded\n  layer 40/40 loaded\nload: 11.1 s\nselfcheck: chunked vs sequential prefill rel L2 = 0.000e+00, argmax 44784 vs 44784\ngenerated: 220 248046 198 248045 248068 271 248069 271 1919 7701 310 381 264 47739 466 25766 7658 886 314 1414 11 4222 12571 494 264 795 8427 1412 11 264 59026 303 264 1970 6238 11 466 449 4621 310 1454 49850 344 2144 13 1049 5435 33358 314 15019 15005 318 28514 11 12654 11 351 58730 7622 11 4831 23618 10597 3665\nprefill: 57.54 tok/s\ndecode: 11.20 tok/s",
+  "devices": [
+   "/dev/iluvatar0",
+   "/dev/iluvatar1",
+   "/dev/iluvatar2",
+   "/dev/iluvatar3"
+  ]
  },
  "external": null,
  "clues": [
@@ -825,7 +843,7 @@
   "ref_repo": "Niko1221/Strata",
   "ref_sha": "6801c77ff6f7a1e08fe78820d3043f469f6f3f6f"
  },
- "gate": "integration_e2e_failed",
- "gate_text": "integration_e2e_failed: .einsteinOS/verify/uintegration6801c77ff6f7/e2e.sh exited 3 running the model at /tmp/model; output: e2e: no real-model backend in this tree (only the synthetic generate backend); not reporting any tok/s",
- "when": "2026-11-09T06:14:49.270357948Z"
+ "gate": "",
+ "gate_text": "",
+ "when": "2026-11-09T06:36:57.039541513Z"
 }
