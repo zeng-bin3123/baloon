@@ -1,6 +1,7 @@
 // router_native.cu - one-wave-per-token MoE router (n_expert <= 512): every lane keeps up to 8 probabilities in registers, each of the k
 // selection passes is a 64-lane butterfly argmax (lowest index wins ties). Softmax and renormalisation are done in double exactly like
 // router_top10, so ids and weights are bit-identical to it.
+#include <cstdint>
 #include "kg_common.cuh"
 #include "baloon/kg_kernels.hpp"
 
@@ -9,7 +10,11 @@ namespace kg {
 namespace {
 constexpr int RW_PER = 8;
 bool g_enabled = true;
-bool valid(const void* p, size_t bytes) { return p != nullptr && bytes > 0; }
+// span_valid: non-null, 4-byte aligned, and the span cannot wrap past the top of the address space.
+bool valid(const void* p, size_t bytes) {
+    const uintptr_t a = (uintptr_t)p;
+    return p != nullptr && bytes > 0 && (a & 3u) == 0 && bytes <= (uintptr_t)UINTPTR_MAX - a;
+}
 bool overlap(const void* a, size_t an, const void* b, size_t bn) {
     const char* pa = (const char*)a; const char* pb = (const char*)b;
     return pa < pb + bn && pb < pa + an;
