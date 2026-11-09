@@ -1,0 +1,94 @@
+// ilu_native_gdn.cu - warp-per-(head,column) gated-delta-net step for BI-V100 (ivcore10, wave64).
+// Grid (h_v, 1, S/4), block (32, 4): col = blockIdx.z*4 + threadIdx.y; lane l owns rows r*32 + l, r < 4, in registers.
+// Reductions are 32-lane xor shuffles (segmented, so wave64 and warp32 hardware agree).
+#include <atomic>
+#include <cmath>
+#include <cstdint>
+#include <cuda_runtime.h>
+#include "baloon/ilu_native_gdn.hpp"
+#include "ilu_gdn_shfl.cuh"
+
+namespace baloon {
+namespace ilu_nat {
+namespace {
+
+constexpr int S = 128;
+std::atomic<bool> g_enabled{true};
+
+__device__ __forceinline__ float warp_sum(float v) { return ilu_gdn::lane_reduce(v); }
+
+__global__ void __launch_bounds__(128, 2)
+native_gdn_step_kernel(float* __restrict__ state, const float* __restrict__ q, const float* __restrict__ k,
+                       const float* __restrict__ v, const float* __restrict__ gate, const float* __restrict__ beta,
+                       float* __restrict__ o, int h_k, int h_v, float scale) {
+    const int head = blockIdx.x;
+    const int lane = threadIdx.x;
+    const int col = blockIdx.z * blockDim.y + threadIdx.y;
+    const int qh = head % h_k;
+    float s[4], kk[4], qq[4];
+#pragma unroll
+    for (int r = 0; r < 4; ++r) {
+        const int i = r * 32 + lane;
+        s[r] = state[((size_t)i * h_v + head) * S + col];
+        kk[r] = k[(size_t)qh * S + i];
+        qq[r] = q[(size_t)qh * S + i];
+    }
+    const float decay = expf(gate[head]);
+    float kv = 0.f;
+#pragma unroll
+    for (int r = 0; r < 4; ++r) { s[r] *= decay; kv += s[r] * kk[r]; }
+    kv = warp_sum(kv);
+    const float d = (v[(size_t)head * S + col] - kv) * beta[head];
+    float acc = 0.f;
+#pragma unroll
+    for (int r = 0; r < 4; ++r) { s[r] += kk[r] * d; acc += s[r] * qq[r]; }
+    acc = warp_sum(acc);
+#pragma unroll
+    for (int r = 0; r < 4; ++r) state[((size_t)(r * 32 + lane) * h_v + head) * S + col] = s[r];
+    if (lane == 0) o[(size_t)head * S + col] = acc * scale;
+}
+
+struct Rg { uint64_t addr, bytes; bool write; };
+
+}  // namespace
+
+namespace step_impl {
+bool valid_span(uint64_t addr, uint64_t bytes) {
+    return addr != 0 && addr % 4 == 0 && bytes <= UINT64_MAX - addr;
+}
+bool overlap(uint64_t a, uint64_t an, uint64_t b, uint64_t bn) { return a < b + bn && b < a + an; }
+}  // namespace step_impl
+
+bool native_gdn_enabled() { return g_enabled.load(); }
+void native_gdn_set_enabled(bool on) { g_enabled.store(on); }
+
+int native_gdn_step(float* state, const float* q, const float* k, const float* v, const float* gate, const float* beta,
+                    float* o, int S_, int h_k, int h_v, void* stream) {
+    if (stream == nullptr) return kReject;
+    if (S_ != S || h_k <= 0 || h_v <= 0 || h_v % h_k != 0 || h_v > 65535) return kReject;
+    const uint64_t hk = (uint64_t)h_k, hv = (uint64_t)h_v;
+    const Rg rg[] = {
+        {(uint64_t)(uintptr_t)state, 128ull * 128ull * hv * 4ull, true},
+        {(uint64_t)(uintptr_t)o, 128ull * hv * 4ull, true},
+        {(uint64_t)(uintptr_t)q, 128ull * hk * 4ull, false},
+        {(uint64_t)(uintptr_t)k, 128ull * hk * 4ull, false},
+        {(uint64_t)(uintptr_t)v, 128ull * hv * 4ull, false},
+        {(uint64_t)(uintptr_t)gate, hv * 4ull, false},
+        {(uint64_t)(uintptr_t)beta, hv * 4ull, false},
+    };
+    const int n = (int)(sizeof(rg) / sizeof(rg[0]));
+    for (int i = 0; i < n; ++i)
+        if (!step_impl::valid_span(rg[i].addr, rg[i].bytes)) return kReject;
+    for (int i = 0; i < n; ++i)
+        for (int j = i + 1; j < n; ++j)
+            if ((rg[i].write || rg[j].write) && step_impl::overlap(rg[i].addr, rg[i].bytes, rg[j].addr, rg[j].bytes))
+                return kReject;
+    const dim3 grid((unsigned)h_v, 1, (unsigned)(S / 4));
+    const dim3 block(32, 4, 1);
+    const float scale = 1.0f / sqrtf((float)S);
+    native_gdn_step_kernel<<<grid, block, 0, (cudaStream_t)stream>>>(state, q, k, v, gate, beta, o, h_k, h_v, scale);
+    return (int)cudaGetLastError();
+}
+
+}  // namespace ilu_nat
+}  // namespace baloon
