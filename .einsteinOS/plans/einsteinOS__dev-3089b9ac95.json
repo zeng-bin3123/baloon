@@ -453,15 +453,22 @@
     }
   ],
   "state": {},
-  "fix_attempts": {},
-  "last_failure": {},
-  "infra_fails": 0,
-  "review_pending": {
+  "fix_attempts": {
+    "ub6cd72ef49": 1
+  },
+  "fail_history": {
+    "ub6cd72ef49": [
+      "review_fail"
+    ]
+  },
+  "last_failure": {
     "ub6cd72ef49": {
-      "compile": "pass",
-      "smoke": "pass"
+      "kind": "review_fail",
+      "text": "Qwen4ExpGuard accepts any \"qwen*\" architecture where the theory requires only \"qwen4exp\"; the unit test also has tautological checks and does not run 7 of the 10 block dequantizers or the arch guard",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
     }
   },
+  "infra_fails": 0,
   "port_units": [
     {
       "id": "pfcccb31b26",
