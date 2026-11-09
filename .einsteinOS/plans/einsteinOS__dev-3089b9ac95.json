@@ -755,6 +755,119 @@
         "tools/strata_pack.py",
         "tools/strata_tokenizer.py"
       ]
+    },
+    {
+      "id": "pfd53c8dce4",
+      "modules": null,
+      "reason": "port: reference files of include/strata/core no theory unit covers",
+      "sources": [
+        "include/strata/core/device.hpp",
+        "include/strata/core/hit_hook.hpp",
+        "include/strata/core/layout.hpp",
+        "include/strata/core/native_dense.hpp",
+        "include/strata/core/native_head.hpp",
+        "include/strata/core/weights.hpp"
+      ]
+    },
+    {
+      "id": "p81030368e8",
+      "modules": null,
+      "reason": "port: reference files of include/strata/kernels no theory unit covers",
+      "sources": [
+        "include/strata/kernels/bf16_bits.hpp",
+        "include/strata/kernels/bf16_gemv.hpp",
+        "include/strata/kernels/dequant_s2.hpp",
+        "include/strata/kernels/elementwise.hpp",
+        "include/strata/kernels/fused_gdn.hpp",
+        "include/strata/kernels/fused_gr.hpp",
+        "include/strata/kernels/gr.hpp",
+        "include/strata/kernels/iq_kernels.hpp",
+        "include/strata/kernels/kv_q8.hpp",
+        "include/strata/kernels/mrope.hpp",
+        "include/strata/kernels/native_flash_attn.hpp",
+        "include/strata/kernels/native_gdn.hpp",
+        "include/strata/kernels/native_gdn_preprocess.hpp",
+        "include/strata/kernels/native_gr_norm.hpp",
+        "include/strata/kernels/native_gr_postops.hpp",
+        "include/strata/kernels/native_mmvq.hpp",
+        "include/strata/kernels/native_moe.hpp",
+        "include/strata/kernels/native_ple_postops.hpp",
+        "include/strata/kernels/native_qsa.hpp",
+        "include/strata/kernels/native_qsa_indexer.hpp",
+        "include/strata/kernels/native_rope.hpp",
+        "include/strata/kernels/ple.hpp",
+        "include/strata/kernels/qsa_decode_attn.hpp",
+        "include/strata/kernels/qsa_select.hpp",
+        "include/strata/kernels/rope.hpp",
+        "include/strata/kernels/router_top10.hpp",
+        "include/strata/kernels/s2_gemv.hpp",
+        "include/strata/kernels/sampler.hpp"
+      ]
+    },
+    {
+      "id": "pf4e4cd455a",
+      "modules": null,
+      "reason": "port: reference files of include/strata/kernels/cpu no theory unit covers",
+      "sources": [
+        "include/strata/kernels/cpu/native_expert.hpp"
+      ]
+    },
+    {
+      "id": "p009a09077e",
+      "modules": null,
+      "reason": "port: reference files of src/artifact no theory unit covers",
+      "sources": [
+        "src/artifact/dequant.cpp"
+      ]
+    },
+    {
+      "id": "p64a6211069",
+      "modules": null,
+      "reason": "port: reference files of src/core no theory unit covers",
+      "sources": [
+        "src/core/concurrent_main.cpp",
+        "src/core/device.cu",
+        "src/core/load_main.cpp",
+        "src/core/overlap_main.cpp"
+      ]
+    },
+    {
+      "id": "padfc8bbf73",
+      "modules": null,
+      "reason": "port: reference files of src/kernels/cpu no theory unit covers",
+      "sources": [
+        "src/kernels/cpu/expert.cpp"
+      ]
+    },
+    {
+      "id": "pb01fed7fa5",
+      "modules": null,
+      "reason": "port: reference files of src/kernels/cuda no theory unit covers",
+      "sources": [
+        "src/kernels/cuda/bf16_gemv.cu",
+        "src/kernels/cuda/dequant_s2.cu",
+        "src/kernels/cuda/elementwise.cu",
+        "src/kernels/cuda/native_bf16.cu",
+        "src/kernels/cuda/native_gr_norm.cu",
+        "src/kernels/cuda/native_gr_postops.cu",
+        "src/kernels/cuda/native_moe.cu",
+        "src/kernels/cuda/native_ple_postops.cu",
+        "src/kernels/cuda/native_qsa.cu",
+        "src/kernels/cuda/native_rope.cu",
+        "src/kernels/cuda/rope.cu",
+        "src/kernels/cuda/router_top10.cu",
+        "src/kernels/cuda/s2_gemv.cu",
+        "src/kernels/cuda/s2_gemv_fast.cu",
+        "src/kernels/cuda/s2_gemv_quads.cu"
+      ]
+    },
+    {
+      "id": "pfd5ae1e7e0",
+      "modules": null,
+      "reason": "port: reference files of src/platform no theory unit covers",
+      "sources": [
+        "src/platform/memory.cpp"
+      ]
     }
   ],
   "verify_seen": {
