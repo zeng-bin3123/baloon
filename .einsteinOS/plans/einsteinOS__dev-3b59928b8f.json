@@ -827,7 +827,8 @@
     }
   },
   "fix_attempts": {
-    "pf7b804cf95": 3
+    "pf7b804cf95": 3,
+    "uintegration6801c77ff6f7": 1
   },
   "fail_history": {
     "pf7b804cf95": [
@@ -862,6 +863,9 @@
     ],
     "u649794726a": [
       "review_fail"
+    ],
+    "uintegration6801c77ff6f7": [
+      "integration_e2e_failed"
     ]
   },
   "last_failure": {
@@ -869,6 +873,11 @@
       "kind": "review_fail",
       "text": "gr_norm normalizes jointly over all 4 streams (D=10240) but theory/decode reference norm each stream row (N=2560) separately, and the unit test cannot detect it",
       "base_ref": "einsteinOS/dev-3b59928b8f"
+    },
+    "uintegration6801c77ff6f7": {
+      "kind": "integration_e2e_failed",
+      "text": "integration_e2e_failed: .einsteinOS/verify/uintegration6801c77ff6f7/e2e.sh exited 3 running the model at /tmp/model; output: e2e: no real-model backend in this tree (only the synthetic generate backend); not reporting any tok/s",
+      "base_ref": "einsteinOS/dev-3b59928b8f-wip-uintegration6801c77ff6f7"
     }
   },
   "infra_fails": 0,
@@ -1179,7 +1188,8 @@
     "u649794726a": true,
     "u8d6745405d": true,
     "ucbadf2af54": true,
-    "ud77a0d7726": true
+    "ud77a0d7726": true,
+    "uintegration6801c77ff6f7": true
   },
   "gates": "build+test+gpu+isa+port+integration",
   "integration_unit": {
