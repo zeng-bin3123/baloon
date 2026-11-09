@@ -881,12 +881,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "uintegration6801c77ff6f7": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "deferred": {
     "pf7b804cf95": {
       "kind": "review_fail",
@@ -1160,7 +1154,8 @@
     "pb675020e77": true,
     "pd8e380f419": true,
     "pfcccb31b26": true,
-    "pfd5ae1e7e0": true
+    "pfd5ae1e7e0": true,
+    "uintegration6801c77ff6f7": true
   },
   "verify_seen": {
     "p11b3c1e15c": true,
