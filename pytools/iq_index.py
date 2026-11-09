@@ -80,6 +80,54 @@ def read_index(path):
     return index
 
 
+class Model:
+    """Read-only view of a validated tensor index: lookup by name, expert/dense split, byte totals per source file."""
+
+    def __init__(self, index):
+        validate(index)
+        self.files = list(index["files"])
+        self.tensors = {e["name"]: e for e in index["tensors"]}
+
+    @classmethod
+    def load(cls, path):
+        return cls(read_index(path))
+
+    def __len__(self):
+        return len(self.tensors)
+
+    def __contains__(self, name):
+        return name in self.tensors
+
+    def get(self, name):
+        """Index entry of `name`; KeyError if absent."""
+        return self.tensors[name]
+
+    def experts(self):
+        return [e for e in self.tensors.values() if e["expert"]]
+
+    def dense(self):
+        return [e for e in self.tensors.values() if not e["expert"]]
+
+    def bytes_by_file(self):
+        out = [0] * len(self.files)
+        for e in self.tensors.values():
+            out[e["file"]] += e["nbytes"]
+        return out
+
+    def total_bytes(self):
+        return sum(self.bytes_by_file())
+
+    def read(self, name):
+        """Raw bytes of tensor `name`, read from the file the index assigns to it."""
+        e = self.tensors[name]
+        with open(self.files[e["file"]], "rb") as f:
+            f.seek(e["offset"])
+            data = f.read(e["nbytes"])
+        if len(data) != e["nbytes"]:
+            raise ValueError("tensor %s is truncated in %s" % (name, self.files[e["file"]]))
+        return data
+
+
 def main(argv=None):
     a = list(sys.argv[1:] if argv is None else argv)
     try:

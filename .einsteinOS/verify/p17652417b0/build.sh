@@ -163,9 +163,11 @@ for f in src/kernels/gpu/*.cu; do
   echo "[cuda] $f"; "$CLANG" $CUFLAGS -Isrc/kernels/gpu -c "$f" -o "$o"
   KG_OBJS="$KG_OBJS $o"
 done
+echo "[cuda] src/native_flash_attn.cu (flash_short.cu delegates to native_flash_attn_step)"
+"$CLANG" $CUFLAGS -c src/native_flash_attn.cu -o "$OUT/native_flash_attn.o"
 echo "[cuda] tests/k32_gpu_kernels/test_kg.cu"
 "$CLANG" $CUFLAGS -c tests/k32_gpu_kernels/test_kg.cu -o "$OUT/test_kg.o"
-link "$OUT/test_k32_gpu_kernels" "$OUT/test_kg.o" $KG_OBJS
+link "$OUT/test_k32_gpu_kernels" "$OUT/test_kg.o" "$OUT/native_flash_attn.o" $KG_OBJS
 
 # ---- unit 33: plan CLI (src/plan) + invariant test ------------------------------------------------------------------------------
 echo "[build] unit 33 CLI (plan_cli)"

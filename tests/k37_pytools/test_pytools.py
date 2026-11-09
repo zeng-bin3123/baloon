@@ -17,7 +17,7 @@ sys.path.insert(0, ROOT)
 import numpy as np  # noqa: E402
 
 from pytools import (bpe_extract, canon_xcheck as cx, gguf_emit, gguf_file as gf, iq_index, layer_pack as lp,  # noqa: E402
-                     locate, mtp_blob, mtp_download as dl, mtp_quant as mq, pack_catalog, planes)
+                     locate, mtp_blob, mtp_download as dl, mtp_quant as mq, pack_catalog, planes, ref_pack)
 
 TSV = os.path.join(ROOT, ".einsteinOS", "port", "p17652417b0.tsv")
 RNG = np.random.default_rng(20261105)
@@ -32,8 +32,8 @@ def tmp(suffix=""):
 class PortTable(unittest.TestCase):
     def test_rows_defined(self):
         rows = [l.rstrip("\r\n").split("\t") for l in open(TSV) if l.strip()]
-        self.assertEqual(len(rows), 72)
-        self.assertEqual(len({(r[0], r[1]) for r in rows}), 72)
+        self.assertEqual(len(rows), 88)
+        self.assertEqual(len({(r[0], r[1]) for r in rows}), 88)
         for rf, rn, mf, mn in rows:
             src = open(os.path.join(ROOT, mf)).read()
             self.assertRegex(src, r"(?m)^(def|class) %s\b" % re.escape(mn), "%s not defined in %s" % (mn, mf))
@@ -612,6 +612,127 @@ class Bpe(unittest.TestCase):
         with self.assertRaises(ValueError): bpe_extract.extract(p2)
         self.assertEqual(bpe_extract.main([p2]), 1)
         for q in (p, p2, out): os.unlink(q)
+
+
+class RefPack(unittest.TestCase):
+    def test_every_type_decodes_bit_exact_from_planes(self):
+        for name in cx.MAPPINGS:
+            raw = rand_blocks(name)
+            s = cx.MAPPINGS[name]
+            shape = (s.block_elems * 6,)
+            e, w = ref_pack.tensor_entry("blk.0.attn_q.weight", name, shape, raw)
+            got = ref_pack.decode_entry(e, bytes(w.buf))
+            want = cx.reference_values(name, raw)
+            self.assertTrue(np.array_equal(got.view(np.uint32), want.view(np.uint32)), name)
+            self.assertEqual(e["bits"], s.bits); self.assertEqual(ref_pack.code_bits(name), s.bits)
+            self.assertEqual(e["sha256"], ref_pack.sha256(raw))
+            for p in e["planes"].values(): self.assertEqual(p["offset"] % 64, 0)
+        for name, type_id, bits in (("F16", 1, 16), ("BF16", 30, 32), ("F32", 0, 32)):
+            raw = RNG.integers(0, 256, 4 * 12, dtype=np.uint8).tobytes()
+            if name != "F32": raw = raw[:2 * 12]
+            e, w = ref_pack.tensor_entry("token_embd.weight", name, (12,), raw)
+            got = ref_pack.decode_entry(e, bytes(w.buf)); want = cx.reference_values(name, raw)
+            self.assertTrue(np.array_equal(got.view(np.uint32), want.view(np.uint32)), name)
+            self.assertEqual(ref_pack.code_bits(type_id), bits)
+
+    def test_code_packing(self):
+        for bits in (2, 4, 8, 16, 32):
+            c = RNG.integers(0, 1 << bits, 64)
+            self.assertTrue(np.array_equal(ref_pack.unpack_codes(ref_pack.pack_codes(c, bits), bits), c))
+        self.assertEqual(len(ref_pack.pack_codes(np.zeros(64, int), 2)), 16)
+        self.assertEqual(len(ref_pack.pack_codes(np.zeros(8, int), 16)), 16)
+        self.assertEqual(ref_pack.pack_codes([1, 2, 3, 0], 2), bytes([1 | (2 << 2) | (3 << 4)]))
+        self.assertEqual(ref_pack.sha256(b"abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+
+    def test_scale_dtype(self):
+        self.assertEqual(ref_pack.choose_scale_dtype(np.array([0.5, 1.25], np.float32)), "f16")
+        self.assertEqual(ref_pack.choose_scale_dtype(np.array([0.1], np.float32)), "f32")
+        self.assertEqual(ref_pack.choose_scale_dtype(np.array([1.0], np.float32), np.array([0.1], np.float32)), "f32")
+        e, w = ref_pack.tensor_entry("x.weight", "Q6_K", (256 * 6,), rand_blocks("Q6_K"))
+        self.assertEqual(e["scale_dtype"], "f32")                    # d * int8 scale is not an f16 value in general
+
+    def test_canonicalise_and_roles(self):
+        raw = rand_blocks("Q4_K")
+        c = ref_pack.canonicalise("Q4_K", raw)
+        self.assertEqual(c["codes"].shape, (6, 256)); self.assertEqual(c["scales"].shape, (6, 8))
+        e, w = ref_pack.tensor_entry("x.weight", "Q4_K", (256 * 6,), raw); blob = bytes(w.buf)
+        self.assertTrue(np.array_equal(ref_pack.rebuild_role(e, blob, "codes"), c["codes"]))
+        self.assertTrue(np.array_equal(ref_pack.rebuild_role(e, blob, "scales"), c["scales"]))
+        self.assertTrue(np.array_equal(ref_pack.rebuild_role(e, blob, "offsets"), c["offsets"]))
+        e2, w2 = ref_pack.tensor_entry("y.weight", "F16", (4,), b"\0" * 8)
+        with self.assertRaises(ValueError): ref_pack.rebuild_role(e2, bytes(w2.buf), "scales")
+        with self.assertRaises(ValueError): ref_pack.tensor_entry("x", "Q4_0", (32,), b"\0" * 17)
+
+    def make_pack(self):
+        ts = [("blk.0.ffn_gate_exps.weight", "Q2_0", (64 * 4,), rand_blocks("Q2_0", 4)),
+              ("blk.0.ffn_up_exps.weight", "Q2_0", (64 * 3,), rand_blocks("Q2_0", 3)),
+              ("blk.0.attn_q.weight", "Q8_0", (32 * 5,), rand_blocks("Q8_0", 5)),
+              ("blk.0.ffn_gate_shexp.weight", "IQ4_NL", (32 * 2,), rand_blocks("IQ4_NL", 2))]
+        return ts, ref_pack.build(ts)
+
+    def test_build_verify_and_tamper(self):
+        ts, (idx, blob) = self.make_pack()
+        self.assertEqual(ref_pack.verify(idx, blob), 4)
+        self.assertEqual(ref_pack.verify_experts(idx, blob), 2)
+        self.assertEqual(ref_pack.verify_experts(idx, blob, expected=2), 2)
+        with self.assertRaises(ValueError): ref_pack.verify_experts(idx, blob, expected=3)
+        for e, (n, t, shp, raw) in zip(idx["tensors"], ts):
+            got = ref_pack.decode_entry(e, blob)
+            self.assertTrue(np.array_equal(got.view(np.uint32), cx.reference_values(t, raw).view(np.uint32)), n)
+        off = idx["tensors"][0]["planes"]["codes"]["offset"]
+        bad = bytearray(blob); bad[off] ^= 1
+        with self.assertRaises(ValueError): ref_pack.verify(idx, bytes(bad))
+        with self.assertRaises(ValueError): ref_pack.verify_experts(idx, bytes(bad))
+        bad = bytearray(blob); bad[idx["tensors"][2]["planes"]["codes"]["offset"]] ^= 1      # dense tensor
+        self.assertEqual(ref_pack.verify_experts(idx, bytes(bad)), 2)                      # experts untouched
+        with self.assertRaises(ValueError): ref_pack.verify(idx, blob + b"\0")
+        i2 = json.loads(json.dumps(idx)); i2["blob_bytes"] += 1                             # every plane shifted by one byte:
+        for e in i2["tensors"]:                                                              # digests still match, alignment does not
+            for p in e["planes"].values(): p["offset"] += 1
+        with self.assertRaises(ValueError): ref_pack.verify(i2, b"\0" + blob)
+        i3 = json.loads(json.dumps(idx)); i3["tensors"][2]["expert"] = True
+        with self.assertRaises(ValueError): ref_pack.verify_experts(i3, blob)
+        with self.assertRaises(ValueError): ref_pack.build(ts + [ts[0]])
+        i4 = dict(idx); i4["version"] = 99
+        with self.assertRaises(ValueError): ref_pack.verify(i4, blob)
+
+    def test_info_and_cli(self):
+        ts, (idx, blob) = self.make_pack()
+        inf = ref_pack.info(idx)
+        self.assertEqual((inf["tensors"], inf["experts"]), (4, 2))
+        self.assertEqual(inf["types"], {"Q2_0": 2, "Q8_0": 1, "IQ4_NL": 1})
+        self.assertEqual(inf["plane_bytes"]["codes"], 4 * 16 + 3 * 16 + 5 * 32 + 2 * 16)
+        self.assertTrue(ref_pack.is_expert("blk.1.ffn_down_exps.weight")); self.assertFalse(ref_pack.is_expert("token_embd.weight"))
+        w = gguf_emit.GGUFWriter()
+        for n, t, shp, raw in ts: w.add_tensor(n, shp, cx.MAPPINGS[t].type, raw)
+        g = tmp(".gguf"); w.write(g)
+        d = tempfile.mkdtemp()
+        self.assertEqual(ref_pack.main(["pack", g, d]), 0)
+        self.assertEqual(ref_pack.main(["verify", d]), 0)
+        self.assertEqual(ref_pack.main(["info", d]), 0)
+        with open(os.path.join(d, "planes.bin"), "r+b") as f: f.write(b"\xff" * 4)
+        self.assertEqual(ref_pack.main(["verify", d]), 1)
+        self.assertEqual(ref_pack.main(["verify"]), 2)
+        os.unlink(g)
+
+
+class ModelView(unittest.TestCase):
+    def test_model(self):
+        w = gguf_emit.GGUFWriter()
+        w.add_tensor("blk.0.ffn_gate_exps.weight", (64, 2), 42, b"\1" * 36)
+        w.add_tensor("token_embd.weight", (4,), 0, np.arange(4, dtype=np.float32).tobytes())
+        a = tmp(".gguf"); w.write(a)
+        m = iq_index.Model(iq_index.index_standalone(a))
+        self.assertEqual(len(m), 2); self.assertIn("token_embd.weight", m); self.assertNotIn("nope", m)
+        self.assertEqual([e["name"] for e in m.experts()], ["blk.0.ffn_gate_exps.weight"])
+        self.assertEqual([e["name"] for e in m.dense()], ["token_embd.weight"])
+        self.assertEqual(m.total_bytes(), 36 + 16); self.assertEqual(m.bytes_by_file(), [52])
+        self.assertEqual(m.read("blk.0.ffn_gate_exps.weight"), b"\1" * 36)
+        self.assertEqual(m.read("token_embd.weight"), np.arange(4, dtype=np.float32).tobytes())
+        with self.assertRaises(KeyError): m.get("nope")
+        bad = iq_index.index_standalone(a); bad["tensors"][0]["nbytes"] += 1
+        with self.assertRaises(ValueError): iq_index.Model(bad)
+        os.unlink(a)
 
 
 class Locate(unittest.TestCase):
