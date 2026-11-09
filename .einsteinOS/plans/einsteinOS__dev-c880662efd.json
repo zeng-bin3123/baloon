@@ -1059,6 +1059,22 @@
         "src/spec/controller.cpp",
         "src/spec/suffix_drafter.cpp"
       ]
+    },
+    {
+      "id": "pdf2e49c487",
+      "modules": null,
+      "reason": "port: reference files of src/core no theory unit covers",
+      "sources": [
+        "src/core/concurrent_main.cpp",
+        "src/core/device.cu",
+        "src/core/graph.cpp",
+        "src/core/layout.cpp",
+        "src/core/load_main.cpp",
+        "src/core/native_dense.cpp",
+        "src/core/native_head.cpp",
+        "src/core/overlap_main.cpp",
+        "src/core/pinned.cu"
+      ]
     }
   ],
   "port_pass": {
