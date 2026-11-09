@@ -225,13 +225,14 @@ inline bool check_architecture(const GgufFile& f, const std::string& expected) {
 }
 
 // Architecture guard constants of the qwen4exp layout (theory: arch_guard_consistent).
-constexpr uint64_t kGuardExperts = 512, kGuardTopK = 10, kGuardHeads = 24, kGuardKvHeads = 2, kGuardLayers = 48;
+constexpr uint64_t kGuardExperts = 512, kGuardTopK = 10, kGuardHeads = 24, kGuardKvHeads = 2, kGuardLayers = 48, kGuardHidden = 2560;
+constexpr const char* kGuardArch = "qwen4exp";
 static_assert(kGuardTopK <= kGuardExperts && kGuardHeads % kGuardKvHeads == 0 && kGuardHeads / kGuardKvHeads == 12 &&
               kGuardLayers > 0, "guard constants must be mutually consistent");
 
-// Guard for the Qwen family mixture-of-experts layout: the architecture must start with "qwen" and the
-// "<arch>.*" keys must carry exactly the guard constants: expert_count 512, expert_used_count 10,
-// attention.head_count 24, attention.head_count_kv 2, block_count 48. All five keys are required.
+// Guard for the qwen4exp layout: general.architecture must be exactly "qwen4exp" (no other "qwen*" string passes)
+// and the "qwen4exp.*" keys must carry exactly the six guard constants: expert_count 512, expert_used_count 10,
+// attention.head_count 24, attention.head_count_kv 2, block_count 48, embedding_length 2560. All keys are required.
 // The fields default to the constants; tests may override them to exercise other fixtures.
 struct Qwen4ExpGuard {
     uint64_t expected_experts = kGuardExperts;
@@ -239,11 +240,12 @@ struct Qwen4ExpGuard {
     uint64_t expected_heads = kGuardHeads;
     uint64_t expected_kv_heads = kGuardKvHeads;
     uint64_t expected_layers = kGuardLayers;
+    uint64_t expected_hidden = kGuardHidden;
     bool check(const GgufFile& f, std::string* why = nullptr) const {
         auto fail = [&](const char* m) { if (why) *why = m; return false; };
         auto arch = f.get_string("general.architecture");
         if (!arch) return fail("missing general.architecture");
-        if (arch->compare(0, 4, "qwen") != 0) return fail("not a qwen architecture");
+        if (*arch != kGuardArch) return fail("architecture is not qwen4exp");
         auto ne = f.get_uint(*arch + ".expert_count");
         if (!ne) return fail("missing expert_count");
         if (*ne != expected_experts) return fail("expert_count mismatch");
@@ -261,6 +263,9 @@ struct Qwen4ExpGuard {
         auto nl = f.get_uint(*arch + ".block_count");
         if (!nl) return fail("missing block_count");
         if (*nl != expected_layers) return fail("block_count mismatch");
+        auto hid = f.get_uint(*arch + ".embedding_length");
+        if (!hid) return fail("missing embedding_length");
+        if (*hid != expected_hidden) return fail("embedding_length mismatch");
         return true;
     }
 };

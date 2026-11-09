@@ -300,8 +300,8 @@ static void test_gguf() {
     CHECK(0x46 * 16777216u + 0x55 * 65536u + 0x47 * 256u + 0x47 == 0x46554747u && kMagic == 0x46554747u);
 
     // architecture guard constants: 512 experts / top-10, 24 heads over 2 kv heads, 48 layers (all required)
-    auto guard_img_d = [&](uint32_t ex, uint32_t used, uint32_t nh, uint32_t nkv, uint32_t nl, uint32_t drop) {
-      Bytes b; put(b, kMagic, 4); put(b, 3, 4); put(b, 0, 8); put(b, 6 - __builtin_popcount(drop), 8);
+    auto guard_img_d = [&](uint32_t ex, uint32_t used, uint32_t nh, uint32_t nkv, uint32_t nl, uint32_t drop, uint32_t hid = 2560) {
+      Bytes b; put(b, kMagic, 4); put(b, 3, 4); put(b, 0, 8); put(b, 7 - __builtin_popcount(drop), 8);
       pstr(b, "general.architecture"); put(b, 8, 4); pstr(b, "qwen4exp");
       auto kv = [&](const char* k, uint32_t v) { pstr(b, k); put(b, 4, 4); put(b, v, 4); };
       kv("qwen4exp.expert_count", ex);
@@ -309,6 +309,7 @@ static void test_gguf() {
       if (!(drop & 2)) kv("qwen4exp.attention.head_count", nh);
       if (!(drop & 4)) kv("qwen4exp.attention.head_count_kv", nkv);
       if (!(drop & 8)) kv("qwen4exp.block_count", nl);
+      if (!(drop & 16)) kv("qwen4exp.embedding_length", hid);
       while (b.size() % 32) b.push_back(0);
       return b; };
     auto guard_img = [&](uint32_t ex, uint32_t used, uint32_t nh, uint32_t nkv, uint32_t nl) { return guard_img_d(ex, used, nh, nkv, nl, 0); };

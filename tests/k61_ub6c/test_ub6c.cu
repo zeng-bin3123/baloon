@@ -4,6 +4,9 @@
 #include <cstdio>
 #include <cstdint>
 #include <set>
+#include <cmath>
+#include <cstring>
+#include <string>
 #include <chrono>
 #include <vector>
 #include "baloon/f16_bits.hpp"
@@ -22,6 +25,138 @@ __global__ void k_f16(const float* in, uint16_t* out, const uint16_t* hin, float
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) out[i] = f16bits::f16_from_f32(in[i]);
     if (i < nh) hout[i] = f16bits::f32_from_f16(hin[i]);
+}
+
+
+static void put_le(std::vector<uint8_t>& b, uint64_t v, int n) { for (int i = 0; i < n; ++i) b.push_back((uint8_t)(v >> (8 * i))); }
+static void put_str(std::vector<uint8_t>& b, const std::string& t) { put_le(b, t.size(), 8); b.insert(b.end(), t.begin(), t.end()); }
+static void put_kv_u32(std::vector<uint8_t>& b, const std::string& k, uint32_t v) { put_str(b, k); put_le(b, 4, 4); put_le(b, v, 4); }
+static uint64_t g_last_hdr_end = 0;
+static uint64_t hdr_end_of(const std::vector<uint8_t>&) { return g_last_hdr_end; }
+// GGUF v3 image with the six guard keys; drop bit i omits key i (0 experts,1 used,2 heads,3 kv,4 layers,5 hidden).
+static std::vector<uint8_t> make_guard_img(const std::string& arch, uint32_t ex, uint32_t used, uint32_t nh, uint32_t nkv,
+                                           uint32_t nl, uint32_t hid, unsigned drop = 0, const std::string& pad = "") {
+    std::vector<uint8_t> b; put_le(b, 0x46554747u, 4); put_le(b, 3, 4); put_le(b, 0, 8);
+    put_le(b, 1 + 6 - __builtin_popcount(drop) + (pad.empty() ? 0 : 1), 8);
+    put_str(b, "general.architecture"); put_le(b, 8, 4); put_str(b, arch);
+    if (!pad.empty()) { put_str(b, "x.pad"); put_le(b, 8, 4); put_str(b, pad); }
+    const uint32_t v[6] = {ex, used, nh, nkv, nl, hid};
+    const char* k[6] = {".expert_count", ".expert_used_count", ".attention.head_count", ".attention.head_count_kv", ".block_count", ".embedding_length"};
+    for (int i = 0; i < 6; ++i) if (!(drop & (1u << i))) put_kv_u32(b, arch + k[i], v[i]);
+    g_last_hdr_end = b.size();
+    while (b.size() % 32) b.push_back(0);
+    return b;
+}
+static bool guard_check(const std::vector<uint8_t>& im, std::string* why) {
+    auto g = gguf_reader::GgufFile::parse(im.data(), im.size());
+    return g && gguf_reader::Qwen4ExpGuard{}.check(*g, why);
+}
+static uint32_t g_rng = 987654321u;
+static uint8_t rnd8() { g_rng = g_rng * 1664525u + 1013904223u; return (uint8_t)(g_rng >> 24); }
+static bool near(float a, float b) { return std::fabs(a - b) <= 1e-5f * std::fmax(1.f, std::fabs(b)); }
+static void set_h(uint8_t* p, uint16_t h) { p[0] = (uint8_t)h; p[1] = (uint8_t)(h >> 8); }
+static float H(uint16_t h) { return f16bits::f32_from_f16(h); }
+
+static void test_arch_guard() {
+    std::string w;
+    CHECK(guard_check(make_guard_img("qwen4exp", 512, 10, 24, 2, 48, 2560), &w));
+    // any other architecture string is refused, even qwen-prefixed ones with identical constants
+    for (const char* a : {"qwen35moe", "qwen2moe", "qwen3moe", "qwen", "qwen4exp2", "qwen4ex", "Qwen4exp", "llama", ""})
+        CHECK(!guard_check(make_guard_img(a, 512, 10, 24, 2, 48, 2560), &w));
+    // every one of the six constants is individually enforced, and every key is required
+    uint32_t good[6] = {512, 10, 24, 2, 48, 2560};
+    for (int i = 0; i < 6; ++i) {
+        for (int delta : {-1, 1}) {
+            uint32_t v[6]; std::memcpy(v, good, sizeof v); v[i] += delta;
+            CHECK(!guard_check(make_guard_img("qwen4exp", v[0], v[1], v[2], v[3], v[4], v[5]), &w));
+        }
+        CHECK(!guard_check(make_guard_img("qwen4exp", 512, 10, 24, 2, 48, 2560, 1u << i), &w));
+    }
+    // refusal reasons
+    CHECK(!guard_check(make_guard_img("qwen35moe", 512, 10, 24, 2, 48, 2560), &w) && w == "architecture is not qwen4exp");
+    CHECK(!guard_check(make_guard_img("qwen4exp", 512, 10, 24, 2, 48, 2048), &w) && w == "embedding_length mismatch");
+    // CLI-level check_architecture is exact-match too
+    auto im = make_guard_img("qwen4exp", 512, 10, 24, 2, 48, 2560);
+    auto g = gguf_reader::GgufFile::parse(im.data(), im.size());
+    CHECK(g && gguf_reader::check_architecture(*g, "qwen4exp") && !gguf_reader::check_architecture(*g, "qwen"));
+}
+
+static void test_block_dequantizers() {
+    const uint16_t ONE = 0x3C00, HALF = 0x3800;
+    // q4_0: y[j] = lo-8, y[j+16] = hi-8
+    { uint8_t b[18] = {}; set_h(b, ONE); for (int j = 0; j < 16; ++j) b[2 + j] = (uint8_t)(j | ((15 - j) << 4));
+      float y[32]; artifact::dequantize_q4_0(b, y);
+      for (int j = 0; j < 16; ++j) { CHECK(y[j] == (float)(j - 8)); CHECK(y[16 + j] == (float)(7 - j)); } }
+    // q5_0: element e = nibble + 16*bit(e) - 16, bit(e) is bit e of the 32-bit high word
+    { uint8_t b[22] = {}; set_h(b, HALF); uint32_t qh = 0xA5C3F00Fu; for (int i = 0; i < 4; ++i) b[2 + i] = (uint8_t)(qh >> (8 * i));
+      for (int j = 0; j < 16; ++j) b[6 + j] = (uint8_t)((j * 7 + 3) & 0xFF);
+      float y[32]; artifact::dequantize_q5_0(b, y);
+      for (int e = 0; e < 32; ++e) { int nib = e < 16 ? (b[6 + e] & 15) : (b[6 + e - 16] >> 4);
+        CHECK(y[e] == 0.5f * (float)(nib + 16 * (int)((qh >> e) & 1) - 16)); } }
+    // q2_0: 64 elements, 4 two-bit codes per byte (lowest first), symbol = code-1, scaled by d
+    { uint8_t b[18] = {}; set_h(b, HALF); for (int j = 0; j < 16; ++j) b[2 + j] = (uint8_t)(0xE4 ^ (j & 1 ? 0x1B : 0));
+      float y[64]; artifact::dequantize_q2_0(b, y);
+      for (int e = 0; e < 64; ++e) CHECK(y[e] == 0.5f * (float)(((b[2 + e / 4] >> (2 * (e % 4))) & 3) - 1)); }
+    // IQ4_XS (random data, independent per-element formula)
+    for (int rep = 0; rep < 20; ++rep) {
+        uint8_t b[136]; for (auto& x : b) x = rnd8(); set_h(b, 0x3400 | (rnd8() & 0x3F));
+        float y[256]; artifact::dequantize_iq4_xs(b, y);
+        uint16_t sh = (uint16_t)(b[2] | (b[3] << 8));
+        for (int e = 0; e < 256; ++e) { int ib = e / 32, j = e % 32;
+            int ls = ((b[4 + ib / 2] >> (4 * (ib & 1))) & 15) | (((sh >> (2 * ib)) & 3) << 4);
+            uint8_t q = b[8 + 16 * ib + (j % 16)]; int code = j < 16 ? (q & 15) : (q >> 4);
+            CHECK(near(y[e], H((uint16_t)(b[0] | (b[1] << 8))) * (float)(ls - 32) * (float)artifact::kvalues_iq4nl[code])); }
+    }
+    // Q4_K / Q5_K (random data)
+    for (int rep = 0; rep < 20; ++rep) for (int five = 0; five < 2; ++five) {
+        uint8_t b[176]; for (auto& x : b) x = rnd8(); set_h(b, 0x3000 | (rnd8() & 0x3F)); set_h(b + 2, 0x3000 | (rnd8() & 0x3F));
+        const uint8_t* sc = b + 4; const uint8_t* qh = b + 16; const uint8_t* qs = b + (five ? 48 : 16);
+        float y[256]; if (five) artifact::dequantize_q5_K(b, y); else artifact::dequantize_q4_K(b, y);
+        float d = H((uint16_t)(b[0] | (b[1] << 8))), dm = H((uint16_t)(b[2] | (b[3] << 8)));
+        for (int e = 0; e < 256; ++e) { int g = e / 32, l = e % 32, j = g / 2;
+            int s6, m6;
+            if (g < 4) { s6 = sc[g] & 63; m6 = sc[g + 4] & 63; }
+            else { s6 = (sc[g + 4] & 15) | ((sc[g - 4] >> 6) << 4); m6 = (sc[g + 4] >> 4) | ((sc[g] >> 6) << 4); }
+            uint8_t q = qs[32 * j + l]; int v = (g & 1) ? (q >> 4) : (q & 15);
+            if (five) v += ((qh[l] >> (2 * j + (g & 1))) & 1) ? 16 : 0;
+            CHECK(near(y[e], d * (float)s6 * (float)v - dm * (float)m6)); }
+    }
+    // Q3_K
+    for (int rep = 0; rep < 20; ++rep) {
+        uint8_t b[110]; for (auto& x : b) x = rnd8(); set_h(b + 108, 0x3000 | (rnd8() & 0x3F));
+        const uint8_t* hm = b; const uint8_t* q = b + 32; const uint8_t* s = b + 96;
+        float y[256]; artifact::dequantize_q3_K(b, y);
+        float d = H((uint16_t)(b[108] | (b[109] << 8)));
+        for (int e = 0; e < 256; ++e) { int n = e / 128, r = e % 128, j = r / 32, half = (r % 32) / 16, l = r % 16;
+            int si = 8 * n + 2 * j + half, grp = si / 4, k = si % 4;
+            int lo = ((grp & 1) ? s[4 + k] : s[k]) >> ((grp >> 1) ? 4 : 0) & 15, hi = (s[8 + k] >> (2 * grp)) & 3;
+            int scale = (lo | (hi << 4)) - 32;
+            int code = (q[32 * n + 16 * half + l] >> (2 * j)) & 3;
+            int bit = (hm[16 * half + l] >> (4 * n + j)) & 1;
+            CHECK(near(y[e], d * (float)scale * (float)(code - (bit ? 0 : 4)))); }
+    }
+    // Q6_K
+    for (int rep = 0; rep < 20; ++rep) {
+        uint8_t b[210]; for (auto& x : b) x = rnd8(); set_h(b + 208, 0x3000 | (rnd8() & 0x3F));
+        const uint8_t* ql = b; const uint8_t* qh = b + 128; const int8_t* sc = (const int8_t*)(b + 192);
+        float y[256]; artifact::dequantize_q6_K(b, y);
+        float d = H((uint16_t)(b[208] | (b[209] << 8)));
+        for (int e = 0; e < 256; ++e) { int h = e / 128, r = e % 128, qd = r / 32, l = r % 32;
+            int lo = (ql[64 * h + l + (qd & 1) * 32] >> (4 * (qd >> 1))) & 15, hi = (qh[32 * h + l] >> (2 * qd)) & 3;
+            int q = (lo | (hi << 4)) - 32;
+            CHECK(near(y[e], d * (float)sc[8 * h + l / 16 + 2 * qd] * (float)q)); }
+    }
+    // the block table is consistent with the GGUF geometry table
+    size_t n; const artifact::BlockType* t = artifact::block_types(&n);
+    CHECK(n == 10);
+    for (size_t i = 0; i < n; ++i) { bool found = false;
+        for (uint32_t ty = 0; ty < 64 && !found; ++ty) { auto g = gguf::block_geometry(ty); found = g.el == t[i].elems && g.by == t[i].bytes; }
+        CHECK(found);
+        // table entry == direct dequantizer on random bytes
+        uint8_t blk[256]; for (auto& x : blk) x = rnd8(); blk[1] &= 0x3B; blk[0] &= 0xFF;
+        float a[256], c[256]; t[i].fn(blk, a);
+        const artifact::BlockType* f = artifact::find_block_type(t[i].name); CHECK(f == &t[i]);
+        f->fn(blk, c); CHECK(std::memcmp(a, c, t[i].elems * 4) == 0); }
 }
 
 static void test_gpu_f16() {
@@ -128,22 +263,17 @@ static void test_gguf_header() {
     c.u64(); CHECK(!c.ok && c.pos == 12);                                   // overrun fails, no OOB advance
     Cursor d(mem, 16); d.pos = 16; CHECK(d.need(0)); CHECK(!d.need(1));
     // data_start = ceil(pos/align)*align : >= pos, < pos+align, multiple of align, idempotent on multiples
-    for (uint64_t a2 : {1ull, 8ull, 32ull, 64ull, 4096ull})
-        for (uint64_t pos = 0; pos < 9000; pos += 13) {
-            uint64_t ds = (pos + a2 - 1) / a2 * a2;
-            CHECK(ds >= pos && ds < pos + a2 && ds % a2 == 0);
-            CHECK((ds + a2 - 1) / a2 * a2 == ds);
-        }
+    // data_start of really parsed images: aligned, >= end of the header, < end + align, tensor data fits
+    for (size_t pad = 0; pad < 70; ++pad) {
+        std::vector<uint8_t> im = make_guard_img("qwen4exp", 512, 10, 24, 2, 48, 2560, 0, std::string(pad, 'p'));
+        auto g = gguf_reader::GgufFile::parse(im.data(), im.size());
+        CHECK(g.has_value());
+        if (g) CHECK(g->data_start % 32 == 0 && g->data_start <= im.size() && g->data_start + 32 > hdr_end_of(im));
+    }
     CHECK(gguf_reader::kMaxArrayElems == (1ull << 24));
     CHECK(gguf_reader::kDefaultAlignment == 32);
-    // tensor element count is the product of dims
-    uint64_t prod = 1; for (uint64_t dd : {3ull, 5ull, 7ull, 11ull}) prod *= dd; CHECK(prod == 1155);
 }
 
-enum DirResult { ShardSet, Single, NoFiles, Ambiguous };
-static DirResult dir_decision(unsigned shards, unsigned found) {
-    return shards ? ShardSet : found == 1 ? Single : found == 0 ? NoFiles : Ambiguous;
-}
 
 static void test_shard_loader() {
     for (uint64_t el : {1ull, 32ull, 64ull, 256ull}) {
@@ -161,11 +291,6 @@ static void test_shard_loader() {
     }
     CHECK(gguf::ple_row_bytes() == 90);
     CHECK(gguf::whole_blocks(160, 32) && !gguf::whole_blocks(161, 32));
-    for (uint64_t r = 0; r < 100; ++r) CHECK(r * 90 + 90 <= 100 * 90);
-    // directory decision: shard set wins; single accepted; empty / ambiguous refused
-    CHECK(dir_decision(3, 9) == ShardSet && dir_decision(1, 1) == ShardSet);
-    CHECK(dir_decision(0, 1) == Single && dir_decision(0, 0) == NoFiles);
-    for (unsigned f = 2; f < 10; ++f) CHECK(dir_decision(0, f) == Ambiguous);
     CHECK(gguf::shards_complete(5, 5) && !gguf::shards_complete(4, 5) && !gguf::shards_complete(6, 5));
     // shard discovery over a file list
     std::vector<std::string> names = {"m-00001-of-00003.gguf", "m-00002-of-00003.gguf", "m-00003-of-00003.gguf"};
@@ -193,9 +318,6 @@ static void test_tokenizer_map() {
     CHECK(bpe::mapped_to_bytes(bpe::bytes_to_mapped(a) + bpe::bytes_to_mapped(b2), &o1) ==
           bpe::mapped_to_bytes(bpe::bytes_to_mapped(a), &o1) + bpe::mapped_to_bytes(bpe::bytes_to_mapped(b2), &o2));
     bool oe = false; CHECK(bpe::mapped_to_bytes("", &oe).empty());
-    // BPE merge shrinks by exactly one
-    std::vector<int> l = {1, 2, 3, 4}; std::vector<int> mg(l.begin(), l.begin() + 1); mg.push_back(99); mg.insert(mg.end(), l.begin() + 3, l.end());
-    CHECK(mg.size() + 1 == l.size());
 }
 
 static void test_weight_segments() {
@@ -224,8 +346,6 @@ static void test_weight_segments() {
         while (left >= 2) { uint64_t cc = core::chunk_len_of(left); cc -= cc % 2; CHECK(cc > 0); left -= cc; ++iters; }
         CHECK(left <= 1 && iters <= rem / 2 + 1);
     }
-    // promoted offsets compose: done/2 + n/2 == (done+n)/2 for 4-aligned values
-    for (uint64_t done = 0; done < 64; done += 4) for (uint64_t n = 0; n < 64; n += 4) CHECK(done / 2 + n / 2 == (done + n) / 2);
     // compact placement: cursor stays 256-aligned and never overlaps
     uint64_t at = 0;
     for (uint64_t dst : {1ull, 255ull, 256ull, 257ull, 5000ull, 90ull}) {
@@ -238,6 +358,8 @@ int main() {
     test_gpu_f16();
     test_f16_host();
     test_dequant();
+    test_block_dequantizers();
+    test_arch_guard();
     test_gguf_header();
     test_shard_loader();
     test_tokenizer_map();

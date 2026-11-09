@@ -3,7 +3,7 @@
 //   gguf_reader <file> meta            every metadata key (file order) with type and value
 //   gguf_reader <file> get <key>       one metadata value (exit 1 when absent)
 //   gguf_reader <file> tensors         tensor directory: name type shape offset bytes
-//   gguf_reader <file> check <arch>    architecture check; for "qwen*" also the expert-count guard
+//   gguf_reader <file> check <arch>    architecture check; for "qwen4exp" also the expert-count guard
 // Exit codes: 0 ok, 1 file unreadable / malformed / key absent / check failed, 2 usage error.
 #include <cinttypes>
 #include <cstdio>
@@ -145,7 +145,7 @@ inline int run(int argc, char** argv, std::FILE* out, std::FILE* err) {
     } else {  // check
         const std::string want = argv[3];
         if (!check_architecture(*f, want)) { std::fprintf(err, "architecture mismatch (want %s)\n", want.c_str()); return 1; }
-        if (want.compare(0, 4, "qwen") == 0) {
+        if (want == kGuardArch) {
             std::string why;
             if (!Qwen4ExpGuard{}.check(*f, &why)) { std::fprintf(err, "guard failed: %s\n", why.c_str()); return 1; }
         }
