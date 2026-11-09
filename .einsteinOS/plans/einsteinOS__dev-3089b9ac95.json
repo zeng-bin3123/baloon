@@ -508,8 +508,8 @@
   ],
   "state": {
     "GgufWriterQ2Contract.lean": {
-      "hash": "480c8bf3464c",
-      "pass": false,
+      "hash": "bb25de82e194",
+      "pass": true,
       "unit_id": "u62b936371e"
     }
   },
