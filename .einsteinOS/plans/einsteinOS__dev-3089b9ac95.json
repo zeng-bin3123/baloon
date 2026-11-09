@@ -331,7 +331,8 @@
         "TokenizerByteLevelBpe.lean",
         "WeightLoaderSegments.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "ddb569d2-ce41-4607-95be-46a6567c6a99"
     },
     {
       "id": "u62b936371e",
@@ -455,6 +456,12 @@
   "fix_attempts": {},
   "last_failure": {},
   "infra_fails": 0,
+  "review_pending": {
+    "ub6cd72ef49": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -690,6 +697,9 @@
       ]
     }
   ],
+  "verify_seen": {
+    "ub6cd72ef49": true
+  },
   "gates": "build+test+gpu+isa+port+integration",
   "integration_unit": {
     "id": "uintegratione5509707730d",
