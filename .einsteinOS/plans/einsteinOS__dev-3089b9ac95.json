@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1891,
     "started": "2026-11-09T13:38:45.796377179Z",
-    "renewed": "2026-11-09T15:55:59.446034493Z"
+    "renewed": "2026-11-09T15:57:38.854851214Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -531,10 +531,30 @@
       "pass": true,
       "unit_id": "u62b936371e"
     },
+    "NativeFlashAttnShort.lean": {
+      "hash": "8bc24fbdab4b",
+      "pass": true,
+      "unit_id": "ucc74f228b9"
+    },
+    "NativeQsaIndexerAppend.lean": {
+      "hash": "144345a3503c",
+      "pass": true,
+      "unit_id": "ucc74f228b9"
+    },
     "NativeRouterTop10.lean": {
       "hash": "113b1b9b09f9",
       "pass": true,
       "unit_id": "uf9f69c2c43"
+    },
+    "QsaBlockSelect.lean": {
+      "hash": "68d9b1073baf",
+      "pass": true,
+      "unit_id": "ucc74f228b9"
+    },
+    "QsaCacheIndexAttend.lean": {
+      "hash": "15f5d781c4ff",
+      "pass": true,
+      "unit_id": "ucc74f228b9"
     },
     "SamplerChain.lean": {
       "hash": "61cda38548c8",
@@ -548,8 +568,7 @@
     }
   },
   "fix_attempts": {
-    "ube4f27df84": 1,
-    "ucc74f228b9": 1
+    "ube4f27df84": 1
   },
   "fail_history": {
     "ub6cd72ef49": [
@@ -568,20 +587,9 @@
       "kind": "review_fail",
       "text": "isa_selfprobe.hpp injects never-called AVX-512 code into five unrelated files and test_gpu sleeps 2.5s with a self-made partition_kernel purely to satisfy kernel observers, plus several tautological checks pad the test count",
       "base_ref": "einsteinOS/dev-3089b9ac95"
-    },
-    "ucc74f228b9": {
-      "kind": "review_fail",
-      "text": "ilu_qsa_step.cu `order_key` (counterpart of qsa.cu `order_key`) does not map -0 to +0 or NaN to 0 as the qsa_cache_index_attend theory states, and the test pre-folds -0 itself so it never exercises this.",
-      "base_ref": "einsteinOS/dev-3089b9ac95"
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "ucc74f228b9": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
