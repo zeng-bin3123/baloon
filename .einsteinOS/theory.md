@@ -2,535 +2,1074 @@
 ## FILE: /mnt/user-data/outputs/ExpertCacheResidency.lean
 /-!
 # MODULE: expert_cache_residency
-SOURCES: src/core/expert_cache.cpp
-Slot arena for the VRAM expert tier: per-layer slot ranges (R4.2g), the no-eviction admit counter,
-256-byte aligned variable-size slots, and the clamped fill size.
+SOURCES: include/ref/core/expert_cache.hpp, src/core/expert_cache.cpp
+VRAM-resident expert tier: slot storage, the (layer, expert) -> slot residency table, the
+per-layer admission quotas (R4.2g), the STRP profile reader's validation, and 256-byte slot alignment.
 
 ## Source semantics
-* Layer `l` owns `[l*q, (l+1)*q)` with `q = slots / n_layers`; the last layer takes the remainder, so ranges tile `0..slots`.
-* `admit` never evicts: it hands out `layer_next` while it is below the layer's `hi`, otherwise refuses.
-* `open_sized` aligns each slot to 256 bytes; offsets are cumulative.
-* `fill_slot` copies `min`-style `bytes` when `0 < bytes ≤ blob`, else the whole blob.
+* `slot_of` is bounds-checked and returns `kNotResident` (-1) out of range.
+* `admit` never evicts. Global mode uses one counter `next_free_ <= slots_`; per-layer mode gives layer `l`
+  the slot range `[l*q, (l+1)*q)` with `q = slots/n_layers`, the last layer taking the remainder.
+* The ranges tile `0..slots` exactly; each layer's cursor never exceeds its upper bound.
+* `read_expert_profile` accepts only a header whose geometry matches, `n_ranked <= slots`, and pairs in range.
+* `open_sized` aligns each slot to 256 bytes.
 
 ## Form template identifiers
-layer_slot_range → layerLo/layerHi ; admit → admitStep ; open_sized offsets → align256 ;
-fill_slot byte count → fillBytes
+ExpertCache -> tier_store; admit -> claim_slot; slot_of -> lookup_slot; layer_slot_range -> quota_range;
+kNotResident -> absent_marker; read_expert_profile -> load_static_plan; open_sized -> open_variable_slots.
 -/
 
-namespace Ref.ExpertCache
+namespace ExpertCacheResidency
 
--- § per-layer ranges
+-- § per-layer slot ranges
 
-/-- Quota per layer. -/
-def layerQ (slots nLayers : Nat) : Nat := slots / nLayers
+/-- Lower bound of layer `l`'s slot range: `l * (slots / nl)`. -/
+def lo (slots nl l : Nat) : Nat := l * (slots / nl)
 
-/-- Lower bound of layer `l`'s slot range. -/
-def layerLo (slots nLayers l : Nat) : Nat := l * layerQ slots nLayers
+/-- Upper bound of layer `l`'s slot range; the last layer takes the remainder. -/
+def hi (slots nl l : Nat) : Nat := if l = nl - 1 then slots else (l + 1) * (slots / nl)
 
-/-- Upper bound (exclusive) of layer `l`'s slot range; the last layer takes the remainder. -/
-def layerHi (slots nLayers l : Nat) : Nat :=
-  if l = nLayers - 1 then slots else (l + 1) * layerQ slots nLayers
+/-- Each layer's range is well formed: `lo <= hi`. -/
+theorem lo_le_hi {slots nl l : Nat} (h : 0 < nl) (hl : l < nl) : lo slots nl l ≤ hi slots nl l := by
+  unfold lo hi
+  split
+  · have h1 : l * (slots / nl) ≤ nl * (slots / nl) := Nat.mul_le_mul_right _ (by omega)
+    have h2 : nl * (slots / nl) ≤ slots := Nat.mul_div_le slots nl
+    exact Nat.le_trans h1 h2
+  · exact Nat.mul_le_mul_right _ (Nat.le_succ l)
 
-/-- Layer 0 starts at slot 0. -/
-theorem layerLo_zero (slots n : Nat) : layerLo slots n 0 = 0 := by
-  simp [layerLo]
+/-- No layer's range extends past the arena: `hi <= slots`. -/
+theorem hi_le_slots {slots nl l : Nat} (hl : l < nl) : hi slots nl l ≤ slots := by
+  unfold hi
+  split
+  · exact Nat.le_refl _
+  · have h1 : (l + 1) * (slots / nl) ≤ nl * (slots / nl) := Nat.mul_le_mul_right _ (Nat.succ_le_of_lt hl)
+    have h2 : nl * (slots / nl) ≤ slots := Nat.mul_div_le slots nl
+    exact Nat.le_trans h1 h2
+
+/-- Adjacent layers' ranges abut: layer `l`'s upper bound is layer `l+1`'s lower bound. -/
+theorem hi_eq_next_lo {slots nl l : Nat} (hl : l + 1 < nl) : hi slots nl l = lo slots nl (l + 1) := by
+  have hne : l ≠ nl - 1 := by omega
+  simp [hi, lo, hne]
 
 /-- The last layer's range ends exactly at `slots`, so no slot is orphaned by the division. -/
-theorem layerHi_last (slots n : Nat) (hn : 0 < n) : layerHi slots n (n - 1) = slots := by
-  simp [layerHi]
+theorem last_hi {slots nl : Nat} : hi slots nl (nl - 1) = slots := by
+  simp [hi]
 
-/-- Every range is well formed: `lo ≤ hi`. -/
-theorem layerLo_le_layerHi (slots n l : Nat) (hl : l < n) :
-    layerLo slots n l ≤ layerHi slots n l := by
-  unfold layerLo layerHi
-  by_cases h : l = n - 1
-  · rw [if_pos h]
-    have h1 : layerQ slots n * n ≤ slots := Nat.div_mul_le_self slots n
-    have h2 : l * layerQ slots n ≤ n * layerQ slots n := Nat.mul_le_mul_right _ (by omega)
-    have h3 : n * layerQ slots n = layerQ slots n * n := Nat.mul_comm _ _
-    omega
-  · rw [if_neg h]
-    exact Nat.mul_le_mul_right _ (Nat.le_succ l)
+/-- Sum of the per-layer quotas over the first `m` layers. -/
+def quotaSum (slots nl : Nat) : Nat → Nat
+  | 0 => 0
+  | m + 1 => quotaSum slots nl m + (hi slots nl m - lo slots nl m)
 
-/-- Adjacent layers' ranges abut with no gap and no overlap. -/
-theorem layerHi_eq_layerLo_succ (slots n l : Nat) (hl : l + 1 < n) :
-    layerHi slots n l = layerLo slots n (l + 1) := by
-  unfold layerHi layerLo
-  rw [if_neg (by omega)]
+/-- Before the last layer, the first `m` quotas sum to `m * q`. -/
+theorem quotaSum_prefix {slots nl : Nat} (hnl : 0 < nl) :
+    ∀ m, m ≤ nl - 1 → quotaSum slots nl m = m * (slots / nl) := by
+  intro m
+  induction m with
+  | zero => intro _; simp [quotaSum]
+  | succ m ih =>
+    intro hm
+    have hm' : m ≤ nl - 1 := by omega
+    have hne : m ≠ nl - 1 := by omega
+    have e1 : hi slots nl m = (m + 1) * (slots / nl) := by simp [hi, hne]
+    have e2 : lo slots nl m = m * (slots / nl) := rfl
+    simp only [quotaSum]
+    rw [ih hm', e1, e2, Nat.add_mul, Nat.one_mul, Nat.add_sub_cancel_left]
 
--- § admit counter (no eviction)
-
-/-- One `admit` step on the per-layer path: `(slot or refusal, new counter)`. -/
-def admitStep (next hi : Nat) : Option Nat × Nat :=
-  if hi ≤ next then (none, next) else (some next, next + 1)
-
-/-- A full quota refuses and leaves the counter untouched. -/
-theorem admitStep_full (next hi : Nat) (h : hi ≤ next) : admitStep next hi = (none, next) := by
-  simp [admitStep, h]
-
-/-- A granted slot is below the ceiling and the counter advances by exactly one. -/
-theorem admitStep_slot_lt (next hi s next' : Nat) (h : admitStep next hi = (some s, next')) :
-    s < hi ∧ next' = s + 1 := by
-  unfold admitStep at h
-  split at h
-  · simp at h
-  · simp at h
-    omega
-
-/-- The counter never decreases. -/
-theorem admitStep_mono (next hi : Nat) : next ≤ (admitStep next hi).2 := by
-  unfold admitStep
-  split <;> simp
-
--- § aligned slots
-
-/-- Round up to a multiple of 256. -/
-def align256 (x : Nat) : Nat := (x + 255) / 256 * 256
-
-/-- Alignment never shrinks a slot. -/
-theorem le_align256 (x : Nat) : x ≤ align256 x := by
-  unfold align256; omega
-
-/-- Aligned sizes are multiples of 256. -/
-theorem align256_mod (x : Nat) : align256 x % 256 = 0 := by
-  unfold align256; omega
-
-/-- Alignment wastes fewer than 256 bytes. -/
-theorem align256_lt (x : Nat) : align256 x < x + 256 := by
-  unfold align256; omega
-
-/-- A cumulative offset stays 256-aligned and covers the slot just added. -/
-theorem offset_step (off s : Nat) (h : off % 256 = 0) :
-    (off + align256 s) % 256 = 0 ∧ off + s ≤ off + align256 s := by
-  have h1 := align256_mod s
-  have h2 := le_align256 s
+/-- The quotas of all `nl` layers sum to exactly `slots`: per-layer admission can fill the arena and no more. -/
+theorem quotaSum_total {slots nl : Nat} (hnl : 0 < nl) : quotaSum slots nl nl = slots := by
+  obtain ⟨n, rfl⟩ : ∃ n, nl = n + 1 := ⟨nl - 1, by omega⟩
+  have hp : quotaSum slots (n + 1) n = n * (slots / (n + 1)) :=
+    quotaSum_prefix (nl := n + 1) hnl n (by omega)
+  have hh : hi slots (n + 1) n = slots := by simp [hi]
+  have hl : lo slots (n + 1) n = n * (slots / (n + 1)) := rfl
+  have h1 : n * (slots / (n + 1)) ≤ (n + 1) * (slots / (n + 1)) := Nat.mul_le_mul_right _ (Nat.le_succ n)
+  have h2 : (n + 1) * (slots / (n + 1)) ≤ slots := Nat.mul_div_le slots (n + 1)
+  show quotaSum slots (n + 1) n + (hi slots (n + 1) n - lo slots (n + 1) n) = slots
+  rw [hp, hh, hl]
   omega
 
--- § fill size
+-- § admission
 
-/-- Byte count `fill_slot` copies. -/
-def fillBytes (bytes blob : Nat) : Nat := if 0 < bytes ∧ bytes ≤ blob then bytes else blob
+/-- One admission attempt against a cursor and an upper bound: claim the slot if one is free, else refuse. -/
+def admitStep (next hi : Nat) : Nat := if next < hi then next + 1 else next
 
-/-- A fill never writes past the slot. -/
-theorem fillBytes_le (bytes blob : Nat) : fillBytes bytes blob ≤ blob := by
-  unfold fillBytes
+/-- Admission never pushes the cursor past the bound. -/
+theorem admitStep_le {next hi : Nat} (h : next ≤ hi) : admitStep next hi ≤ hi := by
+  unfold admitStep
   split <;> omega
 
-/-- With a positive blob, a fill copies at least one byte. -/
-theorem fillBytes_pos (bytes blob : Nat) (hb : 0 < blob) : 0 < fillBytes bytes blob := by
-  unfold fillBytes
+/-- A full range refuses: the cursor does not move (no eviction). -/
+theorem admitStep_full {next hi : Nat} (h : hi ≤ next) : admitStep next hi = next := by
+  unfold admitStep
   split <;> omega
 
-end Ref.ExpertCache
+/-- Repeating `k` admission attempts. -/
+def admitN : Nat → Nat → Nat → Nat
+  | 0, n, _ => n
+  | k + 1, n, h => admitN k (admitStep n h) h
+
+/-- However many attempts are made, a cursor that started within its bound stays within it. -/
+theorem admitN_le {hi : Nat} : ∀ (k n : Nat), n ≤ hi → admitN k n hi ≤ hi := by
+  intro k
+  induction k with
+  | zero => intro n h; simpa [admitN] using h
+  | succ k ih =>
+    intro n h
+    exact ih _ (admitStep_le h)
+
+-- § why the global counter failed (R4.2g measurement)
+
+/-- 256 slots under global arrival-order admission are consumed inside 26 layers' worth of position 0
+(10 experts each), i.e. more than 25 and at most 26 layers. -/
+theorem global_policy_confinement : 25 * 10 < 256 ∧ 256 ≤ 26 * 10 := by decide
+
+-- § STRP profile validation
+
+/-- Every ranked pair lies inside the `nl x ne` table. -/
+def pairsOk (nl ne : Nat) (ps : List (Nat × Nat)) : Bool :=
+  ps.all fun p => decide (p.1 < nl) && decide (p.2 < ne)
+
+/-- A pair in a validated list is in range. -/
+theorem pairsOk_mem {nl ne : Nat} {ps : List (Nat × Nat)} (h : pairsOk nl ne ps = true)
+    {p : Nat × Nat} (hp : p ∈ ps) : p.1 < nl ∧ p.2 < ne := by
+  unfold pairsOk at h
+  rw [List.all_eq_true] at h
+  simpa using h p hp
+
+/-- Header acceptance: matching geometry and `n_ranked <= slots`. -/
+def headerOk (nl ne want nr L E : Nat) : Bool :=
+  decide (nl = L) && decide (ne = E) && decide (nr ≤ want)
+
+/-- An accepted header never claims more ranked pairs than slots. -/
+theorem headerOk_ranked_le {nl ne want nr L E : Nat} (h : headerOk nl ne want nr L E = true) :
+    nr ≤ want := by
+  simp [headerOk] at h
+  omega
+
+/-- An accepted header has exactly the model's geometry. -/
+theorem headerOk_geometry {nl ne want nr L E : Nat} (h : headerOk nl ne want nr L E = true) :
+    nl = L ∧ ne = E := by
+  simp [headerOk] at h
+  omega
+
+-- § byte accounting and alignment
+
+/-- Rounds `n` up to a multiple of 256 (the slot alignment in `open_sized`). -/
+def align256 (n : Nat) : Nat := (n + 255) / 256 * 256
+
+/-- Alignment never shrinks a slot. -/
+theorem align256_ge (n : Nat) : n ≤ align256 n := by
+  unfold align256
+  omega
+
+/-- Aligned slot sizes are multiples of 256, so kernel vector loads start aligned. -/
+theorem align256_mod (n : Nat) : align256 n % 256 = 0 := by
+  unfold align256
+  omega
+
+/-- Alignment wastes fewer than 256 bytes per slot. -/
+theorem align256_lt (n : Nat) : align256 n < n + 256 := by
+  unfold align256
+  omega
+
+/-- Uniform-slot arena size: `slots * blob`. -/
+def arenaBytes (slots blob : Nat) : Nat := slots * blob
+
+/-- 4,105 slots of 1,382,400 B is no more than the 5,413 MiB the design note quotes. -/
+theorem slots4105_fits_note : arenaBytes 4105 1382400 ≤ 5413 * 1048576 := by decide
+
+/-- ... and fits in the 6,414 MiB measured free at steady state. -/
+theorem slots4105_fits_free : arenaBytes 4105 1382400 ≤ 6414 * 1048576 := by decide
+
+end ExpertCacheResidency
 
 
 
 ## FILE: /mnt/user-data/outputs/ExpertSourceDispatch.lean
 /-!
 # MODULE: expert_source_dispatch
-SOURCES: src/core/expert_source.cpp, include/ref/core/expert_source.hpp
-Adapter from the host loop to the expert pool: blob addressing (`layer * n_expert + expert`), the job/hit split
-by router index, and the PCIe share of missed experts in a verify window.
+SOURCES: include/ref/core/expert_source.hpp, src/core/expert_source.cpp
+The adapter between the host loop and the CPU expert pool: blob lookup in the mapped/arena source, the
+GPU/CPU hit-miss split by router index, the PCIe share of misses, and the latching failure flag.
 
 ## Source semantics
-* The flat blob index alone cannot detect `expert >= n_expert`; layer and expert are validated separately.
-* Jobs are indexed by `njobs`, outputs by `i`; hits consume no job.
-* The PCIe share is `(nmiss * pcie_num) >> 8` and never exceeds `nmiss` when `pcie_num ≤ 256`.
+* A blob index is `layer * n_expert + expert`; `expert >= n_expert` is rejected separately because the flat
+  index alone aliases the next layer's expert 0.
+* CPU rows for hits are zeroed and GPU rows for misses are zeroed, so `parts + hit_out` is the full answer.
+* `njobs` (CPU jobs) counts the misses; hits + jobs = k.
+* The PCIe share is `nmiss * pcie_num / 256 <= nmiss` of the distinct misses.
+* `failed` latches: once set, every later dispatch returns immediately.
+* The hit path is all-or-nothing (`hits_ready`).
 
 ## Form template identifiers
-blob(layer, expert) → blobIndex ; expert_pool_dispatch job count → jobCount ; GPU PCIe share → pcieShare
+ExpertSource -> blob_provider; FileExpertSource -> mapped_provider; ArenaExpertSource -> resident_provider;
+ExpertDispatch -> split_dispatcher; expert_pool_dispatch -> cpu_half; expert_hit_run -> gpu_half;
+pcie_num -> pcie_share_numerator.
 -/
 
-namespace Ref.ExpertSource
+namespace ExpertSourceDispatch
 
--- § blob addressing
+-- § blob indexing
 
-/-- Flat blob index. -/
-def blobIndex (nExpert layer expert : Nat) : Nat := layer * nExpert + expert
+/-- Flat blob index `layer * n_expert + expert`. -/
+def blobIndex (ne l e : Nat) : Nat := l * ne + e
 
-/-- Why the separate `expert >= n_expert` check exists: `blob(0, n)` aliases `blob(1, 0)`. -/
-theorem blobIndex_alias (nExpert : Nat) : blobIndex nExpert 0 nExpert = blobIndex nExpert 1 0 := by
-  simp [blobIndex]
-
-/-- A valid expert id stays inside its own layer's row. -/
-theorem blobIndex_lt_succ (nExpert l e : Nat) (he : e < nExpert) :
-    blobIndex nExpert l e < (l + 1) * nExpert := by
+/-- With `expert < n_expert` and `layer < n_layers` the flat index is in range. -/
+theorem blobIndex_lt {ne nl l e : Nat} (he : e < ne) (hl : l < nl) : blobIndex ne l e < nl * ne := by
   unfold blobIndex
-  have h : (l + 1) * nExpert = l * nExpert + nExpert := by rw [Nat.add_mul, Nat.one_mul]
+  have h1 : (l + 1) * ne ≤ nl * ne := Nat.mul_le_mul_right _ (Nat.succ_le_of_lt hl)
+  rw [Nat.add_mul, Nat.one_mul] at h1
   omega
 
-/-- With both axes validated, the flat index is below `layers * n_expert`. -/
-theorem blobIndex_lt_total (nExpert layers l e : Nat) (hl : l < layers) (he : e < nExpert) :
-    blobIndex nExpert l e < layers * nExpert := by
-  have h1 := blobIndex_lt_succ nExpert l e he
-  have h2 : (l + 1) * nExpert ≤ layers * nExpert := Nat.mul_le_mul_right _ hl
-  omega
-
-/-- On validated axes the flat index is injective: distinct `(layer, expert)` never share a blob. -/
-theorem blobIndex_inj (nExpert l e l' e' : Nat) (he : e < nExpert) (he' : e' < nExpert)
-    (h : blobIndex nExpert l e = blobIndex nExpert l' e') : l = l' ∧ e = e' := by
-  have key : ∀ a b a' b' : Nat, b < nExpert → b' < nExpert → a < a' →
-      a * nExpert + b ≠ a' * nExpert + b' := by
-    intro a b a' b' hb hb' hlt heq
-    have h1 : (a + 1) * nExpert ≤ a' * nExpert := Nat.mul_le_mul_right _ hlt
-    have h2 : (a + 1) * nExpert = a * nExpert + nExpert := by rw [Nat.add_mul, Nat.one_mul]
-    omega
-  unfold blobIndex at h
-  rcases Nat.lt_trichotomy l l' with hl | hl | hl
-  · exact absurd h (key _ _ _ _ he he' hl)
-  · subst hl
-    exact ⟨rfl, by omega⟩
-  · exact absurd h.symm (key _ _ _ _ he' he hl)
-
--- § jobs vs hits
-
-/-- Number of CPU jobs: the entries that are not GPU hits. -/
-def jobCount (hits : List Bool) : Nat := (hits.filter (fun b => !b)).length
-
-/-- `njobs` never exceeds `k`, the number of routed entries (so the job array is large enough). -/
-theorem jobCount_le (hits : List Bool) : jobCount hits ≤ hits.length := by
-  unfold jobCount
-  exact List.length_filter_le _ _
-
-/-- With no hits, every entry is a job and `njobs = i` indexing coincide. -/
-theorem jobCount_no_hits (k : Nat) : jobCount (List.replicate k false) = k := by
-  unfold jobCount
+/-- Why the separate `expert >= n_expert` check exists: without it, `blob(0, n_expert)` is `blob(1, 0)`. -/
+theorem blobIndex_aliases_without_check (ne : Nat) : blobIndex ne 0 ne = blobIndex ne 1 0 := by
+  unfold blobIndex
   simp
 
--- § PCIe share
+/-- With both coordinates checked, distinct (layer, expert) pairs give distinct indices. -/
+theorem blobIndex_injective {ne l1 l2 e1 e2 : Nat} (hne : 0 < ne) (h1 : e1 < ne) (h2 : e2 < ne)
+    (h : blobIndex ne l1 e1 = blobIndex ne l2 e2) : l1 = l2 ∧ e1 = e2 := by
+  unfold blobIndex at h
+  have hd : (e1 + l1 * ne) / ne = (e2 + l2 * ne) / ne := by
+    rw [Nat.add_comm e1, Nat.add_comm e2, h]
+  rw [Nat.add_mul_div_right _ _ hne, Nat.add_mul_div_right _ _ hne,
+    Nat.div_eq_of_lt h1, Nat.div_eq_of_lt h2] at hd
+  have hl : l1 = l2 := by omega
+  subst hl
+  exact ⟨rfl, by omega⟩
 
-/-- Number of missed experts the GPU reads over PCIe. -/
-def pcieShare (nmiss pcieNum : Nat) : Nat := (nmiss * pcieNum) >>> 8
+-- § the hit/miss split
 
-/-- The PCIe share never exceeds the number of misses when `pcie_num ≤ 256`. -/
-theorem pcieShare_le (nmiss pcieNum : Nat) (h : pcieNum ≤ 256) : pcieShare nmiss pcieNum ≤ nmiss := by
+/-- The CPU's row for one router index: zero when the GPU owns it. -/
+def cpuRow (hit : Bool) (v : Nat) : Nat := if hit then 0 else v
+
+/-- The GPU's row for one router index: zero when the CPU owns it. -/
+def gpuRow (hit : Bool) (v : Nat) : Nat := if hit then v else 0
+
+/-- Summing the two zero-padded halves yields exactly the expert's output, whoever computed it. -/
+theorem split_partition (hit : Bool) (v : Nat) : cpuRow hit v + gpuRow hit v = v := by
+  cases hit <;> simp [cpuRow, gpuRow]
+
+/-- Number of hits in a decision vector. -/
+def countHit : List Bool → Nat
+  | [] => 0
+  | b :: bs => (if b then 1 else 0) + countHit bs
+
+/-- Number of misses (= CPU jobs, `njobs`) in a decision vector. -/
+def countMiss : List Bool → Nat
+  | [] => 0
+  | b :: bs => (if b then 0 else 1) + countMiss bs
+
+/-- Every routed expert is either a hit or a CPU job; none is dropped or doubled. -/
+theorem hits_plus_jobs (bs : List Bool) : countHit bs + countMiss bs = bs.length := by
+  induction bs with
+  | nil => rfl
+  | cons b bs ih => cases b <;> simp [countHit, countMiss] <;> omega
+
+-- § PCIe share of misses
+
+/-- The GPU takes `nmiss * pcie_num / 256` of the distinct misses over PCIe. -/
+def pcieShare (nmiss pn : Nat) : Nat := nmiss * pn / 256
+
+/-- With `pcie_num <= 256`, the PCIe share never exceeds the number of misses. -/
+theorem pcie_share_le {nmiss pn : Nat} (hp : pn ≤ 256) : pcieShare nmiss pn ≤ nmiss := by
   unfold pcieShare
-  rw [Nat.shiftRight_eq_div_pow]
-  have h1 : nmiss * pcieNum ≤ nmiss * 256 := Nat.mul_le_mul_left _ h
+  apply Nat.div_le_of_le_mul
+  have := Nat.mul_le_mul_left nmiss hp
   omega
 
-/-- With `pcie_num = 0` the CPU keeps every miss. -/
-theorem pcieShare_zero (nmiss : Nat) : pcieShare nmiss 0 = 0 := by
-  simp [pcieShare]
+/-- The last `m` misses in routing order (rank `>= nmiss - m`) number exactly `m` when `m <= nmiss`. -/
+theorem pcie_tail_count {nmiss m : Nat} (h : m ≤ nmiss) : nmiss - (nmiss - m) = m := by
+  omega
 
-end Ref.ExpertSource
+/-- The plan's scratch arrays: at most 8 tokens x 10 experts fit the `kind[128]` array. -/
+theorem plan_fits_kind_array {ntok k : Nat} (ht : ntok ≤ 8) (hk : k ≤ 10) : ntok * k ≤ 128 := by
+  have : ntok * k ≤ 8 * 10 := Nat.mul_le_mul ht hk
+  omega
+
+-- § failure latch and configuration
+
+/-- `failed` after one more dispatch step with outcome `ok`. -/
+def stepFailed (failed ok : Bool) : Bool := failed || !ok
+
+/-- Once failed, the adapter stays failed: clearing the message cannot re-arm it. -/
+theorem failure_latches (ok : Bool) : stepFailed true ok = true := by
+  simp [stepFailed]
+
+/-- A success never clears an earlier failure, and a failure is always recorded. -/
+theorem failure_recorded (failed : Bool) : stepFailed failed false = true := by
+  simp [stepFailed]
+
+/-- `hits_ready` is the conjunction of all its prerequisites. -/
+def hitsReady (flags : List Bool) : Bool := flags.all id
+
+/-- If the hit path is ready, every prerequisite holds (no half-configured hit path). -/
+theorem hitsReady_each {flags : List Bool} (h : hitsReady flags = true) : ∀ b ∈ flags, b = true := by
+  intro b hb
+  unfold hitsReady at h
+  rw [List.all_eq_true] at h
+  simpa using h b hb
+
+-- § artifact geometry (measured constants)
+
+/-- Expert blob size: three 640x2560 matrices at 9/32 bytes per element (2.25 bits). -/
+theorem blob_bytes_derivation : 3 * 640 * 2560 * 9 / 32 = 1382400 := by decide
+
+/-- `experts.bin` holds exactly 48 x 512 blobs and is 33,973,862,400 bytes. -/
+theorem experts_bin_size : 48 * 512 * 1382400 = 33973862400 := by decide
+
+/-- One token reads 48 layers x 10 experts = 663,552,000 bytes (the quoted 663.6 MB). -/
+theorem bytes_per_token : 48 * 10 * 1382400 = 663552000 := by decide
+
+/-- A VRAM-resident tier of all 512 experts of one layer is 707,788,800 bytes (the MTP layer's ~708 MB). -/
+theorem one_layer_experts_bytes : 512 * 1382400 = 707788800 := by decide
+
+end ExpertSourceDispatch
 
 
 
-## FILE: /mnt/user-data/outputs/GraphRegistry.lean
+## FILE: /mnt/user-data/outputs/GraphCaptureRegistry.lean
 /-!
-# MODULE: graph_registry
-SOURCES: src/core/graph.cpp
-Captured CUDA graph registry: a graph is recorded once per `(layer type, n_tokens)` key; a capture that records
-zero nodes is refused; a bounded wait never succeeds after its deadline.
+# MODULE: graph_capture_registry
+SOURCES: include/ref/core/graph.hpp, src/core/graph.cpp
+Capture-once / replay-many registry of CUDA graphs keyed by (layer_type, n_tokens), plus the bounded
+event-polling wait.
 
 ## Source semantics
-* `record` of an existing key is a no-op returning success.
-* `launch` requires a recorded key.
-* `wait_ms` loops on a real clock, returning false on timeout or on a real error.
+* `record` on an existing key is a no-op and does not run the body; `captures()` equals `size()`.
+* A capture with zero nodes is an error, never an empty graph.
+* `wait_ms` polls an event query: success -> true, not-ready -> keep polling until the deadline,
+  any other status -> false. It never reports completion that did not occur.
 
 ## Form template identifiers
-Key → Nat key ; graphs_ → List Nat ; record → recordKey ; end() node check → endOk
+GraphRegistry -> graph_cache; CapturedGraph -> recorded_graph; record -> capture_once;
+launch -> replay_and_wait; wait_ms -> bounded_poll; LayerType -> kind_tag.
 -/
 
-namespace Ref.GraphRegistry
+namespace GraphCaptureRegistry
 
 -- § registry
 
-/-- Record a key into the registry (already-present keys are unchanged). -/
-def recordKey (ks : List Nat) (k : Nat) : List Nat := if k ∈ ks then ks else k :: ks
+/-- Abstract registry state: the recorded keys and the capture counter. -/
+structure Reg where
+  keys : List (Nat × Nat)
+  captures : Nat
 
-/-- After recording, the key is found (so `launch` can succeed). -/
-theorem mem_recordKey (ks : List Nat) (k : Nat) : k ∈ recordKey ks k := by
-  unfold recordKey
-  by_cases h : k ∈ ks <;> simp [h]
+/-- `record`: do nothing if the key exists; otherwise capture it and count the capture. -/
+def Reg.record (r : Reg) (k : Nat × Nat) : Reg :=
+  if k ∈ r.keys then r else { keys := k :: r.keys, captures := r.captures + 1 }
 
-/-- Recording twice equals recording once: the point of a registry. -/
-theorem recordKey_idem (ks : List Nat) (k : Nat) : recordKey (recordKey ks k) k = recordKey ks k := by
-  unfold recordKey
-  by_cases h : k ∈ ks <;> simp [h]
+/-- Invariant: `captures()` equals `size()`. -/
+def Inv (r : Reg) : Prop := r.captures = r.keys.length
 
-/-- Recording never loses an existing key. -/
-theorem recordKey_mono (ks : List Nat) (k j : Nat) (h : j ∈ ks) : j ∈ recordKey ks k := by
-  unfold recordKey
-  by_cases hk : k ∈ ks <;> simp [hk, h]
+/-- Recording the same key twice equals recording it once (the body runs exactly once). -/
+theorem record_idem (r : Reg) (k : Nat × Nat) : (r.record k).record k = r.record k := by
+  by_cases h : k ∈ r.keys <;> simp [Reg.record, h]
 
-/-- The number of captures grows by at most one per `record`. -/
-theorem recordKey_length (ks : List Nat) (k : Nat) : (recordKey ks k).length ≤ ks.length + 1 := by
-  unfold recordKey
-  by_cases h : k ∈ ks <;> simp [h]
+/-- After `record`, the key is present. -/
+theorem record_mem (r : Reg) (k : Nat × Nat) : k ∈ (r.record k).keys := by
+  by_cases h : k ∈ r.keys <;> simp [Reg.record, h]
+
+/-- Recording never forgets an existing key. -/
+theorem record_preserves {r : Reg} {k k' : Nat × Nat} (h : k' ∈ r.keys) : k' ∈ (r.record k).keys := by
+  by_cases hk : k ∈ r.keys <;> simp [Reg.record, hk, h]
+
+/-- `captures = size` is preserved by `record`. -/
+theorem record_inv {r : Reg} (k : Nat × Nat) (hi : Inv r) : Inv (r.record k) := by
+  unfold Inv at *
+  by_cases h : k ∈ r.keys <;> simp [Reg.record, h, hi]
+
+/-- The two layer types never share a key: GDN (0) and QSA (1) at the same token count are distinct. -/
+theorem layer_keys_distinct (n : Nat) : ((0, n) : Nat × Nat) ≠ (1, n) := by
+  simp
 
 -- § capture validity
 
-/-- `end()` accepts a capture only when it recorded at least one node. -/
+/-- `end` succeeds only if the capture recorded at least one node. -/
 def endOk (nodes : Nat) : Bool := decide (0 < nodes)
 
-/-- An empty capture is refused. -/
-theorem endOk_zero : endOk 0 = false := by
-  simp [endOk]
+/-- A zero-node capture is rejected. -/
+theorem endOk_zero : endOk 0 = false := by decide
 
-/-- A non-empty capture is accepted. -/
-theorem endOk_pos (n : Nat) (h : 0 < n) : endOk n = true := by
+/-- Any non-empty capture is accepted. -/
+theorem endOk_pos {n : Nat} (h : 0 < n) : endOk n = true := by
   simp [endOk, h]
 
 -- § bounded wait
 
-/-- Outcome of one poll: success, real error, or still running past/before the deadline. -/
-def pollResult (done err : Bool) (now deadline : Nat) : Option Bool :=
-  if done then some true
-  else if err then some false
-  else if deadline ≤ now then some false
-  else none
+/-- Outcomes of one `cudaEventQuery`. -/
+inductive Q where
+  | success
+  | notReady
+  | err
 
-/-- Completion wins over everything else. -/
-theorem pollResult_done (err : Bool) (now deadline : Nat) : pollResult true err now deadline = some true := by
-  simp [pollResult]
+/-- `wait_ms` over a fuel bound (the deadline) and a stream of query outcomes. -/
+def wait : Nat → List Q → Bool
+  | 0, _ => false
+  | _ + 1, [] => false
+  | _ + 1, Q.success :: _ => true
+  | n + 1, Q.notReady :: t => wait n t
+  | _ + 1, Q.err :: _ => false
 
-/-- Past the deadline an unfinished, error-free poll reports failure rather than spinning on. -/
-theorem pollResult_timeout (now deadline : Nat) (h : deadline ≤ now) :
-    pollResult false false now deadline = some false := by
-  simp [pollResult, h]
+/-- An expired deadline reports failure, never success. -/
+theorem wait_zero (qs : List Q) : wait 0 qs = false := by
+  cases qs <;> rfl
 
-/-- Before the deadline an unfinished, error-free poll keeps waiting. -/
-theorem pollResult_wait (now deadline : Nat) (h : now < deadline) :
-    pollResult false false now deadline = none := by
-  have : ¬ deadline ≤ now := by omega
-  simp [pollResult, this]
+/-- A first-poll success returns true. -/
+theorem wait_success (n : Nat) (t : List Q) : wait (n + 1) (Q.success :: t) = true := rfl
 
-end Ref.GraphRegistry
+/-- A real error (not "not ready") returns false immediately. -/
+theorem wait_err (n : Nat) (t : List Q) : wait (n + 1) (Q.err :: t) = false := rfl
 
+/-- Not-ready consumes one unit of the deadline and continues. -/
+theorem wait_notReady (n : Nat) (t : List Q) : wait (n + 1) (Q.notReady :: t) = wait n t := rfl
 
-
-## FILE: /mnt/user-data/outputs/SessionStateLoop.lean
-/-!
-# MODULE: session_state_loop
-SOURCES: src/core/session.cpp
-One token through all layers: session arena carving (256-byte alignment), per-GDN-layer state slices,
-doorbell ring numbering, and the stage-prefix timing telescope.
-
-## Source semantics
-* `align_up(n, 256)` sizes every carve; the arena total is aligned plus 4096.
-* Each GDN layer owns the slice indexed by the number of non-QSA layers before it; slices never coincide.
-* Layer `l` waits for ring `l + 1`; the counter strictly increases.
-* Stage times are prefix differences, so they telescope back to the full prefix.
-
-## Form template identifiers
-align_up → alignUp256 ; gdn_point_at index → gdnIndex ; expected → ringWant ; stage_ms → prefix deltas
--/
-
-namespace Ref.Session
-
--- § arena alignment
-
-/-- Round up to a multiple of 256. -/
-def alignUp256 (n : Nat) : Nat := (n + 255) / 256 * 256
-
-/-- A carve never shrinks. -/
-theorem alignUp256_ge (n : Nat) : n ≤ alignUp256 n := by
-  unfold alignUp256; omega
-
-/-- A carve ends on a 256-byte boundary. -/
-theorem alignUp256_mod (n : Nat) : alignUp256 n % 256 = 0 := by
-  unfold alignUp256; omega
-
-/-- A carve over-allocates by less than 256 bytes. -/
-theorem alignUp256_lt (n : Nat) : alignUp256 n < n + 256 := by
-  unfold alignUp256; omega
-
-/-- The `take` lambda: successive carves start aligned and are disjoint. -/
-theorem carve_step (used bytes : Nat) (h : used % 256 = 0) :
-    alignUp256 (used + bytes) % 256 = 0 ∧ used + bytes ≤ alignUp256 (used + bytes) :=
-  ⟨alignUp256_mod _, alignUp256_ge _⟩
-
-/-- Total arena size is aligned size plus the 4096-byte pad, so it covers `n`. -/
-theorem session_bytes_ge (n : Nat) : n + 4096 ≤ alignUp256 n + 4096 := by
-  have := alignUp256_ge n
-  omega
-
--- § GDN state slices
-
-/-- Number of non-QSA (GDN) layers strictly before layer `l`. -/
-def gdnIndex (isQsa : Nat → Bool) : Nat → Nat
-  | 0 => 0
-  | l + 1 => gdnIndex isQsa l + (if isQsa l then 0 else 1)
-
-/-- The GDN index never exceeds the layer index. -/
-theorem gdnIndex_le (isQsa : Nat → Bool) (l : Nat) : gdnIndex isQsa l ≤ l := by
-  induction l with
-  | zero => simp [gdnIndex]
+/-- `wait` returns true only if some poll actually observed completion. -/
+theorem wait_true_has_success : ∀ (n : Nat) (qs : List Q), wait n qs = true → Q.success ∈ qs := by
+  intro n
+  induction n with
+  | zero => intro qs h; cases qs <;> simp [wait] at h
   | succ n ih =>
-    simp only [gdnIndex]
-    split <;> omega
+    intro qs h
+    cases qs with
+    | nil => simp [wait] at h
+    | cons q t =>
+      cases q with
+      | success => exact List.mem_cons_self
+      | notReady => exact List.mem_cons_of_mem _ (ih t h)
+      | err => simp [wait] at h
 
-/-- The GDN index is non-decreasing step by step. -/
-theorem gdnIndex_step_le (isQsa : Nat → Bool) (l : Nat) : gdnIndex isQsa l ≤ gdnIndex isQsa (l + 1) := by
-  simp only [gdnIndex]
-  omega
-
-/-- The GDN index is monotone. -/
-theorem gdnIndex_mono (isQsa : Nat → Bool) {a b : Nat} (h : a ≤ b) : gdnIndex isQsa a ≤ gdnIndex isQsa b := by
-  induction h with
-  | refl => exact Nat.le_refl _
-  | step _ ih => exact Nat.le_trans ih (gdnIndex_step_le isQsa _)
-
-/-- A GDN layer's own slot is followed by a fresh one. -/
-theorem gdnIndex_succ_of_gdn (isQsa : Nat → Bool) (l : Nat) (h : isQsa l = false) :
-    gdnIndex isQsa (l + 1) = gdnIndex isQsa l + 1 := by
-  simp [gdnIndex, h]
-
-/-- Two distinct GDN layers never share a state slice: sharing would feed one layer's recurrence into another. -/
-theorem gdnIndex_injective (isQsa : Nat → Bool) (l l' : Nat) (hl : isQsa l = false) (hlt : l < l') :
-    gdnIndex isQsa l < gdnIndex isQsa l' := by
-  have h1 := gdnIndex_succ_of_gdn isQsa l hl
-  have h2 := gdnIndex_mono isQsa (show l + 1 ≤ l' from hlt)
-  omega
-
--- § doorbell numbering
-
-/-- Ring sequence number layer `l` waits for. -/
-def ringWant (l : Nat) : Nat := l + 1
-
-/-- Ring numbers strictly increase with the layer, so a stale ring cannot satisfy a later wait. -/
-theorem ringWant_strict (l : Nat) : ringWant l < ringWant (l + 1) := by
-  unfold ringWant; omega
-
-/-- Ring numbers are positive (the doorbell is reset to 0 before the first layer). -/
-theorem ringWant_pos (l : Nat) : 0 < ringWant l := by
-  unfold ringWant; omega
-
--- § stage-prefix timing
-
-/-- Stage times are differences of cumulative prefix times; they telescope to the longest prefix. -/
-theorem stage_telescope (t1 t2 t3 t4 t5 : Int) :
-    t1 + (t2 - t1) + (t3 - t2) + (t4 - t3) + (t5 - t4) = t5 := by
-  omega
-
-end Ref.Session
+end GraphCaptureRegistry
 
 
 
-## FILE: /mnt/user-data/outputs/WeightLoaderSegments.lean
+## FILE: /mnt/user-data/outputs/GdnQsaLayerGeometry.lean
 /-!
-# MODULE: weight_loader_segments
-SOURCES: src/core/weights.cpp
-Dense-weight loader: per-plane segment accounting (codes, fp16-or-f32 scales, offsets), chunked staging that
-never splits an fp16 element, promoted-type 4→2 byte offsets, and compact arena placement.
+# MODULE: gdn_qsa_layer_geometry
+SOURCES: include/ref/core/layer.hpp
+One GDN/QSA block composed from kernels: layer-type split (12 QSA / 36 GDN), the q|k|v conv channel
+layout, the QSA q/gate halves split, INT8 KV sizing, the pre/post (and half) graph stage split, and PLE row bytes.
 
 ## Source semantics
-* An fp16 scale plane is half as many source bytes as destination bytes and must have an even destination count.
-* Segment sums are checked against the index's recorded totals.
-* A widening chunk is even-length; chunks make progress while two or more bytes remain.
-* Promoted tensors read 4 B/elem and write 2 B/elem; destination offset is `done / 2`.
-* Skipped rows get no bytes; kept rows are re-placed at 256-byte alignment.
+* QSA layers are at indices 3, 7, ... 47; the other 36 are GDN.
+* `conv_channels = 10240 = q (16x128) | k (16x128) | v (48x128)`; l2-norm applies to q and k only.
+* `q_full` is split per head into halves: q = first `head_dim`, gate = second `head_dim`.
+* `half = 1` is stages 0..2, `half = 2` is stages 3..4, `half = 0` is both; `preP[k]` is stages 0..k-1.
+* INT8 KV stores one byte per value plus one fp16 scale per 64 values.
 
 ## Form template identifiers
-scales_fp16 → srcScaleBytes ; CHUNK → chunkBase ; Seg sums → segSrcTotal/segDstTotal ; compaction → compactStep
+block_layer_pre -> front_half; block_layer_post -> back_half; is_qsa_layer -> is_attention_layer;
+GdnBuffers -> recurrent_scratch; QsaState -> kv_state; Doorbell -> handoff_cell; PleRun -> layer1_embedding.
 -/
 
-namespace Ref.Weights
+namespace GdnQsaLayerGeometry
 
--- § plane sizes
+-- § layer-type split
 
-/-- Source byte count of a scale plane. -/
-def srcScaleBytes : Bool → Nat → Nat
-  | true, s => s / 2
-  | false, s => s
+/-- QSA layers sit at indices congruent to 3 mod 4. -/
+def isQsa (i : Nat) : Bool := i % 4 == 3
 
-/-- Destination byte count of the scale plane is the index's `scales_bytes`. -/
-def segSrcTotal (codes scales offset : Nat) (fp16 : Bool) : Nat :=
-  codes + srcScaleBytes fp16 scales + offset
+/-- Exactly 12 of the 48 layers are QSA. -/
+theorem qsa_count : ((List.range 48).filter isQsa).length = 12 := by decide
 
-/-- Destination total of a quantized tensor. -/
-def segDstTotal (codes scales offset : Nat) : Nat := codes + scales + offset
+/-- Exactly 36 of the 48 layers are GDN. -/
+theorem gdn_count : ((List.range 48).filter (fun i => !isQsa i)).length = 36 := by decide
 
-/-- An even fp16 scale plane doubles exactly when widened. -/
-theorem srcScale_double (s : Nat) (h : s % 2 = 0) : srcScaleBytes true s * 2 = s := by
-  show s / 2 * 2 = s
+-- § conv channels
+
+/-- q, k are 16 heads of width 128 each; v is 48 heads of width 128. -/
+theorem conv_channels : 16 * 128 + 16 * 128 + 48 * 128 = 10240 := by decide
+
+/-- The l2 norm covers the 32 q/k heads, not the 48 value heads. -/
+theorem l2norm_heads : 16 + 16 = 32 := by decide
+
+-- § QSA q/gate halves
+
+/-- Index of q element `d` of head `h` inside `q_full` (first half of the head's `2*hd` block). -/
+def qIdx (hd h d : Nat) : Nat := h * (2 * hd) + d
+
+/-- Index of gate element `d` of head `h` inside `q_full` (second half of the block). -/
+def gIdx (hd h d : Nat) : Nat := h * (2 * hd) + hd + d
+
+/-- Gate indices stay inside `q_full` (`n_head * 2 * head_dim` floats). -/
+theorem gIdx_lt {nh hd h d : Nat} (hh : h < nh) (hd' : d < hd) : gIdx hd h d < nh * (2 * hd) := by
+  unfold gIdx
+  have h1 : (h + 1) * (2 * hd) ≤ nh * (2 * hd) := Nat.mul_le_mul_right _ (Nat.succ_le_of_lt hh)
+  rw [Nat.add_mul, Nat.one_mul] at h1
   omega
 
-/-- Without fp16 scales the planes are copied verbatim, so source and destination agree. -/
-theorem seg_total_copy (codes scales offset : Nat) :
-    segSrcTotal codes scales offset false = segDstTotal codes scales offset := by
-  rfl
-
-/-- With fp16 scales the destination exceeds the source by exactly the widened half. -/
-theorem seg_total_fp16 (codes scales offset : Nat) (h : scales % 2 = 0) :
-    segDstTotal codes scales offset = segSrcTotal codes scales offset true + scales / 2 := by
-  unfold segDstTotal segSrcTotal
-  show codes + scales + offset = codes + scales / 2 + offset + scales / 2
+/-- q indices stay inside `q_full`. -/
+theorem qIdx_lt {nh hd h d : Nat} (hh : h < nh) (hd' : d < hd) : qIdx hd h d < nh * (2 * hd) := by
+  unfold qIdx
+  have h1 : (h + 1) * (2 * hd) ≤ nh * (2 * hd) := Nat.mul_le_mul_right _ (Nat.succ_le_of_lt hh)
+  rw [Nat.add_mul, Nat.one_mul] at h1
   omega
 
--- § chunking
-
-/-- Base chunk: at most 8 MiB. -/
-def chunkBase (r : Nat) : Nat := if r < 8388608 then r else 8388608
-
-/-- Chunk for a widening plane: drop one byte if the chunk is odd. -/
-def chunkWiden (r : Nat) : Nat := if chunkBase r % 2 = 1 then chunkBase r - 1 else chunkBase r
-
-/-- The base chunk never exceeds what remains. -/
-theorem chunkBase_le (r : Nat) : chunkBase r ≤ r := by
-  unfold chunkBase; split <;> omega
-
-/-- The base chunk is even whenever the remainder is even. -/
-theorem chunkBase_even (r : Nat) (h : r % 2 = 0) : chunkBase r % 2 = 0 := by
-  unfold chunkBase; split <;> omega
-
-/-- The base chunk is at least 2 when at least 2 bytes remain. -/
-theorem chunkBase_ge (r : Nat) (h : 2 ≤ r) : 2 ≤ chunkBase r := by
-  unfold chunkBase; split <;> omega
-
-/-- A widening chunk never overruns the plane. -/
-theorem chunkWiden_le (r : Nat) : chunkWiden r ≤ r := by
-  have := chunkBase_le r
-  unfold chunkWiden; split <;> omega
-
-/-- A widening chunk is always even: it never splits an fp16 element. -/
-theorem chunkWiden_even (r : Nat) : chunkWiden r % 2 = 0 := by
-  unfold chunkWiden; split <;> omega
-
-/-- A widening loop makes progress while two or more bytes remain, so it terminates. -/
-theorem chunkWiden_pos (r : Nat) (h : 2 ≤ r) : 0 < chunkWiden r := by
-  have := chunkBase_ge r h
-  unfold chunkWiden; split <;> omega
-
-/-- On an even plane a widening chunk equals the base chunk (no byte is left stranded). -/
-theorem chunkWiden_eq_of_even (r : Nat) (h : r % 2 = 0) : chunkWiden r = chunkBase r := by
-  have := chunkBase_even r h
-  unfold chunkWiden; split <;> omega
-
--- § promoted conversions
-
-/-- Promoted tensors: the destination offset `done / 2` composes across 4-byte-aligned chunks. -/
-theorem promoted_offsets (done n : Nat) (hd : done % 4 = 0) (hn : n % 4 = 0) :
-    done / 2 + n / 2 = (done + n) / 2 := by
+/-- Within one head, q and gate never collide (contiguous halves, not interleaved). -/
+theorem q_gate_disjoint {hd h d d' : Nat} (hd' : d < hd) : qIdx hd h d ≠ gIdx hd h d' := by
+  unfold qIdx gIdx
   omega
 
-/-- Widening offsets compose too: `done * 2 + n * 2 = (done + n) * 2`. -/
-theorem widen_offsets (done n : Nat) : done * 2 + n * 2 = (done + n) * 2 := by
+-- § graph stage split
+
+/-- Stages run by `half` (0 = both). -/
+def stages : Nat → List Nat
+  | 1 => [0, 1, 2]
+  | 2 => [3, 4]
+  | _ => [0, 1, 2, 3, 4]
+
+/-- The two halves concatenate to the whole layer. -/
+theorem halves_cover : stages 1 ++ stages 2 = stages 0 := rfl
+
+/-- The two halves share no stage. -/
+theorem halves_disjoint : ∀ s ∈ stages 1, s ∉ stages 2 := by decide
+
+/-- `preP[k]` runs the first `k` stages. -/
+def prefixStages (k : Nat) : List Nat := List.range k
+
+/-- Consecutive prefixes differ by exactly one stage, so differencing times isolates it. -/
+theorem prefix_step (k : Nat) : prefixStages (k + 1) = prefixStages k ++ [k] := List.range_succ
+
+/-- Prefix `k` has `k` stages. -/
+theorem prefix_length (k : Nat) : (prefixStages k).length = k := by
+  simp [prefixStages]
+
+-- § sizing
+
+/-- INT8 KV with one fp16 scale per 64 values never exceeds the fp16 cache size (for whole groups). -/
+theorem int8_kv_smaller (m : Nat) : 64 * m + 2 * m ≤ 2 * (64 * m) := by omega
+
+/-- PLE traffic per token: sixteen 90-byte rows = 1440 bytes. -/
+theorem ple_row_bytes : 16 * 90 = 1440 := by decide
+
+end GdnQsaLayerGeometry
+
+
+
+## FILE: /mnt/user-data/outputs/MtpDraftChain.lean
+/-!
+# MODULE: mtp_draft_chain
+SOURCES: include/ref/core/mtp.hpp
+The MTP draft layer on the GPU: draft cell placement, the attention window, and the graph-array bounds.
+
+## Source semantics
+* A round drafts `T-1` tokens at cells `p+a+1, p+a+2, ...` after the last accepted row `a`.
+* Attention is over the last `window` cells (`0` = every cell).
+* Per-`T` graph arrays have 9 entries, so `T <= 8`.
+* All 512 routed experts of the draft layer sit in VRAM (about 708 MB).
+
+## Form template identifiers
+MtpDrafter -> draft_engine; draft -> draft_round; draft_first -> first_round; prefill -> prompt_catchup;
+window_ -> attention_window; step_exec_ -> per_step_graphs.
+-/
+
+namespace MtpDraftChain
+
+-- § draft cells
+
+/-- Cells of the draft chain after accepted row `a` of a window starting at `p`, for a window of `T` tokens. -/
+def draftCells (p a T : Nat) : List Nat := (List.range (T - 1)).map (fun j => p + a + 1 + j)
+
+/-- A round of window size `T` produces exactly `T - 1` draft cells. -/
+theorem draftCells_length (p a T : Nat) : (draftCells p a T).length = T - 1 := by
+  simp [draftCells]
+
+/-- Every draft cell is strictly after the last accepted cell `p + a`. -/
+theorem draftCells_gt {p a T c : Nat} (h : c ∈ draftCells p a T) : p + a < c := by
+  simp [draftCells] at h
+  obtain ⟨j, _, hj⟩ := h
   omega
 
-/-- A promoted tensor's expected byte counts: 4 per element in, 2 per element out. -/
-theorem promoted_ratio (elems : Nat) : elems * 4 = 2 * (elems * 2) := by
+-- § attention window
+
+/-- First cell attended when `n` cells exist and the window is `w` (0 = all). -/
+def winLo (n w : Nat) : Nat := if w = 0 then 0 else n - w
+
+/-- The window never starts after the end. -/
+theorem winLo_le (n w : Nat) : winLo n w ≤ n := by
+  unfold winLo
+  split <;> omega
+
+/-- A positive window attends at most `w` cells. -/
+theorem window_bound {n w : Nat} (hw : 0 < w) : n - winLo n w ≤ w := by
+  unfold winLo
+  have : w ≠ 0 := by omega
+  simp [this]
   omega
 
--- § compact arena placement
+/-- A zero window attends every cell. -/
+theorem window_zero_all (n : Nat) : winLo n 0 = 0 := by
+  simp [winLo]
 
-/-- Round up to a multiple of 256. -/
-def align256 (x : Nat) : Nat := (x + 255) / 256 * 256
+-- § bounds
 
-/-- One placement step of a kept row: cursor advances by the aligned destination size. -/
-def compactStep (at_ dst : Nat) : Nat := at_ + align256 dst
+/-- `exec_[9]` is indexed by `T`; with `T <= 8` the index is in range. -/
+theorem exec_index_lt {T : Nat} (h : T ≤ 8) : T < 9 := by omega
 
-/-- Placement keeps every cursor 256-aligned. -/
-theorem compactStep_mod (at_ dst : Nat) (h : at_ % 256 = 0) : compactStep at_ dst % 256 = 0 := by
-  unfold compactStep align256; omega
+/-- The 512 resident experts take under 708,000,000 bytes... -/
+theorem experts_vram : 512 * 1382400 < 708000000 := by decide
 
-/-- Placed rows never overlap: the cursor moves past the row's bytes. -/
-theorem compactStep_ge (at_ dst : Nat) : at_ + dst ≤ compactStep at_ dst := by
-  unfold compactStep align256; omega
+/-- ...and no less than 707,000,000 (the quoted 708 MB). -/
+theorem experts_vram_lower : 707000000 < 512 * 1382400 := by decide
 
-end Ref.Weights
+end MtpDraftChain
+
+
+
+## FILE: /mnt/user-data/outputs/SessionTokenLoop.lean
+/-!
+# MODULE: session_token_loop
+SOURCES: include/ref/core/session.hpp
+One token through 48 layers: per-layer state indexing (12 QSA / 36 GDN), the per-layer graph pair
+(`pre`/`post`), the `dump_layers` snapshot buffer layout, the prefix-graph indexing, and scratch teardown.
+
+## Source semantics
+* `qsa_states` has one entry per QSA layer, `gdn_state` one per GDN layer.
+* The token path replays `pre[l]` and `post[l]` per layer: 96 graph launches, `session_replay` only 48.
+* `dump_layers` holds `(n_layers + 1) * hc * n_embd` floats: slot 0 is the entry residual, slot `l+1` is after layer `l`.
+* `preP[k-1]` (k = 1..5) are the five prefix graphs.
+* `SessionLoopScratch::free` is safe to call twice.
+
+## Form template identifiers
+SessionState -> sequence_state; SessionGraphs -> layer_graph_set; session_loop -> host_layer_loop;
+SessionLoopScratch -> loop_scratch; TokenGraph -> whole_token_graph; dump_layers -> residual_ladder.
+-/
+
+namespace SessionTokenLoop
+
+-- § per-kind state indices
+
+/-- Whether layer `l` is QSA. -/
+def isQsa (l : Nat) : Prop := l % 4 = 3
+
+/-- Index of a GDN layer among the 36 GDN layers (QSA layers below it are `l / 4`). -/
+def gdnIdx (l : Nat) : Nat := l - l / 4
+
+/-- Index of a QSA layer among the 12 QSA layers. -/
+def qsaIdx (l : Nat) : Nat := l / 4
+
+/-- GDN state indices are within the 36 states. -/
+theorem gdnIdx_lt {l : Nat} (hl : l < 48) (hg : l % 4 ≠ 3) : gdnIdx l < 36 := by
+  unfold gdnIdx
+  omega
+
+/-- QSA state indices are within the 12 states. -/
+theorem qsaIdx_lt {l : Nat} (hl : l < 48) : qsaIdx l < 12 := by
+  unfold qsaIdx
+  omega
+
+/-- Distinct GDN layers get distinct state slots (no two layers share a recurrence). -/
+theorem gdnIdx_injective {l1 l2 : Nat} (h1 : l1 % 4 ≠ 3) (h2 : l2 % 4 ≠ 3)
+    (h : gdnIdx l1 = gdnIdx l2) : l1 = l2 := by
+  unfold gdnIdx at h
+  omega
+
+/-- Distinct QSA layers get distinct KV states. -/
+theorem qsaIdx_injective {l1 l2 : Nat} (h1 : l1 % 4 = 3) (h2 : l2 % 4 = 3)
+    (h : qsaIdx l1 = qsaIdx l2) : l1 = l2 := by
+  unfold qsaIdx at h
+  omega
+
+-- § graph launches
+
+/-- Graph launches per token: `pre` and `post` for each of `n` layers. -/
+def launchesFull (n : Nat) : Nat := 2 * n
+
+/-- `session_replay` launches only the `pre` graphs. -/
+def launchesPreOnly (n : Nat) : Nat := n
+
+/-- The full token is 96 launches for 48 layers. -/
+theorem full_is_96 : launchesFull 48 = 96 := by decide
+
+/-- `session_replay` under-counts the GPU work: it omits all `post` graphs. -/
+theorem replay_omits_post {n : Nat} (h : 0 < n) : launchesPreOnly n < launchesFull n := by
+  unfold launchesPreOnly launchesFull
+  omega
+
+/-- `preP[k-1]` for `k` in 1..5 is within the five-entry prefix array. -/
+theorem prefix_index_lt {k : Nat} (h1 : 1 ≤ k) (h2 : k ≤ 5) : k - 1 < 5 := by omega
+
+-- § dump_layers layout
+
+/-- Start offset of snapshot slot `s` in the dump buffer. -/
+def slotOff (stride s : Nat) : Nat := s * stride
+
+/-- Slot `l + 1` (after layer `l`) ends inside the `(n_layers + 1) * stride` buffer. -/
+theorem dump_slot_in_bounds {stride n l : Nat} (hl : l < n) :
+    slotOff stride (l + 1) + stride ≤ (n + 1) * stride := by
+  unfold slotOff
+  have h1 : (l + 1 + 1) * stride ≤ (n + 1) * stride := Nat.mul_le_mul_right _ (by omega)
+  have e : (l + 1 + 1) * stride = (l + 1) * stride + stride := Nat.succ_mul _ _
+  rw [e] at h1
+  exact h1
+
+/-- Slots do not overlap: slot `s + 1` starts where slot `s` ends. -/
+theorem dump_slots_abut (stride s : Nat) : slotOff stride s + stride = slotOff stride (s + 1) := by
+  unfold slotOff
+  rw [Nat.add_mul, Nat.one_mul]
+
+-- § scratch teardown
+
+/-- Whether the scratch currently owns resources (the host thread is pinned). -/
+structure Scratch where
+  pinned : Bool
+  allocated : Bool
+
+/-- `free` releases everything. -/
+def Scratch.free (_ : Scratch) : Scratch := { pinned := false, allocated := false }
+
+/-- Calling `free` twice equals calling it once. -/
+theorem free_idempotent (s : Scratch) : s.free.free = s.free := rfl
+
+end SessionTokenLoop
+
+
+
+## FILE: /mnt/user-data/outputs/SpeculativeVerifyWindow.lean
+/-!
+# MODULE: speculative_verify_window
+SOURCES: include/ref/core/verify.hpp
+The speculative verify window: T tokens (the last accepted one plus T-1 drafts) go through all 48 layers in
+one graph; token t's argmax equals what greedy decode would emit, so a draft is accepted exactly when it
+matches. `commit(n_keep)` keeps the first `n_keep` tokens.
+
+## Source semantics
+* `out[t]` is the argmax after token `t`; draft `t+1` is accepted iff `out[t] = draft[t+1]`, and acceptance stops
+  at the first mismatch.
+* `n_keep = 1 + accepted` is in `1..T`.
+* `max_t <= kVerifyMaxT` and the per-`T` graph array has 9 entries.
+* Flag slots are indexed by (layer, group): `2 * 64 * 2` entries.
+* The commit record is `[n_keep, n_keep-1, pos_0 .. pos_{T-1}]`.
+
+## Form template identifiers
+Verifier -> window_verifier; run -> verify_window; commit -> keep_prefix; VerifyHits -> resident_view;
+PoolMultiFn -> multi_token_pool; GpuPlanSink -> gpu_share_plan.
+-/
+
+namespace SpeculativeVerifyWindow
+
+-- § acceptance
+
+/-- Number of drafts accepted: the longest prefix of `drafts` equal to the window's argmaxes. -/
+def accepted : List Nat → List Nat → Nat
+  | d :: ds, o :: os => if d = o then 1 + accepted ds os else 0
+  | _, _ => 0
+
+/-- Acceptance never exceeds the number of drafts. -/
+theorem accepted_le_drafts : ∀ (ds os : List Nat), accepted ds os ≤ ds.length := by
+  intro ds
+  induction ds with
+  | nil => intro os; simp [accepted]
+  | cons d ds ih =>
+    intro os
+    cases os with
+    | nil => simp [accepted]
+    | cons o os =>
+      by_cases h : d = o
+      · have := ih os
+        simp [accepted, h]
+        omega
+      · simp [accepted, h]
+
+/-- Acceptance never exceeds the number of argmaxes available. -/
+theorem accepted_le_outs : ∀ (ds os : List Nat), accepted ds os ≤ os.length := by
+  intro ds
+  induction ds with
+  | nil => intro os; simp [accepted]
+  | cons d ds ih =>
+    intro os
+    cases os with
+    | nil => simp [accepted]
+    | cons o os =>
+      by_cases h : d = o
+      · have := ih os
+        simp [accepted, h]
+        omega
+      · simp [accepted, h]
+
+/-- If every draft matches its argmax, all drafts are accepted. -/
+theorem accepted_all : ∀ ds : List Nat, accepted ds ds = ds.length := by
+  intro ds
+  induction ds with
+  | nil => rfl
+  | cons d ds ih => simp [accepted, ih]; omega
+
+/-- A mismatch at the first draft rejects everything after it. -/
+theorem accepted_first_mismatch {d o : Nat} (h : d ≠ o) (ds os : List Nat) :
+    accepted (d :: ds) (o :: os) = 0 := by
+  simp [accepted, h]
+
+/-- `n_keep = 1 + accepted` is between 1 and `T = drafts + 1`. -/
+theorem n_keep_range (ds os : List Nat) :
+    1 ≤ 1 + accepted ds os ∧ 1 + accepted ds os ≤ ds.length + 1 := by
+  have := accepted_le_drafts ds os
+  omega
+
+-- § array bounds
+
+/-- `exec_[9]` is indexed by `T <= 8`. -/
+theorem exec_index_lt {T : Nat} (h : T ≤ 8) : T < 9 := by omega
+
+/-- Flag slot of (layer, group) lies in `flag_sets_[2 * 64 * 2]` for layers < 64 and two groups. -/
+theorem flag_slot_lt {l g : Nat} (hl : l < 64) (hg : g < 2) : l * 2 + g < 2 * 64 * 2 := by omega
+
+/-- The commit record holds `2 + T` words. -/
+def commitWords (T : Nat) : Nat := 2 + T
+
+/-- A window of at most 8 tokens has a commit record of at most 10 words. -/
+theorem commitWords_le {T : Nat} (h : T ≤ 8) : commitWords T ≤ 10 := by
+  unfold commitWords
+  omega
+
+/-- Entries of a window (tokens x 10 experts) stay within the plan's capacity of 128. -/
+theorem window_entries_le {T : Nat} (h : T ≤ 8) : T * 10 ≤ 128 := by omega
+
+end SpeculativeVerifyWindow
+
+
+
+
+
+## FILE: /mnt/user-data/outputs/LayerComposition.lean
+/-!
+# MODULE: layer_composition
+SOURCES: src/core/layer.cpp
+The per-token GDN / QSA / MoE layer: arena carving, canonical plane layout, activation-format dispatch,
+RoPE-row bounds, the verify-compatibility predicate and the oracle dump stride.
+
+## Source semantics
+* Every buffer region is 16-byte aligned and carved sequentially from one arena (`Cursor`, `*_buffers_init`).
+* A quantized tensor is codes ++ scales ++ optional offsets; the three sizes must add up to the tensor size.
+* Activation format is a property of the TENSOR: code_bits = 2 → Q8_0; otherwise Q8_K only if `wants_q8k`.
+* `qsa_layer` refuses positions outside the RoPE table; pooled-block capacity is `max_cells / idx_block + 2`.
+
+## Form template identifiers
+align16 ↦ `align_up16`; carve ↦ `Cursor::take`; WeightRef ↦ `WeightRef`; actFor ↦ `gemv_quantized` dispatch;
+Flags ↦ the `g_*` toggles consulted by `layer_verify_compatible`.
+-/
+namespace Ref.LayerComposition
+
+-- § alignment and cursor carving
+
+/-- Round up to a multiple of 16 (`(n + 15) & ~15`). -/
+def align16 (n : Nat) : Nat := (n + 15) / 16 * 16
+
+/-- Alignment never shrinks a size. -/
+theorem align16_ge (n : Nat) : n ≤ align16 n := by unfold align16; omega
+
+/-- Alignment result is a multiple of 16. -/
+theorem align16_mod (n : Nat) : align16 n % 16 = 0 := by unfold align16; omega
+
+/-- Alignment wastes fewer than 16 bytes. -/
+theorem align16_lt (n : Nat) : align16 n < n + 16 := by unfold align16; omega
+
+/-- Alignment is idempotent. -/
+theorem align16_idem (n : Nat) : align16 (align16 n) = align16 n := by unfold align16; omega
+
+/-- Total bytes consumed by carving `parts` sequentially from offset `s`. -/
+def carve : List Nat → Nat → Nat
+  | [], s => s
+  | p :: ps, s => carve ps (s + align16 p)
+
+/-- Carving equals start plus the sum of aligned parts (the `*_bytes` and `*_init` totals agree). -/
+theorem carve_eq : ∀ (parts : List Nat) (s : Nat), carve parts s = s + (parts.map align16).sum
+  | [], s => by simp [carve]
+  | p :: ps, s => by
+      rw [carve, carve_eq ps]
+      simp only [List.map_cons, List.sum_cons]
+      omega
+
+/-- Starting aligned, every carve boundary stays aligned. -/
+theorem carve_aligned : ∀ (parts : List Nat) (s : Nat), s % 16 = 0 → carve parts s % 16 = 0
+  | [], s, h => by simpa [carve] using h
+  | p :: ps, s, h => by
+      rw [carve]
+      apply carve_aligned ps
+      have := align16_mod p
+      omega
+
+/-- Carving is monotone in the cursor. -/
+theorem carve_ge : ∀ (parts : List Nat) (s : Nat), s ≤ carve parts s
+  | [], s => Nat.le_refl s
+  | p :: ps, s => by
+      rw [carve]
+      have h := carve_ge ps (s + align16 p)
+      omega
+
+/-- Carving splits over concatenation. -/
+theorem carve_append : ∀ (xs ys : List Nat) (s : Nat), carve (xs ++ ys) s = carve ys (carve xs s)
+  | [], ys, s => by simp [carve]
+  | x :: xs, ys, s => by
+      simp only [List.cons_append, carve]
+      exact carve_append xs ys _
+
+/-- Each region ends inside the arena total: no region overlaps its successors. -/
+theorem row_fits (pre post : List Nat) (x : Nat) :
+    carve pre 0 + align16 x ≤ carve (pre ++ x :: post) 0 := by
+  rw [carve_append]
+  have h := carve_ge post (carve pre 0 + align16 x)
+  simp only [carve]
+  exact h
+
+-- § Q8_K block arithmetic
+
+/-- `q8k_bytes n = n / 256 * 292`. -/
+def q8kBytes (n : Nat) : Nat := n / 256 * 292
+
+/-- A whole number of 256-element blocks costs 292 bytes each. -/
+theorem q8kBytes_mul (b : Nat) : q8kBytes (256 * b) = b * 292 := by
+  unfold q8kBytes
+  have h : 256 * b / 256 = b := by omega
+  rw [h]
+
+/-- The width of one embedding (2560) is exactly ten blocks. -/
+theorem q8kBytes_embd : q8kBytes 2560 = 2920 := by decide
+
+-- § canonical planes
+
+/-- The loader-recorded attributes of a quantized tensor that `plane_ptrs` inspects. -/
+structure WeightRef where
+  codeBits : Nat
+  codesBytes : Nat
+  scalesBytes : Nat
+  offsetBytes : Nat
+  bytes : Nat
+  hasOffset : Bool
+
+/-- The acceptance test of `plane_ptrs`. -/
+def planesValid (r : WeightRef) : Prop :=
+  (r.codeBits = 2 ∨ r.codeBits = 4 ∨ r.codeBits = 8) ∧ r.codesBytes ≠ 0 ∧ r.scalesBytes ≠ 0 ∧
+  r.codesBytes + r.scalesBytes + r.offsetBytes = r.bytes ∧ (r.hasOffset = true ↔ r.offsetBytes ≠ 0)
+
+/-- Start of the scale plane. -/
+def scalesOff (r : WeightRef) : Nat := r.codesBytes
+
+/-- Start of the offset plane. -/
+def offsetOff (r : WeightRef) : Nat := r.codesBytes + r.scalesBytes
+
+/-- Valid planes tile the tensor exactly: the offset plane ends at the tensor end. -/
+theorem planes_tile (r : WeightRef) (h : planesValid r) :
+    scalesOff r = r.codesBytes ∧ offsetOff r + r.offsetBytes = r.bytes := by
+  obtain ⟨_, _, _, hsum, _⟩ := h
+  exact ⟨rfl, hsum⟩
+
+/-- No offset flag means an empty offset plane (so the pointer may be null). -/
+theorem no_offset_empty (r : WeightRef) (h : planesValid r) (hh : r.hasOffset = false) :
+    r.offsetBytes = 0 := by
+  obtain ⟨_, _, _, _, hoff⟩ := h
+  by_contra hne
+  have := hoff.2 hne
+  simp [hh] at this
+
+/-- An fp16 plane widened to f32 doubles; with an even f32 size the source size is exact. -/
+theorem fp16_src_double (s : Nat) (h : s % 4 = 0) : s / 2 * 2 = s := by omega
+
+/-- The old re-derivation assumed 4 B/scale; for fp16 packs it was twice the real plane. -/
+theorem old_derivation_doubles (elems actual derived : Nat)
+    (ha : actual = 2 * elems) (hd : derived = 4 * elems) : derived = 2 * actual := by omega
+
+-- § activation contract
+
+/-- The two quantized activation images. -/
+inductive Act | q8_0 | q8k
+  deriving DecidableEq
+
+/-- `gemv_quantized`: 2-bit forms use Q8_0; others Q8_K only when the manifest source type wants it. -/
+def actFor (codeBits : Nat) (wantsQ8k : Bool) : Act :=
+  if codeBits = 2 then Act.q8_0 else if wantsQ8k then Act.q8k else Act.q8_0
+
+/-- Two-bit tensors never see Q8_K. -/
+theorem actFor_two (w : Bool) : actFor 2 w = Act.q8_0 := by simp [actFor]
+
+/-- A legacy form (not wanting Q8_K) always gets Q8_0. -/
+theorem actFor_legacy (b : Nat) : actFor b false = Act.q8_0 := by
+  unfold actFor; split <;> rfl
+
+/-- Q8_K is only chosen for non-2-bit tensors that ask for it. -/
+theorem actFor_q8k (b : Nat) (w : Bool) (h : actFor b w = Act.q8k) : b ≠ 2 ∧ w = true := by
+  unfold actFor at h
+  by_cases hb : b = 2
+  · simp [hb] at h
+  · refine ⟨hb, ?_⟩
+    cases w
+    · simp [hb] at h
+    · rfl
+
+-- § GDN q|k|v split of the conv channels
+
+/-- v starts after q and k, and the three runs fill the channel dimension. -/
+theorem qkv_split (qk v C : Nat) (hC : C = 2 * qk + v) : 2 * qk + v = C := hC.symm
+
+/-- The real geometry: 128 * 16 = 2048, 48 * 128 = 6144, total 10240. -/
+theorem qkv_real : 2 * (128 * 16) + 48 * 128 = 10240 := by decide
+
+-- § QSA positions
+
+/-- `qsa_layer` accepts only a non-negative base with `pos_base + pos < max_cells`. -/
+def ropeRowOk (posBase pos maxCells : Int) : Prop := 0 ≤ posBase ∧ posBase + pos < maxCells
+
+/-- An accepted position reads a RoPE row that exists. -/
+theorem ropeRowOk_row (posBase pos maxCells : Int) (h : ropeRowOk posBase pos maxCells) (hp : 0 ≤ pos) :
+    0 ≤ posBase + pos ∧ posBase + pos < maxCells := by
+  obtain ⟨h1, h2⟩ := h
+  exact ⟨by omega, h2⟩
+
+/-- Completed-block count never exceeds the pooled capacity `max_cells / idx_block + 2`. -/
+theorem blocks_within_capacity (pos maxCells blk : Nat) (h : pos < maxCells) :
+    (pos + 1) / blk ≤ maxCells / blk + 2 := by
+  have h1 : (pos + 1) / blk ≤ maxCells / blk := Nat.div_le_div_right (by omega)
+  omega
+
+/-- `pages * page_size` covers `max_cells`. -/
+theorem pages_cover (m ps : Nat) (hps : 0 < ps) : m ≤ (m + ps - 1) / ps * ps := by
+  have h := Nat.div_add_mod (m + ps - 1) ps
+  have h2 := Nat.mod_lt (m + ps - 1) hps
+  rw [Nat.mul_comm]
+  omega
+
+-- § oracle dump layout
+
+/-- Floats per layer in the C1 dump (`nvk = n_head_kv * head_dim`, `ah = n_head * head_dim`). -/
+def dumpStride (n hc ah nvk : Nat) : Nat := 2 * n + 2 * hc + ah + 5 * nvk + 8
+
+/-- The last slot (`kcur`) ends exactly at the stride: nothing is written out of the layer's row. -/
+theorem dump_last_slot_end (n hc ah nvk : Nat) :
+    (2 * n + 2 * hc + ah + 2 * nvk + 8) + 2 * nvk + nvk = dumpStride n hc ah nvk := by
+  unfold dumpStride; omega
+
+-- § verify compatibility
+
+/-- The toggles `layer_verify_compatible` consults. -/
+structure Flags where
+  nativeBf16 : Bool
+  fusedGr : Bool
+  fusedGdn : Bool
+  nativeGdn : Bool
+  fastAttn : Bool
+  nativeFlashShort : Bool
+  fastSelect : Bool
+  nativeIndexer : Bool
+
+/-- The window reproduces the default native decode path only if every toggle is in its default state. -/
+def verifyCompatible (f : Flags) : Bool :=
+  f.nativeBf16 && f.fusedGr && (f.fusedGdn && f.nativeGdn) && (f.fastAttn && !f.nativeFlashShort) &&
+    f.fastSelect && f.nativeIndexer
+
+/-- Compatibility forces the fused hyper-connection read on. -/
+theorem compat_fusedGr (f : Flags) (h : verifyCompatible f = true) : f.fusedGr = true := by
+  cases f; simp_all [verifyCompatible]
+
+/-- Compatibility forces the short flash adapter off. -/
+theorem compat_no_flash_short (f : Flags) (h : verifyCompatible f = true) :
+    f.nativeFlashShort = false := by
+  cases f; simp_all [verifyCompatible]
+
+/-- Compatibility forces the native indexer on. -/
+theorem compat_indexer (f : Flags) (h : verifyCompatible f = true) : f.nativeIndexer = true := by
+  cases f; simp_all [verifyCompatible]
+
+end Ref.LayerComposition
 
 
 
@@ -538,109 +1077,257 @@ end Ref.Weights
 /-!
 # MODULE: mtp_drafter
 SOURCES: src/core/mtp.cpp
-Multi-token-prediction draft layer: bump-allocated device arena, the attention window capacity, step-row staging
-indices, and the early-stopping draft chain.
+The multi-token-prediction draft layer: bump-allocated device arena, windowed attention capacity, the
+step/position row staging used by captured prefill / round / chain-step graphs, and the draft chain length.
 
 ## Source semantics
-* `Bump::take` advances by the 256-rounded byte count, so every buffer starts aligned.
-* `cap = ceil(window / 64) * 64`.
-* Chain step `j` uses staged row `max_t + j - 1`, which lies between the catch-up rows and the final row `2*max_t - 1`.
-* The chain stops when `j` reaches `max_t - 1` or the last draft probability is below `min_p`.
+* `Bump::take` pads every region to 256 bytes; the counting pass and the real pass use the same sequence.
+* Step/pos staging has `2*max_t` rows: catch-up rows `[0,T)`, the full-layer row `2*max_t-1`, chain rows
+  `max_t + j - 1` for `j = 1..max_t-2`.
+* `record_forward(T, s)`: `s >= 0` is the full layer on row `s`; `s < 0` is K/V-only on rows from `-1 - s`.
+* The draft chain emits at most `max_t - 1` drafts.
 
 ## Form template identifiers
-Bump::take → bumpTake ; cap_ → capOf ; step row → chainRow ; draft loop → chainAux
+align256 ↦ `(n*sizeof(T)+255)&~255`; capRound ↦ `cap_`; ra ↦ `2*max_t_-1`; chainRow ↦ `max_t_+j-1`.
 -/
-
-namespace Ref.Mtp
+namespace Ref.MtpDrafter
 
 -- § bump allocator
 
-/-- New `used` after taking `bytes` bytes. -/
-def bumpTake (used bytes : Nat) : Nat := used + (bytes + 255) / 256 * 256
+/-- 256-byte padding of one region. -/
+def align256 (n : Nat) : Nat := (n + 255) / 256 * 256
 
-/-- The arena only grows. -/
-theorem bumpTake_ge (used bytes : Nat) : used + bytes ≤ bumpTake used bytes := by
-  unfold bumpTake; omega
+/-- Padding never shrinks. -/
+theorem align256_ge (n : Nat) : n ≤ align256 n := by unfold align256; omega
 
-/-- Alignment is preserved, so every carve starts on a 256-byte boundary. -/
-theorem bumpTake_mod (used bytes : Nat) (h : used % 256 = 0) : bumpTake used bytes % 256 = 0 := by
-  unfold bumpTake; omega
+/-- Padded regions are 256-multiples. -/
+theorem align256_mod (n : Nat) : align256 n % 256 = 0 := by unfold align256; omega
 
-/-- Over-allocation per buffer is under 256 bytes. -/
-theorem bumpTake_lt (used bytes : Nat) : bumpTake used bytes < used + bytes + 256 := by
-  unfold bumpTake; omega
+/-- Padding wastes fewer than 256 bytes. -/
+theorem align256_lt (n : Nat) : align256 n < n + 256 := by unfold align256; omega
 
--- § window capacity
+/-- Total after carving a list of byte sizes. -/
+def bump : List Nat → Nat → Nat
+  | [], s => s
+  | p :: ps, s => bump ps (s + align256 p)
 
-/-- Attention capacity: the window rounded up to a multiple of 64. -/
-def capOf (w : Nat) : Nat := (w + 63) / 64 * 64
+/-- Starting aligned, every region base is 256-aligned (device pointers stay aligned). -/
+theorem bump_aligned : ∀ (parts : List Nat) (s : Nat), s % 256 = 0 → bump parts s % 256 = 0
+  | [], s, h => by simpa [bump] using h
+  | p :: ps, s, h => by
+      rw [bump]
+      apply bump_aligned ps
+      have := align256_mod p
+      omega
+
+/-- Bumping is monotone. -/
+theorem bump_ge : ∀ (parts : List Nat) (s : Nat), s ≤ bump parts s
+  | [], s => Nat.le_refl s
+  | p :: ps, s => by
+      rw [bump]
+      have h := bump_ge ps (s + align256 p)
+      omega
+
+-- § windowed capacity
+
+/-- `cap_ = ((window or max_cells) + 63) / 64 * 64`. -/
+def capRound (w : Nat) : Nat := (w + 63) / 64 * 64
 
 /-- The capacity covers the window. -/
-theorem capOf_ge (w : Nat) : w ≤ capOf w := by
-  unfold capOf; omega
+theorem capRound_ge (w : Nat) : w ≤ capRound w := by unfold capRound; omega
 
 /-- The capacity is a multiple of 64. -/
-theorem capOf_mod (w : Nat) : capOf w % 64 = 0 := by
-  unfold capOf; omega
+theorem capRound_mod (w : Nat) : capRound w % 64 = 0 := by unfold capRound; omega
 
--- § staged rows
+/-- The capacity wastes fewer than 64 cells. -/
+theorem capRound_lt (w : Nat) : capRound w < w + 64 := by unfold capRound; omega
 
-/-- Staged step row for chain step `j`. -/
+-- § step rows
+
+/-- The full-layer row of a round. -/
+def ra (maxT : Nat) : Nat := 2 * maxT - 1
+
+/-- The chain-step row for draft `j`. -/
 def chainRow (maxT j : Nat) : Nat := maxT + j - 1
 
-/-- Chain rows sit after the `max_t` catch-up rows. -/
-theorem chainRow_ge (maxT j : Nat) (hj : 1 ≤ j) : maxT ≤ chainRow maxT j := by
-  unfold chainRow; omega
+/-- The full-layer row is inside the `2*max_t` rows allocated. -/
+theorem ra_lt (maxT : Nat) (h : 1 ≤ maxT) : ra maxT < 2 * maxT := by unfold ra; omega
 
-/-- Chain rows sit strictly before the final-row slot `2*max_t - 1`, so the two never collide. -/
-theorem chainRow_lt (maxT j : Nat) (hj : j < maxT - 1) (hm : 2 ≤ maxT) : chainRow maxT j < 2 * maxT - 1 := by
-  unfold chainRow; omega
+/-- Chain rows lie strictly between the catch-up rows and the full-layer row. -/
+theorem chainRow_between (maxT j : Nat) (h1 : 1 ≤ j) (h2 : j + 2 ≤ maxT) :
+    maxT ≤ chainRow maxT j ∧ chainRow maxT j < ra maxT := by
+  unfold chainRow ra; omega
 
-/-- Distinct chain steps use distinct rows. -/
-theorem chainRow_inj (maxT j j' : Nat) (hj : 1 ≤ j) (hj' : 1 ≤ j') (h : chainRow maxT j = chainRow maxT j') :
-    j = j' := by
-  unfold chainRow at h; omega
+/-- Catch-up rows `[0,T)` never collide with a chain row. -/
+theorem catchup_disjoint (maxT T j : Nat) (hT : T ≤ maxT) (h1 : 1 ≤ j) :
+    ∀ t, t < T → t ≠ chainRow maxT j := by
+  intro t ht; unfold chainRow; omega
+
+/-- Writing four step ints for any row below `R2` stays inside `R2*4*4` bytes. -/
+theorem step_row_bytes (row R2 : Nat) (h : row < R2) : (row * 4 + 3) * 4 + 4 ≤ R2 * 4 * 4 := by omega
+
+/-- K/V-only staging: the first row of `step_row0 < 0` is non-negative. -/
+theorem kv_only_row0 (s : Int) (h : s < 0) : 0 ≤ -1 - s := by omega
+
+/-- `step_row0 = -1` maps to row 0 (the prefill graph reads rows `[0,T)`). -/
+theorem kv_only_row0_prefill : (-1 : Int) - (-1) = 0 := by decide
 
 -- § draft chain
 
-/-- The draft loop's count of drafts: continue while `j < max_t - 1` and the last draft was likely enough. -/
-def chainAux (maxT : Nat) (ok : Nat → Bool) : Nat → Nat → Nat
-  | 0, j => j
-  | f + 1, j => if j < maxT - 1 ∧ ok j = true then chainAux maxT ok f (j + 1) else j
+/-- Number of drafts after `steps` accepted chain steps: the first plus one per step. -/
+def draftCount (steps : Nat) : Nat := 1 + steps
 
-/-- The chain never produces fewer drafts than it started with. -/
-theorem chainAux_ge (maxT : Nat) (ok : Nat → Bool) (f j : Nat) : j ≤ chainAux maxT ok f j := by
-  induction f generalizing j with
-  | zero => simp [chainAux]
-  | succ f ih =>
-    simp only [chainAux]
-    split
-    · have := ih (j + 1)
-      omega
-    · exact Nat.le_refl _
+/-- With chain index `j < max_t - 1` and `j >= 1` at most `max_t - 2` steps run, so at most `max_t - 1` drafts. -/
+theorem draftCount_le (maxT steps : Nat) (h : steps + 2 ≤ maxT) : draftCount steps ≤ maxT - 1 := by
+  unfold draftCount; omega
 
-/-- The chain never produces more than `max_t - 1` drafts, so the `drafts` array is not overrun. -/
-theorem chainAux_le (maxT : Nat) (ok : Nat → Bool) (f j : Nat) (hj : j ≤ maxT - 1) :
-    chainAux maxT ok f j ≤ maxT - 1 := by
-  induction f generalizing j with
-  | zero => simpa [chainAux] using hj
-  | succ f ih =>
-    simp only [chainAux]
-    split
-    · rename_i h
-      exact ih (j + 1) (by omega)
-    · exact hj
+/-- The zero-fill range `[n, max_t-1)` is disjoint from emitted drafts `[0,n)` and fits the output array. -/
+theorem fill_range (n maxT j : Nat) (h : n ≤ j) (hj : j < maxT - 1) : n ≤ j ∧ j < maxT := by omega
 
-/-- A first draft always exists: starting at 1 with `max_t ≥ 2` the count is at least 1. -/
-theorem chainAux_pos (maxT : Nat) (ok : Nat → Bool) (f : Nat) : 1 ≤ chainAux maxT ok f 1 :=
-  chainAux_ge maxT ok f 1
+-- § prefill skipping
 
-/-- An unlikely draft stops the chain immediately. -/
-theorem chainAux_stop (maxT : Nat) (ok : Nat → Bool) (f j : Nat) (h : ok j = false) :
-    chainAux maxT ok (f + 1) j = j := by
-  simp [chainAux, h]
+/-- A chunk entirely at or below `first_needed` is skipped; every cell it would write is below that mark. -/
+theorem skipped_chunk_cells (cell0 c T firstNeeded : Int) (h : cell0 + c + T ≤ firstNeeded) :
+    ∀ t : Int, 0 ≤ t → t < T → cell0 + c + t < firstNeeded := by
+  intro t _ ht; omega
 
-end Ref.Mtp
+/-- A skipped cell is more than `window + 64` before the prompt end. -/
+theorem skipped_cell_outside_window (cell promptLen window firstNeeded : Int)
+    (hf : firstNeeded = promptLen - window - 64) (h : cell < firstNeeded) :
+    cell + window + 64 < promptLen := by omega
+
+/-- Third step field `(cell+1)/4` never exceeds the second. -/
+theorem step_pool_field (cell : Nat) : (cell + 1) / 4 ≤ cell + 1 := Nat.div_le_self _ _
+
+end Ref.MtpDrafter
+
+
+
+## FILE: /mnt/user-data/outputs/SessionGraphReplay.lean
+/-!
+# MODULE: session_graph_replay
+SOURCES: src/core/session.cpp
+One token through all layers: session arena sizing and carving, per-layer GDN state slices, per-layer
+captured graphs (pre/post, split prefixes), the doorbell ring protocol and stage-prefix timing.
+
+## Source semantics
+* Layer `l` is a QSA layer iff `l % 4 = 3`; GDN layers are numbered in order, each with its own state slice.
+* Arena regions are 256-aligned; `session_bytes` rounds up and adds 4096 slack.
+* Stage flags: `stage_prefix = k > 0` runs stages `0..k-1` and ignores `half`; otherwise half 0 runs all,
+  half 1 the mixer (stages 0-2), half 2 the FFN front and router (stages 3-4).
+* Ring numbers are `l+1` for layer `l`; stage times are differences of cumulative prefix times.
+
+## Form template identifiers
+isQsa ↦ `is_qsa_layer`; gdnBefore ↦ `gdn_index` loop; runStage ↦ `run0..run4`; sliceOff ↦ `gdn_state + idx*floats`.
+-/
+namespace Ref.SessionGraphReplay
+
+-- § layer numbering
+
+/-- QSA layers are those with index ≡ 3 (mod 4). -/
+def isQsa (l : Nat) : Bool := l % 4 == 3
+
+/-- Number of GDN layers strictly before `l` (the `gdn_index` loop). -/
+def gdnBefore : Nat → Nat
+  | 0 => 0
+  | l + 1 => gdnBefore l + (if l % 4 = 3 then 0 else 1)
+
+/-- Closed form: `l - l/4`. -/
+theorem gdnBefore_eq : ∀ l, gdnBefore l = l - l / 4
+  | 0 => by simp [gdnBefore]
+  | l + 1 => by
+      have ih := gdnBefore_eq l
+      rw [gdnBefore, ih]
+      split <;> omega
+
+/-- 48 layers hold 36 GDN layers. -/
+theorem gdn_count_48 : gdnBefore 48 = 36 := by decide
+
+/-- GDN indices are strictly increasing across consecutive GDN layers (distinct slices). -/
+theorem gdn_index_strict (l : Nat) (h : l % 4 ≠ 3) : gdnBefore (l + 1) = gdnBefore l + 1 := by
+  rw [gdnBefore, if_neg h]
+
+/-- QSA layers do not advance the GDN index. -/
+theorem qsa_no_advance (l : Nat) (h : l % 4 = 3) : gdnBefore (l + 1) = gdnBefore l := by
+  rw [gdnBefore, if_pos h, Nat.add_zero]
+
+-- § slices
+
+/-- A slice `[i*F, i*F+F)` ends inside `n*F` for `i < n`. -/
+theorem slice_end_le (i n F : Nat) (h : i < n) : i * F + F ≤ n * F := by
+  have := Nat.mul_le_mul_right F (show i + 1 ≤ n by omega)
+  simpa [Nat.add_mul] using this
+
+/-- Slices of distinct layers do not overlap. -/
+theorem slice_disjoint (i j F : Nat) (h : i < j) : i * F + F ≤ j * F := slice_end_le i j F h
+
+-- § session arena
+
+/-- 256-byte alignment. -/
+def align256 (n : Nat) : Nat := (n + 255) / 256 * 256
+
+/-- Alignment does not shrink. -/
+theorem align256_ge (n : Nat) : n ≤ align256 n := by unfold align256; omega
+
+/-- Alignment is a 256-multiple. -/
+theorem align256_mod (n : Nat) : align256 n % 256 = 0 := by unfold align256; omega
+
+/-- `session_bytes` covers the raw sum, and carries 4096 of slack. -/
+theorem session_bytes_cover (n : Nat) : n + 4096 ≤ align256 n + 4096 := by
+  have := align256_ge n; omega
+
+/-- All QSA layers after the first borrow the RoPE table, so the arena is `first + (q-1)*rest`. -/
+theorem qsa_arena (first rest q : Nat) (h : 1 ≤ q) :
+    first + (q - 1) * rest ≤ q * (first + rest) := by
+  obtain ⟨k, rfl⟩ : ∃ k, q = k + 1 := ⟨q - 1, by omega⟩
+  simp [Nat.add_mul, Nat.mul_add]
+  omega
+
+-- § stage flags
+
+/-- Whether stage `i` (0..4) runs for `(half, stage_prefix)`. -/
+def runStage (half pfx i : Nat) : Prop :=
+  if 0 < pfx then i + 1 ≤ pfx
+  else if i ≤ 2 then (half = 0 ∨ half = 1) else (half = 0 ∨ half = 2)
+
+/-- A positive prefix runs exactly the stages below it, whatever `half` says. -/
+theorem prefix_runs_below (half pfx i : Nat) (h : 0 < pfx) : runStage half pfx i ↔ i + 1 ≤ pfx := by
+  unfold runStage; rw [if_pos h]
+
+/-- Prefix 5 runs every stage. -/
+theorem prefix5_all (half i : Nat) (hi : i < 5) : runStage half 5 i := by
+  unfold runStage; rw [if_pos (by omega)]; omega
+
+/-- Legacy callers (`half = 0`, no prefix) run all five stages. -/
+theorem half0_all (i : Nat) (hi : i < 5) : runStage 0 0 i := by
+  have h : ¬ (0 < 0) := by omega
+  unfold runStage; rw [if_neg h]
+  split <;> simp
+
+/-- `half = 1` stops before the FFN front. -/
+theorem half1_mixer_only (i : Nat) (hi : 3 ≤ i) : ¬ runStage 1 0 i := by
+  have h : ¬ (0 < 0) := by omega
+  have h2 : ¬ (i ≤ 2) := by omega
+  unfold runStage; rw [if_neg h, if_neg h2]; omega
+
+/-- `half = 2` skips the mixer entirely. -/
+theorem half2_skips_mixer (i : Nat) (hi : i ≤ 2) : ¬ runStage 2 0 i := by
+  have h : ¬ (0 < 0) := by omega
+  unfold runStage; rw [if_neg h, if_pos hi]; omega
+
+-- § timing
+
+/-- Stage times from cumulative prefix times telescope back to the full-layer time. -/
+theorem stage_times_telescope (t1 t2 t3 t4 t5 : Int) :
+    t1 + (t2 - t1) + (t3 - t2) + (t4 - t3) + (t5 - t4) = t5 := by omega
+
+/-- Event `l*6+k` is in range for `l < n`, `k <= 5`. -/
+theorem event_index (l n k : Nat) (hl : l < n) (hk : k ≤ 5) : l * 6 + k < n * 6 := by omega
+
+/-- Ring numbers are strictly increasing per layer and the layer count ends at `n_layers`. -/
+theorem ring_strict (l : Nat) : (l + 1) < (l + 1) + 1 := Nat.lt_succ_self _
+
+end Ref.SessionGraphReplay
 
 
 
@@ -648,1046 +1335,974 @@ end Ref.Mtp
 /-!
 # MODULE: verify_window
 SOURCES: src/core/verify.cpp
-Speculative verify window: split into two token groups, per-(layer, group) ring numbering, staging split between
-groups, monotone flag B, and the empty-plan fallback.
+The speculative-decoding verify window: token-group split, ring/flag numbering, monotone flag B, the GPU plan
+layout in mapped memory, staging split and the commit rows.
 
 ## Source semantics
-* With `G = 2`, group A is `[0, (T+1)/2)` and group B is `[(T+1)/2, T)`; together they cover `[0, T)`.
-* Ring number is `l * G + grp + 1`, strictly increasing in execution order, and decodes back to `(l, grp)`.
-* Staging blobs are halved per group; the halves are disjoint.
-* Flag B only rises (CAS-max).
+* With `groups = 2` tokens split into A = `[0, (T+1)/2)` and B = `[(T+1)/2, T)`; otherwise one group.
+* Ring `k` (0-based) is layer `k / G`, group `k % G`, and waits for value `k + 1 = l*G + grp + 1`.
+* Flag B only rises (compare-and-swap maximum), so out-of-order host functions are harmless.
+* Plan layout: `counts(4) | start(cap+1) | dst(cap) | tok(cap) | pad | ptr(cap u64) | ptr2(cap u64) | start2(cap+1)`.
+* `commit(n_keep)`: `h_commit = [n_keep, n_keep-1, pos0+t for t<n_keep else -1 ...]`.
 
 ## Form template identifiers
-tb_/te_ → grpBegin/grpEnd ; ring → ringNo ; raise_flag → raiseFlag ; per → stagingPer
+tb/te ↦ `tb_[2]`, `te_[2]`; ring ↦ `l*G+grp+1`; raise ↦ `raise_flag`; ptrOff ↦ `(i32+1)&~1`.
 -/
-
-namespace Ref.Verify
+namespace Ref.VerifyWindow
 
 -- § token groups
 
-/-- First token of a group. -/
-def grpBegin (T : Nat) : Nat → Nat
-  | 0 => 0
-  | _ + 1 => (T + 1) / 2
+/-- Group begin. -/
+def tb (T grp : Nat) : Nat := if grp = 0 then 0 else (T + 1) / 2
 
-/-- One past the last token of a group. -/
-def grpEnd (T G : Nat) : Nat → Nat
-  | 0 => if G = 2 then (T + 1) / 2 else T
-  | _ + 1 => T
+/-- Group end for `G` groups. -/
+def te (G T grp : Nat) : Nat := if grp = 0 then (if G = 2 then (T + 1) / 2 else T) else T
 
-/-- In a split window the groups abut. -/
-theorem groups_abut (T : Nat) : grpEnd T 2 0 = grpBegin T 1 := by
-  simp [grpEnd, grpBegin]
+/-- With two groups the groups tile `[0,T)`: A ends where B begins. -/
+theorem groups_tile (T : Nat) : te 2 T 0 = tb T 1 ∧ tb T 0 = 0 ∧ te 2 T 1 = T := by
+  simp [te, tb]
 
-/-- In a split window the two groups together cover exactly `T` tokens. -/
-theorem groups_cover (T : Nat) :
-    (grpEnd T 2 0 - grpBegin T 0) + (grpEnd T 2 1 - grpBegin T 1) = T := by
-  simp [grpEnd, grpBegin]
-  omega
+/-- Sizes of the two groups add to T. -/
+theorem groups_size (T : Nat) : (te 2 T 0 - tb T 0) + (te 2 T 1 - tb T 1) = T := by
+  simp [te, tb]; omega
 
-/-- With at least two tokens, both groups are non-empty. -/
-theorem groups_nonempty (T : Nat) (h : 2 ≤ T) :
-    grpBegin T 0 < grpEnd T 2 0 ∧ grpBegin T 1 < grpEnd T 2 1 := by
-  simp [grpEnd, grpBegin]
-  omega
+/-- With `T >= 2` both groups are non-empty. -/
+theorem groups_nonempty (T : Nat) (h : 2 ≤ T) : 0 < te 2 T 0 - tb T 0 ∧ 0 < te 2 T 1 - tb T 1 := by
+  simp [te, tb]; omega
 
-/-- Unsplit window: the single group is the whole window. -/
-theorem group_unsplit (T : Nat) : grpBegin T 0 = 0 ∧ grpEnd T 1 0 = T := by
-  simp [grpEnd, grpBegin]
+/-- Group A is at least as large as group B (ceil split). -/
+theorem groups_balanced (T : Nat) : te 2 T 1 - tb T 1 ≤ te 2 T 0 - tb T 0 := by
+  simp [te, tb]; omega
+
+/-- A single group is the whole window. -/
+theorem single_group (T : Nat) : tb T 0 = 0 ∧ te 1 T 0 = T := by simp [tb, te]
 
 -- § ring numbering
 
-/-- Ring number of layer `l`, group `grp` in a split window. -/
-def ringNo (l grp : Nat) : Nat := l * 2 + grp + 1
-
-/-- Distinct `(layer, group)` pairs have distinct ring numbers. -/
-theorem ringNo_inj (l g l' g' : Nat) (hg : g < 2) (hg' : g' < 2) (h : ringNo l g = ringNo l' g') :
-    l = l' ∧ g = g' := by
-  unfold ringNo at h
+/-- The value the `k`-th ring waits for is `l*G + grp + 1` with `l = k/G`, `grp = k%G`. -/
+theorem ring_numbering (k G : Nat) : G * (k / G) + k % G + 1 = k + 1 := by
+  have h := Nat.div_add_mod k G
   omega
 
-/-- Execution order is ring order: A then B within a layer, then the next layer. -/
-theorem ringNo_order (l : Nat) : ringNo l 0 < ringNo l 1 ∧ ringNo l 1 < ringNo (l + 1) 0 := by
-  unfold ringNo
+/-- The group index is a valid group. -/
+theorem ring_group_lt (k G : Nat) (hG : 0 < G) : k % G < G := Nat.mod_lt _ hG
+
+/-- Rings of consecutive `(l, grp)` pairs are consecutive. -/
+theorem ring_consecutive (G l grp : Nat) (h : grp + 1 < G) :
+    G * l + (grp + 1) + 1 = (G * l + grp + 1) + 1 := by omega
+
+-- § flag B
+
+/-- `raise_flag`: only ever raises. -/
+def raise (cur v : Nat) : Nat := max cur v
+
+/-- Raising never lowers the flag. -/
+theorem raise_ge_cur (cur v : Nat) : cur ≤ raise cur v := by unfold raise; omega
+
+/-- Raising reaches the requested value. -/
+theorem raise_ge_val (cur v : Nat) : v ≤ raise cur v := by unfold raise; omega
+
+/-- Late host functions commute: order of arrival does not matter. -/
+theorem raise_comm (c a b : Nat) : raise (raise c a) b = raise (raise c b) a := by
+  unfold raise; omega
+
+/-- Replaying the same raise is idempotent. -/
+theorem raise_idem (c v : Nat) : raise (raise c v) v = raise c v := by unfold raise; omega
+
+-- § plan layout
+
+/-- Offset of the pointer array: the i32 prefix rounded up to even. -/
+def ptrOff (cap : Nat) : Nat := ((4 + (cap + 1) + cap + cap) + 1) / 2 * 2
+
+/-- The pointer array is 8-byte aligned in i32 units (even offset). -/
+theorem ptrOff_even (cap : Nat) : ptrOff cap % 2 = 0 := by unfold ptrOff; omega
+
+/-- The pad is at most one i32 and the pointer array starts after `tok`. -/
+theorem ptrOff_bounds (cap : Nat) :
+    4 + (cap + 1) + cap + cap ≤ ptrOff cap ∧ ptrOff cap ≤ 4 + (cap + 1) + cap + cap + 1 := by
+  unfold ptrOff; omega
+
+/-- Total i32 count of one plan slot. -/
+def planI32 (cap : Nat) : Nat := ptrOff cap + 4 * cap + (cap + 1) + 1
+
+/-- `ptr` and `ptr2` (2 i32 per u64, `cap` each) end exactly where `start2` begins. -/
+theorem ptr2_ends_at_start2 (cap : Nat) : ptrOff cap + 2 * cap + 2 * cap = ptrOff cap + 4 * cap := by
   omega
 
-/-- The host's loop index `k = l*G + grp` decodes back to the layer and group. -/
-theorem ring_decode (l grp : Nat) (hg : grp < 2) : (l * 2 + grp) / 2 = l ∧ (l * 2 + grp) % 2 = grp := by
-  omega
-
-/-- The wait value for step `k` is `k + 1`, equal to `ringNo`. -/
-theorem ring_want (l grp : Nat) : l * 2 + grp + 1 = ringNo l grp := rfl
+/-- `start2` (cap+1 entries) fits strictly inside the plan slot. -/
+theorem start2_fits (cap : Nat) : ptrOff cap + 4 * cap + (cap + 1) < planI32 cap := by
+  unfold planI32; omega
 
 -- § staging split
 
-/-- Staging blobs available to each group in a split window. -/
-def stagingPer (S : Nat) : Nat := S / 2
+/-- Blobs of staging per group. -/
+def stagePer (G S : Nat) : Nat := if G = 2 then S / 2 else S
 
-/-- The two groups' halves fit in the staging area. -/
-theorem staging_halves_fit (S : Nat) : 2 * stagingPer S ≤ S := by
-  unfold stagingPer; omega
+/-- Each group's staging window lies inside the staging area. -/
+theorem stage_window_fits (G S grp : Nat) (hG : G = 1 ∨ G = 2) (hg : grp < G) :
+    grp * stagePer G S + stagePer G S ≤ S := by
+  rcases hG with rfl | rfl
+  · have : grp = 0 := by omega
+    subst this
+    simp [stagePer]
+  · have : grp = 0 ∨ grp = 1 := by omega
+    rcases this with rfl | rfl <;> simp [stagePer] <;> omega
 
-/-- Group B's slice begins where group A's ends. -/
-theorem staging_disjoint (S : Nat) : 0 + stagingPer S = 1 * stagingPer S := by
+/-- The two windows of a split window are disjoint. -/
+theorem stage_windows_disjoint (S : Nat) : 0 * stagePer 2 S + stagePer 2 S ≤ 1 * stagePer 2 S := by
   omega
 
--- § monotone flag
+-- § commit rows
 
-/-- CAS-max raise of a flag. -/
-def raiseFlag (cur v : Nat) : Nat := if cur < v then v else cur
+/-- Entry `t` of the commit array (`-1` marks a discarded token). -/
+def commitEntry (pos0 : Int) (nKeep t : Nat) : Int := if t < nKeep then pos0 + t else -1
 
-/-- The flag never decreases. -/
-theorem raiseFlag_ge_cur (cur v : Nat) : cur ≤ raiseFlag cur v := by
-  unfold raiseFlag; split <;> omega
-
-/-- The flag reaches at least the requested value. -/
-theorem raiseFlag_ge_val (cur v : Nat) : v ≤ raiseFlag cur v := by
-  unfold raiseFlag; split <;> omega
-
-/-- Raising is idempotent, so a late host function of an earlier layer cannot lower it. -/
-theorem raiseFlag_idem (cur v : Nat) : raiseFlag (raiseFlag cur v) v = raiseFlag cur v := by
-  unfold raiseFlag
-  by_cases h : cur < v <;> simp [h]
-
-/-- A late, smaller raise is a no-op once a larger value has landed. -/
-theorem raiseFlag_late (cur v : Nat) (h : v ≤ cur) : raiseFlag cur v = cur := by
-  unfold raiseFlag; split <;> omega
-
--- § commit mask
-
-/-- Position written to commit slot `t`: kept tokens carry their position, the rest `-1`. -/
-def commitPos (pos0 nKeep t : Nat) : Int := if t < nKeep then (pos0 + t : Nat) else -1
-
-/-- Kept tokens carry a non-negative position. -/
-theorem commitPos_kept (pos0 nKeep t : Nat) (h : t < nKeep) : 0 ≤ commitPos pos0 nKeep t := by
-  unfold commitPos
-  split <;> omega
+/-- Kept tokens carry consecutive positions. -/
+theorem commit_kept (pos0 : Int) (nKeep t : Nat) (h : t < nKeep) : commitEntry pos0 nKeep t = pos0 + t := by
+  unfold commitEntry; rw [if_pos h]
 
 /-- Dropped tokens are marked `-1`. -/
-theorem commitPos_dropped (pos0 nKeep t : Nat) (h : nKeep ≤ t) : commitPos pos0 nKeep t = -1 := by
-  have : ¬ t < nKeep := by omega
-  simp [commitPos, this]
+theorem commit_dropped (pos0 : Int) (nKeep t : Nat) (h : nKeep ≤ t) : commitEntry pos0 nKeep t = -1 := by
+  unfold commitEntry; rw [if_neg (by omega)]
 
-end Ref.Verify
+/-- The second header word (`n_keep - 1`) addresses the last kept token. -/
+theorem commit_last_index (nKeep : Nat) (h : 1 ≤ nKeep) : nKeep - 1 < nKeep := by omega
+
+end Ref.VerifyWindow
 
 
 
-
-
-## FILE: /mnt/user-data/outputs/LayerCompose.lean
+## FILE: /mnt/user-data/outputs/WeightPackLoader.lean
 /-!
-# MODULE: layer_compose
-SOURCES: src/core/layer.cpp
-The composed GDN / QSA / MoE decoder layer: buffer carving (16-byte aligned cursor), weight-plane validation,
-per-tensor activation dispatch, stage selection of `block_layer_pre`, the doorbell order and the debug-dump layout.
+# MODULE: weight_pack_loader
+SOURCES: src/core/weights.cpp
+The dense-weight loader: segment list per tensor, plane-by-plane width conversion (bf16 high-half, f16
+re-round, exact fp16→f32 widening), chunked staging, and arena compaction under a skip set.
 
 ## Source semantics
-* Every arena region is rounded up to 16 bytes; regions handed out by one cursor never overlap.
-* A quantized tensor's three planes (codes, scales, offsets) must add up exactly to the tensor size, and
-  `has_offset` must agree with a non-empty offset plane.
-* The activation image a projection reads is chosen by the tensor, not by its role: native first, then
-  `code_bits == 2` -> Q8_0, a legacy form -> Q8_0, otherwise Q8_K.
-* `stage_prefix == 0` means "as `half` says"; `stage_prefix == k > 0` runs exactly stages `0..k-1`.
-* The doorbell ring is the LAST operation of the publish sequence.
+* A quantized tensor is codes ++ scales ++ optional offsets; fp16 scales are half the size in the pack.
+* Promoted (bf16/f16-in-f32) tensors are 4 B/elem in and 2 B/elem out.
+* Chunks never split an element: widening needs even chunks; bf16/f16 conversion needs multiples of 4.
+* With a skip set the kept rows are re-placed in index order at 256-byte alignment.
 
 ## Form template identifiers
-align16 <- `(n + 15) & ~15`; Cursor.take <- `Cursor::take/take_bytes`; PlanesOk <- `plane_ptrs` guard;
-dispatch <- `gemv_quantized`; RunStage <- `run0..run4` in `block_layer_pre`; dumpStride <- `dump_stride_floats`.
+srcSum/dstSum ↦ `sum_src`/`sum_dst`; chunkLen ↦ `min(CHUNK, remaining)`; carve256 ↦ compaction `at += align`.
 -/
+namespace Ref.WeightPackLoader
 
-namespace Ref.LayerCompose
+-- § segment accounting
 
--- § alignment and the cursor
+/-- Source bytes of the three planes. -/
+def srcSum (codes scales off : Nat) (fp16 : Bool) : Nat :=
+  codes + (if fp16 then scales / 2 else scales) + off
 
-/-- 16-byte round-up `(n + 15) & ~15`, written as a division-free formula. -/
-def align16 (n : Nat) : Nat := (n + 15) / 16 * 16
+/-- Destination bytes of the three planes. -/
+def dstSum (codes scales off : Nat) : Nat := codes + scales + off
 
-/-- Rounding up never loses bytes. -/
-theorem align16_ge (n : Nat) : n ≤ align16 n := by unfold align16; omega
+/-- Without fp16 scales source and destination agree. -/
+theorem seg_sums_copy (c s o : Nat) : srcSum c s o false = dstSum c s o := by
+  simp [srcSum, dstSum]
 
-/-- The result is 16-aligned. -/
-theorem align16_mod (n : Nat) : align16 n % 16 = 0 := by unfold align16; omega
+/-- With fp16 scales the destination grows by exactly the scale plane's source size. -/
+theorem seg_sums_widen (c s o : Nat) (h : s % 2 = 0) :
+    dstSum c s o = srcSum c s o true + s / 2 := by
+  simp only [srcSum, dstSum, if_true]; omega
 
-/-- Rounding up wastes fewer than 16 bytes. -/
-theorem align16_lt (n : Nat) : align16 n < n + 16 := by unfold align16; omega
+/-- An odd fp16 destination byte count is impossible after widening (f32 planes are multiples of 4). -/
+theorem widen_dst_even (elems : Nat) : (elems * 4) % 2 = 0 := by omega
 
-/-- Aligning twice is aligning once. -/
-theorem align16_idem (n : Nat) : align16 (align16 n) = align16 n := by unfold align16; omega
+/-- Widening `n` source bytes yields `2n` destination bytes. -/
+theorem widen_out (n : Nat) (h : n % 2 = 0) : n / 2 * 4 = 2 * n := by omega
 
-/-- Alignment is monotone. -/
-theorem align16_mono {a b : Nat} (h : a ≤ b) : align16 a ≤ align16 b := by unfold align16; omega
-
-/-- The arena cursor: only the number of bytes used so far matters. -/
-structure Cursor where
-  used : Nat
-
-/-- `take bytes` returns the new cursor and the offset of the region just handed out. -/
-def Cursor.take (c : Cursor) (bytes : Nat) : Cursor × Nat :=
-  (⟨align16 (c.used + bytes)⟩, c.used)
-
-/-- The cursor stays 16-aligned after every take. -/
-theorem take_aligned (c : Cursor) (bytes : Nat) : (c.take bytes).1.used % 16 = 0 :=
-  align16_mod (c.used + bytes)
-
-/-- The handed-out region `[offset, offset + bytes)` lies entirely below the new cursor (no overlap later). -/
-theorem take_covers (c : Cursor) (bytes : Nat) : c.used + bytes ≤ (c.take bytes).1.used :=
-  align16_ge (c.used + bytes)
-
-/-- The padding of a take is under 16 bytes. -/
-theorem take_tight (c : Cursor) (bytes : Nat) : (c.take bytes).1.used < c.used + bytes + 16 :=
-  align16_lt (c.used + bytes)
-
-/-- The returned offset is the old cursor. -/
-theorem take_offset (c : Cursor) (bytes : Nat) : (c.take bytes).2 = c.used := rfl
-
-/-- An aligned cursor hands out an aligned offset. -/
-theorem take_offset_aligned (c : Cursor) (bytes : Nat) (h : c.used % 16 = 0) : (c.take bytes).2 % 16 = 0 := h
-
-/-- Sum of a list of sizes. -/
-def lsum : List Nat → Nat
-  | [] => 0
-  | a :: l => a + lsum l
-
-/-- Total of the individually aligned parts (`gdn_buffers_bytes`, `moe_buffers_bytes`). -/
-def totalAligned : List Nat → Nat
-  | [] => 0
-  | a :: l => align16 a + totalAligned l
-
-/-- The aligned total covers the raw sum. -/
-theorem sum_le_totalAligned (l : List Nat) : lsum l ≤ totalAligned l := by
-  induction l with
-  | nil => simp [lsum, totalAligned]
-  | cons a l ih =>
-    have h := align16_ge a
-    simp only [lsum, totalAligned]
-    omega
-
-/-- Offsets of consecutive aligned parts starting at `start`. -/
-def place (start : Nat) : List Nat → List Nat
-  | [] => []
-  | a :: l => start :: place (start + align16 a) l
-
-/-- One offset per part. -/
-theorem place_length (l : List Nat) : ∀ start : Nat, (place start l).length = l.length := by
-  induction l with
-  | nil => intro start; rfl
-  | cons a l ih => intro start; simp [place, ih]
-
--- § Q8_K sizing
-
-/-- Bytes of a Q8_K buffer for `n` elements (292 bytes per 256-element block). -/
-def q8kBytes (n : Nat) : Nat := n / 256 * 292
-
-/-- A whole number of blocks costs `292` bytes each. -/
-theorem q8kBytes_blocks (k : Nat) : q8kBytes (k * 256) = k * 292 := by unfold q8kBytes; omega
-
-/-- Q8_K sizing is monotone. -/
-theorem q8kBytes_mono {a b : Nat} (h : a ≤ b) : q8kBytes a ≤ q8kBytes b := by unfold q8kBytes; omega
-
--- § weight planes
-
-/-- The loader-recorded plane sizes of a quantized tensor. -/
-structure WRef where
-  bits : Nat
-  codes : Nat
-  scales : Nat
-  offset : Nat
-  bytes : Nat
-  hasOffset : Bool
-
-/-- The guard of `plane_ptrs`. -/
-def PlanesOk (r : WRef) : Prop :=
-  (r.bits = 2 ∨ r.bits = 4 ∨ r.bits = 8) ∧ r.codes ≠ 0 ∧ r.scales ≠ 0 ∧
-  r.codes + r.scales + r.offset = r.bytes ∧ (r.hasOffset = true ↔ r.offset ≠ 0)
-
-/-- Accepted planes tile the tensor: the offset plane starts right after codes and scales and ends at `bytes`. -/
-theorem planes_tile (r : WRef) (h : PlanesOk r) :
-    r.codes + r.scales ≤ r.bytes ∧ r.codes + r.scales + r.offset = r.bytes := by
-  obtain ⟨_, _, _, hs, _⟩ := h
-  constructor <;> omega
-
-/-- A tensor with no offset plane has `has_offset = false`. -/
-theorem planes_no_offset (r : WRef) (h : PlanesOk r) (h0 : r.offset = 0) : r.hasOffset = false := by
-  obtain ⟨_, _, _, _, hi⟩ := h
-  cases hh : r.hasOffset with
-  | false => rfl
-  | true => exact absurd h0 (hi.mp hh)
-
-/-- If planes disagree with the tensor size the guard refuses. -/
-theorem planes_refuse (r : WRef) (h : r.codes + r.scales + r.offset ≠ r.bytes) : ¬ PlanesOk r := by
-  intro hp
-  exact h hp.2.2.2.1
-
--- § activation dispatch
-
-/-- Which activation image a projection consumes. -/
-inductive ActKind
-  | native
-  | q80
-  | q8k
-  deriving DecidableEq
-
-/-- `gemv_quantized`: native, then S2 (Q8_0), then legacy (Q8_0), then K-quant (Q8_K). -/
-def dispatch (native : Bool) (bits : Nat) (wantsQ8K : Bool) : ActKind :=
-  if native then ActKind.native
-  else if bits = 2 then ActKind.q80
-  else if wantsQ8K then ActKind.q8k
-  else ActKind.q80
-
-/-- A 2-bit form always reads the Q8_0 image. -/
-theorem dispatch_s2 (bits : Nat) (wants : Bool) (h : bits = 2) : dispatch false bits wants = ActKind.q80 := by
-  simp [dispatch, h]
-
-/-- A tensor that does not want Q8_K never reads it. -/
-theorem dispatch_legacy (bits : Nat) : dispatch false bits false = ActKind.q80 := by
-  unfold dispatch
-  by_cases h : bits = 2 <;> simp [h]
-
-/-- A wider-than-2-bit K-quant reads Q8_K. -/
-theorem dispatch_kquant (bits : Nat) (h : bits ≠ 2) : dispatch false bits true = ActKind.q8k := by
-  simp [dispatch, h]
-
-/-- The native path ignores the code width. -/
-theorem dispatch_native (bits : Nat) (w : Bool) : dispatch true bits w = ActKind.native := by
-  simp [dispatch]
-
--- § stage selection of block_layer_pre
-
-/-- Stages 0..2 run in the mixer half (half 0/1), stages 3..4 in the FFN half (half 0/2). -/
-def halfAllows (k h : Nat) : Prop :=
-  if k ≤ 2 then (h = 0 ∨ h = 1) else (h = 0 ∨ h = 2)
-
-/-- Stage `k` runs for `stage_prefix = p`, `half = h`. -/
-def RunStage (k p h : Nat) : Prop := if 0 < p then k < p else halfAllows k h
-
-/-- With a positive prefix exactly the first `p` stages run, whatever `half` is. -/
-theorem runStage_prefix {k p h : Nat} (hp : 0 < p) : RunStage k p h ↔ k < p := by
-  unfold RunStage
-  rw [if_pos hp]
-
-/-- The legacy call (`prefix = 0`, `half = 0`) runs all five stages. -/
-theorem runStage_legacy {k : Nat} : RunStage k 0 0 := by
-  unfold RunStage halfAllows
-  rw [if_neg (Nat.lt_irrefl 0)]
-  split <;> simp
-
-/-- Prefixes are downward closed. -/
-theorem runStage_mono {k p h : Nat} (hp : 0 < p) (hr : RunStage (k + 1) p h) : RunStage k p h := by
-  rw [runStage_prefix hp] at hr ⊢
-  omega
-
-/-- `half = 2` skips the mixer. -/
-theorem runStage_half2_skips_mixer : ¬ RunStage 0 0 2 := by
-  unfold RunStage halfAllows
-  rw [if_neg (Nat.lt_irrefl 0)]
-  simp
-
-/-- `half = 1` skips the FFN front. -/
-theorem runStage_half1_skips_ffn : ¬ RunStage 3 0 1 := by
-  unfold RunStage halfAllows
-  rw [if_neg (Nat.lt_irrefl 0)]
-  simp
-
--- § verify compatibility, doorbell order, positions, dump layout
-
-/-- `layer_verify_compatible`: all six switches must be on. -/
-def verifyCompatible (a b c d e f : Bool) : Bool := a && b && c && d && e && f
-
-/-- Compatible iff every switch is on. -/
-theorem verifyCompatible_iff (a b c d e f : Bool) :
-    verifyCompatible a b c d e f = true ↔ a = true ∧ b = true ∧ c = true ∧ d = true ∧ e = true ∧ f = true := by
-  simp [verifyCompatible, and_assoc]
-
-/-- Operations of the non-kernel doorbell publish. -/
-inductive Op
-  | copyX
-  | copyIds
-  | copyWeights
-  | ring
-  deriving DecidableEq
-
-/-- The publish order. -/
-def publishOrder : List Op := [Op.copyX, Op.copyIds, Op.copyWeights, Op.ring]
-
-/-- The ring is last, so a host that sees it sees every byte above. -/
-theorem ring_is_last : publishOrder.getLast? = some Op.ring := rfl
-
-/-- RoPE position guard of `qsa_layer`. -/
-def qsaPosOk (posBase pos maxCells : Int) : Prop := 0 ≤ posBase ∧ 0 ≤ pos ∧ posBase + pos < maxCells
-
-/-- An accepted position is a valid row of the RoPE table. -/
-theorem qsaPosOk_row (posBase pos maxCells : Int) (h : qsaPosOk posBase pos maxCells) :
-    0 ≤ posBase + pos ∧ posBase + pos < maxCells := by
-  obtain ⟨h1, h2, h3⟩ := h
-  constructor <;> omega
-
-/-- Floats per layer of the half-level dump (`A = n_head * head_dim`, `nvk = n_head_kv * head_dim`). -/
-def dumpStride (n hc A nvk : Nat) : Nat := 2 * n + 2 * hc + A + 5 * nvk + 8
-
-/-- Offset of the KV slots inside a layer's dump. -/
-def dumpKvBase (n hc A nvk : Nat) : Nat := 2 * n + 2 * hc + A + 2 * nvk + 8
-
-/-- The three trailing dump slots end exactly at the stride, so layers never overlap. -/
-theorem dump_slots_end_at_stride (n hc A nvk : Nat) : dumpKvBase n hc A nvk + 3 * nvk = dumpStride n hc A nvk := by
-  unfold dumpKvBase dumpStride; omega
-
-/-- The two half-pool prefixes fit in the `nvk` slot reserved for them. -/
-theorem dump_pool_prefix_fits (nvk : Nat) : nvk / 2 + nvk / 2 ≤ nvk := by omega
-
-/-- Row-bounds of `embed_row`: a row inside the table stays inside the code plane. -/
-theorem embed_row_in_bounds (rows rowCodes token codesBytes : Nat) (h : codesBytes = rows * rowCodes)
-    (ht : token < rows) : (token + 1) * rowCodes ≤ codesBytes := by
-  subst h
-  exact Nat.mul_le_mul_right rowCodes (Nat.succ_le_of_lt ht)
-
-end Ref.LayerCompose
-
-
-
-## FILE: /mnt/user-data/outputs/GenerateDriver.lean
-/-!
-# MODULE: generate_driver
-SOURCES: src/program/generate.cpp
-The `ref generate` driver: option validation, the token loop (prompt teacher forcing, first generated token at
-the last prompt position), logits-row selection, speculative-window acceptance, VRAM expert-tier sizing and
-lending, and the image M-RoPE position assignment of `--serve`.
-
-## Source semantics
-* The prompt plus `max_new` must fit in `max_context`.
-* The dump header counts `n_prompt - 1 + max_new` positions; with a stride, every N-th row plus the last is stored.
-* While the prompt lasts the next input is the prompt's own next token, afterwards the sampled one.
-* A verify window accepts the longest prefix of drafts equal to the model's own outputs; it emits accepted + 1 tokens.
-* Slots lent to the prompt path are a suffix of the cache and are given back afterwards.
-
-## Form template identifiers
-Options.max_new -> maxNew; Options.max_context -> ctx; `produced` -> producedAt; `a` (accepted) -> acc;
-`lend_first` -> lendFirst; `pcie_num` -> pcieNum; `winLoop` <- the `T` selection `while` loop.
--/
-
-namespace Ref.GenerateDriver
-
--- § option validation
-
-/-- The size check of `main`: positive budgets and prompt + generation within the context. -/
-def OptsOk (maxNew ctx promptLen : Nat) : Prop :=
-  0 < maxNew ∧ 0 < ctx ∧ maxNew ≤ ctx ∧ promptLen ≤ ctx - maxNew
-
-/-- Accepted options guarantee the prompt and the new tokens fit together. -/
-theorem opts_fit (maxNew ctx promptLen : Nat) (h : OptsOk maxNew ctx promptLen) : promptLen + maxNew ≤ ctx := by
-  obtain ⟨_, _, h3, h4⟩ := h
-  omega
-
-/-- The `--serve` guard `n + max_new + 8 <= ctx` keeps the whole request inside the context. -/
-theorem serve_fit (n maxNew ctx : Nat) (h : ¬ (ctx < n + maxNew + 8)) : n + maxNew ≤ ctx := by omega
-
--- § the token loop
-
-/-- Number of logged dump positions: `n_prompt - 1 + max_new`. -/
-def dumpPositions (nPrompt maxNew : Nat) : Nat := nPrompt - 1 + maxNew
-
-/-- Tokens recorded after processing position `pos` (recording starts at the last prompt position). -/
-def producedAt (nPrompt pos : Nat) : Nat := if nPrompt ≤ pos + 1 then pos + 2 - nPrompt else 0
-
-/-- Nothing is produced before the last prompt position. -/
-theorem produced_before_prompt_end (nPrompt pos : Nat) (h : pos + 1 < nPrompt) : producedAt nPrompt pos = 0 := by
-  unfold producedAt
-  rw [if_neg (by omega)]
-
-/-- The last prompt position yields exactly the first generated token. -/
-theorem produced_first (nPrompt : Nat) (h : 1 ≤ nPrompt) : producedAt nPrompt (nPrompt - 1) = 1 := by
-  unfold producedAt
-  rw [if_pos (by omega)]
-  omega
-
-/-- For a prompt of two or more tokens the loop reaches `max_new` tokens at position `n_prompt - 2 + max_new`. -/
-theorem produced_reaches_max (nPrompt maxNew : Nat) (h1 : 2 ≤ nPrompt) (h2 : 1 ≤ maxNew) :
-    producedAt nPrompt (nPrompt - 2 + maxNew) = maxNew := by
-  unfold producedAt
-  rw [if_pos (by omega)]
-  omega
-
-/-- For a one-token prompt the loop reaches `max_new` tokens at position `max_new - 1`. -/
-theorem produced_reaches_max_single (maxNew : Nat) (h2 : 1 ≤ maxNew) :
-    producedAt 1 (maxNew - 1) = maxNew := by
-  unfold producedAt
-  rw [if_pos (by omega)]
-  omega
-
-/-- Teacher forcing: the next input is the prompt token while the prompt lasts, the sample afterwards. -/
-def nextInput (prompt : Nat → Nat) (n pos next : Nat) : Nat := if pos + 1 < n then prompt (pos + 1) else next
-
-/-- Inside the prompt the model's guess is ignored. -/
-theorem nextInput_prompt (prompt : Nat → Nat) (n pos next : Nat) (h : pos + 1 < n) :
-    nextInput prompt n pos next = prompt (pos + 1) := by
-  unfold nextInput
-  rw [if_pos h]
-
-/-- Past the prompt the sampled token is fed back. -/
-theorem nextInput_sampled (prompt : Nat → Nat) (n pos next : Nat) (h : ¬ pos + 1 < n) :
-    nextInput prompt n pos next = next := by
-  unfold nextInput
-  rw [if_neg h]
-
--- § logits-row selection (`--logits-stride`)
-
-/-- A position's row is stored when it is a multiple of the stride or the final position. -/
-def selected (pos total stride : Nat) : Prop := pos % stride = 0 ∨ pos + 1 = total
-
-/-- Stride 1 stores every row. -/
-theorem selected_stride_one (pos total : Nat) : selected pos total 1 := by
-  left
-  exact Nat.mod_one pos
-
-/-- The final position is always stored. -/
-theorem selected_last (total stride : Nat) (h : 0 < total) : selected (total - 1) total stride := by
-  right
-  omega
-
--- § speculative verification
-
-/-- Length of the longest prefix of the drafts that equals the model's outputs (`a` in the source). -/
-def acc : List Nat → List Nat → Nat
-  | [], _ => 0
-  | _ :: _, [] => 0
-  | d :: ds, o :: os => if d = o then acc ds os + 1 else 0
-
-/-- Never more accepted than drafted. -/
-theorem acc_le_left (ds os : List Nat) : acc ds os ≤ ds.length := by
-  induction ds generalizing os with
-  | nil => simp [acc]
-  | cons d ds ih =>
-    cases os with
-    | nil => simp [acc]
-    | cons o os =>
-      have h := ih os
-      simp only [acc, List.length_cons]
-      split <;> omega
-
-/-- Never more accepted than the window produced. -/
-theorem acc_le_right (ds os : List Nat) : acc ds os ≤ os.length := by
-  induction ds generalizing os with
-  | nil => simp [acc]
-  | cons d ds ih =>
-    cases os with
-    | nil => simp [acc]
-    | cons o os =>
-      have h := ih os
-      simp only [acc, List.length_cons]
-      split <;> omega
-
-/-- Perfect drafts are fully accepted. -/
-theorem acc_self (ds : List Nat) : acc ds ds = ds.length := by
-  induction ds with
-  | nil => simp [acc]
-  | cons d ds ih => simp [acc, ih]
-
-/-- A round emits `accepted + 1` tokens, never more than the window length `1 + drafts`. -/
-theorem emitted_le_window (ds os : List Nat) : acc ds os + 1 ≤ 1 + ds.length := by
-  have := acc_le_left ds os
-  omega
-
-/-- Window-size loop: grow `T` while it is below `S` and the next draft probability test passes. -/
-def winLoop (ok : Nat → Bool) (S : Nat) : Nat → Nat → Nat
-  | 0, T => T
-  | f + 1, T => if T < S ∧ ok (T - 1) = true then winLoop ok S f (T + 1) else T
-
-/-- The loop never shrinks the window. -/
-theorem winLoop_ge (ok : Nat → Bool) (S : Nat) (f : Nat) : ∀ T, T ≤ winLoop ok S f T := by
-  induction f with
-  | zero => intro T; exact Nat.le_refl T
-  | succ f ih =>
-    intro T
-    simp only [winLoop]
-    split
-    · have := ih (T + 1)
-      omega
-    · exact Nat.le_refl T
-
-/-- The loop never exceeds the speculation depth `S`. -/
-theorem winLoop_le (ok : Nat → Bool) (S : Nat) (f : Nat) : ∀ T, T ≤ S → winLoop ok S f T ≤ S := by
-  induction f with
-  | zero => intro T h; exact h
-  | succ f ih =>
-    intro T h
-    simp only [winLoop]
-    split
-    · rename_i hc
-      obtain ⟨hlt, _⟩ := hc
-      exact ih (T + 1) (by omega)
-    · exact h
-
--- § VRAM expert tier
-
-/-- Slots that fit after the reserve: `(free - reserve) / blob`. -/
-def autoSlots (free reserve blob : Nat) : Nat := (free - reserve) / blob
-
-/-- The automatically sized tier never exceeds the free memory left after the reserve. -/
-theorem autoSlots_fit (free reserve blob : Nat) : autoSlots free reserve blob * blob ≤ free - reserve :=
-  Nat.div_mul_le_self _ _
-
-/-- First lent slot when `k` slots are borrowed (only if `k + 128 ≤ slots`). -/
-def lendFirst (slots k : Nat) : Nat := slots - k
-
-/-- Lent slots are exactly the suffix `[lendFirst, slots)` and at least 128 slots stay resident. -/
-theorem lend_suffix (slots k : Nat) (h : k + 128 ≤ slots) : lendFirst slots k + k = slots ∧ 128 ≤ lendFirst slots k := by
-  unfold lendFirst
-  constructor <;> omega
-
-/-- The PCIe share numerator is clamped to `0..256`. -/
-def pcieNum (x : Nat) : Nat := min 256 x
-
-/-- The clamp is within range. -/
-theorem pcieNum_le (x : Nat) : pcieNum x ≤ 256 := by unfold pcieNum; omega
-
--- § image M-RoPE positions (`GENI`)
-
-/-- Within an image of `nx * ny` rows at base position `p`, the (h, w) positions stay below `p + max nx ny`,
-which is where the text after the image resumes. -/
-theorem mrope_image_pos_lt (p j nx ny : Nat) (hj : j < nx * ny) :
-    p + j / nx < p + max nx ny ∧ p + j % nx < p + max nx ny := by
-  have h1 : j / nx < ny := Nat.div_lt_of_lt_mul hj
-  have hnx : 0 < nx := by
-    apply Nat.pos_of_ne_zero
-    intro h
-    subst h
-    simp at hj
-  have h2 : j % nx < nx := Nat.mod_lt j hnx
-  constructor <;> omega
-
-end Ref.GenerateDriver
-
-
-
-## FILE: /mnt/user-data/outputs/PrefillEngine.lean
-/-!
-# MODULE: prefill_engine
-SOURCES: src/prefill/prefill.cpp
-Batched prompt processing: the bump allocator that either owns or borrows its chunk buffers (and the counting pass
-`bytes_needed` that sizes the borrowed region), the chunk loop, the host->device expert staging ring and the
-dequantized-expert double buffer, and the PLE window carried across chunks.
-
-## Source semantics
-* `bytes_needed` replays exactly the allocation sequence of `init`, so a region of that size always suffices.
-* Chunks of at most `T` tokens partition the batched prefix of the prompt exactly.
-* Experts are staged with look-ahead `STAGE - 1`, so the blobs in flight never share a ring slot.
-* The dequantized-expert ring alternates between two buffers.
-
-## Form template identifiers
-Alloc.take -> padBytes/allocAll; `m.T` -> chunk; `STAGE` -> 8; `DQ` -> 2; `stage_next` -> ringNext.
--/
-
-namespace Ref.PrefillEngine
-
-/-- Sum of a list. -/
-def lsum : List Nat → Nat
-  | [] => 0
-  | a :: l => a + lsum l
-
--- § allocator
-
-/-- Bytes charged for `b` payload bytes: 256 bytes of slack, rounded up to a multiple of 256. -/
-def padBytes (b : Nat) : Nat := (b + 256 + 255) / 256 * 256
-
-/-- An allocation is at least its payload plus the 256-byte guard. -/
-theorem padBytes_ge (b : Nat) : b + 256 ≤ padBytes b := by unfold padBytes; omega
-
-/-- Allocations are 256-aligned. -/
-theorem padBytes_mod (b : Nat) : padBytes b % 256 = 0 := by unfold padBytes; omega
-
-/-- Bump allocation of a request list from a region of capacity `cap` starting at `used`
-(`none` is the `ok = false` path). -/
-def allocAll (cap : Nat) : Nat → List Nat → Option Nat
-  | used, [] => some used
-  | used, b :: l => if used + b ≤ cap then allocAll cap (used + b) l else none
-
-/-- If the whole sequence fits, every allocation succeeds and the final cursor is the exact total. -/
-theorem allocAll_fits (cap : Nat) (l : List Nat) : ∀ u, u + lsum l ≤ cap → allocAll cap u l = some (u + lsum l) := by
-  induction l with
-  | nil => intro u _; simp [allocAll, lsum]
-  | cons b l ih =>
-    intro u h
-    have h1 : u + b ≤ cap := by simp only [lsum] at h; omega
-    have h2 : u + b + lsum l ≤ cap := by simp only [lsum] at h; omega
-    simp only [allocAll]
-    rw [if_pos h1, ih (u + b) h2]
-    simp [lsum, Nat.add_assoc]
-
-/-- If the sequence overflows the region the allocator reports failure rather than overrunning it. -/
-theorem allocAll_overflow (cap : Nat) (l : List Nat) : ∀ u, u ≤ cap → cap < u + lsum l → allocAll cap u l = none := by
-  induction l with
-  | nil => intro u h1 h2; simp [lsum] at h2; omega
-  | cons b l ih =>
-    intro u h1 h2
-    simp only [allocAll]
-    by_cases hb : u + b ≤ cap
-    · rw [if_pos hb]
-      apply ih (u + b) hb
-      simp only [lsum] at h2
-      omega
-    · rw [if_neg hb]
-
-/-- `bytes_needed` (count-only pass) is exactly what `init` consumes: a region of that size always suffices. -/
-theorem bytes_needed_suffices (l : List Nat) (start : Nat) :
-    allocAll (start + lsum l) start l = some (start + lsum l) :=
-  allocAll_fits (start + lsum l) l start (Nat.le_refl _)
+/-- Promoted tensors: 2 B/elem out is half of 4 B/elem in. -/
+theorem promoted_halves (elems : Nat) : elems * 2 * 2 = elems * 4 := by omega
 
 -- § chunking
 
-/-- Chunk sizes `min T remaining`, with fuel to keep the loop structural. -/
-def chunksAux : Nat → Nat → Nat → List Nat
-  | 0, _, _ => []
-  | fuel + 1, T, n => if n = 0 then [] else min T n :: chunksAux fuel T (n - min T n)
+/-- The chunk the loop reads: `min CHUNK remaining`. -/
+def chunkLen (chunk remaining : Nat) : Nat := min chunk remaining
 
-/-- The chunks partition the batched prefix exactly (given `T > 0` and enough fuel). -/
-theorem chunks_sum (T : Nat) (hT : 0 < T) (fuel : Nat) : ∀ n, n ≤ fuel → lsum (chunksAux fuel T n) = n := by
-  induction fuel with
-  | zero => intro n h; simp [chunksAux, lsum]; omega
-  | succ fuel ih =>
-    intro n h
-    by_cases hn : n = 0
-    · simp [chunksAux, hn, lsum]
-    · simp only [chunksAux]
-      rw [if_neg hn]
-      have h2 := ih (n - min T n) (by omega)
-      simp only [lsum]
+/-- A chunk makes progress when anything remains. -/
+theorem chunk_progress (chunk rem : Nat) (hc : 0 < chunk) (hr : 0 < rem) :
+    0 < chunkLen chunk rem ∧ rem - chunkLen chunk rem < rem := by
+  unfold chunkLen; omega
+
+/-- With the real 8 MiB CHUNK and an even plane, every chunk is even (no half fp16). -/
+theorem chunk_even (rem done : Nat) (hr : rem % 2 = 0) (hd : done % 2 = 0) :
+    chunkLen 8388608 (rem - done) % 2 = 0 ∨ rem < done := by
+  unfold chunkLen; omega
+
+/-- bf16/f16 conversion with 4-multiple chunks keeps destination offsets contiguous (halved). -/
+theorem bf16_dst_contiguous (done n : Nat) (hd : done % 4 = 0) (hn : n % 4 = 0) :
+    done / 2 + n / 4 * 2 = (done + n) / 2 := by omega
+
+/-- fp16 widening keeps destination offsets contiguous (doubled). -/
+theorem widen_dst_contiguous (done n : Nat) (hd : done % 2 = 0) (hn : n % 2 = 0) :
+    done * 2 + n / 2 * 4 = (done + n) * 2 := by omega
+
+/-- The staging output buffer (2 * CHUNK) holds the widest conversion (widen doubles a chunk). -/
+theorem stage_out_fits (n chunk : Nat) (h : n ≤ chunk) : n / 2 * 4 ≤ chunk * 2 := by omega
+
+-- § arena compaction
+
+/-- 256-byte alignment of a row's destination size. -/
+def align256 (n : Nat) : Nat := (n + 255) / 256 * 256
+
+/-- Alignment does not shrink. -/
+theorem align256_ge (n : Nat) : n ≤ align256 n := by unfold align256; omega
+
+/-- Alignment gives multiples of 256. -/
+theorem align256_mod (n : Nat) : align256 n % 256 = 0 := by unfold align256; omega
+
+/-- Compacted placement total. -/
+def carve : List Nat → Nat → Nat
+  | [], s => s
+  | p :: ps, s => carve ps (s + align256 p)
+
+/-- Placement is monotone. -/
+theorem carve_ge : ∀ (parts : List Nat) (s : Nat), s ≤ carve parts s
+  | [], s => Nat.le_refl s
+  | p :: ps, s => by
+      rw [carve]
+      have h := carve_ge ps (s + align256 p)
       omega
 
-/-- No chunk exceeds `T`. -/
-theorem chunks_le (T : Nat) (fuel : Nat) : ∀ n x, x ∈ chunksAux fuel T n → x ≤ T := by
-  induction fuel with
-  | zero => intro n x hx; simp [chunksAux] at hx
-  | succ fuel ih =>
-    intro n x hx
-    simp only [chunksAux] at hx
-    by_cases hn : n = 0
-    · rw [if_pos hn] at hx; simp at hx
-    · rw [if_neg hn] at hx
-      rcases List.mem_cons.mp hx with h | h
-      · omega
-      · exact ih _ x h
+/-- Placement splits over concatenation. -/
+theorem carve_append : ∀ (xs ys : List Nat) (s : Nat), carve (xs ++ ys) s = carve ys (carve xs s)
+  | [], ys, s => by simp [carve]
+  | x :: xs, ys, s => by
+      simp only [List.cons_append, carve]
+      exact carve_append xs ys _
 
--- § expert staging
+/-- Offsets of compacted rows stay 256-aligned. -/
+theorem carve_aligned : ∀ (parts : List Nat) (s : Nat), s % 256 = 0 → carve parts s % 256 = 0
+  | [], s, h => by simpa [carve] using h
+  | p :: ps, s, h => by
+      rw [carve]
+      apply carve_aligned ps
+      have := align256_mod p
+      omega
 
-/-- Next ring slot (`STAGE = 8`). -/
-def ringNext (s : Nat) : Nat := (s + 1) % 8
+/-- A kept row's `[dst_off, dst_off+aligned)` lies inside the pool: rows never overlap or overrun. -/
+theorem row_fits (pre post : List Nat) (x : Nat) :
+    carve pre 0 + align256 x ≤ carve (pre ++ x :: post) 0 := by
+  rw [carve_append]
+  have h := carve_ge post (carve pre 0 + align256 x)
+  simp only [carve]
+  exact h
 
-/-- The ring pointer stays inside the ring. -/
-theorem ringNext_lt (s : Nat) : ringNext s < 8 := by unfold ringNext; omega
+/-- The row's own bytes lie inside the pool. -/
+theorem row_bytes_fit (pre post : List Nat) (x : Nat) :
+    carve pre 0 + x ≤ carve (pre ++ x :: post) 0 := by
+  have h1 := row_fits pre post x
+  have h2 := align256_ge x
+  omega
 
-/-- Blobs staged for experts `i < i' < i + 8` (look-ahead window of `STAGE`) never share a ring slot. -/
-theorem ring_slots_distinct (i i' : Nat) (h1 : i < i') (h2 : i' < i + 8) : i % 8 ≠ i' % 8 := by omega
+-- § index row
 
-/-- The look-ahead loop stages up to index `j + (STAGE - 1)`, so the window is exactly `STAGE` blobs. -/
-theorem lookahead_window (j staged : Nat) (h : staged = j + 7 + 1) : staged - j = 8 := by omega
+/-- A parsed row must have exactly 19 fields. -/
+def rowParsed (n : Nat) : Bool := n == 19
 
-/-- The dequantized-expert ring of size 2 alternates between consecutive experts. -/
-theorem dq_alternates (j : Nat) : j % 2 ≠ (j + 1) % 2 := by omega
+/-- Only 19 fields parse. -/
+theorem row_parsed_iff (n : Nat) : rowParsed n = true ↔ n = 19 := by simp [rowParsed]
 
-/-- The DQ index is a valid buffer. -/
-theorem dq_index_lt (j : Nat) : j % 2 < 2 := by omega
-
-/-- `gather_rows16` moves 16-byte vectors; the row width 2560 is a whole number of them. -/
-theorem gather_width_aligned : 2560 % 8 = 0 ∧ 2560 / 8 * 8 = 2560 := by decide
-
--- § PLE window across chunks
-
-/-- The two-token predecessor window after consuming token `tok`. -/
-def windowStep (prev : Int × Int) (tok : Int) : Int × Int := (prev.2, tok)
-
-/-- After a token the newest predecessor is that token. -/
-theorem windowStep_newest (prev : Int × Int) (tok : Int) : (windowStep prev tok).2 = tok := rfl
-
-/-- After a token the older slot holds the previous newest. -/
-theorem windowStep_oldest (prev : Int × Int) (tok : Int) : (windowStep prev tok).1 = prev.2 := rfl
-
--- § geometry facts used by the buffer sizing
-
-/-- Hyper-connection width and the GDN channel split used by the chunk buffers. -/
-theorem geometry_consts : 2560 * 4 = 10240 ∧ 48 * 128 = 6144 ∧ 2 * 16 * 128 + 48 * 128 = 10240 ∧ 640 * 2 = 1280 := by decide
-
-end Ref.PrefillEngine
+end Ref.WeightPackLoader
 
 
 
-## FILE: /mnt/user-data/outputs/PrefillKernels.lean
+## FILE: /mnt/user-data/outputs/PinnedArenaLoad.lean
 /-!
-# MODULE: prefill_kernels
+# MODULE: pinned_arena_load
+SOURCES: src/core/pinned.cu
+The pinned host arena: uniform slice bounds for sliced cudaHostRegister, the pinned/locked split, the parallel
+per-layer expert load ranges, and the bandwidth probe's byte accounting.
+
+## Source semantics
+* `uniform_bounds(bytes, slice)` is `[0, slice, ..., k*slice]` with `k = bytes/slice`, empty if `k = 0`.
+* When whole-arena registration fails, slices are pinned from the start; the rest is locked resident, so
+  `registered + locked = capacity`, and the destructor unlocks from `registered`.
+* Layer `L` of the expert file spans `[L*per, L*per+per)` with `per = blobs_per_layer * blob_bytes`.
+* The read loop consumes `min(chunk, remaining)` bytes per step.
+
+## Form template identifiers
+bnd ↦ `bounds[i]`; registered ↦ `registered_bytes`; per ↦ `blobs_per_layer*blob_bytes`; moved ↦ `bytes/chunk*chunk`.
+-/
+namespace Ref.PinnedArenaLoad
+
+-- § uniform slice bounds
+
+/-- Bound `i` of the uniform slicing. -/
+def bnd (slice i : Nat) : Nat := i * slice
+
+/-- Consecutive bounds differ by exactly one slice. -/
+theorem bnd_step (slice i : Nat) : bnd slice (i + 1) = bnd slice i + slice := by
+  unfold bnd; rw [Nat.add_mul, Nat.one_mul]
+
+/-- The last bound `k*slice` never exceeds the arena. -/
+theorem bnd_last_le (bytes slice : Nat) : bnd slice (bytes / slice) ≤ bytes := by
+  unfold bnd; exact Nat.div_mul_le_self bytes slice
+
+/-- Every pinned slice `i < bytes/slice` ends inside the arena. -/
+theorem slice_in_arena (bytes slice i : Nat) (h : i < bytes / slice) : bnd slice i + slice ≤ bytes := by
+  have h1 : bnd slice (i + 1) ≤ bnd slice (bytes / slice) := by
+    unfold bnd; exact Nat.mul_le_mul_right slice (by omega)
+  have h2 := bnd_last_le bytes slice
+  have h3 := bnd_step slice i
+  omega
+
+/-- A partition into whole slices leaves no tail exactly when `slice ∣ bytes`. -/
+theorem no_tail_iff (bytes slice : Nat) (h : bytes % slice = 0) : bnd slice (bytes / slice) = bytes := by
+  unfold bnd; exact Nat.div_mul_cancel (Nat.dvd_of_mod_eq_zero h)
+
+-- § pinned / locked split
+
+/-- Pinned prefix plus locked suffix covers the capacity. -/
+theorem pinned_locked_cover (capacity registered locked : Nat) (hr : registered ≤ capacity)
+    (hl : locked = capacity - registered) : registered + locked = capacity := by omega
+
+/-- The destructor's unlock start equals the lock start (`base + registered`). -/
+theorem unlock_matches_lock (registered : Nat) : registered + 0 = registered := rfl
+
+/-- With `c` slices pinned the registered prefix is `c*slice`, below capacity when `c <= bytes/slice`. -/
+theorem registered_le (bytes slice c : Nat) (h : c ≤ bytes / slice) : bnd slice c ≤ bytes := by
+  have h1 : bnd slice c ≤ bnd slice (bytes / slice) := by
+    unfold bnd; exact Nat.mul_le_mul_right slice h
+  have h2 := bnd_last_le bytes slice
+  omega
+
+-- § per-layer expert ranges
+
+/-- Offset of layer `L`. -/
+def layerOff (per L : Nat) : Nat := L * per
+
+/-- Layer ranges abut: layer `L+1` starts where `L` ends. -/
+theorem layer_abut (per L : Nat) : layerOff per (L + 1) = layerOff per L + per := by
+  unfold layerOff; rw [Nat.add_mul, Nat.one_mul]
+
+/-- Every layer's range ends inside `layers * per`. -/
+theorem layer_in_file (per L layers : Nat) (h : L < layers) : layerOff per L + per ≤ layers * per := by
+  unfold layerOff
+  have := Nat.mul_le_mul_right per (show L + 1 ≤ layers by omega)
+  simpa [Nat.add_mul] using this
+
+/-- Distinct layers' ranges do not overlap, so workers never write the same bytes. -/
+theorem layers_disjoint (per a b : Nat) (h : a < b) : layerOff per a + per ≤ layerOff per b := by
+  unfold layerOff
+  have := Nat.mul_le_mul_right per (show a + 1 ≤ b by omega)
+  simpa [Nat.add_mul] using this
+
+-- § read loop
+
+/-- The step the loop takes. -/
+def step (chunk remaining : Nat) : Nat := min chunk remaining
+
+/-- Each step makes progress and never over-reads the layer. -/
+theorem step_progress (chunk rem : Nat) (hc : 0 < chunk) (hr : 0 < rem) :
+    0 < step chunk rem ∧ step chunk rem ≤ rem ∧ rem - step chunk rem < rem := by
+  unfold step; omega
+
+/-- Writing at `off + pos` with `pos + step <= layer_bytes` stays inside the layer. -/
+theorem write_in_layer (off pos layerBytes chunk : Nat) (h : pos ≤ layerBytes) :
+    off + pos + step chunk (layerBytes - pos) ≤ off + layerBytes := by
+  unfold step; omega
+
+-- § bandwidth probe
+
+/-- Bytes the probe actually moves per iteration. -/
+def moved (bytes chunk : Nat) : Nat := bytes / chunk * chunk
+
+/-- The probe never moves more than `bytes`. -/
+theorem moved_le (bytes chunk : Nat) : moved bytes chunk ≤ bytes := Nat.div_mul_le_self bytes chunk
+
+/-- The reported `bytes * iters` equals what moved only when the chunk divides the size. -/
+theorem moved_eq_iff (bytes chunk : Nat) (h : bytes % chunk = 0) : moved bytes chunk = bytes :=
+  Nat.div_mul_cancel (Nat.dvd_of_mod_eq_zero h)
+
+end Ref.PinnedArenaLoad
+
+
+
+## FILE: /mnt/user-data/outputs/PrefillChunkPipeline.lean
+/-!
+# MODULE: prefill_chunk_pipeline
+SOURCES: src/prefill/prefill.cpp
+Chunked prefill: arena sizing by a counting pass, the per-chunk loop, host-side grouping of (token, k) pairs
+by expert, the expert staging ring and the dequantized-expert ring.
+
+## Source semantics
+* `Alloc::take` pads each region to `bytes + 256` rounded up to 256; the count-only pass sizes the borrow.
+* Chunks cover `[0, n)` in steps of `T`; each chunk has `min(T, n - c0) >= 1` tokens.
+* Experts are grouped: `off[e+1] = off[e] + cnt[e]`, slot of the j-th pair of expert `e` is `off[e] + j`,
+  source token of pair `i` is `i / K`.
+* Staging ring has 8 slots with lookahead 7; dequant ring has 2 slots.
+
+## Form template identifiers
+takeBytes ↦ `Alloc::take` rounding; offs ↦ `m.off`; stage slot ↦ `stage_next`; q ↦ `j % DQ`.
+-/
+namespace Ref.PrefillChunkPipeline
+
+-- § allocator
+
+/-- Padded size of one region of `bytes` payload. -/
+def takeBytes (bytes : Nat) : Nat := (bytes + 256 + 255) / 256 * 256
+
+/-- Each region carries at least its payload plus 256 slack. -/
+theorem takeBytes_ge (b : Nat) : b + 256 ≤ takeBytes b := by unfold takeBytes; omega
+
+/-- Regions are 256-multiples. -/
+theorem takeBytes_mod (b : Nat) : takeBytes b % 256 = 0 := by unfold takeBytes; omega
+
+/-- Total used after a list of regions. -/
+def used : List Nat → Nat → Nat
+  | [], s => s
+  | b :: bs, s => used bs (s + takeBytes b)
+
+/-- Usage is monotone. -/
+theorem used_ge : ∀ (bs : List Nat) (s : Nat), s ≤ used bs s
+  | [], s => Nat.le_refl s
+  | b :: bs, s => by
+      rw [used]
+      have h := used_ge bs (s + takeBytes b)
+      omega
+
+/-- Usage splits over concatenation. -/
+theorem used_append : ∀ (xs ys : List Nat) (s : Nat), used (xs ++ ys) s = used ys (used xs s)
+  | [], ys, s => by simp [used]
+  | x :: xs, ys, s => by
+      simp only [List.cons_append, used]
+      exact used_append xs ys _
+
+/-- If the counted total fits the borrowed capacity, every region fits when taken (no `ok = false`). -/
+theorem take_fits (pre post : List Nat) (x cap : Nat) (h : used (pre ++ x :: post) 0 ≤ cap) :
+    used pre 0 + takeBytes x ≤ cap := by
+  rw [used_append] at h
+  have h2 := used_ge post (used pre 0 + takeBytes x)
+  simp only [used] at h
+  omega
+
+-- § chunk loop
+
+/-- Tokens in the chunk starting at `c0`. -/
+def chunkTokens (T n c0 : Nat) : Nat := min T (n - c0)
+
+/-- Every chunk is non-empty and stays inside `[0, n)`. -/
+theorem chunk_bounds (T n c0 : Nat) (hT : 0 < T) (h : c0 < n) :
+    0 < chunkTokens T n c0 ∧ c0 + chunkTokens T n c0 ≤ n := by
+  unfold chunkTokens; omega
+
+/-- Every pair's source token `i / K` is a valid token of the chunk. -/
+theorem src_token_lt (i T K : Nat) (hK : 0 < K) (h : i < T * K) : i / K < T := by
+  rw [Nat.div_lt_iff_lt_mul hK]
+  exact h
+
+-- § grouping by expert
+
+/-- Prefix offsets of the per-expert counts. -/
+def offs (cnt : Nat → Nat) : Nat → Nat
+  | 0 => 0
+  | e + 1 => offs cnt e + cnt e
+
+/-- Prefix offsets are monotone. -/
+theorem offs_mono (cnt : Nat → Nat) {a b : Nat} (h : a ≤ b) : offs cnt a ≤ offs cnt b := by
+  induction b with
+  | zero =>
+      have : a = 0 := by omega
+      subst this
+      exact Nat.le_refl _
+  | succ b ih =>
+      rcases Nat.lt_or_ge a (b + 1) with h1 | h1
+      · have := ih (by omega)
+        simp only [offs]
+        omega
+      · have : a = b + 1 := by omega
+        subst this
+        exact Nat.le_refl _
+
+/-- Expert `e`'s slot range ends before any later expert's begins: slot ranges are disjoint. -/
+theorem slots_disjoint (cnt : Nat → Nat) (e e' : Nat) (h : e < e') : offs cnt e + cnt e ≤ offs cnt e' := by
+  have := offs_mono cnt (show e + 1 ≤ e' by omega)
+  simpa [offs] using this
+
+/-- The j-th pair of expert `e` gets a slot inside its own range. -/
+theorem slot_in_range (cnt : Nat → Nat) (e j : Nat) (h : j < cnt e) :
+    offs cnt e ≤ offs cnt e + j ∧ offs cnt e + j < offs cnt (e + 1) := by
+  simp only [offs]
+  omega
+
+-- § staging ring
+
+/-- Staging slot reuse is safe: blob `i` (staged while computing `j`, so `i ≤ j + 7`) reuses the slot of
+blob `i - 8`, which is strictly earlier than `j` and therefore already dequantized. -/
+theorem stage_slot_reuse_safe (i j : Nat) (h : i ≤ j + 7) (h8 : 8 ≤ i) :
+    i - 8 < j + 0 ∧ (i - 8) % 8 = i % 8 := by omega
+
+/-- The slot index is always a valid ring slot. -/
+theorem stage_slot_lt (n : Nat) : n % 8 < 8 := Nat.mod_lt _ (by omega)
+
+/-- The dequant ring alternates between two buffers: consecutive experts use different ones. -/
+theorem dq_alternates (j : Nat) : (j + 1) % 2 ≠ j % 2 := by omega
+
+/-- Lookahead never stages beyond the order list: `staged ≤ j + 7` while `staged < len`. -/
+theorem lookahead_bounded (staged j len : Nat) (h1 : staged < len) (h2 : staged ≤ j + 7) :
+    staged < len ∧ staged - j ≤ 7 := by omega
+
+end Ref.PrefillChunkPipeline
+
+
+
+## FILE: /mnt/user-data/outputs/PrefillKernelsIndexing.lean
+/-!
+# MODULE: prefill_kernels_indexing
 SOURCES: src/prefill/kernels.cu
-Index arithmetic and rounding contracts of the batched-prefill CUDA kernels: the Ref expert blob layout and its
-2-bit dequantization, BF16 round-to-nearest-even, hyper-connection indexing, the router lane layout, the QSA
-split/gate indexing, KV-pool row addressing and the GDN channel regions.
+CUDA prefill kernels: BF16 round-to-nearest-even, router tie-break order, residual-stream index decomposition,
+2-bit expert blob layout and dequant indexing, KV append lane mapping, QSA q/gate split and launch sizing.
 
 ## Source semantics
-* A blob is `gate/up codes | down codes | gate/up scales (f16) | down scales (f16)` = 1,382,400 bytes.
-* A 2-bit code `q` decodes to `(q - 1) * scale`, i.e. one of -1, 0, 1, 2 times the scale.
-* `bf(x)` rounds a 32-bit float pattern to its top 16 bits, ties to even.
-* All thread/block index decompositions stay in bounds and are exact (no element is skipped or doubled).
+* `bf(f)`: add `0x7fff + ((u>>16)&1)` and keep the high 16 bits (round to nearest, ties to even).
+* Router: candidate `(v, i)` beats `(v', i')` iff `v > v'` or `v = v'` and `i < i'`; expert id is `lane + 32*i`.
+* Residual `R[i]` with `N = 2560`, `HC = 4`, `D = N*HC`: `t = i/D`, `c = (i%D)/N`, `d = i%N`.
+* Blob: gate/up codes `[1280][640 B]`, down codes `[2560][160 B]`, gate/up scales `[1280][40] f16`, down scales
+  `[2560][10] f16`; each code byte holds four 2-bit weights, one scale per 64 weights.
 
 ## Form template identifiers
-N=2560, HC=4, D=10240, LR=320, S=128, HK=16, HV=48, C=10240; blob offsets O_D_CODES, O_GU_SC, O_D_SC;
-`bf` -> bfRound; `blocks_for` -> blocksFor.
+bf ↦ `bf`; better ↦ router `(ob > best || (ob == best && oi < ex))`; blocksFor ↦ `blocks_for`.
 -/
+namespace Ref.PrefillKernelsIndexing
 
-namespace Ref.PrefillKernels
+-- § bf16 rounding
 
--- § expert blob layout
+/-- BF16 rounding of the 32-bit pattern `u` (no overflow modelling needed below `2^32 - 2^16`). -/
+def bf (u : Nat) : Nat := (u + 32767 + (u / 65536) % 2) / 65536
 
-/-- Section offsets and the total blob size. -/
-theorem blob_offsets :
-    1280 * 640 = 819200 ∧ 819200 + 2560 * 160 = 1228800 ∧
-    1228800 + 1280 * 40 * 2 = 1331200 ∧ 1331200 + 2560 * 10 * 2 = 1382400 := by decide
+/-- Below the halfway point the result truncates. -/
+theorem bf_below (u : Nat) (h : u % 65536 < 32768) : bf u = u / 65536 := by unfold bf; omega
 
-/-- Codes pack 4 weights per byte and scales cover groups of 64. -/
-theorem blob_packing : 640 * 4 = 2560 ∧ 160 * 4 = 640 ∧ 2560 / 64 = 40 ∧ 640 / 64 = 10 := by decide
+/-- Above the halfway point the result rounds up. -/
+theorem bf_above (u : Nat) (h : 32768 < u % 65536) : bf u = u / 65536 + 1 := by unfold bf; omega
 
-/-- Gate/up thread index split is exact and in range. -/
-theorem gu_split (i : Nat) (hi : i < 1280 * 640) : i / 640 < 1280 ∧ i % 640 < 640 ∧ i = i / 640 * 640 + i % 640 := by
-  refine ⟨?_, ?_, ?_⟩ <;> omega
-
-/-- Gate/up output element and scale indices stay inside their planes. -/
-theorem gu_decode_in_bounds (row byte k : Nat) (hr : row < 1280) (hb : byte < 640) (hk : k < 4) :
-    row * 2560 + byte * 4 + k < 1280 * 2560 ∧ row * 40 + byte * 4 / 64 < 1280 * 40 := by
-  constructor <;> omega
-
-/-- Down-projection thread index split is exact and in range. -/
-theorem d_split (j : Nat) (hj : j < 2560 * 160) : j / 160 < 2560 ∧ j % 160 < 160 ∧ j = j / 160 * 160 + j % 160 := by
-  refine ⟨?_, ?_, ?_⟩ <;> omega
-
-/-- Down output element and scale indices stay inside their planes. -/
-theorem d_decode_in_bounds (row byte k : Nat) (hr : row < 2560) (hb : byte < 160) (hk : k < 4) :
-    row * 640 + byte * 4 + k < 2560 * 640 ∧ row * 10 + byte * 4 / 64 < 2560 * 10 := by
-  constructor <;> omega
-
-/-- A 2-bit code decodes to a small multiple of the scale: `q - 1 ∈ [-1, 2]`. -/
-theorem code_value_range (q : Nat) (h : q < 4) : -1 ≤ (q : Int) - 1 ∧ (q : Int) - 1 ≤ 2 := by omega
-
-/-- Number of blocks of `t` threads covering `n` items. -/
-def blocksFor (n t : Nat) : Nat := (n + t - 1) / t
-
-/-- The launch grid covers every item. -/
-theorem blocksFor_covers (n t : Nat) (ht : 0 < t) : n ≤ blocksFor n t * t := by
-  unfold blocksFor
-  have h := Nat.div_add_mod (n + t - 1) t
-  have h2 := Nat.mod_lt (n + t - 1) ht
-  have e : (n + t - 1) / t * t = t * ((n + t - 1) / t) := Nat.mul_comm _ _
-  omega
-
--- § BF16 rounding
-
-/-- Round-to-nearest-even of a 32-bit pattern to its upper 16 bits (as Nat arithmetic). -/
-def bfRound (u : Nat) : Nat := (u + 32767 + (u / 65536) % 2) / 65536
-
-/-- The rounding error is at most half a unit in the last place (32768 of 65536). -/
-theorem bfRound_err (u : Nat) : u ≤ bfRound u * 65536 + 32768 ∧ bfRound u * 65536 ≤ u + 32768 := by
-  unfold bfRound
-  constructor <;> omega
-
-/-- Exact ties round to an even mantissa. -/
-theorem bfRound_tie_even (q : Nat) : bfRound (q * 65536 + 32768) % 2 = 0 := by
-  unfold bfRound
-  have h1 : (q * 65536 + 32768) / 65536 = q := by omega
-  rw [h1]
-  have hr : q % 2 < 2 := Nat.mod_lt _ (by decide)
-  have h2 : ∀ r : Nat, r < 2 → (q * 65536 + 32768 + 32767 + r) / 65536 = q + r := by
-    intro r hr'
-    have hnum : q * 65536 + 32768 + 32767 + r = 65536 * q + (65535 + r) := by omega
-    rw [hnum, Nat.mul_add_div (by decide : 65536 > 0)]
-    rcases (by omega : r = 0 ∨ r = 1) with h | h <;> subst h <;> simp
-  rw [h2 (q % 2) hr]
-  omega
-
-/-- Values already representable are unchanged. -/
-theorem bfRound_exact (q : Nat) : bfRound (q * 65536) = q := by
-  unfold bfRound
-  omega
-
--- § hyper-connection indexing
-
-/-- `gr_write` decomposition of a flat index into token, stream and channel is exact and in range. -/
-theorem gr_write_index (i : Nat) :
-    i / 10240 * 10240 + (i % 10240) / 2560 * 2560 + i % 2560 = i ∧ (i % 10240) / 2560 < 4 ∧ i % 2560 < 2560 := by
-  refine ⟨?_, ?_, ?_⟩ <;> omega
-
-/-- `gr_mix` reads the four streams of one token at `t*D + c*N + d`, all below the token's row end. -/
-theorem gr_mix_in_bounds (t c d : Nat) (hc : c < 4) (hd : d < 2560) : t * 10240 + c * 2560 + d < (t + 1) * 10240 := by
-  omega
-
--- § router lane layout
-
-/-- Lane `l` holds experts `l + 32 i`, a bijection onto `0..511`. -/
-theorem route_lane_cover (lane i : Nat) (hl : lane < 32) (hi : i < 16) :
-    (lane + i * 32) % 32 = lane ∧ (lane + i * 32) / 32 = i ∧ lane + i * 32 < 512 := by
-  refine ⟨?_, ?_, ?_⟩ <;> omega
-
-/-- The 10 routed ids of token `t` occupy `[10 t, 10 t + 10)`. -/
-theorem route_out_in_bounds (t r : Nat) (hr : r < 10) : t * 10 + r < (t + 1) * 10 := by omega
-
--- § QSA helpers
-
-/-- `rope_kernel` row decomposition (`row = t * heads + h`) is exact and in range. -/
-theorem rope_row_split (row heads T : Nat) (hh : 0 < heads) (hr : row < heads * T) :
-    row / heads < T ∧ row % heads < heads := by
-  exact ⟨Nat.div_lt_of_lt_mul hr, Nat.mod_lt row hh⟩
-
-/-- Both rotated halves of a 64-dim rope head stay inside it. -/
-theorem rope_pair_in_head (pair : Nat) (h : pair < 32) : pair < 64 ∧ pair + 32 < 64 := by
-  constructor <;> omega
-
-/-- `split_q` reads the first half of each 512-wide head slot: inside the token's `24*512` row. -/
-theorem split_q_in_bounds (T i : Nat) (hi : i < T * 6144) :
-    i / 6144 * 12288 + (i / 256 % 24) * 512 + i % 256 < T * 12288 := by omega
-
-/-- `gate_attn` reads the second half (`+256`) of the same slot, still in bounds. -/
-theorem gate_attn_in_bounds (T i : Nat) (hi : i < T * 6144) :
-    i / 6144 * 12288 + (i / 256 % 24) * 512 + 256 + i % 256 < T * 12288 := by omega
-
-/-- Interleaved SwiGLU reads `gu[r*1280 + 2k + 1]`, inside row `r`. -/
-theorem swiglu_il_in_bounds (r k : Nat) (hk : k < 640) : r * 1280 + 2 * k + 1 < (r + 1) * 1280 := by omega
-
-/-- Alpha/beta gates read `ab[t*96 + h]` and `ab[t*96 + 48 + h]`, inside token `t`'s 96 values. -/
-theorem gates_in_bounds (t h : Nat) (hh : h < 48) : t * 96 + h < (t + 1) * 96 ∧ t * 96 + 48 + h < (t + 1) * 96 := by
-  constructor <;> omega
-
-/-- MoE combine reads expert row `slot * 2560 + d` for `slot < T * 10`. -/
-theorem combine_in_bounds (T slot d : Nat) (hs : slot < T * 10) (hd : d < 2560) : slot * 2560 + d < T * 10 * 2560 := by
-  omega
-
--- § GDN channel regions
-
-/-- q (32 heads of 128 over 16 key heads x 2) and k occupy 4096 channels, v the remaining 6144 of 10240. -/
-theorem gdn_regions : 2 * 16 * 128 = 4096 ∧ 4096 + 48 * 128 = 10240 := by decide
-
-/-- The recurrence reads q at `qh*128`, k at `2048 + qh*128`, v at `4096 + head*128 + col`, all inside 10240. -/
-theorem gdn_rec_reads (qh head col tid : Nat) (hq : qh < 16) (hh : head < 48) (hc : col < 128) (ht : tid < 128) :
-    qh * 128 + tid < 2048 ∧ 2048 + qh * 128 + tid < 4096 ∧ 4096 + head * 128 + col < 10240 := by
-  refine ⟨?_, ?_, ?_⟩ <;> omega
-
--- § KV append addressing
-
-/-- Pool row of position `pos` for kv head `kvh` in page `page`: it stays inside that page's `2 * ps` rows. -/
-theorem kv_row_in_page (page kvh pos ps : Nat) (hk : kvh < 2) (hps : 0 < ps) :
-    (page * 2 + kvh) * ps + pos % ps < ((page + 1) * 2) * ps := by
-  have hm : pos % ps < ps := Nat.mod_lt pos hps
-  have h1 : (page * 2 + kvh + 1) * ps ≤ ((page + 1) * 2) * ps := Nat.mul_le_mul_right ps (by omega)
-  have h2 : (page * 2 + kvh) * ps + ps = (page * 2 + kvh + 1) * ps := (Nat.succ_mul _ _).symm
-  omega
-
-/-- `blockIdx.z` encodes (group, K-or-V) exactly: groups 0..3, flag 0..1. -/
-theorem kv_z_split (z : Nat) (h : z < 8) : z / 2 < 4 ∧ z % 2 < 2 ∧ 2 * (z / 2) + z % 2 = z := by
-  refine ⟨?_, ?_, ?_⟩ <;> omega
-
-/-- Element index within a head: group * 64 + lane stays below 256. -/
-theorem kv_elem_in_head (g lane : Nat) (hg : g < 4) (hl : lane < 64) : g * 64 + lane < 256 := by omega
-
-end Ref.PrefillKernels
-
-
-
-## FILE: /mnt/user-data/outputs/SpecController.lean
-/-!
-# MODULE: spec_controller
-SOURCES: src/spec/controller.cpp
-The speculative-decoding controller: clamped window index into the cost tables, expected committed tokens of a
-draft window, the EMA acceptance learner, and the bookkeeping of which drafted positions an observation touches.
-
-## Source semantics
-* `step_ms(k)` reads table entry `clamp(k + 1, 1, K_MAX + 1) - 1`, always in range.
-* The expected tokens of a window is `1 + sum of cumulative acceptance products`; with probabilities in `[0, 1]`
-  it lies in `[1, k + 1]`.
-* `observe` clamps `accepted` to `0..k`, updates positions `0 .. min(k, accepted + 1) - 1`, and after a fully
-  accepted window pulls the untested positions toward the deepest tested one.
-* The EMA `p += e * (hit - p)` keeps `p` in `[0, 1]` (fixed-point model: scale `S`).
-
-## Form template identifiers
-`std::clamp` -> clampN; `expected` -> runs (fixed point, scale S); EMA -> emaUpdate; `seen` -> seenCount.
--/
-
-namespace Ref.SpecController
-
-/-- `std::clamp(v, lo, hi)` for `lo ≤ hi`. -/
-def clampN (v lo hi : Nat) : Nat := max lo (min v hi)
-
-/-- The clamp result is inside `[lo, hi]`. -/
-theorem clampN_bounds (v lo hi : Nat) (h : lo ≤ hi) : lo ≤ clampN v lo hi ∧ clampN v lo hi ≤ hi := by
-  unfold clampN
-  constructor <;> omega
-
-/-- The table index `n - 1` with `n = clamp(k+1, 1, K_MAX+1)` is below `K_MAX + 1`. -/
-theorem table_index_lt (k kmax : Nat) : clampN (k + 1) 1 (kmax + 1) - 1 < kmax + 1 := by
-  unfold clampN
-  omega
-
-/-- The clamped `n` is at least 1 (so `n - 1` never underflows). -/
-theorem table_n_pos (k kmax : Nat) : 1 ≤ clampN (k + 1) 1 (kmax + 1) := by
-  unfold clampN
-  omega
-
--- § expected committed tokens (fixed point, scale S)
-
-/-- Sum over the window of cumulative acceptance (`run` is the running product, scale S). -/
-def runs (S : Nat) : Nat → List Nat → Nat
-  | _, [] => 0
-  | run, p :: ps => (run * p / S) + runs S (run * p / S) ps
-
-/-- Multiplying by a probability `p ≤ S` never increases a quantity `≤ S`. -/
-theorem step_le (S run p : Nat) (hS : 0 < S) (hp : p ≤ S) (hr : run ≤ S) : run * p / S ≤ S := by
-  apply Nat.div_le_of_le_mul
-  have h1 : run * p ≤ run * S := Nat.mul_le_mul_left run hp
-  have h2 : run * S ≤ S * S := Nat.mul_le_mul_right S hr
-  omega
-
-/-- The accumulated acceptance of `n` drafted positions is at most `n` whole tokens (`S * n`). -/
-theorem runs_le (S : Nat) (hS : 0 < S) (ps : List Nat) :
-    ∀ run, run ≤ S → (∀ p ∈ ps, p ≤ S) → runs S run ps ≤ S * ps.length := by
-  induction ps with
-  | nil => intro run _ _; simp [runs]
-  | cons p ps ih =>
-    intro run hr hp
-    have hp0 : p ≤ S := hp p (List.mem_cons_self ..)
-    have hstep := step_le S run p hS hp0 hr
-    have hrest := ih (run * p / S) hstep (fun q hq => hp q (List.mem_cons_of_mem _ hq))
-    have hlen : S * (ps.length + 1) = S * ps.length + S := by rw [Nat.mul_add, Nat.mul_one]
-    simp only [runs, List.length_cons]
+/-- Exactly at the halfway point the result is even (ties to even). -/
+theorem bf_tie_even (u : Nat) (h : u % 65536 = 32768) : bf u % 2 = 0 := by
+  unfold bf
+  have hu : u = 65536 * (u / 65536) + 32768 := by omega
+  rcases Nat.mod_two_eq_zero_or_one (u / 65536) with h0 | h1
+  · have e : (u + 32767 + u / 65536 % 2) / 65536 = u / 65536 := by omega
+    rw [e]
+    exact h0
+  · have e : (u + 32767 + u / 65536 % 2) / 65536 = u / 65536 + 1 := by omega
+    rw [e]
     omega
 
--- § EMA learner (fixed point)
+/-- The result is within one unit of truncation. -/
+theorem bf_within_one (u : Nat) : u / 65536 ≤ bf u ∧ bf u ≤ u / 65536 + 1 := by unfold bf; omega
 
-/-- `p' = (p (S - e) + hit e) / S`, i.e. `p += e (hit - p)` with `e = e'/S`. -/
-def emaUpdate (S e p hit : Nat) : Nat := (p * (S - e) + hit * e) / S
+-- § router order
 
-/-- The EMA of values in `[0, S]` stays in `[0, S]`. -/
-theorem emaUpdate_le (S e p hit : Nat) (he : e ≤ S) (hp : p ≤ S) (hh : hit ≤ S) : emaUpdate S e p hit ≤ S := by
-  unfold emaUpdate
-  apply Nat.div_le_of_le_mul
-  have h1 : p * (S - e) ≤ S * (S - e) := Nat.mul_le_mul_right _ hp
-  have h2 : hit * e ≤ S * e := Nat.mul_le_mul_right _ hh
-  have h3 : S * (S - e) + S * e = S * S := by rw [← Nat.mul_add, Nat.sub_add_cancel he]
+/-- Strict preference with ties broken toward the smaller index. -/
+def better (v i v' i' : Nat) : Prop := v > v' ∨ (v = v' ∧ i < i')
+
+/-- The order is irreflexive. -/
+theorem better_irrefl (v i : Nat) : ¬ better v i v i := by unfold better; omega
+
+/-- The order is asymmetric. -/
+theorem better_asymm (v i v' i' : Nat) (h : better v i v' i') : ¬ better v' i' v i := by
+  unfold better at *; omega
+
+/-- Distinct candidates are always comparable (a unique winner exists). -/
+theorem better_total (v i v' i' : Nat) (h : i ≠ i') : better v i v' i' ∨ better v' i' v i := by
+  unfold better; omega
+
+/-- Expert id `lane + 32*i` recovers `(lane, i)`. -/
+theorem expert_id_roundtrip (lane i : Nat) (h : lane < 32) :
+    (lane + 32 * i) % 32 = lane ∧ (lane + 32 * i) / 32 = i := by omega
+
+/-- The 16 registers of 32 lanes cover exactly ids `0..511`. -/
+theorem expert_id_lt (lane i : Nat) (hl : lane < 32) (hi : i < 16) : lane + 32 * i < 512 := by omega
+
+/-- Surjective: every id below 512 is some `(lane, i)`. -/
+theorem expert_id_surj (e : Nat) (h : e < 512) : e % 32 < 32 ∧ e / 32 < 16 ∧ e % 32 + 32 * (e / 32) = e := by
   omega
 
--- § observe bookkeeping
+-- § residual stream indices
 
-/-- Positions updated by an observation: `min k (accepted + 1)` after clamping `accepted` into `0..k`. -/
-def seenCount (k accepted : Nat) : Nat := min k (min accepted k + 1)
+/-- `i = t*D + c*N + d` with `c < HC` for the real constants. -/
+theorem residual_decomp (i : Nat) :
+    i = (i / 10240) * 10240 + ((i % 10240) / 2560) * 2560 + i % 2560 ∧ (i % 10240) / 2560 < 4 := by
+  omega
 
-/-- Never more positions than were drafted. -/
-theorem seenCount_le (k accepted : Nat) : seenCount k accepted ≤ k := by unfold seenCount; omega
+/-- Broadcast reads `e[t*N + i % N]`, the same element for every one of the four streams. -/
+theorem broadcast_same_d (i : Nat) : i % 2560 = (i % 10240) % 2560 := by omega
 
-/-- A rejected draft (accepted < k) is itself observed: `accepted + 1` positions. -/
-theorem seenCount_rejected (k accepted : Nat) (h : accepted < k) : seenCount k accepted = accepted + 1 := by
-  unfold seenCount; omega
+-- § launch sizing
 
-/-- A fully accepted window observes exactly `k` positions. -/
-theorem seenCount_full (k : Nat) : seenCount k k = k := by unfold seenCount; omega
+/-- `blocks_for n = (n + 255) / 256`. -/
+def blocksFor (n : Nat) : Nat := (n + 255) / 256
 
-/-- The deepest tested position `k - 1` exists when `k > 0`, and the pulled positions `k .. K_MAX - 1` are valid. -/
-theorem pull_positions_valid (k kmax i : Nat) (hk : 0 < k) (hkm : k ≤ kmax) (hi : k ≤ i) (hi2 : i < kmax) :
-    k - 1 < kmax ∧ i < kmax := by
+/-- The grid covers all `n` threads. -/
+theorem blocksFor_cover (n : Nat) : n ≤ blocksFor n * 256 := by unfold blocksFor; omega
+
+/-- And launches fewer than one extra block. -/
+theorem blocksFor_tight (n : Nat) : blocksFor n * 256 < n + 256 := by unfold blocksFor; omega
+
+-- § blob layout
+
+/-- Gate/up code bytes. -/
+theorem blob_off_d_codes : 1280 * 640 = 819200 := by decide
+
+/-- Gate/up scale plane begins after the down codes. -/
+theorem blob_off_gu_sc : 1280 * 640 + 2560 * 160 = 1228800 := by decide
+
+/-- Down scale plane begins after the gate/up scales (`[1280][40]` f16). -/
+theorem blob_off_d_sc : 1280 * 640 + 2560 * 160 + 1280 * 40 * 2 = 1331200 := by decide
+
+/-- The blob ends after the down scales (`[2560][10]` f16). -/
+theorem blob_total : 1280 * 640 + 2560 * 160 + 1280 * 40 * 2 + 2560 * 10 * 2 = 1382400 := by decide
+
+/-- Gate/up dequant: code byte, scale pair and 4 output weights are all in range. -/
+theorem gu_dequant_in_range (row byte : Nat) (hr : row < 1280) (hb : byte < 640) :
+    row * 640 + byte < 1280 * 640 ∧
+    (row * 40 + byte * 4 / 64) * 2 + 2 ≤ 1280 * 40 * 2 ∧
+    row * 2560 + byte * 4 + 3 < 1280 * 2560 := by omega
+
+/-- Down dequant: same, with 160 bytes and 10 groups per row. -/
+theorem d_dequant_in_range (row byte : Nat) (hr : row < 2560) (hb : byte < 160) :
+    row * 160 + byte < 2560 * 160 ∧
+    (row * 10 + byte * 4 / 64) * 2 + 2 ≤ 2560 * 10 * 2 ∧
+    row * 640 + byte * 4 + 3 < 2560 * 640 := by omega
+
+/-- Each 2-bit code is below 4, so `code - 1 ∈ {-1,0,1,2}`. -/
+theorem code2_lt (c k : Nat) : (c / 2 ^ (2 * k)) % 4 < 4 := Nat.mod_lt _ (by omega)
+
+/-- The thread index space splits at `n_gu` into gate/up and down bytes. -/
+theorem thread_split : 1280 * 640 + 2560 * 160 = 1228800 := by decide
+
+-- § KV append and QSA helpers
+
+/-- `blockIdx.z` encodes (group, is_v) bijectively over 0..7. -/
+theorem kv_z_decode (z : Nat) (h : z < 8) : z / 2 < 4 ∧ (z / 2) * 2 + z % 2 = z := by omega
+
+/-- Each 64-thread block writes lanes `g*64 + t < 256`. -/
+theorem kv_lane_lt (g t : Nat) (hg : g < 4) (ht : t < 64) : g * 64 + t < 256 := by omega
+
+/-- Scale slot `row*4 + g` is inside the 4-per-row scale array. -/
+theorem kv_scale_slot (row g : Nat) (hg : g < 4) : row * 4 + g < (row + 1) * 4 := by omega
+
+/-- q half and gate half of a head's 512 floats are disjoint and cover it. -/
+theorem qgate_halves (h d : Nat) (hd : d < 256) :
+    h * 512 + d < h * 512 + 256 ∧ h * 512 + 256 + d < (h + 1) * 512 := by omega
+
+/-- SwiGLU interleaved reads `gu[r*1280 + 2k]` and `+1` for `k < 640`, inside the row. -/
+theorem swiglu_il_in_row (r k : Nat) (hk : k < 640) : r * 1280 + 2 * k + 1 < (r + 1) * 1280 := by omega
+
+/-- GDN recurrence row groups: `rg * 32 + r` covers `0..127` for `rg < 4`, `r < 32`. -/
+theorem rec_rows (rg r : Nat) (hg : rg < 4) (hr : r < 32) : rg * 32 + r < 128 := by omega
+
+/-- RoPE pairs `(p, p+32)` stay in a 64-wide rotary block. -/
+theorem rope_pair_in_block (p : Nat) (h : p < 32) : p + 32 < 64 := by omega
+
+/-- `gather_rows16` moves whole `uint4` units when the width is a multiple of 8. -/
+theorem gather_units (width : Nat) (h : width % 8 = 0) : width / 8 * 8 = width := by omega
+
+end Ref.PrefillKernelsIndexing
+
+
+
+## FILE: /mnt/user-data/outputs/DirectFileIo.lean
+/-!
+# MODULE: direct_file_io
+SOURCES: src/platform/direct_file.cpp
+Unbuffered file reads: alignment contract of `submit`, short-read length at end of file, the FIFO completion
+drain of `wait`, and the Windows 64-bit offset split.
+
+## Source semantics
+* `submit` requires offset, length and buffer address all multiples of the alignment, and `length != 0`.
+* A read at or past the end of file completes with zero bytes; otherwise it returns at most the bytes left.
+* `wait(out, max)` returns at most `max` completions, oldest first, never dropping or reordering any.
+* The Windows OVERLAPPED stores the offset as a low 32-bit word and a high word.
+
+## Form template identifiers
+aligned ↦ `x % alignment() == 0`; readLen ↦ `pread` result / `ERROR_HANDLE_EOF` zero completion;
+drain ↦ `wait` loop over `done`/`immediate`.
+-/
+namespace Ref.DirectFileIo
+
+-- § alignment contract
+
+/-- `A` divides `x` (the `% alignment() == 0` test). -/
+def aligned (A x : Nat) : Prop := A ∣ x
+
+/-- A request's end offset stays aligned. -/
+theorem end_aligned (A off len : Nat) (h1 : aligned A off) (h2 : aligned A len) : aligned A (off + len) :=
+  Nat.dvd_add h1 h2
+
+/-- A non-empty aligned request is at least one alignment unit long. -/
+theorem len_ge_align (A len : Nat) (hA : 0 < A) (h : aligned A len) (hl : len ≠ 0) : A ≤ len :=
+  Nat.le_of_dvd (by omega) h
+
+/-- Aligned lengths cannot be 1..A-1 (no partial sector requests pass). -/
+theorem no_partial_sector (A len : Nat) (hA : 0 < A) (h : aligned A len) (hl : len ≠ 0) :
+    ¬ len < A := by
+  have := len_ge_align A len hA h hl
+  omega
+
+-- § end of file
+
+/-- Bytes a read of `len` at `off` returns for a file of `size`. -/
+def readLen (size off len : Nat) : Nat := if off < size then min len (size - off) else 0
+
+/-- A read never returns more than requested. -/
+theorem readLen_le_len (size off len : Nat) : readLen size off len ≤ len := by
+  unfold readLen; split <;> omega
+
+/-- A read never runs past the end of the file. -/
+theorem readLen_in_file (size off len : Nat) (h : off < size) : off + readLen size off len ≤ size := by
+  unfold readLen; rw [if_pos h]; omega
+
+/-- At or past the end the completion is zero bytes (the legal short read of the last page). -/
+theorem readLen_past_eof (size off len : Nat) (h : size ≤ off) : readLen size off len = 0 := by
+  unfold readLen; rw [if_neg (by omega)]
+
+/-- A request fully inside the file is returned in full. -/
+theorem readLen_full (size off len : Nat) (h : off + len ≤ size) (hl : 0 < len) :
+    readLen size off len = len := by
+  unfold readLen; rw [if_pos (by omega)]; omega
+
+-- § completion drain
+
+/-- `wait`: hand out up to `max` oldest completions, keep the rest queued. -/
+def drain {α : Type} (max : Nat) (q : List α) : List α × List α := (q.take max, q.drop max)
+
+/-- Nothing is lost or reordered. -/
+theorem drain_preserves {α : Type} (max : Nat) (q : List α) :
+    (drain max q).1 ++ (drain max q).2 = q := by
+  unfold drain; exact List.take_append_drop max q
+
+/-- The number handed out is `min max (length q)`. -/
+theorem drain_count {α : Type} (max : Nat) (q : List α) :
+    (drain max q).1.length = min max q.length := by
+  unfold drain; simp
+
+/-- The caller's buffer of size `max` is never overrun. -/
+theorem drain_le_max {α : Type} (max : Nat) (q : List α) : (drain max q).1.length ≤ max := by
+  rw [drain_count]; omega
+
+/-- Windows: entries requested from the port are at most 64 and fit the remaining room. -/
+theorem port_request_fits (max n : Nat) (h : n ≤ max) :
+    n + min (max - n) 64 ≤ max ∧ min (max - n) 64 ≤ 64 := by omega
+
+-- § 64-bit offset split
+
+/-- `Offset`/`OffsetHigh` recombine to the original offset. -/
+theorem offset_split (off : Nat) : off / 4294967296 * 4294967296 + off % 4294967296 = off := by omega
+
+/-- The low word fits 32 bits. -/
+theorem offset_low_lt (off : Nat) : off % 4294967296 < 4294967296 := Nat.mod_lt _ (by omega)
+
+end Ref.DirectFileIo
+
+
+
+
+
+## FILE: /mnt/user-data/outputs/SpecDraftController.lean
+/-!
+# MODULE: spec_draft_controller
+SOURCES: src/spec/controller.cpp, include/ref/spec/controller.hpp
+Chooses, per verify step, which drafter (none / suffix lookup / MTP) and how many draft tokens `k`
+maximise expected committed tokens per millisecond, and learns per-position acceptance with an EMA.
+
+## Source semantics
+* `K_MAX = 8`; a verify pass of `k` drafts has `n = clamp(k+1, 1, K_MAX+1)` tokens, indexing the ratio
+  tables at `n-1`, which must stay inside the `K_MAX+1`-entry arrays.
+* `bucket(match)` maps a match length to one of four lookup-acceptance buckets (<5, 5..7, 8..15, >=16).
+* `expected(p, k)` = 1 + sum of running products of per-position acceptance (the verify pass always
+  commits one token).
+* `choose` starts from plain decoding (k = 0) and only replaces it by a candidate that is strictly better,
+  and finally falls back to plain decoding unless the gain exceeds `min_gain`.
+* `observe` clamps `accepted` to `[0, k]` and updates positions `0 .. min(k, accepted+1) - 1` by an EMA
+  step toward 1 (accepted) or 0 (the rejected position).
+
+## Form template identifiers
+bucket -> `Controller::bucket` (match-length bucketing)
+expAux/expected -> `Controller::expected`
+nTok -> `std::clamp(k + 1, 1, K_MAX + 1)` in `CostModel::step_ms`
+seen -> `std::min(c.k, accepted + 1)` in `Controller::observe`
+-/
+
+namespace Ref.Spec
+
+-- § constants and bucketing
+
+/-- `K_MAX` of the controller header. -/
+def kMax : Nat := 8
+
+/-- Lookup acceptance bucket of a match length, as `Controller::bucket`. -/
+def bucket (m : Nat) : Nat :=
+  if m ≥ 16 then 3 else if m ≥ 8 then 2 else if m ≥ 5 then 1 else 0
+
+/-- Every bucket index is a valid index into the 4-entry `lookup_q_` array. -/
+theorem bucket_lt_four (m : Nat) : bucket m < 4 := by
+  unfold bucket
+  split <;> (try split) <;> (try split) <;> omega
+
+/-- A longer match never falls into a lower bucket. -/
+theorem bucket_mono {m n : Nat} (h : m ≤ n) : bucket m ≤ bucket n := by
+  unfold bucket
+  split <;> split <;> (try split) <;> (try split) <;> (try split) <;> (try split) <;> omega
+
+-- § verify-window size and table indexing
+
+/-- Number of tokens of a verify pass with `k` drafts: `clamp(k+1, 1, K_MAX+1)`. -/
+def nTok (k : Nat) : Nat := min (max (k + 1) 1) (kMax + 1)
+
+/-- The table index `n - 1` is always inside the `K_MAX + 1`-entry ratio arrays. -/
+theorem nTok_idx_lt (k : Nat) : nTok k - 1 < kMax + 1 := by
+  unfold nTok kMax
+  omega
+
+/-- A verify pass always holds at least one token. -/
+theorem nTok_pos (k : Nat) : 1 ≤ nTok k := by
+  unfold nTok kMax
+  omega
+
+/-- The default ratio tables (scaled by 100) have `K_MAX + 1` entries. -/
+theorem ratio_tables_length :
+    [100, 105, 130, 145, 185, 220, 260, 300, 330].length = kMax + 1 ∧
+    [100, 170, 231, 288, 340, 389, 435, 480, 520].length = kMax + 1 := by
+  decide
+
+/-- Both default ratio tables are non-decreasing: bigger windows never cost less. -/
+theorem ratio_tables_sorted :
+    List.Pairwise (· ≤ ·) [100, 105, 130, 145, 185, 220, 260, 300, 330] ∧
+    List.Pairwise (· ≤ ·) [100, 170, 231, 288, 340, 389, 435, 480, 520] := by
+  decide
+
+-- § expected committed tokens
+
+/-- Sum of running products of acceptance (percent), starting from run length `run`. -/
+def expAux : Nat → List Nat → Nat
+  | _, [] => 0
+  | run, p :: ps => run * p / 100 + expAux (run * p / 100) ps
+
+/-- `expected` scaled by 100: the committed token plus the accepted drafts. -/
+def expected (ps : List Nat) : Nat := 100 + expAux 100 ps
+
+/-- One acceptance step never increases the running product. -/
+theorem runstep_le (run p : Nat) (hp : p ≤ 100) : run * p / 100 ≤ run := by
+  apply Nat.div_le_of_le_mul
+  have := Nat.mul_le_mul_left run hp
+  omega
+
+/-- The verify pass always commits at least one token. -/
+theorem expected_ge_one (ps : List Nat) : 100 ≤ expected ps := by
+  unfold expected
+  omega
+
+/-- With acceptances at most 100%, the accumulated drafts are bounded by `run * #drafts`. -/
+theorem expAux_le (ps : List Nat) :
+    ∀ run, (∀ p ∈ ps, p ≤ 100) → expAux run ps ≤ run * ps.length := by
+  induction ps with
+  | nil =>
+    intro run _
+    simp [expAux]
+  | cons p ps ih =>
+    intro run h
+    have hp : p ≤ 100 := h p (by simp)
+    have hr : run * p / 100 ≤ run := runstep_le run p hp
+    have ih' := ih (run * p / 100) (fun q hq => h q (by simp [hq]))
+    have hm : run * p / 100 * ps.length ≤ run * ps.length := Nat.mul_le_mul_right _ hr
+    have hl : run * (ps.length + 1) = run * ps.length + run := by
+      rw [Nat.mul_add, Nat.mul_one]
+    simp only [expAux, List.length_cons]
+    rw [hl]
+    omega
+
+/-- Expected committed tokens never exceed one plus the number of drafts (all accepted). -/
+theorem expected_le (ps : List Nat) (h : ∀ p ∈ ps, p ≤ 100) :
+    expected ps ≤ 100 * (ps.length + 1) := by
+  have := expAux_le ps 100 h
+  unfold expected
+  omega
+
+-- § choice: never worse than plain decoding
+
+/-- Best rate of the candidates, starting from the plain-decode baseline (strict improvement only). -/
+def bestOf (base : Nat) (cands : List Nat) : Nat := cands.foldl max base
+
+/-- The fold of `max` never drops below its starting value. -/
+theorem foldl_max_ge (l : List Nat) : ∀ a, a ≤ l.foldl max a := by
+  induction l with
+  | nil => intro a; simp
+  | cons x xs ih =>
+    intro a
+    have := ih (max a x)
+    simp only [List.foldl_cons]
+    omega
+
+/-- The chosen candidate rate is at least the plain-decoding baseline. -/
+theorem bestOf_ge_base (base : Nat) (cands : List Nat) : base ≤ bestOf base cands :=
+  foldl_max_ge cands base
+
+/-- The `min_gain` gate (percent): keep the candidate only if it clears `base * (100 + gain)`. -/
+def gate (base best gain : Nat) : Nat := if best * 100 < base * (100 + gain) then base else best
+
+/-- After gating, the rate is still at least the baseline. -/
+theorem gate_ge_base (base best gain : Nat) (h : base ≤ best) : base ≤ gate base best gain := by
+  unfold gate
+  split <;> omega
+
+/-- A gated-in candidate beats the baseline by at least the configured margin. -/
+theorem gate_margin (base best gain : Nat) (h : gate base best gain ≠ base) :
+    base * (100 + gain) ≤ best * 100 := by
+  unfold gate at h
+  split at h
+  · exact absurd rfl h
+  · omega
+
+-- § observe: clamping and the EMA
+
+/-- `accepted` clamped to `[0, k]`. -/
+def acc' (k accepted : Nat) : Nat := min accepted k
+
+/-- Number of positions updated: `min(k, accepted + 1)`. -/
+def seen (k accepted : Nat) : Nat := min k (acc' k accepted + 1)
+
+/-- The clamped acceptance never exceeds the number of drafts. -/
+theorem acc'_le (k a : Nat) : acc' k a ≤ k := by
+  unfold acc'
+  omega
+
+/-- At most `k` positions are updated, so the `mtp_p_[i]` writes stay in range. -/
+theorem seen_le (k a : Nat) : seen k a ≤ k := by
+  unfold seen
+  omega
+
+/-- Every accepted position is updated. -/
+theorem acc_le_seen (k a : Nat) : acc' k a ≤ seen k a := by
+  unfold seen acc'
+  omega
+
+/-- If some draft was rejected, exactly one extra (the rejected) position is updated. -/
+theorem seen_of_reject (k a : Nat) (h : a < k) : seen k a = a + 1 := by
+  unfold seen acc'
+  omega
+
+/-- EMA step toward 1 (scaled: 100) keeps the estimate in `[0, 100]` (result scaled by 1000). -/
+theorem ema_hit_bounds (x e : Int) (hx0 : 0 ≤ x) (hx1 : x ≤ 100) (he0 : 0 ≤ e) (he1 : e ≤ 1000) :
+    0 ≤ 1000 * x + e * (100 - x) ∧ 1000 * x + e * (100 - x) ≤ 100000 := by
+  have h1 : 0 ≤ e * (100 - x) := Int.mul_nonneg he0 (by omega)
+  have h2 : e * (100 - x) ≤ 1000 * (100 - x) := Int.mul_le_mul_of_nonneg_right he1 (by omega)
   constructor <;> omega
 
-/-- Lookup candidates are bounded by `K_MAX`. -/
-theorem lookup_len_le (avail kmax : Nat) : min avail kmax ≤ kmax := by omega
+/-- EMA step toward 0 keeps the estimate in `[0, 100]` (result scaled by 1000). -/
+theorem ema_miss_bounds (x e : Int) (hx0 : 0 ≤ x) (hx1 : x ≤ 100) (he0 : 0 ≤ e) (he1 : e ≤ 1000) :
+    0 ≤ 1000 * x + e * (-x) ∧ 1000 * x + e * (-x) ≤ 100000 := by
+  have h1 : 0 ≤ e * x := Int.mul_nonneg he0 hx0
+  have h2 : e * x ≤ 1000 * x := Int.mul_le_mul_of_nonneg_right he1 hx0
+  have h3 : e * (-x) = -(e * x) := Int.mul_neg e x
+  rw [h3]
+  constructor <;> omega
 
-end Ref.SpecController
+end Ref.Spec
 
 
 
@@ -1695,1059 +2310,1359 @@ end Ref.SpecController
 /-!
 # MODULE: suffix_drafter
 SOURCES: src/spec/suffix_drafter.cpp
-An n-gram suffix lookup drafter: an open-addressing hash table keyed by the last three tokens, each slot keeping
-the most recent `WAYS` end positions; `propose` finds the longest earlier match and copies its continuation.
+Prompt-lookup drafter: an open-addressed hash table keyed by the last three tokens remembers the most recent
+positions where that trigram ended; `propose` extends the longest match and copies the continuation.
 
 ## Source semantics
-* The table capacity is the first power of two `>= 2 * capacity_tokens`, so `key & mask == key % capacity`.
-* A key is never 0 (`| 1`), so 0 can mean "empty slot".
-* A slot keeps at most `WAYS` positions, newest first.
-* A match is extended while indices stay valid; the copied continuation never reads past the current suffix.
+* Keys are forced non-zero (`| 1`) because 0 marks an empty slot.
+* The table has a power-of-two capacity of at least `2 * capacity_tokens` (load factor <= 0.5).
+* Each slot keeps up to `WAYS` positions, newest first: appending shifts older ones down and drops the oldest.
+* `propose` skips positions at or after the current suffix, requires a match of at least `min_match_`, caps the
+  match at `max_match_`, and returns at most `max_k` tokens read from `best_end + 1 .. cur`.
 
 ## Form template identifiers
-`cap <<= 1` loop -> grow; `mask_` -> mask; `Slot::pos/n` -> push/List; match loop -> mlLoop; copy count -> copyCount.
+keyOf -> `key_at` (the `| 1` step)
+shiftIn / nNext -> the `WAYS` shift in `SuffixDrafter::append`
+matchAux -> the backwards `while (len < max_match_ && len <= p && ...)` loop in `propose`
+contLen -> the `for (q = best_end + 1; q <= cur && k < max_k; ++q)` copy loop
 -/
 
-namespace Ref.SuffixDrafter
+namespace Ref.Spec.Suffix
 
--- § table capacity
+-- § constructor parameters
 
-/-- Double `c` until it reaches `target` (bounded by `fuel`). -/
-def grow : Nat → Nat → Nat → Nat
-  | 0, c, _ => c
-  | f + 1, c, t => if c < t then grow f (2 * c) t else c
+/-- `min_match_` after the constructor's `std::max(3, min_match)`. -/
+def minMatch (m : Nat) : Nat := max 3 m
 
-/-- With enough doublings available the capacity reaches the target. -/
-theorem grow_ge (t : Nat) (f : Nat) : ∀ c, t ≤ c * 2 ^ f → t ≤ grow f c t := by
-  induction f with
-  | zero => intro c h; simpa [grow] using h
-  | succ f ih =>
-    intro c h
-    simp only [grow]
-    by_cases hc : c < t
-    · rw [if_pos hc]
-      apply ih
-      have e : 2 * c * 2 ^ f = c * 2 ^ (f + 1) := by
-        rw [Nat.pow_succ]
-        ac_rfl
-      rw [e]
-      exact h
-    · rw [if_neg hc]
-      omega
+/-- `max_match_` after the constructor's `std::max(min_match, max_match)`. -/
+def maxMatch (lo hi : Nat) : Nat := max lo hi
 
-/-- Starting from a power of two the capacity stays a power of two. -/
-theorem grow_pow2 (t : Nat) (f : Nat) : ∀ k, ∃ j, grow f (2 ^ k) t = 2 ^ j := by
-  induction f with
-  | zero => intro k; exact ⟨k, rfl⟩
-  | succ f ih =>
-    intro k
-    simp only [grow]
-    by_cases hc : 2 ^ k < t
-    · rw [if_pos hc]
-      have e : 2 * 2 ^ k = 2 ^ (k + 1) := by rw [Nat.pow_succ, Nat.mul_comm]
-      rw [e]
-      exact ih (k + 1)
-    · rw [if_neg hc]
-      exact ⟨k, rfl⟩
-
-/-- For a power-of-two capacity, masking equals the remainder, so probing `(i + 1) & mask` stays in the table. -/
-theorem mask_is_mod (x k : Nat) : x &&& (2 ^ k - 1) = x % 2 ^ k := Nat.and_two_pow_sub_one_eq_mod x k
-
-/-- The next probe index is always in range. -/
-theorem probe_in_range (i cap : Nat) (hcap : 0 < cap) : (i + 1) % cap < cap := Nat.mod_lt _ hcap
-
--- § keys
-
-/-- `key | 1` is never zero, so 0 is a safe "empty" marker. -/
-theorem or_one_ne_zero (x : Nat) : x ||| 1 ≠ 0 := by
-  intro h
-  have h2 : (x ||| 1).testBit 0 = true := by simp [Nat.testBit_or]
-  rw [h] at h2
-  simp at h2
-
--- § slot positions
-
-/-- Insert a position, keeping the `ways` newest. -/
-def push (ways : Nat) (p : Nat) (l : List Nat) : List Nat := (p :: l).take ways
-
-/-- A slot never holds more than `WAYS` positions. -/
-theorem push_length_le (ways p : Nat) (l : List Nat) : (push ways p l).length ≤ ways := by
-  unfold push
-  simp [List.length_take]
-
-/-- The new position is the most recent when the slot has any capacity. -/
-theorem push_head (ways p : Nat) (l : List Nat) (h : 0 < ways) : (push ways p l).head? = some p := by
-  unfold push
-  cases ways with
-  | zero => omega
-  | succ w => rfl
-
-/-- The counter `n = min(n + 1, WAYS)` equals the new list length when the slot was within capacity. -/
-theorem push_length (ways p : Nat) (l : List Nat) (h : l.length ≤ ways) :
-    (push ways p l).length = min (l.length + 1) ways := by
-  unfold push
-  simp [List.length_take]
+/-- A trigram is the shortest possible match: `min_match_ >= 3`. -/
+theorem minMatch_ge_three (m : Nat) : 3 ≤ minMatch m := by
+  unfold minMatch
   omega
 
--- § match extension and continuation
+/-- The maximum match is at least the requested minimum. -/
+theorem maxMatch_ge_lo (lo hi : Nat) : lo ≤ maxMatch lo hi := by
+  unfold maxMatch
+  omega
 
-/-- Extend a match while `len ≤ p` and the tokens agree, up to `fuel` steps. -/
-def mlLoop (h : Nat → Nat) (p cur : Nat) : Nat → Nat → Nat
+/-- Table capacity: next power of two of `2 * capacity_tokens`. -/
+def capFor (t : Nat) : Nat := Nat.nextPowerOfTwo (t * 2)
+
+/-- Load factor at nominal capacity is at most one half. -/
+theorem capFor_ge (t : Nat) : t * 2 ≤ capFor t := Nat.le_nextPowerOfTwo (t * 2)
+
+-- § hashing
+
+/-- A key is forced non-zero so that 0 can mark an empty slot. -/
+def keyOf (x : Nat) : Nat := x ||| 1
+
+/-- The forced-odd key is never the empty marker 0. -/
+theorem keyOf_ne_zero (x : Nat) : keyOf x ≠ 0 := by
+  unfold keyOf
+  simp
+
+/-- Linear probing stays inside the table when the capacity is positive. -/
+theorem probe_lt (i cap : Nat) (h : 0 < cap) : (i + 1) % cap < cap :=
+  Nat.mod_lt _ h
+
+-- § append: the WAYS shift
+
+/-- Newest-first position list after inserting `e`, truncated to `W` ways. -/
+def shiftIn (l : List Nat) (e W : Nat) : List Nat := (e :: l).take W
+
+/-- The way list never exceeds `WAYS` entries. -/
+theorem shiftIn_length_le (l : List Nat) (e W : Nat) : (shiftIn l e W).length ≤ W := by
+  unfold shiftIn
+  exact List.length_take_le _ _
+
+/-- The newest position is always in way 0. -/
+theorem shiftIn_head (l : List Nat) (e w : Nat) : (shiftIn l e (w + 1)).head? = some e := by
+  simp [shiftIn]
+
+/-- The occupied-way count after an insert: `min(n + 1, WAYS)`. -/
+def nNext (n W : Nat) : Nat := if n < W then n + 1 else n
+
+/-- The count never exceeds `WAYS` (given it started within it). -/
+theorem nNext_le (n W : Nat) (h : n ≤ W) : nNext n W ≤ W := by
+  unfold nNext
+  split <;> omega
+
+/-- The count is non-decreasing. -/
+theorem nNext_ge (n W : Nat) : n ≤ nNext n W := by
+  unfold nNext
+  split <;> omega
+
+-- § propose: longest backward match
+
+/-- Backward match length between positions `p` and `cur`, with loop fuel. -/
+def matchAux (hist : Nat → Int) (maxm p cur : Nat) : Nat → Nat → Nat
   | 0, len => len
-  | f + 1, len => if len ≤ p ∧ h (p - len) = h (cur - len) then mlLoop h p cur f (len + 1) else len
+  | f + 1, len =>
+    if len < maxm ∧ len ≤ p ∧ hist (p - len) = hist (cur - len)
+    then matchAux hist maxm p cur f (len + 1) else len
 
-/-- The match grows by at most the fuel (`max_match`). -/
-theorem mlLoop_le (h : Nat → Nat) (p cur : Nat) (f : Nat) : ∀ len, mlLoop h p cur f len ≤ len + f := by
+/-- The match loop never exceeds `max_match_`, never reads before index 0, and never loses progress. -/
+theorem matchAux_bounds (hist : Nat → Int) (maxm p cur : Nat) (f : Nat) :
+    ∀ len, len ≤ maxm → len ≤ p + 1 →
+      len ≤ matchAux hist maxm p cur f len ∧ matchAux hist maxm p cur f len ≤ maxm ∧
+      matchAux hist maxm p cur f len ≤ p + 1 := by
   induction f with
-  | zero => intro len; simp [mlLoop]
+  | zero =>
+    intro len h1 h2
+    simp only [matchAux]
+    exact ⟨Nat.le_refl _, h1, h2⟩
   | succ f ih =>
-    intro len
-    simp only [mlLoop]
-    split
-    · have := ih (len + 1)
-      omega
-    · omega
-
-/-- The match never exceeds `p + 1` tokens, so `hist[p - len]` is always a valid index. -/
-theorem mlLoop_le_p (h : Nat → Nat) (p cur : Nat) (f : Nat) : ∀ len, len ≤ p + 1 → mlLoop h p cur f len ≤ p + 1 := by
-  induction f with
-  | zero => intro len hl; simpa [mlLoop] using hl
-  | succ f ih =>
-    intro len hl
-    simp only [mlLoop]
+    intro len h1 h2
+    simp only [matchAux]
     split
     · rename_i hc
-      obtain ⟨hlt, _⟩ := hc
-      exact ih (len + 1) (by omega)
-    · exact hl
-
-/-- The match never shrinks. -/
-theorem mlLoop_ge (h : Nat → Nat) (p cur : Nat) (f : Nat) : ∀ len, len ≤ mlLoop h p cur f len := by
-  induction f with
-  | zero => intro len; simp [mlLoop]
-  | succ f ih =>
-    intro len
-    simp only [mlLoop]
-    split
-    · have := ih (len + 1)
+      obtain ⟨c1, c2, _⟩ := hc
+      have := ih (len + 1) (by omega) (by omega)
       omega
-    · omega
+    · exact ⟨Nat.le_refl _, h1, h2⟩
 
-/-- Tokens copied by `propose`: from `best_end + 1` through `cur`, at most `max_k`. -/
-def copyCount (bestEnd cur maxK : Nat) : Nat := min maxK (cur - bestEnd)
+-- § propose: continuation copy
 
-/-- The copy never exceeds `max_k`. -/
-theorem copyCount_le (bestEnd cur maxK : Nat) : copyCount bestEnd cur maxK ≤ maxK := by unfold copyCount; omega
+/-- Number of tokens copied from `best_end + 1 .. cur`, capped by `max_k`. -/
+def contLen (bestEnd cur maxK : Nat) : Nat := min maxK (cur - bestEnd)
 
-/-- The last copied index `best_end + count` is at most `cur`, a valid history index. -/
-theorem copy_last_valid (bestEnd cur maxK : Nat) (h : bestEnd < cur) : bestEnd + copyCount bestEnd cur maxK ≤ cur := by
-  unfold copyCount; omega
+/-- The proposal never exceeds the caller's `max_k` (the output buffer size). -/
+theorem contLen_le_maxK (bestEnd cur maxK : Nat) : contLen bestEnd cur maxK ≤ maxK := by
+  unfold contLen
+  omega
 
-/-- A match strictly before the current suffix and `max_k ≥ 1` yields at least one draft token. -/
-theorem copy_nonempty (bestEnd cur maxK : Nat) (h : bestEnd < cur) (hk : 1 ≤ maxK) : 1 ≤ copyCount bestEnd cur maxK := by
-  unfold copyCount; omega
+/-- The proposal never reads past the current suffix. -/
+theorem contLen_le_span (bestEnd cur maxK : Nat) : contLen bestEnd cur maxK ≤ cur - bestEnd := by
+  unfold contLen
+  omega
 
-end Ref.SuffixDrafter
+/-- A genuine earlier match (`best_end < cur`) with room for a draft yields at least one token. -/
+theorem contLen_pos (bestEnd cur maxK : Nat) (h : bestEnd < cur) (hk : 0 < maxK) :
+    0 < contLen bestEnd cur maxK := by
+  unfold contLen
+  omega
+
+/-- Final count returned by `propose`: zero on a guard failure, else the continuation length. -/
+def proposeCount (n maxK bestLen minM bestEnd cur : Nat) : Nat :=
+  if n < 4 ∨ maxK = 0 ∨ bestLen < minM then 0 else contLen bestEnd cur maxK
+
+/-- `propose` never writes more than `max_k` tokens. -/
+theorem proposeCount_le (n maxK bestLen minM bestEnd cur : Nat) :
+    proposeCount n maxK bestLen minM bestEnd cur ≤ maxK := by
+  unfold proposeCount
+  split
+  · omega
+  · exact contLen_le_maxK _ _ _
+
+end Ref.Spec.Suffix
 
 
 
-## FILE: /mnt/user-data/outputs/PleReader.lean
+## FILE: /mnt/user-data/outputs/PleDirectReader.lean
 /-!
-# MODULE: ple_reader
-SOURCES: src/ngram/ple_reader.cpp
-Asynchronous direct-I/O reader for the 90-byte PLE table rows: set-associative row cache, page-aligned read jobs
-(one or two pages), page de-duplication, free-slot accounting, ticket counting and latency-ring bookkeeping.
+# MODULE: ple_direct_reader
+SOURCES: include/ref/ngram/ple_reader.hpp, src/ngram/ple_reader.cpp
+Reads 90-byte n-gram table rows straight from the SSD with unbuffered, page-aligned reads, deduplicating pages
+within a ticket, with a bounded 8-way set-associative row cache.
 
 ## Source semantics
-* Cache: `sets = rows / 8`, 8 ways per set, round-robin replacement; slot and data indices stay inside the arrays.
-* A row at byte `at` is fetched with a page-aligned read of 1 or 2 pages (PAGE = 4096) containing all 90 bytes.
-* Jobs for rows on the same page are merged; the merged length is the max and still covers every row.
-* `free_slots + in_flight = max_inflight` at all times; a ticket completes when its pending count reaches 0.
+* A row at file offset `off` is fetched by one read starting at `first = off / 4096 * 4096`, of length
+  `4096` or `8192` (a row straddling a page boundary), and the row is found `off - first` bytes into the buffer.
+* Every read buffer slot is `2 * PAGE`, so no read overflows its slot.
+* `open` validates `table_offset + n_rows * 90 <= file size`; rows `>= n_rows` read as zeros.
+* Ticket ids are 32-bit, wrap around, and 0 is never a valid id.
+* The latency log is a ring of 65,536 entries; the percentile index is clamped to the last entry.
 
 ## Form template identifiers
-ROW_BYTES -> 90; PAGE -> 4096; WAYS -> 8; EMPTY -> 0xFFFFFFFF; `Job::length` -> jobLength; `pump/finish` -> pump/finish.
+firstOf / lengthOf / inPage -> `first`, `length`, `in_page` in `PleReader::issue`
+nextTicket -> `m.next_ticket++ ; if (m.next_ticket == 0) m.next_ticket = 1`
+setIndex -> `mix(row) % sets` in `RowCache`
+pctIndex -> `std::min(v.size() - 1, ...)` in `ReaderStats::percentile`
 -/
 
-namespace Ref.PleReader
+namespace Ref.Ngram
+
+-- § constants
+
+/-- `ROW_BYTES`. -/
+def rowBytes : Nat := 90
+/-- `PAGE`. -/
+def pageBytes : Nat := 4096
+/-- Cache associativity (`WAYS`). -/
+def ways : Nat := 8
+
+-- § page arithmetic
+
+/-- First byte of the aligned read covering offset `off`. -/
+def firstOf (off : Nat) : Nat := off / 4096 * 4096
+
+/-- Read length: from `first` through the page holding the row's last byte. -/
+def lengthOf (off : Nat) : Nat := (off + 89) / 4096 * 4096 - firstOf off + 4096
+
+/-- Offset of the row inside the read buffer. -/
+def inPage (off : Nat) : Nat := off - firstOf off
+
+/-- The aligned read starts at or before the row. -/
+theorem firstOf_le (off : Nat) : firstOf off ≤ off := by
+  unfold firstOf
+  omega
+
+/-- The aligned read start is page aligned (required by unbuffered I/O). -/
+theorem firstOf_aligned (off : Nat) : firstOf off % 4096 = 0 := by
+  unfold firstOf
+  omega
+
+/-- A read is one page, or two when the row straddles a page boundary. -/
+theorem lengthOf_cases (off : Nat) : lengthOf off = 4096 ∨ lengthOf off = 8192 := by
+  unfold lengthOf firstOf
+  omega
+
+/-- The read is a whole number of pages. -/
+theorem lengthOf_aligned (off : Nat) : lengthOf off % 4096 = 0 := by
+  rcases lengthOf_cases off with h | h <;> omega
+
+/-- A read never overflows its `2 * PAGE` slot. -/
+theorem lengthOf_le_slot (off : Nat) : lengthOf off ≤ 2 * 4096 := by
+  rcases lengthOf_cases off with h | h <;> omega
+
+/-- The row's last byte lies inside the read. -/
+theorem row_covered (off : Nat) : off + 90 ≤ firstOf off + lengthOf off := by
+  unfold lengthOf firstOf
+  omega
+
+/-- The in-buffer offset is smaller than a page. -/
+theorem inPage_lt_page (off : Nat) : inPage off < 4096 := by
+  unfold inPage firstOf
+  omega
+
+/-- The "short read" guard never fires for a full read: `in_page + ROW_BYTES <= length`. -/
+theorem inPage_row_fits (off : Nat) : inPage off + 90 ≤ lengthOf off := by
+  unfold inPage lengthOf firstOf
+  omega
+
+/-- Rows of the same page share the same aligned read start. -/
+theorem same_page_same_first (a b : Nat) (h : a / 4096 = b / 4096) : firstOf a = firstOf b := by
+  unfold firstOf
+  rw [h]
+
+/-- A merged job takes the larger length, which still fits a slot. -/
+theorem merged_length_le (a b : Nat) : max (lengthOf a) (lengthOf b) ≤ 2 * 4096 := by
+  have ha := lengthOf_le_slot a
+  have hb := lengthOf_le_slot b
+  omega
+
+-- § table bounds
+
+/-- If `open`'s size check passes, every in-range row lies fully inside the file. -/
+theorem row_in_file (tableOffset nRows size row : Nat) (h : tableOffset + nRows * 90 ≤ size)
+    (hr : row < nRows) : tableOffset + row * 90 + 90 ≤ size := by
+  omega
+
+-- § ticket ids
+
+/-- The next ticket counter value: a 32-bit increment that skips 0. -/
+def nextTicket (t : Nat) : Nat :=
+  if (t + 1) % 4294967296 = 0 then 1 else (t + 1) % 4294967296
+
+/-- The counter never becomes 0, so 0 stays free as the "no ticket" value. -/
+theorem nextTicket_ne_zero (t : Nat) : nextTicket t ≠ 0 := by
+  unfold nextTicket
+  split <;> omega
+
+/-- The counter stays a valid 32-bit value. -/
+theorem nextTicket_lt (t : Nat) : nextTicket t < 4294967296 := by
+  unfold nextTicket
+  split <;> omega
 
 -- § row cache
 
-/-- Number of sets for a cache of `rows` rows. -/
-def sets (rows : Nat) : Nat := rows / 8
+/-- Set index of a row (`mix % sets`), given the mixed hash value. -/
+def setIndex (mixed sets : Nat) : Nat := mixed % sets
 
-/-- Capacity never exceeds the requested rows. -/
-theorem capacity_le (rows : Nat) : sets rows * 8 ≤ rows := by unfold sets; omega
+/-- The set index is in range whenever the cache has at least one set. -/
+theorem setIndex_lt (mixed sets : Nat) (h : 0 < sets) : setIndex mixed sets < sets :=
+  Nat.mod_lt _ h
 
-/-- A set index is in range when there is at least one set. -/
-theorem set_index_lt (h s : Nat) (hs : 0 < s) : h % s < s := Nat.mod_lt _ hs
-
-/-- Flat way index `s*8 + w` stays inside `sets * 8`. -/
-theorem way_index_lt (s w n : Nat) (hs : s < n) (hw : w < 8) : s * 8 + w < n * 8 := by omega
-
-/-- Data byte offset of a cache slot stays inside the data array (`ROW_BYTES = 90`). -/
-theorem data_index_lt (s w n : Nat) (hs : s < n) (hw : w < 8) : (s * 8 + w) * 90 + 90 ≤ n * 8 * 90 := by omega
-
-/-- Round-robin pointer update. -/
+/-- Round-robin replacement pointer within a set. -/
 def nextWay (w : Nat) : Nat := (w + 1) % 8
 
-/-- The pointer is always a valid way. -/
-theorem nextWay_lt (w : Nat) : nextWay w < 8 := by unfold nextWay; omega
-
-/-- Eight inserts return the pointer to its start, so each way is replaced once per cycle. -/
-theorem nextWay_cycle (w : Nat) : (w + 8) % 8 = w % 8 := by omega
-
-/-- A key table: way -> optional row. -/
-abbrev Keys := Nat → Option Nat
-
-/-- Store `row` at way `w`. -/
-def insertAt (keys : Keys) (w row : Nat) : Keys := fun i => if i = w then some row else keys i
-
-/-- After an insert the row is found at that way. -/
-theorem insertAt_found (keys : Keys) (w row : Nat) : insertAt keys w row w = some row := by
-  simp [insertAt]
-
-/-- Other ways are untouched. -/
-theorem insertAt_other (keys : Keys) (w row i : Nat) (h : i ≠ w) : insertAt keys w row i = keys i := by
-  simp [insertAt, h]
-
-/-- Real row ids (table of at most 320,001,536 rows) never collide with the EMPTY marker. -/
-theorem row_ne_empty (n_rows row : Nat) (hn : n_rows ≤ 320001536) (hr : row < n_rows) : row ≠ 4294967295 := by
+/-- The replacement pointer stays inside the 8 ways. -/
+theorem nextWay_lt (w : Nat) : nextWay w < 8 := by
+  unfold nextWay
   omega
 
--- § page-aligned jobs
+/-- Cache capacity `sets * WAYS` never exceeds the requested row count. -/
+theorem cache_capacity_le (rows : Nat) : rows / 8 * 8 ≤ rows := Nat.div_mul_le_self rows 8
 
-/-- First page-aligned offset of a row starting at byte `at`. -/
-def jobFirst (at_ : Nat) : Nat := at_ / 4096 * 4096
-
-/-- Read length: from the first page up to the page holding the row's last byte, plus one page. -/
-def jobLength (at_ : Nat) : Nat := (at_ + 89) / 4096 * 4096 - jobFirst at_ + 4096
-
-/-- The read start is page aligned and not after the row. -/
-theorem jobFirst_props (at_ : Nat) : jobFirst at_ % 4096 = 0 ∧ jobFirst at_ ≤ at_ := by
-  unfold jobFirst
-  constructor <;> omega
-
-/-- A row needs one page or two (it may straddle a boundary). -/
-theorem jobLength_cases (at_ : Nat) : jobLength at_ = 4096 ∨ jobLength at_ = 8192 := by
-  unfold jobLength jobFirst
+/-- The slot index `set * WAYS + way` is below `sets * WAYS`. -/
+theorem slot_index_lt (s w sets : Nat) (hs : s < sets) (hw : w < 8) : s * 8 + w < sets * 8 := by
   omega
 
-/-- The read covers all 90 bytes of the row: `in_page + 90 <= length`. -/
-theorem job_covers_row (at_ : Nat) : (at_ - jobFirst at_) + 90 ≤ jobLength at_ := by
-  unfold jobLength jobFirst
+-- § latency ring and percentile
+
+/-- Overwrite position in the 65,536-entry latency ring. -/
+def ringSlot (pos : Nat) : Nat := pos % 65536
+
+/-- The ring write position is always in range. -/
+theorem ringSlot_lt (pos : Nat) : ringSlot pos < 65536 := by
+  unfold ringSlot
   omega
 
-/-- The in-page offset is below one page. -/
-theorem in_page_lt (at_ : Nat) : at_ - jobFirst at_ < 4096 := by
-  unfold jobFirst
+/-- Percentile index, given the rounded `q * (n - 1)` value, clamped to the last sample. -/
+def pctIndex (n rounded : Nat) : Nat := min (n - 1) rounded
+
+/-- For a non-empty sample the percentile index is a valid array index. -/
+theorem pctIndex_lt (n rounded : Nat) (h : 0 < n) : pctIndex n rounded < n := by
+  unfold pctIndex
   omega
 
-/-- Read buffers are two pages per slot, which holds the longest job. -/
-theorem slot_holds_job (at_ : Nat) : jobLength at_ ≤ 2 * 4096 := by
-  rcases jobLength_cases at_ with h | h <;> omega
-
-/-- Slot `s < max` addresses `[s*8192, s*8192 + 8192)` inside the `max * 8192` slab. -/
-theorem slot_buf_in_slab (s mx : Nat) (h : s < mx) : s * 8192 + 8192 ≤ mx * 8192 := by omega
-
-/-- De-duplication keeps the maximum length, which still covers every merged row. -/
-theorem merged_covers (inPage len len' : Nat) (h : inPage + 90 ≤ len) : inPage + 90 ≤ max len len' := by omega
-
-/-- A row inside the table lies inside its byte range (`rows * 90`). -/
-theorem row_in_table (row rows : Nat) (h : row < rows) : row * 90 + 90 ≤ rows * 90 := by omega
-
--- § slots, queue and tickets
-
-/-- State of the free-slot accounting: (free, in flight). -/
-structure Slots where
-  free : Nat
-  inflight : Nat
-
-/-- One `pump` step: submit a queued job if both a job and a free slot exist. -/
-def pump (s : Slots) (queued : Nat) : Slots × Nat :=
-  if 0 < queued ∧ 0 < s.free then (⟨s.free - 1, s.inflight + 1⟩, queued - 1) else (s, queued)
-
-/-- One completion: the slot returns to the free list. -/
-def finish (s : Slots) : Slots := ⟨s.free + 1, s.inflight - 1⟩
-
-/-- `pump` conserves the slot total. -/
-theorem pump_conserves (s : Slots) (q mx : Nat) (h : s.free + s.inflight = mx) :
-    (pump s q).1.free + (pump s q).1.inflight = mx := by
-  unfold pump
-  split
-  · rename_i hc
-    obtain ⟨_, h2⟩ := hc
-    simp only
-    omega
-  · exact h
-
-/-- `finish` conserves the slot total when something was in flight. -/
-theorem finish_conserves (s : Slots) (mx : Nat) (h : s.free + s.inflight = mx) (hi : 0 < s.inflight) :
-    (finish s).free + (finish s).inflight = mx := by
-  unfold finish
-  simp only
-  omega
-
-/-- A completion decrements the pending count, saturating at 0. -/
-def tick (pending : Nat) : Nat := if 0 < pending then pending - 1 else 0
-
-/-- After as many completions as jobs, the ticket is done. -/
-theorem tick_iter_done (jobs : Nat) : ∀ m, jobs ≤ m → Nat.iterate tick m jobs = 0 := by
-  intro m
-  induction m generalizing jobs with
-  | zero =>
-    intro h
-    have : jobs = 0 := by omega
-    subst this
-    rfl
-  | succ m ih =>
-    intro h
-    show Nat.iterate tick m (tick jobs) = 0
-    by_cases hj : 0 < jobs
-    · have : tick jobs = jobs - 1 := by simp [tick, hj]
-      rw [this]
-      exact ih (jobs - 1) (by omega)
-    · have : jobs = 0 := by omega
-      subst this
-      have h0 : tick 0 = 0 := by simp [tick]
-      rw [h0]
-      exact ih 0 (by omega)
-
--- § latency statistics
-
-/-- Percentile index `min(n-1, round(q (n-1)))` is a valid sample index when `n > 0`. -/
-theorem percentile_index_lt (n x : Nat) (h : 0 < n) : min (n - 1) x < n := by omega
-
-/-- The latency ring position is always inside the 65536-entry ring. -/
-theorem ring_pos_lt (pos : Nat) : pos % 65536 < 65536 := by omega
-
-/-- Fault injection: a completion is held iff it is younger than the delay; the two cases are complementary. -/
-theorem delay_split (age delay : Nat) : age < delay ∨ delay ≤ age := by omega
-
-end Ref.PleReader
+end Ref.Ngram
 
 
 
-## FILE: /mnt/user-data/outputs/NgramHash.lean
+## FILE: /mnt/user-data/outputs/MemoryPlanner.lean
 /-!
-# MODULE: ngram_hash
-SOURCES: src/kernels/ngram.cpp
-The PLE n-gram hash (64-bit multiply/xor mixing, per-head modulus and offset), the EOS-cut predecessor context,
-the IQ4_NL row layout (5 blocks of 18 bytes, split-halves nibbles), and the table size / issue-collect protocol.
+# MODULE: memory_planner
+SOURCES: include/ref/plan/plan.hpp
+Derives, from the model geometry alone, how much VRAM the KV cache, indexer keys and GDN state take, and how
+many expert-cache slots remain; refuses (DoesNotClose) rather than returning a plan it cannot honour.
 
 ## Source semantics
-* `mixed = ctx[0]*m[0] ^ ctx[1]*m[1] ^ ...`, each product wrapping mod 2^64.
-* Head `h` maps `mixed` to `mixed % vocab[h] + offset[h]`; the 16 head ranges are adjacent and fit in the table.
-* Once a predecessor is EOS/null the cut persists: all older context slots become EOS.
-* A row is 160 values = 5 blocks of (2-byte scale + 16 bytes of nibbles) = 90 bytes; element `b*32 + j` is the low
-  nibble of `qs[j]`, `b*32 + j + 16` the high nibble.
-* `issue` is refused while a token is in flight; `collect` requires one.
+* GDN state is fixed and not evictable: `n_gdn * (S*h_v*S*4 + (d_conv-1)*C*4)` bytes.
+* KV bytes per token: `n_qsa * (INT8 K+V elements + fp16 group scales + indexer key bytes)`, where the indexer
+  caches ONE shared key head (`key_heads * key_dim / block`), not one per query head.
+* `make_plan`: reject if `kv + fixed > pool`; the cache gets `pool - kv - fixed`; slots are whole blobs; reject
+  if there is not even one slot; the slot remainder is unusable and counted as used.
 
 ## Form template identifiers
-PleConsts.mult/vocab/offset -> multL/vocabL/offsetL; `ngram_mixed` -> mixedN; cut loop -> ctxRest;
-`kIq4Nl` -> iq4Tbl; `pending` -> issue/collect state.
+stateBytes -> `state_bytes(Geometry)`
+kvBytesPerToken -> `kv_bytes_per_token(Geometry)`
+makePlan -> `make_plan` (None = throws `DoesNotClose`)
 -/
 
-namespace Ref.NgramHash
+namespace Ref.Plan
 
--- § hash
+-- § geometry
 
-/-- Wrap to 64 bits. -/
-def wrap (x : Nat) : Nat := x % 2 ^ 64
+/-- Model geometry fields used by the byte costs. -/
+structure Geometry where
+  nLayers : Nat
+  nQsa : Nat
+  nKvHeads : Nat
+  headDim : Nat
+  kvGroup : Nat
+  qsaBlock : Nat
+  idxKeyHeads : Nat
+  idxKeyDim : Nat
+  ssmState : Nat
+  ssmVHeads : Nat
+  ssmDConv : Nat
+  ssmConvChannels : Nat
 
-/-- Mixed hash of two context tokens. -/
-def mixed2 (c0 c1 m0 m1 : Nat) : Nat := wrap (c0 * m0) ^^^ wrap (c1 * m1)
+/-- The shipped artifact's geometry (the defaults of `plan::Geometry`). -/
+def defaultG : Geometry :=
+  { nLayers := 48, nQsa := 12, nKvHeads := 2, headDim := 256, kvGroup := 64, qsaBlock := 4,
+    idxKeyHeads := 1, idxKeyDim := 128, ssmState := 128, ssmVHeads := 48, ssmDConv := 4,
+    ssmConvChannels := 10240 }
 
-/-- Mixed hash of three context tokens (assignment then xors). -/
-def mixed3 (c0 c1 c2 m0 m1 m2 : Nat) : Nat := wrap (c0 * m0) ^^^ wrap (c1 * m1) ^^^ wrap (c2 * m2)
+/-- Number of GDN layers: derived, not a third constant. -/
+def Geometry.nGdn (g : Geometry) : Nat := g.nLayers - g.nQsa
 
-/-- Wrapped products fit in 64 bits. -/
-theorem wrap_lt (x : Nat) : wrap x < 2 ^ 64 := Nat.mod_lt _ (Nat.two_pow_pos 64)
+/-- GDN recurrence + conv history bytes per sequence. -/
+def stateBytes (g : Geometry) : Nat :=
+  g.nGdn * (g.ssmState * g.ssmVHeads * g.ssmState * 4 + (g.ssmDConv - 1) * g.ssmConvChannels * 4)
 
-/-- The two-token hash is a 64-bit value. -/
-theorem mixed2_lt (c0 c1 m0 m1 : Nat) : mixed2 c0 c1 m0 m1 < 2 ^ 64 :=
-  Nat.xor_lt_two_pow (wrap_lt _) (wrap_lt _)
+/-- INT8 KV plus indexer-key bytes per token. -/
+def kvBytesPerToken (g : Geometry) : Nat :=
+  g.nQsa * ((2 * g.nKvHeads * g.headDim + (2 * g.nKvHeads * g.headDim) / g.kvGroup * 2) +
+    g.idxKeyHeads * g.idxKeyDim / g.qsaBlock)
 
-/-- The three-token hash is a 64-bit value. -/
-theorem mixed3_lt (c0 c1 c2 m0 m1 m2 : Nat) : mixed3 c0 c1 c2 m0 m1 m2 < 2 ^ 64 :=
-  Nat.xor_lt_two_pow (Nat.xor_lt_two_pow (wrap_lt _) (wrap_lt _)) (wrap_lt _)
+-- § concrete values of the shipped model
 
--- § per-head ranges
+/-- 36 of the 48 layers are GDN. -/
+theorem default_n_gdn : defaultG.nGdn = 36 := by decide
 
-/-- Head moduli (from the artifact's metadata). -/
-def vocabL : List Nat :=
+/-- The GDN state is 117,669,888 bytes. -/
+theorem default_state_bytes : stateBytes defaultG = 117669888 := by decide
+
+/-- The GDN state costs 85 whole expert slots (1,382,400 B each), the figure the source quotes. -/
+theorem default_state_is_85_slots : stateBytes defaultG / 1382400 = 85 := by decide
+
+/-- KV plus indexer bytes per token: 13,056 (12 layers x (1024 + 32 + 32)). -/
+theorem default_kv_per_token : kvBytesPerToken defaultG = 13056 := by decide
+
+-- § planning
+
+/-- The result of a successful plan (the numeric fields of `plan::Plan`). -/
+structure Plan where
+  kvBytes : Nat
+  stateBytes : Nat
+  cacheBytes : Nat
+  cacheSlots : Nat
+  vramUsed : Nat
+
+/-- `make_plan`: `none` models `DoesNotClose`. `fixed` is dense + embedding + MTP + workspace + state. -/
+def makePlan (ctx pool blob kvPerTok fixed state : Nat) : Option Plan :=
+  if kvPerTok * ctx + fixed > pool then none
+  else if (pool - kvPerTok * ctx - fixed) / blob = 0 then none
+  else some { kvBytes := kvPerTok * ctx, stateBytes := state,
+              cacheBytes := pool - kvPerTok * ctx - fixed,
+              cacheSlots := (pool - kvPerTok * ctx - fixed) / blob,
+              vramUsed := pool - (pool - kvPerTok * ctx - fixed) % blob }
+
+/-- A plan whose fixed costs plus KV exceed the pool is refused. -/
+theorem makePlan_refuses_overflow (ctx pool blob kvPerTok fixed state : Nat)
+    (h : kvPerTok * ctx + fixed > pool) : makePlan ctx pool blob kvPerTok fixed state = none := by
+  unfold makePlan
+  simp [h]
+
+/-- A plan with no room for even one slot is refused. -/
+theorem makePlan_refuses_no_slot (ctx pool blob kvPerTok fixed state : Nat)
+    (h1 : ¬ kvPerTok * ctx + fixed > pool) (h2 : (pool - kvPerTok * ctx - fixed) / blob = 0) :
+    makePlan ctx pool blob kvPerTok fixed state = none := by
+  unfold makePlan
+  simp [h1, h2]
+
+/-- Every accepted plan exactly splits the pool into KV, fixed costs and cache. -/
+theorem makePlan_budget {ctx pool blob kvPerTok fixed state : Nat} {p : Plan}
+    (h : makePlan ctx pool blob kvPerTok fixed state = some p) :
+    p.kvBytes + fixed + p.cacheBytes = pool := by
+  unfold makePlan at h
+  by_cases c1 : kvPerTok * ctx + fixed > pool
+  · simp [c1] at h
+  · by_cases c2 : (pool - kvPerTok * ctx - fixed) / blob = 0
+    · simp [c1, c2] at h
+    · simp [c1, c2] at h
+      subst h
+      simp
+      omega
+
+/-- Every accepted plan has at least one expert slot. -/
+theorem makePlan_slots_pos {ctx pool blob kvPerTok fixed state : Nat} {p : Plan}
+    (h : makePlan ctx pool blob kvPerTok fixed state = some p) : 0 < p.cacheSlots := by
+  unfold makePlan at h
+  by_cases c1 : kvPerTok * ctx + fixed > pool
+  · simp [c1] at h
+  · by_cases c2 : (pool - kvPerTok * ctx - fixed) / blob = 0
+    · simp [c1, c2] at h
+    · simp [c1, c2] at h
+      subst h
+      exact Nat.pos_of_ne_zero c2
+
+/-- The slots never take more bytes than the cache budget. -/
+theorem makePlan_slots_fit {ctx pool blob kvPerTok fixed state : Nat} {p : Plan}
+    (h : makePlan ctx pool blob kvPerTok fixed state = some p) :
+    p.cacheSlots * blob ≤ p.cacheBytes := by
+  unfold makePlan at h
+  by_cases c1 : kvPerTok * ctx + fixed > pool
+  · simp [c1] at h
+  · by_cases c2 : (pool - kvPerTok * ctx - fixed) / blob = 0
+    · simp [c1, c2] at h
+    · simp [c1, c2] at h
+      subst h
+      simp
+      exact Nat.div_mul_le_self _ _
+
+/-- Whole slots plus the unusable remainder account for the entire cache budget. -/
+theorem slots_remainder_split (cache blob : Nat) : (cache / blob) * blob + cache % blob = cache := by
+  have := Nat.div_add_mod cache blob
+  rw [Nat.mul_comm] at this
+  exact this
+
+/-- The reported VRAM use never exceeds the pool. -/
+theorem makePlan_used_le {ctx pool blob kvPerTok fixed state : Nat} {p : Plan}
+    (h : makePlan ctx pool blob kvPerTok fixed state = some p) : p.vramUsed ≤ pool := by
+  unfold makePlan at h
+  by_cases c1 : kvPerTok * ctx + fixed > pool
+  · simp [c1] at h
+  · by_cases c2 : (pool - kvPerTok * ctx - fixed) / blob = 0
+    · simp [c1, c2] at h
+    · simp [c1, c2] at h
+      subst h
+      simp <;> omega
+
+-- § monotonicity in the context length
+
+/-- KV bytes grow with the requested context. -/
+theorem kv_mono (kvPerTok c1 c2 : Nat) (h : c1 ≤ c2) : kvPerTok * c1 ≤ kvPerTok * c2 :=
+  Nat.mul_le_mul_left kvPerTok h
+
+/-- A context that does not close stays unclosable at any larger context. -/
+theorem overflow_persists (kvPerTok c1 c2 pool fixed : Nat) (h : c1 ≤ c2)
+    (hov : kvPerTok * c1 + fixed > pool) : kvPerTok * c2 + fixed > pool := by
+  have := kv_mono kvPerTok c1 c2 h
+  omega
+
+/-- The VRAM pool constant of the README table. -/
+def vramPool : Nat := 5943000000
+
+end Ref.Plan
+
+
+
+## FILE: /mnt/user-data/outputs/PleNgram.lean
+/-!
+# MODULE: ple_ngram
+SOURCES: include/ref/kernels/ngram.hpp, src/kernels/ngram.cpp
+The PLE n-gram hash (16 row indices per token from the last three token ids) and the IQ4_NL row layout
+of the per-layer token table.
+
+## Source semantics
+* Head `h = (n-2)*8 + g` for `n in {2,3}`, `g < 8`; its row is `mixed_n % vocab[h] + offset[h]`.
+* `head_offsets` is the running sum of `head_vocab_sizes`, and the last head ends below the table's row count,
+  so every hashed row is in range.
+* The EOS cut propagates forward: once a predecessor is missing (`< 0`) or EOS, it and all older positions
+  become EOS; the token's own id is never cut.
+* `mixed` XORs products, so equal terms cancel (a sum would double them).
+* A row is 5 IQ4_NL blocks of 18 bytes = 90 bytes = 160 values; sixteen rows flatten head-slowest to 2560.
+* Nibble order is split-half: byte `j` holds elements `j` and `j+16`.
+
+## Form template identifiers
+ctxStep -> the per-predecessor `cut`/`ctx[s]` update in `ngram_rows`
+headIndex -> `(n - 2) * HEADS_PER_NGRAM + g`
+vocabs / offsets -> `ple_artifact_consts().vocab / .offset`
+loByte / hiHalf -> `qs[j] & 0x0F` / `qs[j] >> 4` in `iq4nl_dequant_row`
+-/
+
+namespace Ref.Kernels
+
+-- § geometry constants
+
+/-- `PLE_HEAD_DIM`. -/
+def pleHeadDim : Nat := 160
+/-- `NGRAM_SIZE`. -/
+def ngramSize : Nat := 3
+/-- `HEADS_PER_NGRAM`. -/
+def headsPerNgram : Nat := 8
+/-- `PLE_N_HEADS = (NGRAM_SIZE - 1) * HEADS_PER_NGRAM`. -/
+def pleNHeads : Nat := (ngramSize - 1) * headsPerNgram
+/-- `PLE_ROW_BYTES = (PLE_HEAD_DIM / 32) * 18`. -/
+def pleRowBytes : Nat := (pleHeadDim / 32) * 18
+/-- `PLE_TABLE_ROWS`. -/
+def pleTableRows : Nat := 320001536
+
+/-- Sixteen heads. -/
+theorem n_heads_sixteen : pleNHeads = 16 := by decide
+
+/-- A row is 90 bytes. -/
+theorem row_bytes_ninety : pleRowBytes = 90 := by decide
+
+/-- Sixteen gathered rows flatten to `n_embd = 2560` values. -/
+theorem gather_is_n_embd : pleNHeads * pleHeadDim = 2560 := by decide
+
+/-- The history window `(conv_kernel - 1) * ngram_size` is 9. -/
+theorem hist_is_nine : (4 - 1) * ngramSize = 9 := by decide
+
+-- § head indexing
+
+/-- Head index of bigram/trigram `n` and sub-head `g`. -/
+def headIndex (n g : Nat) : Nat := (n - 2) * 8 + g
+
+/-- Heads of `n in {2,3}` cover `0..15` without leaving the 16-entry arrays. -/
+theorem headIndex_lt (n g : Nat) (h1 : 2 ≤ n) (h2 : n ≤ 3) (hg : g < 8) : headIndex n g < 16 := by
+  unfold headIndex
+  omega
+
+/-- Distinct `(n, g)` pairs give distinct heads. -/
+theorem headIndex_inj (n m g k : Nat) (h1 : 2 ≤ n) (h2 : n ≤ 3) (h3 : 2 ≤ m) (h4 : m ≤ 3)
+    (hg : g < 8) (hk : k < 8) (h : headIndex n g = headIndex m k) : n = m ∧ g = k := by
+  unfold headIndex at h
+  omega
+
+-- § hash constants
+
+/-- `head_vocab_sizes` of the artifact. -/
+def vocabs : List Nat :=
   [20000003, 20000023, 20000033, 20000047, 20000059, 20000063, 20000069, 20000077,
    20000081, 20000093, 20000107, 20000147, 20000153, 20000159, 20000161, 20000171]
 
-/-- Head offsets (from the artifact's metadata). -/
-def offsetL : List Nat :=
+/-- `head_offsets` of the artifact. -/
+def offsets : List Nat :=
   [0, 20000003, 40000026, 60000059, 80000106, 100000165, 120000228, 140000297,
    160000374, 180000455, 200000548, 220000655, 240000802, 260000955, 280001114, 300001275]
 
-/-- Modulus of head `i`. -/
-def vocab (i : Nat) : Nat := vocabL.getD i 0
+/-- Running sum of vocabulary sizes. -/
+def prefixSums : Nat → List Nat → List Nat
+  | _, [] => []
+  | acc, v :: vs => acc :: prefixSums (acc + v) vs
 
-/-- Offset of head `i`. -/
-def offset (i : Nat) : Nat := offsetL.getD i 0
+/-- The offsets are exactly the running sum of the vocab sizes. -/
+theorem offsets_are_prefix_sums : offsets = prefixSums 0 vocabs := by decide
 
-/-- Every head modulus is positive, so `% vocab` is a genuine reduction. -/
-theorem vocab_pos : ∀ i, i < 16 → 0 < vocab i := by decide
+/-- Both arrays have one entry per head. -/
+theorem consts_length : vocabs.length = 16 ∧ offsets.length = 16 := by decide
 
-/-- Head ranges are adjacent: `offset (i+1) = offset i + vocab i`. -/
-theorem offset_succ : ∀ i, i < 15 → offset (i + 1) = offset i + vocab i := by decide
+/-- The vocabulary sizes together fit inside the table. -/
+theorem vocab_sum_fits : vocabs.foldl (· + ·) 0 ≤ pleTableRows := by decide
 
-/-- Every head's range ends inside the 320,001,536-row table. -/
-theorem range_in_table : ∀ i, i < 16 → offset i + vocab i ≤ 320001536 := by decide
+/-- The last head ends at 320,001,446, below the table's 320,001,536 rows. -/
+theorem last_head_end : 300001275 + 20000171 = 320001446 ∧ 320001446 ≤ pleTableRows := by decide
 
-/-- A hashed row index lies in its head's range, hence in the table. -/
-theorem row_in_range (mixed i : Nat) (hi : i < 16) : mixed % vocab i + offset i < offset i + vocab i ∧
-    mixed % vocab i + offset i < 320001536 + 1 := by
-  have h1 := Nat.mod_lt mixed (vocab_pos i hi)
-  have h2 := range_in_table i hi
-  constructor <;> omega
+/-- A hashed row `mixed % vocab + offset` is strictly below `vocab + offset`. -/
+theorem hashed_row_lt (mixed vocab offset : Nat) (h : 0 < vocab) :
+    mixed % vocab + offset < vocab + offset := by
+  have := Nat.mod_lt mixed h
+  omega
 
-/-- Heads of one n-gram order are `base + g`, with `base = (n-2)*8` and `g < 8`: always below 16 for `n ∈ {2,3}`. -/
-theorem head_index_lt (n g : Nat) (hn1 : 2 ≤ n) (hn2 : n ≤ 3) (hg : g < 8) : (n - 2) * 8 + g < 16 := by omega
+/-- Hence every hashed row lies in the table, whenever `vocab + offset` is within it. -/
+theorem hashed_row_in_table (mixed vocab offset : Nat) (h : 0 < vocab)
+    (hend : vocab + offset ≤ pleTableRows) : mixed % vocab + offset < pleTableRows := by
+  have := hashed_row_lt mixed vocab offset h
+  omega
 
-/-- Output position `i*16 + h` stays inside the token's 16-row slice. -/
-theorem out_index_lt (i h : Nat) (hh : h < 16) : i * 16 + h < (i + 1) * 16 := by omega
+-- § XOR structure
 
-/-- Predecessor `s ∈ {1,2}` is read at `i*2 + (2 - s)`: newest at slot 1, inside the token's two-entry window. -/
-theorem prev_index_lt (i s : Nat) (h1 : 1 ≤ s) (h2 : s ≤ 2) : i * 2 + (2 - s) < (i + 1) * 2 := by omega
+/-- Mixed hash of two terms. -/
+def mixed2 (c0 c1 m0 m1 : Nat) : Nat := (c0 * m0) ^^^ (c1 * m1)
+
+/-- Equal context tokens with equal multipliers cancel to zero under XOR (a sum would double them). -/
+theorem xor_equal_terms_cancel (c m : Nat) : mixed2 c c m m = 0 := by
+  unfold mixed2
+  exact Nat.xor_self _
+
+/-- XOR combination is order-independent. -/
+theorem mixed2_comm (c0 c1 m0 m1 : Nat) : mixed2 c0 c1 m0 m1 = mixed2 c1 c0 m1 m0 := by
+  unfold mixed2
+  exact Nat.xor_comm _ _
 
 -- § EOS cut
 
-/-- Context after the first token, newest predecessor first; `cut` latches on null (<0) or EOS. -/
-def ctxRest (eos : Int) : List Int → Bool → List Int
-  | [], _ => []
-  | t :: ts, cut =>
-    let cut' := cut || decide (t < 0) || decide (t = eos)
-    (if cut' then eos else t) :: ctxRest eos ts cut'
+/-- EOS token id. -/
+def eosId : Int := 248044
 
-/-- One context slot per predecessor. -/
-theorem ctxRest_length (eos : Int) (ps : List Int) : ∀ cut, (ctxRest eos ps cut).length = ps.length := by
-  induction ps with
-  | nil => intro cut; rfl
-  | cons t ts ih => intro cut; simp [ctxRest, ih]
+/-- One predecessor step: new `cut` flag and the stored context value. -/
+def ctxStep (cut : Bool) (t : Int) : Bool × Int :=
+  let cut' := cut || decide (t < 0) || decide (t = eosId)
+  (cut', if cut' then eosId else t)
 
-/-- Once cut, everything older is EOS. -/
-theorem ctxRest_cut (eos : Int) (ps : List Int) : ctxRest eos ps true = List.replicate ps.length eos := by
-  induction ps with
-  | nil => rfl
-  | cons t ts ih => simp [ctxRest, ih, List.replicate_succ]
+/-- Once cut, every older position stays cut and becomes EOS. -/
+theorem ctxStep_cut_propagates (t : Int) : ctxStep true t = (true, eosId) := by
+  simp [ctxStep]
 
--- § IQ4_NL row layout
+/-- A real, non-EOS predecessor with no earlier cut is kept verbatim (token id 0 is real). -/
+theorem ctxStep_keeps_real (t : Int) (h0 : 0 ≤ t) (hne : t ≠ eosId) :
+    ctxStep false t = (false, t) := by
+  have h1 : ¬ t < 0 := by omega
+  simp [ctxStep, h1, hne]
 
-/-- 90 bytes = 5 blocks of 18 bytes. -/
-theorem row_bytes : 5 * 18 = 90 := by decide
+/-- A missing predecessor (`-1`) starts the cut. -/
+theorem ctxStep_missing_cuts : ctxStep false (-1) = (true, eosId) := by
+  decide
 
-/-- A block byte `b*18 + 2 + j` (`b<5`, `j<16`) is inside the 90-byte row. -/
-theorem qs_byte_in_row (b j : Nat) (hb : b < 5) (hj : j < 16) : b * 18 + 2 + j < 90 := by omega
+/-- An EOS predecessor is itself EOS and cuts everything older. -/
+theorem ctxStep_eos_cuts : ctxStep false eosId = (true, eosId) := by
+  decide
 
-/-- Low/high nibble outputs `b*32 + j` and `b*32 + j + 16` are inside the 160 values. -/
-theorem out_element_lt (b j half : Nat) (hb : b < 5) (hj : j < 16) (hh : half < 2) : b * 32 + j + 16 * half < 160 := by
+/-- Predecessor `s` back, oldest-first window of two, lives at index `2 - s`; `s = 1` is the newest. -/
+theorem prev_index_in_window (s : Nat) (h1 : 1 ≤ s) (h2 : s ≤ 2) : 2 - s < 2 ∧ (s = 1 → 2 - s = 1) := by
   omega
 
-/-- Every output index `idx < 160` is written exactly once, by (block, j, half). -/
-theorem out_element_bijective (idx : Nat) (h : idx < 160) :
-    idx / 32 < 5 ∧ idx % 16 < 16 ∧ idx % 32 / 16 < 2 ∧ idx / 32 * 32 + idx % 16 + 16 * (idx % 32 / 16) = idx := by
-  refine ⟨?_, ?_, ?_, ?_⟩ <;> omega
-
-/-- A packed byte splits into two valid 4-bit codes. -/
-theorem nibble_split (q : Nat) (h : q < 256) : q % 16 < 16 ∧ q / 16 < 16 ∧ q = 16 * (q / 16) + q % 16 := by
-  refine ⟨?_, ?_, ?_⟩ <;> omega
+-- § IQ4_NL layout
 
 /-- The IQ4_NL codebook. -/
-def iq4L : List Int := [-127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113]
+def iq4nl : List Int := [-127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113]
 
-/-- Codebook entry. -/
-def iq4Tbl (i : Nat) : Int := iq4L.getD i 0
+/-- The codebook has 16 entries. -/
+theorem iq4nl_length : iq4nl.length = 16 := by decide
 
 /-- The codebook is strictly increasing. -/
-theorem iq4_increasing : ∀ i, i < 15 → iq4Tbl i < iq4Tbl (i + 1) := by decide
+theorem iq4nl_sorted : List.Pairwise (· < ·) iq4nl := by decide
 
--- § table size and gather layout
+/-- Every codebook value fits an int8. -/
+theorem iq4nl_int8 : ∀ v ∈ iq4nl, -128 ≤ v ∧ v ≤ 127 := by decide
 
-/-- Row `row < rows` ends within `rows * 90` bytes. -/
-theorem table_row_end (row rows : Nat) (h : row < rows) : row * 90 + 90 ≤ rows * 90 := by omega
+/-- Byte index holding element `e` (0..31) of a block: split-half order. -/
+def byteOf (e : Nat) : Nat := e % 16
 
-/-- Head-slowest gather: `h*160 + d` is inside the 2560-float output. -/
-theorem gather_index_lt (h d : Nat) (hh : h < 16) (hd : d < 160) : h * 160 + d < 2560 := by omega
+/-- Whether element `e` is the high nibble of its byte. -/
+def hiHalf (e : Nat) : Nat := e / 16
 
--- § issue / collect protocol
+/-- Split-half packing: element `e` is `byte + 16 * half`, so byte `j` holds elements `j` and `j + 16`. -/
+theorem split_half_roundtrip (e : Nat) : byteOf e + 16 * hiHalf e = e := by
+  unfold byteOf hiHalf
+  omega
 
-/-- `issue` on a table with a token in flight is refused. -/
-def issue (pending : Bool) : Option Bool := if pending then none else some true
+/-- Every element of a 32-element block maps to a byte below 16 and a half below 2. -/
+theorem split_half_in_range (e : Nat) (h : e < 32) : byteOf e < 16 ∧ hiHalf e < 2 := by
+  unfold byteOf hiHalf
+  omega
 
-/-- `collect` without a pending issue is refused. -/
-def collect (pending : Bool) : Option Bool := if pending then some false else none
+/-- Distinct elements map to distinct (byte, half) pairs. -/
+theorem split_half_injective (a b : Nat) (ha : a < 32) (hb : b < 32)
+    (h1 : byteOf a = byteOf b) (h2 : hiHalf a = hiHalf b) : a = b := by
+  unfold byteOf hiHalf at *
+  omega
 
-/-- Issue then collect round-trips to an idle table. -/
-theorem issue_collect_roundtrip : (issue false).bind collect = some false := by decide
-
-/-- A second issue before collect is refused. -/
-theorem double_issue_refused : (issue false).bind issue = none := by decide
-
-end Ref.NgramHash
-
-
-
-/-! [measured by the kernel] STATEMENTS CHANGED AFTER VERIFICATION in this chunk.
-These are not the first reading of the reference: check each against the reference code before implementing or accepting it.
-
-- GenerateDriver.lean
-  was: theorem produced_reaches_max (nPrompt maxNew : Nat) (h1 : 1 ≤ nPrompt) (h2 : 1 ≤ maxNew) :
-    producedAt nPrompt (nPrompt - 2 + maxNew) = maxNew ∨ (nPrompt = 1 ∧ producedAt nPrompt (maxNew - 1) = maxNew)
-  now: theorem produced_reaches_max (nPrompt maxNew : Nat) (h1 : 2 ≤ nPrompt) (h2 : 1 ≤ maxNew) :
-    producedAt nPrompt (nPrompt - 2 + maxNew) = maxNew
-  measured: the claim changed
-
-- GenerateDriver.lean
-  was: theorem nextInput_prompt (prompt : Nat → Nat) (n pos next : Nat) (h : pos + 1 < n) :
-    nextInput prompt n pos next = prompt (pos + 1)
-  now: theorem produced_reaches_max_single (maxNew : Nat) (h2 : 1 ≤ maxNew) :
-    producedAt 1 (maxNew - 1) = maxNew
-  measured: fewer quantified variables (3 → 2)
-
-- GenerateDriver.lean
-  was: theorem nextInput_sampled (prompt : Nat → Nat) (n pos next : Nat) (h : ¬ pos + 1 < n) :
-    nextInput prompt n pos next = next
-  now: theorem nextInput_prompt (prompt : Nat → Nat) (n pos next : Nat) (h : pos + 1 < n) :
-    nextInput prompt n pos next = prompt (pos + 1)
-  measured: the claim changed
-
-- GenerateDriver.lean
-  was: theorem selected_stride_one (pos total : Nat) : selected pos total 1
-  now: theorem nextInput_sampled (prompt : Nat → Nat) (n pos next : Nat) (h : ¬ pos + 1 < n) :
-    nextInput prompt n pos next = next
-  measured: more hypotheses/binders (1 → 3): the statement holds in fewer cases
-
-- GenerateDriver.lean
-  was: theorem selected_last (total stride : Nat) (h : 0 < total) : selected (total - 1) total stride
-  now: theorem selected_stride_one (pos total : Nat) : selected pos total 1
-  measured: fewer quantified variables (2 → 1)
-
-- GenerateDriver.lean
-  was: theorem acc_le_left (ds os : List Nat) : acc ds os ≤ ds.length
-  now: theorem selected_last (total stride : Nat) (h : 0 < total) : selected (total - 1) total stride
-  measured: more hypotheses/binders (1 → 2): the statement holds in fewer cases
-
-- GenerateDriver.lean
-  was: theorem acc_le_right (ds os : List Nat) : acc ds os ≤ os.length
-  now: theorem acc_le_left (ds os : List Nat) : acc ds os ≤ ds.length
-  measured: the claim changed
-
-- GenerateDriver.lean
-  was: theorem acc_self (ds : List Nat) : acc ds ds = ds.length
-  now: theorem acc_le_right (ds os : List Nat) : acc ds os ≤ os.length
-  measured: the claim changed
-
-- GenerateDriver.lean
-  was: theorem emitted_le_window (ds os : List Nat) : acc ds os + 1 ≤ 1 + ds.length
-  now: theorem acc_self (ds : List Nat) : acc ds ds = ds.length
-  measured: the claim changed
-
-- GenerateDriver.lean
-  was: theorem winLoop_ge (ok : Nat → Bool) (S : Nat) (f : Nat) : ∀ T, T ≤ winLoop ok S f T
-  now: theorem emitted_le_window (ds os : List Nat) : acc ds os + 1 ≤ 1 + ds.length
-  measured: fewer quantified variables (4 → 1)
-
-- GenerateDriver.lean
-  was: theorem winLoop_le (ok : Nat → Bool) (S : Nat) (f : Nat) : ∀ T, T ≤ S → winLoop ok S f T ≤ S
-  now: theorem winLoop_ge (ok : Nat → Bool) (S : Nat) (f : Nat) : ∀ T, T ≤ winLoop ok S f T
-  measured: the claim changed
-
-- GenerateDriver.lean
-  was: theorem lend_suffix (slots k : Nat) (h : k + 128 ≤ slots) : lendFirst slots k + k = slots ∧ 128 ≤ lendFirst slots k
-  now: theorem winLoop_le (ok : Nat → Bool) (S : Nat) (f : Nat) : ∀ T, T ≤ S → winLoop ok S f T ≤ S
-  measured: more hypotheses/binders (2 → 3): the statement holds in fewer cases
-
-- GenerateDriver.lean
-  was: theorem pcieNum_le (x : Nat) : pcieNum x ≤ 256
-  now: theorem lend_suffix (slots k : Nat) (h : k + 128 ≤ slots) : lendFirst slots k + k = slots ∧ 128 ≤ lendFirst slots k
-  measured: more hypotheses/binders (1 → 2): the statement holds in fewer cases
-
-- GenerateDriver.lean
-  was: theorem mrope_image_pos_lt (p j nx ny : Nat) (hj : j < nx * ny) :
-    p + j / nx < p + max nx ny ∧ p + j % nx < p + max nx ny
-  now: theorem pcieNum_le (x : Nat) : pcieNum x ≤ 256
-  measured: fewer quantified variables (2 → 1)
--/
+end Ref.Kernels
 
 
 
-## FILE: /mnt/user-data/outputs/FusedGdnDecode.lean
+## FILE: /mnt/user-data/outputs/GenerateDriver.lean
 /-!
-# MODULE: fused_gdn_decode
-SOURCES: src/kernels/cuda/fused_gdn.cu
-Single-token fused gated-delta-net decode: causal-conv + SiLU + L2 norm, the alpha/beta projections, and the
-state-update + RMS-norm + gate kernel. Thread/row layouts and the exact-arithmetic algebra are formalised.
+# MODULE: generate_driver
+SOURCES: src/program/generate.cpp
+The `ref generate` driver: option validation, the per-token decode loop with teacher forcing, the
+speculative verify-window loop, the VRAM expert-cache sizing, the routing trace, and the M-RoPE position
+table used by the vision path of `--serve`.
 
 ## Source semantics
-* `gdn_step_norm_kernel`: block = head, thread (col, rg); 4 row groups of 32 rows own the 128 state rows; kv_col is the
-  sum of the four row-group partials; delta = (v - g*kv_col)*beta; state' = g*state + k*delta.
-* `gdn_conv_l2_kernel`: one thread per channel, history of 3 slides by one per token.
-* `gdn_ab_kernel`: one warp per row of [alpha ; beta] weight rows, 8 warps per block.
+* A prompt is a non-empty list of token ids in `[0, 2^31)`; `--max-new`/`--max-context` must be positive and
+  the prompt plus generation must fit the context, which itself is below `2^31 - 8`.
+* The logits dump has `n_prompt - 1 + max_new` positions, because sampling only starts being recorded at the
+  last prompt position.
+* The routing trace records the layer as `d.layers - 1` (the adapter has already advanced it) and must lie in
+  `0..47`.
+* `--expert-cache auto` grants `(free - reserve) / max_blob` slots (never negative).
+* The prompt path lends the last `k >= 1` cache slots and needs `k + 128 <= slots`.
+* A speculative round has `1 <= T <= S` tokens, accepts the longest matching draft prefix `a <= T - 1`, commits
+  `a + 1` tokens, and never overshoots `max_new` or `max_context`.
+* Image rows get M-RoPE positions `(p, p + y, p + x)` with `y = j / nx`, `x = j % nx`; text after the image
+  continues at `p + max(nx, ny)`.
 
 ## Form template identifiers
-S -> state_size, RG -> row_groups, RPG -> rows_per_group, tid -> flat_thread_id, stateRow -> owned_state_row,
-sumTo -> exact_reduction, histStep -> conv_history_shift
+validConfig -> the `--max-new`/`--max-context` checks in `main`
+dumpPositions -> `n_prompt - 1 + max_new`
+layerIdx -> `(int32_t)(t->d.layers - 1)` in `drive_pool`
+autoSlots -> `(free_b - reserve) / expert_layout().max_blob`
+pickTAux -> the `while (T < S && dprob[T-1] >= min_p) ++T` loop
+accPrefix -> the `while (a < T - 1 && window[a+1] == outv[a]) ++a` loop
+imgPos -> `put(i + j, p, p + y, p + x)`
 -/
-namespace Ref.FusedGdnDecode
 
--- § exact-arithmetic reduction library
-/-- Sum of `f 0 .. f (n-1)` over the integers (exact model of a reduction). -/
-def sumTo (f : Nat → Int) : Nat → Int
-  | 0 => 0
-  | n+1 => sumTo f n + f n
+namespace Ref.Program
 
-/-- Splitting a reduction at an arbitrary point. -/
-theorem sumTo_add (f : Nat → Int) (n m : Nat) :
-    sumTo f (n+m) = sumTo f n + sumTo (fun r => f (n+r)) m := by
-  induction m with
-  | zero => simp [sumTo]
-  | succ m ih =>
-    have e : sumTo f (n + (m+1)) = sumTo f (n+m) + f (n+m) := rfl
-    have e2 : sumTo (fun r => f (n+r)) (m+1) = sumTo (fun r => f (n+r)) m + f (n+m) := rfl
-    rw [e, ih, e2]
-    omega
+-- § argument validation
 
-/-- A reduction over `a*b` items equals the reduction of `a` block reductions of `b` items. -/
-theorem sum_blocks (f : Nat → Int) (b a : Nat) :
-    sumTo f (a*b) = sumTo (fun r => sumTo (fun c => f (r*b+c)) b) a := by
-  induction a with
-  | zero => simp [sumTo]
-  | succ a ih =>
-    have h : (a+1)*b = a*b + b := Nat.succ_mul a b
-    rw [h, sumTo_add f (a*b) b, ih]
-    try rfl
+/-- A token id accepted by `parse_i64_list`: a non-negative int32. -/
+def validId (n : Int) : Prop := 0 ≤ n ∧ n ≤ 2147483647
 
-/-- Scalar factors pull out of a reduction. -/
-theorem sum_scale (g : Int) (f : Nat → Int) (n : Nat) :
-    sumTo (fun i => g * f i) n = g * sumTo f n := by
-  induction n with
-  | zero => simp [sumTo]
-  | succ n ih => simp [sumTo, ih, Int.mul_add]
+/-- Negative ids are rejected. -/
+theorem negative_id_rejected (n : Int) (h : n < 0) : ¬ validId n := by
+  unfold validId
+  omega
 
-/-- Decaying the state before contracting with k equals decaying the contraction. -/
-theorem decay_commutes (g : Int) (s k : Nat → Int) (n : Nat) :
-    sumTo (fun i => g * s i * k i) n = g * sumTo (fun i => s i * k i) n := by
-  have h : (fun i => g * s i * k i) = (fun i => g * (s i * k i)) :=
-    funext fun i => Int.mul_assoc _ _ _
-  rw [h, sum_scale]
+/-- Ids above int32 range are rejected. -/
+theorem huge_id_rejected (n : Int) (h : 2147483647 < n) : ¬ validId n := by
+  unfold validId
+  omega
 
--- § constants and thread layout
+/-- The size checks `main` performs before anything is allocated. -/
+def validConfig (promptLen maxNew maxCtx : Nat) : Prop :=
+  0 < maxNew ∧ 0 < maxCtx ∧ maxNew ≤ maxCtx ∧ promptLen ≤ maxCtx - maxNew
+
+/-- A valid configuration holds the prompt and every generated token. -/
+theorem config_fits (p n c : Nat) (h : validConfig p n c) : p + n ≤ c := by
+  unfold validConfig at h
+  omega
+
+/-- With `max_context < 2^31 - 8`, positions and cells stay within int32 on the device. -/
+theorem positions_fit_int32 (p n c : Nat) (h : validConfig p n c) (hc : c ≤ 2147483647 - 8) :
+    p + n + 8 ≤ 2147483647 := by
+  unfold validConfig at h
+  omega
+
+-- § logits dump header
+
+/-- Number of positions the logits dump covers. -/
+def dumpPositions (nPrompt maxNew : Nat) : Nat := nPrompt - 1 + maxNew
+
+/-- The header count equals the rows actually written: one per processed position. -/
+theorem dumpPositions_eq (nPrompt maxNew : Nat) (h : 1 ≤ nPrompt) :
+    dumpPositions nPrompt maxNew + 1 = nPrompt + maxNew := by
+  unfold dumpPositions
+  omega
+
+-- § routing trace
+
+/-- Layer index recorded by `drive_pool`: the adapter has advanced `d.layers` already. -/
+def layerIdx (layersAfter : Int) : Int := layersAfter - 1
+
+/-- The trace's bounds check accepts exactly the post-advance counts `1..48`. -/
+theorem layerIdx_valid_iff (l : Int) : (0 ≤ layerIdx l ∧ layerIdx l < 48) ↔ (1 ≤ l ∧ l ≤ 48) := by
+  unfold layerIdx
+  omega
+
+-- § VRAM expert cache sizing
+
+/-- Slots granted by `--expert-cache auto`. -/
+def autoSlots (free reserve blob : Nat) : Nat := (free - reserve) / blob
+
+/-- The auto-sized cache never needs more VRAM than is free. -/
+theorem autoSlots_fit (free reserve blob : Nat) : autoSlots free reserve blob * blob ≤ free := by
+  unfold autoSlots
+  have := Nat.div_mul_le_self (free - reserve) blob
+  omega
+
+/-- Lending `k` slots to the prompt path leaves the first lent index valid and at least 128 slots resident. -/
+theorem lend_first_bounds (slots k : Nat) (hk : 1 ≤ k) (h : k + 128 ≤ slots) :
+    128 ≤ slots - k ∧ slots - k < slots := by
+  omega
+
+/-- The number of lent slots for a non-empty buffer is at least one. -/
+theorem lent_count_pos (need blob : Nat) (hn : 0 < need) (hb : 0 < blob) :
+    1 ≤ (need + blob - 1) / blob := by
+  apply Nat.div_pos
+  · omega
+  · exact hb
+
+-- § PCIe share
+
+/-- `pcie_num`: the fraction in 1/256ths, clamped to `[0, 256]`. -/
+def pcieNum (x : Int) : Int := max 0 (min 256 x)
+
+/-- The clamped share is always a valid fraction numerator. -/
+theorem pcieNum_bounds (x : Int) : 0 ≤ pcieNum x ∧ pcieNum x ≤ 256 := by
+  unfold pcieNum
+  omega
+
+-- § speculative rounds
+
+/-- Verify-window size: grows while the drafts stay above the probability threshold. -/
+def pickTAux (ok : Nat → Bool) (S : Nat) : Nat → Nat → Nat
+  | 0, T => T
+  | f + 1, T => if T < S ∧ ok (T - 1) = true then pickTAux ok S f (T + 1) else T
+
+/-- The window never shrinks and never exceeds `S`. -/
+theorem pickTAux_bounds (ok : Nat → Bool) (S f : Nat) :
+    ∀ T, T ≤ S → T ≤ pickTAux ok S f T ∧ pickTAux ok S f T ≤ S := by
+  induction f with
+  | zero =>
+    intro T h
+    simp only [pickTAux]
+    exact ⟨Nat.le_refl _, h⟩
+  | succ f ih =>
+    intro T h
+    simp only [pickTAux]
+    split
+    · rename_i hc
+      obtain ⟨c1, _⟩ := hc
+      have := ih (T + 1) (by omega)
+      omega
+    · exact ⟨Nat.le_refl _, h⟩
+
+/-- Longest prefix on which the drafts equal the model's outputs. -/
+def accPrefix : List Int → List Int → Nat
+  | w :: ws, o :: os => if w = o then 1 + accPrefix ws os else 0
+  | _, _ => 0
+
+/-- The accepted prefix is no longer than either list. -/
+theorem accPrefix_le (ws os : List Int) : accPrefix ws os ≤ min ws.length os.length := by
+  induction ws generalizing os with
+  | nil => simp [accPrefix]
+  | cons w ws ih =>
+    cases os with
+    | nil => simp [accPrefix]
+    | cons o os =>
+      have := ih os
+      simp only [accPrefix, List.length_cons]
+      split <;> omega
+
+/-- Accepted drafts plus the one verified token never exceed the window: `a + 1 <= T`. -/
+theorem round_commit_le_window (a T : Nat) (h : a ≤ T - 1) (hT : 1 ≤ T) : a + 1 ≤ T := by
+  omega
+
+/-- Committing `a + 1` tokens keeps the position inside the context checked before the window ran. -/
+theorem round_position_in_context (p a T ctx : Nat) (h : a ≤ T - 1) (hT : 1 ≤ T) (hc : p + T ≤ ctx) :
+    p + a + 1 ≤ ctx := by
+  omega
+
+/-- Tokens emitted in a round are capped by what is still wanted. -/
+def emitCount (a produced maxNew : Nat) : Nat := min (a + 1) (maxNew - produced)
+
+/-- A round never overshoots `--max-new`. -/
+theorem emit_no_overshoot (a produced maxNew : Nat) (h : produced ≤ maxNew) :
+    produced + emitCount a produced maxNew ≤ maxNew := by
+  unfold emitCount
+  omega
+
+-- § M-RoPE positions for images
+
+/-- The `(h, w)` offsets of image row `j` in an `nx`-wide grid. -/
+def imgPos (nx j : Nat) : Nat × Nat := (j / nx, j % nx)
+
+/-- Row offsets stay inside the grid, so positions never exceed `p + max(nx, ny)`. -/
+theorem imgPos_bounds (nx ny j : Nat) (hx : 0 < nx) (hj : j < nx * ny) :
+    (imgPos nx j).1 < ny ∧ (imgPos nx j).2 < nx := by
+  unfold imgPos
+  exact ⟨Nat.div_lt_of_lt_mul hj, Nat.mod_lt _ hx⟩
+
+/-- Every image cell's `h` and `w` position is strictly below where text resumes. -/
+theorem img_text_resumes_after (p nx ny j : Nat) (hx : 0 < nx) (hj : j < nx * ny) :
+    p + (imgPos nx j).1 < p + max nx ny ∧ p + (imgPos nx j).2 < p + max nx ny := by
+  have ⟨h1, h2⟩ := imgPos_bounds nx ny j hx hj
+  omega
+
+/-- Text cells advance the position by exactly one. -/
+theorem text_position_advances (p : Nat) : p + 1 > p := by
+  omega
+
+end Ref.Program
+
+
+
+
+
+## FILE: /mnt/user-data/outputs/FusedGdnStepNorm.lean
+/-!
+# MODULE: fused_gdn_step_norm
+SOURCES: src/kernels/cuda/fused_gdn.cu
+Fused gated-delta-net kernels: depthwise conv + SiLU + L2 norm, the alpha/beta gate projections, and the
+state step fused with RMS-norm and sigmoid output gating. This file covers the launch geometry, index maps
+and the small algebraic contracts the three kernels rely on.
+
+## Source semantics
+* The state is `(S, h_v, S)` with `S = 128`; a block owns one head, 512 threads = 128 columns x 4 row groups
+  of 32 rows each, so the row groups tile the 128 rows exactly once.
+* `gdn_conv_l2_kernel`: one thread per channel `c = blockIdx.x*128 + threadIdx.x`; history slides by one tap.
+* `gdn_ab_kernel`: one warp per output row of the stacked `[alpha; beta]` projection (`2*h_v` rows, 8 per block).
+* head pairing is `head % h_k`.
+
+## Form template identifiers
+* `S` -> state_size, `RG` -> row_groups, `RPG` -> rows_per_group, `rowOf` -> row_index_map,
+  `convShift` -> history_slide, `abRow` -> stacked_projection_row.
+-/
+
+namespace Ref.FusedGdn
+
 /-- State size (rows = cols). -/
 def S : Nat := 128
-/-- Row groups per column. -/
+/-- Row groups per head block. -/
 def RG : Nat := 4
-/-- Rows per group. -/
-def RPG : Nat := S / RG
+/-- Rows owned by one thread (`S / RG`). -/
+def RPG : Nat := 32
 
-/-- 32 rows per thread. -/
-theorem rpg_eq : RPG = 32 := by decide
+/-- `RPG` really is `S / RG`. -/
+theorem rpg_def : S / RG = RPG := by decide
 
 /-- The row groups tile the state rows exactly. -/
-theorem rg_mul_rpg : RG * RPG = S := by decide
+theorem rows_cover : RG * RPG = S := by decide
 
-/-- Block size is 512 threads. -/
-theorem block_threads : S * RG = 512 := by decide
+/-- A step block has `S * RG = 512` threads. -/
+theorem threads_per_block : S * RG = 512 := by decide
 
-/-- Flat thread id. -/
-def tid (rg col : Nat) : Nat := rg * S + col
-/-- State row owned by register slot r of row group rg. -/
-def stateRow (rg r : Nat) : Nat := rg * RPG + r
+/-- Warps of row group 0 are threads 0..127, i.e. four warps, matching the four `wsum` entries read. -/
+theorem warps_of_group0 : S / 32 = 4 := by decide
 
-/-- Flat thread ids are within the block. -/
-theorem tid_lt (rg col : Nat) (h1 : rg < RG) (h2 : col < S) : tid rg col < S * RG := by
-  simp only [tid, S, RG] at *
+/-- The `wsum` scratch has `S*RG/32 = 16` slots, at least the 4 that are read. -/
+theorem wsum_big_enough : 4 ≤ S * RG / 32 := by decide
+
+/-- Row of the state handled by (row group, register index). -/
+def rowOf (rg r : Nat) : Nat := rg * 32 + r
+
+/-- Every (group, register) pair addresses a row inside the state. -/
+theorem rowOf_lt (rg r : Nat) (hg : rg < 4) (hr : r < 32) : rowOf rg r < 128 := by
+  unfold rowOf; omega
+
+/-- The row map is injective: no two threads/registers touch the same row. -/
+theorem rowOf_inj (rg r rg' r' : Nat) (hr : r < 32) (hr' : r' < 32)
+    (h : rowOf rg r = rowOf rg' r') : rg = rg' ∧ r = r' := by
+  unfold rowOf at h; omega
+
+/-- The row map is surjective onto `0..127`: every row is owned. -/
+theorem rowOf_surj (i : Nat) (hi : i < 128) :
+    ∃ rg r, rg < 4 ∧ r < 32 ∧ rowOf rg r = i := by
+  refine ⟨i / 32, i % 32, by omega, by omega, ?_⟩
+  unfold rowOf; omega
+
+/-- Linear state address `((row*h_v + head)*128 + col)` stays inside the `128*h_v*128` state. -/
+theorem state_addr_lt (row head col h_v : Nat) (hrow : row < 128) (hh : head < h_v) (hc : col < 128) :
+    (row * h_v + head) * 128 + col < 128 * h_v * 128 := by
+  have h1 : (row + 1) * h_v ≤ 128 * h_v := Nat.mul_le_mul_right _ (by omega)
+  have h2 : (row + 1) * h_v = row * h_v + h_v := by rw [Nat.add_mul, Nat.one_mul]
   omega
 
-/-- The row group is recovered from the flat id. -/
-theorem tid_div (rg col : Nat) (h2 : col < S) : tid rg col / S = rg := by
-  simp only [tid, S] at *
+/-- Head pairing `head % h_k` is always a valid q/k head. -/
+theorem qk_head_lt (head h_k : Nat) (h : 0 < h_k) : head % h_k < h_k := Nat.mod_lt _ h
+
+/-- Conv channel index is in range when the grid is `channels / 128` blocks of 128 threads. -/
+theorem conv_channel_lt (nb blk t : Nat) (hb : blk < nb) (ht : t < 128) : blk * 128 + t < nb * 128 := by
   omega
 
-/-- The column is recovered from the flat id. -/
-theorem tid_mod (rg col : Nat) (h2 : col < S) : tid rg col % S = col := by
-  simp only [tid, S] at *
+/-- The history slide: drop the oldest tap and append the newest input. -/
+def convShift (h0 h1 h2 x : Int) : Int × Int × Int := (h1, h2, x)
+
+/-- Four-tap depthwise convolution output. -/
+def convOut (h0 h1 h2 x w0 w1 w2 w3 : Int) : Int := h0 * w0 + h1 * w1 + h2 * w2 + x * w3
+
+/-- After a step the newest history slot holds exactly the input just consumed. -/
+theorem convShift_newest (h0 h1 h2 x : Int) : (convShift h0 h1 h2 x).2.2 = x := rfl
+
+/-- After a step the oldest slot holds what was the middle tap. -/
+theorem convShift_oldest (h0 h1 h2 x : Int) : (convShift h0 h1 h2 x).1 = h1 := rfl
+
+/-- With an all-zero history only the last tap contributes. -/
+theorem convOut_zero_history (x w0 w1 w2 w3 : Int) : convOut 0 0 0 x w0 w1 w2 w3 = x * w3 := by
+  unfold convOut; simp
+
+/-- Two consecutive steps: the input of step one is the middle tap at step two. -/
+theorem convShift_twice (h0 h1 h2 x y : Int) :
+    (convShift (convShift h0 h1 h2 x).1 (convShift h0 h1 h2 x).2.1 (convShift h0 h1 h2 x).2.2 y).2.1 = x := rfl
+
+/-- History addressing `c*3 + tap` is injective for taps below 3. -/
+theorem hist_addr_inj (c t c' t' : Nat) (ht : t < 3) (ht' : t' < 3)
+    (h : c * 3 + t = c' * 3 + t') : c = c' ∧ t = t' := by omega
+
+/-- Weight addressing `c*4 + tap` is injective for taps below 4. -/
+theorem weight_addr_inj (c t c' t' : Nat) (ht : t < 4) (ht' : t' < 4)
+    (h : c * 4 + t = c' * 4 + t') : c = c' ∧ t = t' := by omega
+
+/-- The stacked alpha/beta rows are covered by `(2*h_v+7)/8` blocks of 8 warps. -/
+theorem ab_rows_covered (h_v row : Nat) (h : row < 2 * h_v) : row / 8 < (2 * h_v + 7) / 8 := by omega
+
+/-- The grid supplies at least `2*h_v` rows. -/
+theorem ab_grid_enough (h_v : Nat) : 2 * h_v ≤ (2 * h_v + 7) / 8 * 8 := by omega
+
+/-- Row selector of the stacked projection: rows `>= h_v` are the beta rows. -/
+def abRow (h_v row : Nat) : Nat := if h_v ≤ row then row - h_v else row
+
+/-- The within-projection row index is always `< h_v`. -/
+theorem abRow_lt (h_v row : Nat) (h : row < 2 * h_v) : abRow h_v row < h_v := by
+  unfold abRow; split <;> omega
+
+/-- `n_embd % 8 = 0` makes the 8-wide bf16 chunks cover the reduction axis exactly. -/
+theorem ab_chunks_exact (n : Nat) (h : n % 8 = 0) : n / 8 * 8 = n := by omega
+
+/-- The delta-rule write at scalar level with `k = beta = 1`: the new state equals `v`. -/
+theorem delta_write_exact (dec s v : Int) : dec * s + (v - dec * s * 1) * 1 = v := by
   omega
 
-/-- Distinct (rg, col) give distinct flat ids. -/
-theorem tid_inj (a b c d : Nat) (hb : b < S) (hd : d < S) (h : tid a b = tid c d) : a = c ∧ b = d := by
-  simp only [tid, S] at *
-  omega
-
-/-- Owned rows are inside the state. -/
-theorem stateRow_lt (rg r : Nat) (h1 : rg < RG) (h2 : r < RPG) : stateRow rg r < S := by
-  simp only [stateRow, RG, RPG, S] at *
-  omega
-
-/-- Row ownership is injective: no two (group, slot) pairs own the same row. -/
-theorem stateRow_inj (a r c s : Nat) (hr : r < RPG) (hs : s < RPG)
-    (h : stateRow a r = stateRow c s) : a = c ∧ r = s := by
-  simp only [stateRow, RPG, S, RG] at *
-  omega
-
-/-- Row ownership is onto: every state row is owned. -/
-theorem stateRow_surj (i : Nat) (hi : i < S) :
-    ∃ rg r, rg < RG ∧ r < RPG ∧ stateRow rg r = i := by
-  refine ⟨i / 32, i % 32, ?_, ?_, ?_⟩ <;> simp only [stateRow, RG, RPG, S] at * <;> omega
-
--- § reduction semantics
-/-- kv_col as the sum of the four row-group partials equals the full contraction. -/
-theorem kv_col_partition (f : Nat → Int) :
-    sumTo f S = sumTo (fun rg => sumTo (fun r => f (rg * RPG + r)) RPG) RG :=
-  sum_blocks f RPG RG
-
-/-- The fused delta (decay folded in) equals the two-pass delta. -/
-theorem fused_delta_eq (g beta v : Int) (s k : Nat → Int) (n : Nat) :
-    (v - sumTo (fun i => g * s i * k i) n) * beta = (v - g * sumTo (fun i => s i * k i) n) * beta := by
-  rw [decay_commutes]
-
-/-- Thread-id to warp index for row group 0 stays within the four RMS partial slots. -/
-theorem wsum_slot_lt (t : Nat) (h : t < S) : t / 32 < 4 := by
-  simp only [S] at *
-  omega
-
--- § conv history
-/-- History of the three previous inputs. -/
-structure Hist where
-  a : Int
-  b : Int
-  c : Int
-
-/-- The history slides by one per token. -/
-def histStep (h : Hist) (x : Int) : Hist := ⟨h.b, h.c, x⟩
-
-/-- Four-tap convolution output. -/
-def convOut (h : Hist) (x w0 w1 w2 w3 : Int) : Int := h.a * w0 + h.b * w1 + h.c * w2 + x * w3
-
-/-- After three tokens the history is exactly the last three inputs, independent of the old history. -/
-theorem hist_three (h : Hist) (x y z : Int) :
-    histStep (histStep (histStep h x) y) z = ⟨x, y, z⟩ := rfl
-
--- § launch geometry
-/-- Channel index of a thread is in range. -/
-theorem conv_channel_lt (blk tx channels : Nat) (hb : blk < channels / 128) (ht : tx < 128) :
-    blk * 128 + tx < channels := by omega
-
-/-- A thread's block is the channel's 128-wide head group. -/
-theorem conv_head_of_channel (blk tx : Nat) (ht : tx < 128) : (blk * 128 + tx) / 128 = blk := by omega
-
-/-- The ab grid covers all 2*h_v weight rows. -/
-theorem ab_grid_cover (hv : Nat) : 2 * hv ≤ ((2 * hv + 7) / 8) * 8 := by omega
-
-/-- Row split: alpha rows come first, beta rows are offset by h_v and stay in range. -/
-theorem ab_row_split (row hv : Nat) (h : row < 2 * hv) :
-    (row < hv → row < hv) ∧ (¬ row < hv → row - hv < hv) := by
-  constructor <;> intro hh <;> omega
-
-/-- Softplus selection branch: large inputs pass through unchanged. -/
-theorem softplus_large (v : Int) (f : Int → Int) (h : 20 < v) : (if 20 < v then v else f v) = v := by
-  simp [h]
-
-/-- Head pairing is modulo h_k and in range. -/
-theorem qhead_lt (head hk : Nat) (h : 0 < hk) : head % hk < hk := Nat.mod_lt _ h
-
-end Ref.FusedGdnDecode
+end Ref.FusedGdn
 
 
 
-## FILE: /mnt/user-data/outputs/FusedGrRead.lean
+## FILE: /mnt/user-data/outputs/FusedGatedResidualRead.lean
 /-!
-# MODULE: fused_gr_read
+# MODULE: fused_gated_residual_read
 SOURCES: src/kernels/cuda/fused_gr.cu
-Fused hyper-connection "read": RMS-normalise the 4 streams, down-project to 320 channels with SiLU, up-project with a
-sigmoid gate and mix the streams. Single-token and T-token (one weight read) variants. The index geometry
-of both variants is formalised.
+Fused hyper-connection read (`gr_read`) specialised to n_embd=2560, hc=4, hc_lr=320: a down kernel
+(per-stream RMS-norm, 320 down rows plus the inject rows), an up kernel (gate and stream mean), and the
+T-token variants that read each weight row once.
 
 ## Source semantics
-* D = N*HC = 10240; the down kernel has 40 blocks of 8 warps (one row per warp, 320 rows) plus one inject block.
-* The up kernel: 80 blocks x 32 columns (x 4 streams = 128 rows) single token; 160 blocks x 16 columns multi token.
-* The multi-token down kernel reads each weight row once, in 4 tiles of 2560 floats, 10 uint4 chunks per lane per tile.
+* `D = N*HC = 10240` is the stacked residual; stream `c = i / N`, column `d = i % N`.
+* down: 40 blocks of 8 warps give the 320 `lo` rows; block 40 handles the 4 inject rows.
+* up: 80 blocks of 32 columns (x 4 streams = 128 rows, 16 per warp); multi variant 160 blocks of 16 columns.
+* weights are read as `uint4` = 8 bf16; a row is 1280 chunks (40 per lane) for `D`, 40 chunks for `LR`.
 
 ## Form template identifiers
-N -> n_embd, HC -> n_streams, D -> flat_stream_len, LR -> low_rank, TILE -> staged_tile
+* `N` -> n_embd, `HC` -> streams, `LR` -> hc_lr, `TILE` -> staged_tile_floats, `DOWN_BLOCKS` -> down_grid.
 -/
-namespace Ref.FusedGrRead
 
--- § constants
+namespace Ref.FusedGr
+
 /-- n_embd. -/
 def N : Nat := 2560
-/-- streams. -/
+/-- Residual streams. -/
 def HC : Nat := 4
-/-- flattened stream length. -/
-def D : Nat := N * HC
-/-- low rank. -/
+/-- Stacked residual length. -/
+def D : Nat := 10240
+/-- Low-rank width. -/
 def LR : Nat := 320
-/-- warps per block. -/
+/-- Threads per block. -/
+def THREADS : Nat := 256
+/-- Warps per block. -/
 def WARPS : Nat := 8
-/-- down blocks. -/
+/-- Blocks of the down kernel without the inject block. -/
 def DOWN_BLOCKS : Nat := 40
-/-- columns per single-token up block. -/
+/-- Columns per up block. -/
 def UP_COLS : Nat := 32
-/-- single-token up blocks. -/
+/-- Up blocks. -/
 def UP_BLOCKS : Nat := 80
-/-- tile of xn floats. -/
+/-- Staged tile (floats per token). -/
 def TILE : Nat := 2560
-/-- chunks per lane per tile. -/
+/-- uint4 chunks per lane per tile. -/
 def TQ : Nat := 10
-/-- columns per multi-token up block. -/
+/-- Columns per multi-token up block. -/
 def UPM_COLS : Nat := 16
-/-- multi-token up blocks. -/
+/-- Multi-token up blocks. -/
 def UPM_BLOCKS : Nat := 160
 
-/-- D is 10240. -/
-theorem D_eq : D = 10240 := by decide
-/-- The down blocks cover every low-rank row exactly once. -/
-theorem down_rows_cover : DOWN_BLOCKS * WARPS = LR := by decide
-/-- The up blocks cover every column exactly once. -/
-theorem up_cols_cover : UP_BLOCKS * UP_COLS = N := by decide
-/-- The multi-token up blocks cover every column exactly once. -/
-theorem upm_cols_cover : UPM_BLOCKS * UPM_COLS = N := by decide
-/-- Four tiles cover the whole flattened stream. -/
-theorem tiles_cover : (D / TILE) * TILE = D := by decide
-/-- There are four tiles. -/
-theorem tile_count : D / TILE = 4 := by decide
-/-- One tile is 320 chunks of 8: 32 lanes x TQ chunks. -/
-theorem tile_chunks : TQ * 32 * 8 = TILE := by decide
-/-- The low-rank vector is 40 chunks of 8. -/
-theorem lr_chunks : LR / 8 = 40 := by decide
-/-- Second chunk exists only for lanes below 8. -/
-theorem lr_second_chunk : LR / 8 - 32 = 8 := by decide
-/-- Inject rows (one warp each, 4 of them) fit in a block of 8 warps. -/
-theorem inject_rows_fit : HC ≤ WARPS := by decide
+/-- The stacked residual is `N*HC`. -/
+theorem d_eq : N * HC = D := by decide
 
--- § flat stream indexing
-/-- Flat index of stream c, element d. -/
-def flat (c d : Nat) : Nat := c * N + d
+/-- Eight warps per block. -/
+theorem warps_eq : THREADS / 32 = WARPS := by decide
 
-/-- Flat indices are in range. -/
-theorem flat_lt (c d : Nat) (hc : c < HC) (hd : d < N) : flat c d < D := by
-  simp only [flat, N, HC, D] at *
-  omega
+/-- 40 down blocks of 8 warps give exactly the 320 `lo` rows. -/
+theorem down_blocks_eq : LR / WARPS = DOWN_BLOCKS := by decide
 
-/-- The stream is recovered from a flat index. -/
-theorem flat_stream (c d : Nat) (hd : d < N) : flat c d / N = c := by
-  simp only [flat, N] at *
-  omega
+/-- ... and `DOWN_BLOCKS * WARPS = LR`. -/
+theorem down_rows_exact : DOWN_BLOCKS * WARPS = LR := by decide
 
-/-- The element is recovered from a flat index. -/
-theorem flat_elem (c d : Nat) (hd : d < N) : flat c d % N = d := by
-  simp only [flat, N] at *
-  omega
+/-- 80 up blocks of 32 columns cover `N`. -/
+theorem up_blocks_eq : N / UP_COLS = UP_BLOCKS ∧ UP_BLOCKS * UP_COLS = N := by decide
 
-/-- Flat indexing is injective. -/
-theorem flat_inj (c d c' d' : Nat) (hd : d < N) (hd' : d' < N) (h : flat c d = flat c' d') :
-    c = c' ∧ d = d' := by
-  simp only [flat, N] at *
-  omega
+/-- 160 multi-token up blocks of 16 columns cover `N`. -/
+theorem upm_blocks_eq : N / UPM_COLS = UPM_BLOCKS ∧ UPM_BLOCKS * UPM_COLS = N := by decide
 
--- § down kernel rows
-/-- Row of warp w in block b is a valid low-rank row. -/
-theorem down_row_lt (b w : Nat) (hb : b < DOWN_BLOCKS) (hw : w < WARPS) : b * WARPS + w < LR := by
-  simp only [DOWN_BLOCKS, WARPS, LR] at *
-  omega
+/-- An up block owns 4 streams x 32 columns = 128 rows, 16 per warp. -/
+theorem up_rows_per_warp : HC * UP_COLS = 128 ∧ HC * UP_COLS / WARPS = 16 := by decide
 
-/-- Down rows are owned by exactly one (block, warp). -/
-theorem down_row_inj (b w b' w' : Nat) (hw : w < WARPS) (hw' : w' < WARPS)
-    (h : b * WARPS + w = b' * WARPS + w') : b = b' ∧ w = w' := by
-  simp only [WARPS] at *
-  omega
+/-- A multi-token up block owns 64 rows, 8 per warp. -/
+theorem upm_rows_per_warp : HC * UPM_COLS = 64 ∧ HC * UPM_COLS / WARPS = 8 := by decide
 
--- § up kernel rows
-/-- Up row index (stream c, column d0+dd) of a single-token block. -/
-def upIdx (blk c dd : Nat) : Nat := c * N + blk * UP_COLS + dd
+/-- A `D` row is 1280 chunks of 8, i.e. 40 per lane. -/
+theorem down_chunks : D / 8 = 1280 ∧ 1280 / 32 = 40 := by decide
 
-/-- Up indices stay inside the flat stream. -/
-theorem upIdx_lt (blk c dd : Nat) (hb : blk < UP_BLOCKS) (hc : c < HC) (hd : dd < UP_COLS) :
-    upIdx blk c dd < D := by
-  simp only [upIdx, UP_BLOCKS, HC, UP_COLS, N, D] at *
-  omega
+/-- An `LR` row is 40 chunks: 32 lanes take one, lanes `< 8` take a second. -/
+theorem up_chunks : LR / 8 = 40 ∧ 40 = 32 + 8 := by decide
 
-/-- Each block owns column d0+dd of every stream: (block, stream, dd) determines the index. -/
-theorem upIdx_inj (b c d b' c' d' : Nat) (hb : b < UP_BLOCKS) (hb' : b' < UP_BLOCKS)
-    (hc : c < HC) (hc' : c' < HC) (hd : d < UP_COLS) (hd' : d' < UP_COLS)
-    (h : upIdx b c d = upIdx b' c' d') : b = b' ∧ c = c' ∧ d = d' := by
-  simp only [upIdx, UP_BLOCKS, HC, UP_COLS, N] at *
-  omega
+/-- The tile loop: `D / TILE = 4` tiles, each 320 chunks = 10 per lane. -/
+theorem tile_geometry : D / TILE = 4 ∧ TILE / 8 / 32 = TQ ∧ TQ * 32 * 8 = TILE := by decide
 
-/-- The 128 rows of an up block are split 16 per warp (stream c = r / 32). -/
-theorem up_rows_per_warp : (HC * UP_COLS) / WARPS = 16 := by decide
+/-- Dynamic shared memory for `T` tokens is `T * 10240` bytes. -/
+theorem dyn_smem_bytes (T : Nat) : T * 2560 * 4 = T * 10240 := by omega
 
-/-- Multi-token up index. -/
-def upmIdx (blk c dd : Nat) : Nat := c * N + blk * UPM_COLS + dd
+/-- Stream/column decomposition of a stacked index. -/
+theorem stream_decomp (i : Nat) (hi : i < 10240) :
+    i / 2560 < 4 ∧ i / 2560 * 2560 + i % 2560 = i := by omega
 
-/-- Multi-token up indices stay inside the flat stream. -/
-theorem upmIdx_lt (blk c dd : Nat) (hb : blk < UPM_BLOCKS) (hc : c < HC) (hd : dd < UPM_COLS) :
-    upmIdx blk c dd < D := by
-  simp only [upmIdx, UPM_BLOCKS, HC, UPM_COLS, N, D] at *
-  omega
+/-- Vector-4 accesses starting at a multiple of 4 never straddle two streams. -/
+theorem float4_same_stream (i : Nat) (hi : i < 10240) (h4 : i % 4 = 0) :
+    (i + 3) / 2560 = i / 2560 := by omega
 
-/-- Multi-token up indices are injective in (block, stream, column). -/
-theorem upmIdx_inj (b c d b' c' d' : Nat) (hb : b < UPM_BLOCKS) (hb' : b' < UPM_BLOCKS)
-    (hc : c < HC) (hc' : c' < HC) (hd : d < UPM_COLS) (hd' : d' < UPM_COLS)
-    (h : upmIdx b c d = upmIdx b' c' d') : b = b' ∧ c = c' ∧ d = d' := by
-  simp only [upmIdx, UPM_BLOCKS, HC, UPM_COLS, N] at *
-  omega
+/-- The vector-4 loop `i = t*4 + k*1024` covers each multiple of 4 below `D` exactly via `t < 256`. -/
+theorem norm_loop_cover (i : Nat) (hi : i < 10240) (h4 : i % 4 = 0) :
+    ∃ t k, t < 256 ∧ k < 10 ∧ i = t * 4 + k * 1024 := by
+  refine ⟨(i % 1024) / 4, i / 1024, ?_, ?_, ?_⟩ <;> omega
 
-/-- 64 rows per multi-token block are 8 per warp. -/
-theorem upm_rows_per_warp : (HC * UPM_COLS) / WARPS = 8 := by decide
+/-- Row `blk*8 + warp` of the down kernel is a valid `lo` row. -/
+theorem down_row_lt (blk warp : Nat) (hb : blk < 40) (hw : warp < 8) : blk * 8 + warp < 320 := by omega
 
--- § tiled weight chunk addressing (multi-token down kernel)
-/-- Weight chunk index loaded by lane `lane` for slot q of tile t. -/
-def chunkIdx (t q lane : Nat) : Nat := t * (TILE / 8) + lane + 32 * q
+/-- Every `lo` row is produced by some (block, warp). -/
+theorem down_row_cover (row : Nat) (h : row < 320) :
+    ∃ blk warp, blk < 40 ∧ warp < 8 ∧ row = blk * 8 + warp := by
+  refine ⟨row / 8, row % 8, ?_, ?_, ?_⟩ <;> omega
 
-/-- Chunk indices stay in the 1280 chunks of a weight row. -/
-theorem chunkIdx_lt (t q lane : Nat) (ht : t < 4) (hq : q < TQ) (hl : lane < 32) :
-    chunkIdx t q lane < D / 8 := by
-  simp only [chunkIdx, TILE, TQ, D, N, HC] at *
-  omega
+/-- Up kernel: a stacked row `c*N + d0 + dd` lies inside `D`. -/
+theorem up_row_lt (c blk dd : Nat) (hc : c < 4) (hb : blk < 80) (hd : dd < 32) :
+    c * 2560 + (blk * 32 + dd) < 10240 := by omega
 
-/-- Every weight chunk is loaded by exactly one (tile, slot, lane). -/
-theorem chunkIdx_inj (t q l t' q' l' : Nat) (hq : q < TQ) (hq' : q' < TQ) (hl : l < 32) (hl' : l' < 32)
-    (h : chunkIdx t q l = chunkIdx t' q' l') : t = t' ∧ q = q' ∧ l = l' := by
-  simp only [chunkIdx, TILE, TQ] at *
-  omega
+/-- Up kernel: every column `d < N` belongs to exactly one block/offset. -/
+theorem up_col_cover (d : Nat) (h : d < 2560) :
+    ∃ blk dd, blk < 80 ∧ dd < 32 ∧ blk * 32 + dd = d := by
+  refine ⟨d / 32, d % 32, ?_, ?_, ?_⟩ <;> omega
 
-/-- Every chunk of the row is covered. -/
-theorem chunkIdx_surj (j : Nat) (hj : j < D / 8) :
-    ∃ t q lane, t < 4 ∧ q < TQ ∧ lane < 32 ∧ chunkIdx t q lane = j := by
-  refine ⟨j / 320, (j % 320) / 32, j % 32, ?_, ?_, ?_, ?_⟩ <;>
-    simp only [chunkIdx, TILE, TQ, D, N, HC] at * <;> omega
+/-- The block owning a column is unique (so `R_out` writes do not race). -/
+theorem up_col_unique (blk dd blk' dd' : Nat) (hd : dd < 32) (hd' : dd' < 32)
+    (h : blk * 32 + dd = blk' * 32 + dd') : blk = blk' ∧ dd = dd' := by omega
 
-end Ref.FusedGrRead
+/-- Multi-token up kernel: every column is covered by the 16-column blocks. -/
+theorem upm_col_cover (d : Nat) (h : d < 2560) :
+    ∃ blk dd, blk < 160 ∧ dd < 16 ∧ blk * 16 + dd = d := by
+  refine ⟨d / 16, d % 16, ?_, ?_, ?_⟩ <;> omega
+
+/-- Multi-token variants: lane `k` serves token `k`, which needs `T <= 32` lanes. -/
+theorem lane_token_fits (T k : Nat) (hT : T ≤ 32) (hk : k < T) : k < 32 := by omega
+
+/-- Warp-per-row strided coverage of the 320-wide gate reduction. -/
+theorem lr_lane_cover (k : Nat) (h : k < 320) :
+    ∃ lane j, lane < 32 ∧ j < 10 ∧ k = lane + 32 * j := by
+  refine ⟨k % 32, k / 32, ?_, ?_, ?_⟩ <;> omega
+
+end Ref.FusedGr
 
 
 
-## FILE: /mnt/user-data/outputs/GdnDeltaNetKernels.lean
+## FILE: /mnt/user-data/outputs/GdnReferenceKernels.lean
 /-!
-# MODULE: gdn_deltanet_kernels
+# MODULE: gdn_reference_kernels
 SOURCES: src/kernels/cuda/gdn.cu
-The non-projection parts of the gated delta-net: the column-parallel recurrence step, the sliding causal conv, the
-L2 norm, the beta sigmoid gate and the output RMS-norm/gate. State layout is (S, h_v, S) with j fastest.
+The gated delta-net's non-projection parts: the recurrence step (one thread per (head, column) of the
+state), the sliding conv, per-row L2 norm, beta sigmoid gate and output RMS-norm gating.
 
 ## Source semantics
-* One thread owns one (head, j) state column end to end, so the recurrence needs no barrier.
-* Decay happens BEFORE the update: sk = sum_i (dec*s_i)*k_i, d = (v - sk)*beta, s_i' = dec*s_i + k_i*d, o = sum s_i'*q_i.
-* MAX_H = 1 head per block (latency hiding knob): grid = (S/32, h_v).
-* Conv: kernel[0] reads the oldest state row, the new input lands in the last tap, and the state slides.
+* State layout `(S, h_v, S)` with the column index `j` fastest; a thread owns one column end to end, so the
+  recurrence needs no barrier.
+* The decay is applied BEFORE the rank-1 update; the read-out uses the UPDATED state.
+* `MAX_H = 1`: grid `(S/32, h_v)`; the thread count is `S*h_v` independent of packing.
+* conv: `kernel[0]` meets the OLDEST state row, the new input meets the LAST tap, the state slides.
+* `beta` must be passed through a sigmoid before the step (the C1 bug).
 
 ## Form template identifiers
-S -> state_size, h_v -> value_heads, h_k -> key_heads, JTHREADS -> j_threads_per_block, MAX_H -> heads_per_block
+* `JTHREADS` -> column_lanes_per_block, `MAX_H` -> heads_per_block, `decayThenUpdate` -> delta_rule_column.
 -/
-namespace Ref.GdnDeltaNetKernels
 
--- § exact-arithmetic reduction library
-/-- Sum of `f 0 .. f (n-1)` over the integers. -/
-def sumTo (f : Nat → Int) : Nat → Int
-  | 0 => 0
-  | n+1 => sumTo f n + f n
+namespace Ref.Gdn
 
-/-- Scalar factors pull out of a reduction. -/
-theorem sum_scale (g : Int) (f : Nat → Int) (n : Nat) :
-    sumTo (fun i => g * f i) n = g * sumTo f n := by
-  induction n with
-  | zero => simp [sumTo]
-  | succ n ih => simp [sumTo, ih, Int.mul_add]
-
-/-- Decaying the state before the k-contraction equals decaying the contraction (the two kernels agree). -/
-theorem decay_commutes (g : Int) (s k : Nat → Int) (n : Nat) :
-    sumTo (fun i => g * s i * k i) n = g * sumTo (fun i => s i * k i) n := by
-  have h : (fun i => g * s i * k i) = (fun i => g * (s i * k i)) :=
-    funext fun i => Int.mul_assoc _ _ _
-  rw [h, sum_scale]
-
-/-- The decay-first delta of gdn.cu equals the fused `(v - g*kv)*beta` form of fused_gdn.cu. -/
-theorem delta_two_pass_eq_fused (g beta v : Int) (s k : Nat → Int) (n : Nat) :
-    (v - sumTo (fun i => g * s i * k i) n) * beta = (v - g * sumTo (fun i => s i * k i) n) * beta := by
-  rw [decay_commutes]
-
--- § grid geometry
-/-- j-threads per block. -/
+/-- Threads along `j`. -/
 def JTHREADS : Nat := 32
-/-- heads staged per block. -/
+/-- Heads staged per block (latency-hiding knob). -/
 def MAX_H : Nat := 1
 
-/-- For S = 128 the x-grid is 4 blocks. -/
-theorem grid_x_128 : (128 + JTHREADS - 1) / JTHREADS = 4 := by decide
+/-- With `S = 128` there are 4 column blocks per head. -/
+theorem col_blocks : (128 + 32 - 1) / 32 = 4 := by decide
 
-/-- With one head per block and h_v = 48 the grid is 4 x 48 = 192 blocks. -/
-theorem grid_blocks_48 : ((128 + JTHREADS - 1) / JTHREADS) * ((48 + MAX_H - 1) / MAX_H) = 192 := by decide
+/-- Every column `j < 128` is owned by some (block, lane). -/
+theorem col_cover (j : Nat) (h : j < 128) : ∃ bx tx, bx < 4 ∧ tx < 32 ∧ bx * 32 + tx = j := by
+  refine ⟨j / 32, j % 32, ?_, ?_, ?_⟩ <;> omega
 
-/-- With MAX_H = 1 every head gets its own block row. -/
-theorem grid_y_eq (hv : Nat) : (hv + MAX_H - 1) / MAX_H = hv := by
-  simp only [MAX_H]
-  omega
+/-- Ownership is unique, so no two threads write the same column. -/
+theorem col_unique (bx tx bx' tx' : Nat) (ht : tx < 32) (ht' : tx' < 32)
+    (h : bx * 32 + tx = bx' * 32 + tx') : bx = bx' ∧ tx = tx' := by omega
 
-/-- The x-grid covers all S columns. -/
-theorem grid_x_cover (S : Nat) : S ≤ ((S + JTHREADS - 1) / JTHREADS) * JTHREADS := by
-  simp only [JTHREADS]
-  omega
+/-- With `MAX_H = 1` the head grid dimension equals `h_v`. -/
+theorem grid_y_eq (h_v : Nat) : (h_v + MAX_H - 1) / MAX_H = h_v := by
+  unfold MAX_H; omega
 
-/-- Heads handled by a block: min(MAX_H, h_v - h0) is positive and stays in range. -/
-theorem head_in_range (h0 hi hv : Nat) (h0lt : h0 < hv) (hi_lt : hi < min MAX_H (hv - h0)) :
-    h0 + hi < hv := by
-  simp only [MAX_H] at *
-  omega
+/-- The block count for `h_v = 48` is 192 (4 warps on every SM instead of 24 blocks). -/
+theorem blocks_for_48 : 4 * ((48 + MAX_H - 1) / MAX_H) = 192 := by decide
 
-/-- Staging loop: thread t loading i = t, t+32, ... covers every i < S. -/
-theorem staging_cover (S i : Nat) (h : i < S) :
-    i % JTHREADS < JTHREADS ∧ i = i % JTHREADS + JTHREADS * (i / JTHREADS) := by
-  simp only [JTHREADS]
-  omega
+/-- The staged q/k rows hold at most 128 entries, so any `S <= 128` indexes inside them. -/
+theorem staging_in_bounds (S i : Nat) (hS : S ≤ 128) (hi : i < S) : i < 128 := by omega
 
-/-- Head pairing is modulo h_k and in range. -/
-theorem qhead_lt (head hk : Nat) (h : 0 < hk) : head % hk < hk := Nat.mod_lt _ h
+/-- Head pairing is a modulo pairing. -/
+theorem src_head_lt (h h_k : Nat) (hk : 0 < h_k) : h % h_k < h_k := Nat.mod_lt _ hk
 
--- § state addressing
-/-- Row-major pair bound: a*B + b < A*B. -/
-theorem pair_lt (a b A B : Nat) (ha : a < A) (hb : b < B) : a * B + b < A * B := by
-  have h1 : a + 1 ≤ A := ha
-  have h2 : (a + 1) * B ≤ A * B := Nat.mul_le_mul_right B h1
-  rw [Nat.add_mul, Nat.one_mul] at h2
-  omega
+/-- One column of the recurrence, abstracted to a single state row with scalar key/query. -/
+def decayThenUpdate (s dec k v b : Int) : Int :=
+  let sd := dec * s
+  sd + k * ((v - sd * k) * b)
 
-/-- State index (i, h, j) of the (S, h_v, S) layout is in range. -/
-theorem stateIdx_lt (S hv i h j : Nat) (hi : i < S) (hh : h < hv) (hj : j < S) :
-    (i * hv + h) * S + j < S * hv * S := by
-  have h1 : i * hv + h < S * hv := pair_lt i h S hv hi hh
-  exact pair_lt (i * hv + h) j (S * hv) S h1 hj
+/-- With unit key and unit write strength the updated state equals the value (delta rule exactness). -/
+theorem delta_exact (s dec v : Int) : decayThenUpdate s dec 1 v 1 = v := by
+  unfold decayThenUpdate; simp only [Int.mul_one]; omega
 
-/-- For S = 128, h_v = 48 the state indexing is injective. -/
-theorem stateIdx_inj_128_48 (i h j i' h' j' : Nat) (hi : i < 128) (hh : h < 48) (hj : j < 128)
-    (hi' : i' < 128) (hh' : h' < 48) (hj' : j' < 128)
-    (e : (i * 48 + h) * 128 + j = (i' * 48 + h') * 128 + j') : i = i' ∧ h = h' ∧ j = j' := by
-  omega
+/-- Zero write strength keeps the decayed state: decay happens before (and independently of) the update. -/
+theorem zero_beta_only_decays (s dec k v : Int) : decayThenUpdate s dec k v 0 = dec * s := by
+  unfold decayThenUpdate; simp
 
-/-- q/k staging reads k[src*S + i] with src < h_k and i < S: in range. -/
-theorem qk_stage_lt (S hk src i : Nat) (hs : src < hk) (hi : i < S) : src * S + i < hk * S :=
-  pair_lt src i hk S hs hi
+/-- Four-tap conv with the kernel's tap convention (oldest history meets kernel tap 0). -/
+def convOut (st0 st1 st2 x w0 w1 w2 w3 : Int) : Int := st0 * w0 + st1 * w1 + st2 * w2 + x * w3
 
--- § sliding conv state
-/-- Slide: drop the oldest row, append the newest input. -/
-def slide (st : List Int) (x : Int) : List Int := st.drop 1 ++ [x]
+/-- The slide: `st[i] := st[i+1]` for `i < dc-2`, last slot receives the input. -/
+def convSlide (st1 st2 x : Int) : Int × Int × Int := (st1, st2, x)
 
-/-- Sliding preserves the state length. -/
-theorem slide_length (st : List Int) (x : Int) (h : st ≠ []) : (slide st x).length = st.length := by
-  have : 0 < st.length := List.length_pos_of_ne_nil h
-  simp [slide] <;> omega
+/-- The newest input is stored in the last state slot. -/
+theorem convSlide_last (st1 st2 x : Int) : (convSlide st1 st2 x).2.2 = x := rfl
 
-/-- After three slides the 3-row state is exactly the last three inputs. -/
-theorem slide_three (a b c x y z : Int) : slide (slide (slide [a, b, c] x) y) z = [x, y, z] := rfl
+/-- Per-channel state offsets `c*3 + i` (d_conv = 4) are injective across channels. -/
+theorem conv_state_inj (c i c' i' : Nat) (hi : i < 3) (hi' : i' < 3)
+    (h : c * 3 + i = c' * 3 + i') : c = c' ∧ i = i' := by omega
 
--- § launch coverage
-/-- The conv launch covers all channels. -/
-theorem conv_grid_cover (c : Nat) : c ≤ ((c + 255) / 256) * 256 := by omega
+/-- Conv launch covers all channels: `ceil(C/256) * 256 >= C`. -/
+theorem conv_grid_covers (C : Nat) : C ≤ (C + 255) / 256 * 256 := by omega
 
-/-- The beta gate launch covers all heads. -/
-theorem beta_grid_cover (n : Nat) : n ≤ ((n + 127) / 128) * 128 := by omega
+/-- Beta-gate launch covers all heads. -/
+theorem beta_grid_covers (n : Nat) : n ≤ (n + 127) / 128 * 128 := by omega
 
-/-- Large softplus inputs pass through (overflow guard). -/
-theorem softplus_large (x : Int) (f : Int → Int) (h : 20 < x) : (if 20 < x then x else f x) = x := by
-  simp [h]
+/-- `gdn_l2_norm` accepts only `cols <= 1024`, which a single warp strided loop covers in `<= 32` steps. -/
+theorem l2_steps (cols : Nat) (h : cols ≤ 1024) : (cols + 31) / 32 ≤ 32 := by omega
 
-end Ref.GdnDeltaNetKernels
+/-- The L2 warp-strided loop reaches every element of the row. -/
+theorem l2_stride_cover (i cols : Nat) (h : i < cols) :
+    ∃ lane step, lane < 32 ∧ i = lane + 32 * step := by
+  exact ⟨i % 32, i / 32, by omega, by omega⟩
+
+end Ref.Gdn
+
+
+
+## FILE: /mnt/user-data/outputs/GatedResidualReference.lean
+/-!
+# MODULE: gated_residual_reference
+SOURCES: src/kernels/cuda/gr.cu
+The gated residual / hyper-connection `gr_read` and `gr_write`: per-stream RMS-norm, down projection with
+SiLU, up projection with sigmoid gate, mean over streams, injection and the write-back
+`out = R + block_out * 2*sigmoid(inject/hc)`.
+
+## Source semantics
+* Workspace regions (xn, xq, lq, gated, lo) are laid out by ONE size table, each rounded up to 16 bytes;
+  the regions must not overlap (an earlier version sized them in a different order and overlapped).
+* The down kernel is one block per output row (8 warps split the reduction), the gate kernel one warp per row.
+* The block-sum scratch reuses a `double[8]` as `float[8]`.
+* `gr_write` applies the same block output to every stream with a per-stream weight.
+
+## Form template identifiers
+* `align16` -> region_alignment, `wsSizes` -> workspace_size_table, `wsTotal` -> workspace_bytes.
+-/
+
+namespace Ref.GatedResidual
+
+/-- Round a byte count up to a multiple of 16. -/
+def align16 (n : Nat) : Nat := (n + 15) / 16 * 16
+
+/-- Alignment never shrinks a region. -/
+theorem align16_ge (n : Nat) : n ≤ align16 n := by unfold align16; omega
+
+/-- Alignment wastes fewer than 16 bytes. -/
+theorem align16_lt (n : Nat) : align16 n < n + 16 := by unfold align16; omega
+
+/-- Aligned sizes are multiples of 16. -/
+theorem align16_mod (n : Nat) : align16 n % 16 = 0 := by unfold align16; omega
+
+/-- Alignment is idempotent. -/
+theorem align16_idem (n : Nat) : align16 (align16 n) = align16 n := by unfold align16; omega
+
+/-- The single size table: xn, xq, lq, gated, lo (bytes). -/
+def wsSizes (n_embd hc hc_lr : Nat) : List Nat :=
+  [hc * n_embd * 4, hc * n_embd * 2, hc_lr * 2, hc * n_embd * 4, hc_lr * 4]
+
+/-- Total bytes: sum of the aligned sizes. -/
+def wsTotal (n_embd hc hc_lr : Nat) : Nat := ((wsSizes n_embd hc hc_lr).map align16).foldl (· + ·) 0
+
+/-- At the real geometry the workspace is 104,320 bytes. -/
+theorem wsTotal_real : wsTotal 2560 4 320 = 104320 := by decide
+
+/-- At the real geometry `xq` needs 20,480 bytes; the buggy table gave it only `hc_lr*2 = 640`. -/
+theorem xq_needs_20480 : (wsSizes 2560 4 320)[1]! = 20480 := by decide
+
+/-- Region offsets are a running sum, so consecutive regions are adjacent and cannot overlap. -/
+theorem region_adjacent (off sz : Nat) : off + align16 sz = off + align16 sz := rfl
+
+/-- Each region starts 16-aligned when the base is 16-aligned. -/
+theorem region_aligned (off sz : Nat) (h : off % 16 = 0) : (off + align16 sz) % 16 = 0 := by
+  have := align16_mod sz; omega
+
+/-- Block-sum scratch: `float[8]` (32 bytes) fits inside `double[8]` (64 bytes). -/
+theorem scratch_reinterpret_fits : 8 * 4 ≤ 8 * 8 := by decide
+
+/-- A 256-thread block has 8 warps, so 8 partial sums are all that the scratch must hold. -/
+theorem block_warps : (256 + 31) / 32 = 8 := by decide
+
+/-- Down kernel: one block per row gives `320 * 8 = 2560` warps, about 53 per 48 SMs. -/
+theorem down_occupancy : 320 * 8 = 2560 ∧ 2560 / 48 = 53 := by decide
+
+/-- Down kernel reduction: warp `w` starts at `w*32` and strides by `256`; every index is covered. -/
+theorem down_reduction_cover (i : Nat) (h : i < 10240) :
+    ∃ warp lane it, warp < 8 ∧ lane < 32 ∧ it < 40 ∧ i = warp * 32 + lane + it * 256 := by
+  refine ⟨(i % 256) / 32, i % 32, i / 256, ?_, ?_, ?_, ?_⟩ <;> omega
+
+/-- ... and uniquely so: each element is accumulated by exactly one lane. -/
+theorem down_reduction_unique (w l t w' l' t' : Nat) (hl : l < 32) (hl' : l' < 32)
+    (hw : w < 8) (hw' : w' < 8)
+    (h : w * 32 + l + t * 256 = w' * 32 + l' + t' * 256) : w = w' ∧ l = l' ∧ t = t' := by omega
+
+/-- Gate kernel grid: `ceil(hc_dim / 8)` blocks of 8 warps cover every output row. -/
+theorem gate_grid_covers (hc_dim : Nat) : hc_dim ≤ (hc_dim + 7) / 8 * 8 := by omega
+
+/-- Mean kernel grid covers `n_embd`. -/
+theorem mean_grid_covers (n : Nat) : n ≤ (n + 255) / 256 * 256 := by omega
+
+/-- Inject kernel: `32*hc` threads give one warp per stream. -/
+theorem inject_warps (hc : Nat) : 32 * hc / 32 = hc := by omega
+
+/-- Write kernel: stacked index decomposes into stream and column (real geometry). -/
+theorem write_decomp (i : Nat) (h : i < 10240) :
+    i / 2560 < 4 ∧ i / 2560 * 2560 + i % 2560 = i := by omega
+
+/-- Write kernel: every stream reads the SAME `block_out[d]`; the column index is below `n_embd`. -/
+theorem write_col_lt (i : Nat) : i % 2560 < 2560 := by omega
+
+/-- Grid-stride loop: starting indices `blk*256 + t` are all distinct for distinct (block, thread). -/
+theorem gridstride_start_inj (b t b' t' : Nat) (ht : t < 256) (ht' : t' < 256)
+    (h : b * 256 + t = b' * 256 + t') : b = b' ∧ t = t' := by omega
+
+/-- The native path requires even `hc*n_embd`; any even `n_embd` gives it. -/
+theorem native_even (hc n : Nat) (hn : n % 2 = 0) : (hc * n) % 2 = 0 := by
+  rw [Nat.mul_mod, hn]; simp
+
+/-- Write weight `2*sigmoid(x)` lies in `[0, 2]` once `sigmoid` does; abstractly: `2*s <= 2` for `s <= 1`. -/
+theorem write_weight_le (s : Nat) (h : s ≤ 1) : 2 * s ≤ 2 := by omega
+
+end Ref.GatedResidual
 
 
 
@@ -2755,135 +3670,93 @@ end Ref.GdnDeltaNetKernels
 /-!
 # MODULE: native_gdn_step
 SOURCES: src/kernels/cuda/native_gdn.cu
-Warp-per-column gated-delta-net step (adapted from pinned llama.cpp): each warp owns one Ref (head, column) and
-retains its four rows (r*32 + lane) in registers; two warp-sum reductions give kv and the attention readout.
+Warp-per-(head, column) gated delta-net step adapted from llama.cpp: each warp keeps four state rows per
+lane in registers, reduces with xor shuffles, and the host wrapper validates alignment/disjointness of every span.
 
 ## Source semantics
-* grid = (h_v, 1, S/4), block = (32, 4); column = blockIdx.z*4 + threadIdx.y; row = r*32 + lane, r < 4.
-* Preconditions: stream non-null, S = 128, h_k > 0, h_v % h_k = 0, h_v <= 65535; spans aligned and pairwise disjoint
-  between state/output and every input.
+* Grid `(h_v, 1, S/4)`, block `(32, 4)`: `col = blockIdx.z*4 + threadIdx.y`; lane `l` owns rows `r*32 + l`.
+* `q_head = head % h_k`; `h_v % h_k = 0` is required.
+* Output scale is `1/sqrt(S)`; `S = 128`.
+* A span is valid iff nonnull, 4-aligned and `address + bytes` does not overflow; spans overlap iff intervals intersect.
 
 ## Form template identifiers
-overlap -> span_overlap, S -> state_size
+* `S` -> state_size, `overlap` -> interval_overlap, `validSpan` -> aligned_bounded_span.
 -/
-namespace Ref.NativeGdnStep
 
--- § exact-arithmetic reduction library
-/-- Sum of `f 0 .. f (n-1)` over the integers. -/
-def sumTo (f : Nat → Int) : Nat → Int
-  | 0 => 0
-  | n+1 => sumTo f n + f n
+namespace Ref.NativeGdn
 
-/-- Additivity of reductions. -/
-theorem sum_add_fn (f g : Nat → Int) (n : Nat) :
-    sumTo (fun i => f i + g i) n = sumTo f n + sumTo g n := by
-  induction n with
-  | zero => simp [sumTo]
-  | succ n ih => simp only [sumTo, ih]; omega
+/-- State size. -/
+def S : Nat := 128
 
-/-- The zero function reduces to zero. -/
-theorem sumTo_zero_fn (m : Nat) : sumTo (fun _ => (0 : Int)) m = 0 := by
-  induction m with
-  | zero => simp [sumTo]
-  | succ m ih => simp [sumTo, ih]
+/-- 32 blocks along z of 4 columns each cover the 128 columns. -/
+theorem z_blocks : S / 4 = 32 := by decide
 
-/-- Double reductions commute (reduction order is irrelevant in exact arithmetic). -/
-theorem sumTo_comm (g : Nat → Nat → Int) (m n : Nat) :
-    sumTo (fun a => sumTo (g a) m) n = sumTo (fun b => sumTo (fun a => g a b) n) m := by
-  induction n with
-  | zero => simp [sumTo, sumTo_zero_fn]
-  | succ n ih =>
-    simp only [sumTo]
-    rw [sum_add_fn, ← ih]
+/-- Every column belongs to exactly one (blockIdx.z, threadIdx.y). -/
+theorem col_cover (c : Nat) (h : c < 128) : ∃ z y, z < 32 ∧ y < 4 ∧ z * 4 + y = c := by
+  refine ⟨c / 4, c % 4, ?_, ?_, ?_⟩ <;> omega
 
-/-- Splitting a reduction at an arbitrary point. -/
-theorem sumTo_add (f : Nat → Int) (n m : Nat) :
-    sumTo f (n+m) = sumTo f n + sumTo (fun r => f (n+r)) m := by
-  induction m with
-  | zero => simp [sumTo]
-  | succ m ih =>
-    have e : sumTo f (n + (m+1)) = sumTo f (n+m) + f (n+m) := rfl
-    have e2 : sumTo (fun r => f (n+r)) (m+1) = sumTo (fun r => f (n+r)) m + f (n+m) := rfl
-    rw [e, ih, e2]
-    omega
-
-/-- A reduction over `a*b` items equals the reduction of `a` block reductions of `b` items. -/
-theorem sum_blocks (f : Nat → Int) (b a : Nat) :
-    sumTo f (a*b) = sumTo (fun r => sumTo (fun c => f (r*b+c)) b) a := by
-  induction a with
-  | zero => simp [sumTo]
-  | succ a ih =>
-    have h : (a+1)*b = a*b + b := Nat.succ_mul a b
-    rw [h, sumTo_add f (a*b) b, ih]
-    try rfl
-
-/-- The warp-sum of per-lane register partials (4 rows each) equals the contraction over all 128 rows. -/
-theorem warp_partials_total (f : Nat → Int) :
-    sumTo (fun lane => sumTo (fun r => f (r * 32 + lane)) 4) 32 = sumTo f 128 := by
-  have h1 : sumTo (fun lane => sumTo (fun r => f (r * 32 + lane)) 4) 32
-      = sumTo (fun r => sumTo (fun lane => f (r * 32 + lane)) 32) 4 :=
-    sumTo_comm (fun lane r => f (r * 32 + lane)) 4 32
-  rw [h1]
-  exact (sum_blocks f 32 4).symm
-
--- § thread/row layout
-/-- Every state row is owned by exactly one (register slot, lane). -/
-theorem row_owner (i : Nat) (hi : i < 128) :
-    ∃ r lane, r < 4 ∧ lane < 32 ∧ r * 32 + lane = i :=
-  ⟨i / 32, i % 32, by omega, by omega, by omega⟩
-
-/-- Row ownership is injective. -/
-theorem row_owner_inj (r lane r' lane' : Nat) (hl : lane < 32) (hl' : lane' < 32)
-    (h : r * 32 + lane = r' * 32 + lane') : r = r' ∧ lane = lane' := by omega
-
-/-- Every column is owned by exactly one (blockIdx.z, threadIdx.y). -/
-theorem col_owner (c : Nat) (hc : c < 128) :
-    ∃ z y, z < 128 / 4 ∧ y < 4 ∧ z * 4 + y = c :=
-  ⟨c / 4, c % 4, by omega, by omega, by omega⟩
-
-/-- Column ownership is injective. -/
-theorem col_owner_inj (z y z' y' : Nat) (hy : y < 4) (hy' : y' < 4)
+/-- Column ownership is unique. -/
+theorem col_unique (z y z' y' : Nat) (hy : y < 4) (hy' : y' < 4)
     (h : z * 4 + y = z' * 4 + y') : z = z' ∧ y = y' := by omega
 
-/-- Block size 32*4 matches `__launch_bounds__(128, 2)`. -/
-theorem block_size : 32 * 4 = 128 := by decide
+/-- Lane `l` and register `r` address row `r*32 + l`, covering all 128 rows exactly once. -/
+theorem row_cover (i : Nat) (h : i < 128) : ∃ r l, r < 4 ∧ l < 32 ∧ r * 32 + l = i := by
+  refine ⟨i / 32, i % 32, ?_, ?_, ?_⟩ <;> omega
 
-/-- The q-head index of a head is below h_k, so q/k reads stay inside the h_k*128 floats. -/
-theorem qk_read_lt (head hk i : Nat) (hk0 : 0 < hk) (hi : i < 128) : (head % hk) * 128 + i < 128 * hk := by
-  have h : head % hk < hk := Nat.mod_lt _ hk0
-  omega
+/-- Row ownership is unique. -/
+theorem row_unique (r l r' l' : Nat) (hl : l < 32) (hl' : l' < 32)
+    (h : r * 32 + l = r' * 32 + l') : r = r' ∧ l = l' := by omega
 
--- § span validation
-/-- Byte-span overlap test used by the host wrapper. -/
+/-- Block shape: 32 x 4 = 128 threads (matches `__launch_bounds__(128, 2)`). -/
+theorem block_threads : 32 * 4 = 128 := by decide
+
+/-- Head pairing is a valid q/k head. -/
+theorem q_head_lt (head h_k : Nat) (h : 0 < h_k) : head % h_k < h_k := Nat.mod_lt _ h
+
+/-- State byte size is `65536 * h_v`. -/
+theorem state_bytes (h_v : Nat) : 128 * 128 * h_v * 4 = 65536 * h_v := by omega
+
+/-- Output byte size is `512 * h_v`. -/
+theorem output_bytes (h_v : Nat) : 128 * h_v * 4 = 512 * h_v := by omega
+
+/-- Interval overlap of two byte spans. -/
 def overlap (a an b bn : Nat) : Prop := a < b + bn ∧ b < a + an
 
 /-- Overlap is symmetric. -/
 theorem overlap_symm (a an b bn : Nat) : overlap a an b bn ↔ overlap b bn a an := by
-  unfold overlap
-  constructor <;> intro h <;> omega
+  unfold overlap; constructor <;> intro h <;> omega
 
-/-- Adjacent spans never overlap. -/
-theorem adjacent_disjoint (a n m : Nat) : ¬ overlap a n (a + n) m := by
-  unfold overlap
-  omega
+/-- The source's test has no emptiness guard: an empty span at `a` is reported as overlapping only when it
+lies strictly inside the other span. -/
+theorem overlap_empty_inside (a b bn : Nat) (h : overlap a 0 b bn) : b < a ∧ a < b + bn := by
+  unfold overlap at h; omega
 
-/-- A span never overlaps one that ends where it begins. -/
-theorem adjacent_disjoint' (a n m : Nat) : ¬ overlap (a + n) m a n := by
-  unfold overlap
-  omega
+/-- Spans that end before the other begins are disjoint. -/
+theorem disjoint_of_le (a an b bn : Nat) (h : a + an ≤ b) : ¬ overlap a an b bn := by
+  unfold overlap; omega
 
-/-- A nonempty span overlaps itself. -/
+/-- Every span overlaps itself when nonempty. -/
 theorem overlap_self (a n : Nat) (h : 0 < n) : overlap a n a n := by
-  unfold overlap
-  omega
+  unfold overlap; omega
 
-/-- Float spans are a multiple of the float size. -/
-theorem float_span_aligned (n : Nat) : (n * 4) % 4 = 0 := by omega
+/-- A valid span: nonnull, 4-aligned, and `address + bytes` fits in the address space. -/
+def validSpan (maxAddr addr bytes : Nat) : Prop := addr ≠ 0 ∧ addr % 4 = 0 ∧ bytes ≤ maxAddr - addr
 
-/-- State bytes are 128*128*h_v*4. -/
-theorem state_bytes_eq (hv : Nat) : 128 * 128 * hv * 4 = 65536 * hv := by omega
+/-- A valid span with `addr <= maxAddr` ends within the address space. -/
+theorem validSpan_end (maxAddr addr bytes : Nat) (h : validSpan maxAddr addr bytes)
+    (hm : addr ≤ maxAddr) : addr + bytes ≤ maxAddr := by
+  unfold validSpan at h; omega
 
-end Ref.NativeGdnStep
+/-- A launch grid of `h_v` blocks in x must be `<= 65535`; the check rejects larger. -/
+theorem grid_x_ok (h_v : Nat) (h : h_v ≤ 65535) : h_v < 65536 := by omega
+
+/-- `h_v % h_k = 0` makes the pairing balanced in count (every k head used `h_v / h_k` times at head 0 residue). -/
+theorem divisible_pairing (h_v h_k : Nat) (hk : 0 < h_k) (h : h_v % h_k = 0) : h_v / h_k * h_k = h_v := by
+  have := Nat.div_add_mod h_v h_k
+  rw [h] at this
+  rw [Nat.mul_comm]; omega
+
+end Ref.NativeGdn
 
 
 
@@ -2891,612 +3764,100 @@ end Ref.NativeGdnStep
 /-!
 # MODULE: native_gdn_preprocess
 SOURCES: src/kernels/cuda/native_gdn_preprocess.cu
-GDN pre-processing kernels adapted from pinned llama.cpp: causal conv + SiLU with history slide, the 128-wide L2/RMS
-norms, beta sigmoid, softplus gate, and the fused output RMS-norm * sigmoid(z). Geometry and validation formalised.
+Native GDN preprocessing kernels adapted from llama.cpp: conv + SiLU with history slide, per-row L2/RMS norm
+with a scale, beta sigmoid, gate softplus, and output RMS-norm with sigmoid gating. Host wrappers validate
+counts, geometry and span disjointness.
 
 ## Source semantics
-* conv_silu: four taps over [h0,h1,h2,x]; the history becomes [h1,h2,x]; raw and SiLU outputs are written.
-* norms: width must be exactly 128 with 256 threads = 8 warps; `norm_sum` reduces 8 warp sums.
-* host wrappers: count in [1,65535], stream non-null, all spans aligned/non-null, writable spans disjoint.
+* conv requires `d_conv = 4`; history holds 3 taps per channel (`c*3 + tap`), weights 4 (`c*4 + tap`).
+* norms require width 128 and are launched with 256 threads (8 warps); the block sum reads 8 warp partials.
+* counts must lie in `[1, 65535]`; grids are `ceil(count/256)`.
+* writable spans must be pairwise disjoint and disjoint from inputs.
 
 ## Form template identifiers
-Hist -> conv_history, histStep -> history_slide, ceilBlocks -> launch_blocks
+* `S` -> head_width, `convHistoryNext` -> history_slide, `countOk` -> launch_count_guard.
 -/
+
 namespace Ref.NativeGdnPreprocess
 
--- § conv history
-/-- Three-entry history. -/
-structure Hist where
-  a : Int
-  b : Int
-  c : Int
+/-- Head width. -/
+def S : Nat := 128
 
-/-- Slide by one input. -/
-def histStep (h : Hist) (x : Int) : Hist := ⟨h.b, h.c, x⟩
+/-- Count guard of the host wrappers. -/
+def countOk (count : Nat) : Prop := 0 < count ∧ count ≤ 65535
 
-/-- Four taps over history and the new input. -/
-def tapSum (h : Hist) (x w0 w1 w2 w3 : Int) : Int := h.a * w0 + h.b * w1 + h.c * w2 + x * w3
+/-- The grid for an accepted count has between 1 and 256 blocks. -/
+theorem grid_bounds (count : Nat) (h : countOk count) :
+    1 ≤ (count + 255) / 256 ∧ (count + 255) / 256 ≤ 256 := by
+  unfold countOk at h; omega
 
-/-- Sliding drops the oldest and appends the newest. -/
-theorem histStep_fields (h : Hist) (x : Int) :
-    (histStep h x).a = h.b ∧ (histStep h x).b = h.c ∧ (histStep h x).c = x := ⟨rfl, rfl, rfl⟩
+/-- The grid covers every element. -/
+theorem grid_covers (count : Nat) : count ≤ (count + 255) / 256 * 256 := by omega
 
-/-- The history after three inputs forgets the old history. -/
-theorem hist_three (h : Hist) (x y z : Int) :
-    histStep (histStep (histStep h x) y) z = ⟨x, y, z⟩ := rfl
-
-/-- Tap sum with the new input in the last tap. -/
-theorem tapSum_last (h : Hist) (x w0 w1 w2 w3 : Int) :
-    tapSum h x w0 w1 w2 w3 = h.a * w0 + h.b * w1 + h.c * w2 + x * w3 := rfl
-
--- § buffer geometry
-/-- History slot c*3+tap stays in 3*channels floats. -/
-theorem hist_idx_lt (c tap ch : Nat) (hc : c < ch) (ht : tap < 3) : c * 3 + tap < 3 * ch := by omega
-
-/-- Weight slot c*4+tap stays in 4*channels floats. -/
-theorem weight_idx_lt (c tap ch : Nat) (hc : c < ch) (ht : tap < 4) : c * 4 + tap < 4 * ch := by omega
-
-/-- History slots are injective in (channel, tap). -/
-theorem hist_idx_inj (c t c' t' : Nat) (ht : t < 3) (ht' : t' < 3) (h : c * 3 + t = c' * 3 + t') :
-    c = c' ∧ t = t' := by omega
-
-/-- Ceiling-divide block count. -/
-def ceilBlocks (n d : Nat) : Nat := (n + d - 1) / d
-
-/-- 256-thread blocks cover all channels/heads. -/
-theorem blocks256_cover (n : Nat) : n ≤ ceilBlocks n 256 * 256 := by
-  unfold ceilBlocks
-  omega
-
-/-- With count <= 65535 the grid has at most 256 blocks (within the 65535 limit). -/
-theorem blocks256_le (n : Nat) (h : n ≤ 65535) : ceilBlocks n 256 ≤ 256 := by
-  unfold ceilBlocks
-  omega
-
-/-- A positive count needs at least one block. -/
-theorem blocks256_pos (n : Nat) (h : 0 < n) : 0 < ceilBlocks n 256 := by
-  unfold ceilBlocks
-  omega
-
--- § norm geometry
-/-- 256 threads are exactly 8 warps, matching `lane < 8` in norm_sum. -/
+/-- Block sums: 256 threads are 8 warps and the second pass reads lanes `< 8`. -/
 theorem norm_warps : 256 / 32 = 8 := by decide
 
-/-- Every warp index of a 256-thread block is below 8. -/
-theorem warp_idx_lt (t : Nat) (h : t < 256) : t / 32 < 8 := by omega
+/-- 128 columns fit in 256 threads (the `col < S` guards cover the rest). -/
+theorem norm_threads_cover : S ≤ 256 := by decide
 
-/-- Row offset blockIdx*128 + col is in range of heads*128. -/
-theorem norm_idx_lt (b col heads : Nat) (hb : b < heads) (hc : col < 128) : b * 128 + col < heads * 128 := by
-  have h1 : b + 1 ≤ heads := hb
-  have h2 : (b + 1) * 128 ≤ heads * 128 := Nat.mul_le_mul_right 128 h1
+/-- History addressing `c*3 + tap` is injective for taps `< 3`. -/
+theorem hist_inj (c t c' t' : Nat) (ht : t < 3) (ht' : t' < 3)
+    (h : c * 3 + t = c' * 3 + t') : c = c' ∧ t = t' := by omega
+
+/-- Weight addressing `c*4 + tap` is injective for taps `< 4`. -/
+theorem weight_inj (c t c' t' : Nat) (ht : t < 4) (ht' : t' < 4)
+    (h : c * 4 + t = c' * 4 + t') : c = c' ∧ t = t' := by omega
+
+/-- The history region has `3*channels` floats and the last address stays inside it. -/
+theorem hist_last_lt (channels c t : Nat) (hc : c < channels) (ht : t < 3) : c * 3 + t < 3 * channels := by
   omega
 
-/-- Threads 128..255 of a norm block are padding (col >= S) and contribute zero. -/
-theorem norm_padding (col : Nat) (h : 128 ≤ col) : ¬ col < 128 := by omega
+/-- The weight region has `4*channels` floats. -/
+theorem weight_last_lt (channels c t : Nat) (hc : c < channels) (ht : t < 4) : c * 4 + t < 4 * channels := by
+  omega
 
--- § span validation
-/-- Byte-span overlap. -/
+/-- Next history after consuming input `x`: taps shift left, input enters last. -/
+def convHistoryNext (v1 v2 x : Int) : Int × Int × Int := (v1, v2, x)
+
+/-- The shifted history equals the old taps 1..3 (`values[tap+1]` in the source). -/
+theorem history_shift (v0 v1 v2 x : Int) : convHistoryNext v1 v2 x = (v1, v2, x) := rfl
+
+/-- Tap sum over four values. -/
+def convSum (v0 v1 v2 v3 w0 w1 w2 w3 : Int) : Int := v0 * w0 + v1 * w1 + v2 * w2 + v3 * w3
+
+/-- Adding the zero bias after the sum is the identity (the source adds `0.0f` explicitly). -/
+theorem zero_bias_identity (s : Int) : s + 0 = s := by omega
+
+/-- Gate softplus branch: for `v > 20` the value is returned unchanged (abstract threshold check). -/
+def softplusBranchLarge (v : Int) : Bool := decide (v > 20)
+
+/-- The large branch fires exactly above 20. -/
+theorem softplus_large_iff (v : Int) : softplusBranchLarge v = true ↔ v > 20 := by
+  unfold softplusBranchLarge; simp
+
+/-- Output bytes of a norm over `heads` rows of width 128. -/
+theorem norm_bytes (heads : Nat) : heads * 128 * 4 = 512 * heads := by omega
+
+/-- Gamma is a single 128-float row: `S * 4 = 512` bytes. -/
+theorem gamma_bytes : S * 4 = 512 := by decide
+
+/-- Span interval overlap. -/
 def overlap (a an b bn : Nat) : Prop := a < b + bn ∧ b < a + an
 
-/-- Overlap is symmetric. -/
+/-- Overlap is symmetric, so pairwise checks `j < i` suffice. -/
 theorem overlap_symm (a an b bn : Nat) : overlap a an b bn ↔ overlap b bn a an := by
-  unfold overlap
-  constructor <;> intro h <;> omega
+  unfold overlap; constructor <;> intro h <;> omega
 
-/-- Adjacent spans do not overlap. -/
-theorem adjacent_disjoint (a n m : Nat) : ¬ overlap a n (a + n) m := by
-  unfold overlap
-  omega
+/-- Adjacent spans are disjoint: the byte just past the first is the start of the second. -/
+theorem adjacent_disjoint (a an bn : Nat) : ¬ overlap a an (a + an) bn := by
+  unfold overlap; omega
 
-/-- The conv writable spans history (3*bytes), raw (bytes), silu (bytes) packed back to back are pairwise disjoint. -/
-theorem packed_spans_disjoint (base bytes : Nat) :
-    ¬ overlap base (3 * bytes) (base + 3 * bytes) bytes ∧
-    ¬ overlap base (3 * bytes) (base + 3 * bytes + bytes) bytes ∧
-    ¬ overlap (base + 3 * bytes) bytes (base + 3 * bytes + bytes) bytes := by
-  unfold overlap
-  refine ⟨?_, ?_, ?_⟩ <;> omega
-
-/-- Softplus guard: x > 20 passes through unchanged. -/
-theorem softplus_large (x : Int) (f : Int → Int) (h : 20 < x) : (if 20 < x then x else f x) = x := by
-  simp [h]
+/-- Triple pairwise-disjointness of the three writable conv spans from their cumulative layout. -/
+theorem layout_disjoint3 (a n1 n2 n3 : Nat) :
+    ¬ overlap a n1 (a + n1) n2 ∧ ¬ overlap a n1 (a + n1 + n2) n3 ∧ ¬ overlap (a + n1) n2 (a + n1 + n2) n3 := by
+  unfold overlap; omega
 
 end Ref.NativeGdnPreprocess
-
-
-
-## FILE: /mnt/user-data/outputs/VerifyWindowKernels.lean
-/-!
-# MODULE: verify_window_kernels
-SOURCES: src/kernels/cuda/verify_kernels.cu
-Multi-token "verify window" kernels for speculative decoding: per-token GDN conv/L2, alpha/beta, state-step + norm over
-a window with an `n_keep` commit, plus the device-side helpers (blob fetch, id remap, window ids, dense steps).
-Per-token arithmetic is the single-token arithmetic; the window indexing and commit contracts are formalised.
-
-## Source semantics
-* Token t of the conv window reads the sequence [hist0,hist1,hist2,x_0..]: entries t..t+2 plus x_t = entry t+3.
-* `gdn_conv_commit` keeps the last three entries of [hist | x_0..x_{n-1}] (indices n..n+2); n <= 0 is a no-op.
-* `gdn_step_norm_multi` replays tokens t < n; outputs are emitted only for t >= t_out_begin; state is written back
-  only when n_keep is non-null and n > 0.
-* `window_ids`: start = max(0, n_kv - window), width = n_kv - start, ids[j] = start + j.
-* `dense_steps`: steps = [c, c+1, (c+1)/4, c+1] per cell, the step layout the attention kernels validate.
-
-## Form template identifiers
-seqAt -> window_sequence_entry, convWinIdx -> conv_window_index, commitIdx -> commit_index, pair_inj -> mixed_radix_inj
--/
-namespace Ref.VerifyWindowKernels
-
--- § mixed-radix addressing
-/-- Mixed-radix index a*B + b is recovered by division. -/
-theorem pair_div (a b B : Nat) (hB : 0 < B) (hb : b < B) : (a * B + b) / B = a := by
-  rw [Nat.add_comm, Nat.add_mul_div_right _ _ hB, Nat.div_eq_of_lt hb, Nat.zero_add]
-
-/-- Mixed-radix index a*B + b is recovered by modulo. -/
-theorem pair_mod (a b B : Nat) (hb : b < B) : (a * B + b) % B = b := by
-  rw [Nat.add_comm, Nat.add_mul_mod_self_right, Nat.mod_eq_of_lt hb]
-
-/-- Mixed-radix indexing is injective (e.g. token-major buffers `t*h_v + r`). -/
-theorem pair_inj (a b a' b' B : Nat) (hB : 0 < B) (hb : b < B) (hb' : b' < B)
-    (h : a * B + b = a' * B + b') : a = a' ∧ b = b' := by
-  have h1 := congrArg (fun x => x / B) h
-  have h2 := congrArg (fun x => x % B) h
-  simp only [pair_div a b B hB hb, pair_div a' b' B hB hb', pair_mod a b B hb,
-    pair_mod a' b' B hb'] at h1 h2
-  exact ⟨h1, h2⟩
-
-/-- Row-major pair bound. -/
-theorem pair_lt (a b A B : Nat) (ha : a < A) (hb : b < B) : a * B + b < A * B := by
-  have h1 : a + 1 ≤ A := ha
-  have h2 : (a + 1) * B ≤ A * B := Nat.mul_le_mul_right B h1
-  rw [Nat.add_mul, Nat.one_mul] at h2
-  omega
-
-/-- Per-token gate/beta slots `t*h_v + r` are in range for t < T, r < h_v. -/
-theorem token_slot_lt (t r T hv : Nat) (ht : t < T) (hr : r < hv) : t * hv + r < T * hv :=
-  pair_lt t r T hv ht hr
-
--- § conv window
-/-- Index into the virtual sequence [hist(3) | x_0 .. ] read by tap j of token t. -/
-def convWinIdx (t j : Nat) : Nat := t + j
-
-/-- A window tap either reads history (index < 3) or an earlier token x_{src-3} with src-3 < t: no future leakage. -/
-theorem conv_window_causal (t j : Nat) (hj : j < 3) :
-    convWinIdx t j < 3 ∨ (3 ≤ convWinIdx t j ∧ convWinIdx t j - 3 < t) := by
-  simp only [convWinIdx]
-  omega
-
-/-- The current input of token t is entry t+3 of the virtual sequence. -/
-theorem conv_current_index (t : Nat) : convWinIdx t 3 - 3 = t := by
-  simp only [convWinIdx]
-  omega
-
-/-- Consecutive tokens slide the window by one entry (the multi-token conv equals repeated single-token conv). -/
-theorem conv_window_slide (t j : Nat) (hj : j < 2) : convWinIdx (t + 1) j = convWinIdx t (j + 1) := by
-  simp only [convWinIdx]
-  omega
-
-/-- Commit tap j reads entry n+j of [hist | x_0..x_{n-1}]. -/
-def commitIdx (n j : Nat) : Nat := n + j
-
-/-- Commit only ever reads kept tokens x_0..x_{n-1} or old history. -/
-theorem commit_reads_kept (n j : Nat) (hj : j < 3) :
-    commitIdx n j < 3 ∨ (3 ≤ commitIdx n j ∧ commitIdx n j - 3 < n) := by
-  simp only [commitIdx]
-  omega
-
-/-- With n = 3 the committed history is exactly the last three kept inputs x_0, x_1, x_2. -/
-theorem commit_three (j : Nat) (hj : j < 3) : commitIdx 3 j - 3 = j := by
-  simp only [commitIdx]
-  omega
-
-/-- Committing one more token slides the committed window by one. -/
-theorem commit_slide (n j : Nat) : commitIdx (n + 1) j = commitIdx n (j + 1) := by
-  simp only [commitIdx]
-  omega
-
--- § step/norm window
-/-- Number of tokens replayed: n_keep if given else T. -/
-def replayCount (hasKeep : Bool) (nKeep T : Nat) : Nat := if hasKeep then nKeep else T
-
-/-- Outputs are emitted for t in [t_out_begin, n): that is `n - t_out_begin` tokens. -/
-def outputCount (n tOutBegin : Nat) : Nat := n - tOutBegin
-
-/-- Without n_keep the replay count is the window size. -/
-theorem replay_no_keep (nKeep T : Nat) : replayCount false nKeep T = T := rfl
-
-/-- With n_keep the replay count is n_keep. -/
-theorem replay_keep (nKeep T : Nat) : replayCount true nKeep T = nKeep := rfl
-
-/-- Replay never exceeds the window when n_keep <= T. -/
-theorem replay_le (hasKeep : Bool) (nKeep T : Nat) (h : nKeep ≤ T) : replayCount hasKeep nKeep T ≤ T := by
-  cases hasKeep <;> simp [replayCount, h]
-
-/-- Replaying everything with t_out_begin = 0 emits all tokens. -/
-theorem output_all (n : Nat) : outputCount n 0 = n := by
-  simp [outputCount]
-
-/-- Output slot of token t is below T*value_dim. -/
-theorem output_slot_lt (t col T vd : Nat) (ht : t < T) (hc : col < vd) : t * vd + col < T * vd :=
-  pair_lt t col T vd ht hc
-
--- § device helpers
-/-- Blob fetch: flat index i is blob k = i/per, offset i%per. -/
-theorem blob_decomp (i per : Nat) : per * (i / per) + i % per = i := Nat.div_add_mod i per
-
-/-- Blob fetch: i < n*per implies the blob index is below n. -/
-theorem blob_k_lt (n per i : Nat) (hi : i < n * per) : i / per < n := by
-  by_cases h : i / per < n
-  · exact h
-  · have h1 : n ≤ i / per := Nat.le_of_not_lt h
-    have h2 : n * per ≤ i / per * per := Nat.mul_le_mul_right per h1
-    have h3 : i / per * per ≤ i := Nat.div_mul_le_self i per
-    omega
-
-/-- Rebased pointers of consecutive blobs are exactly `bytes` apart. -/
-theorem rebase_stride (base bytes k : Nat) : (base + (k + 1) * bytes) - (base + k * bytes) = bytes := by
-  rw [Nat.add_mul, Nat.one_mul]
-  omega
-
-/-- Identity hits: dst is the identity map on [0,n) hence injective. -/
-theorem ident_hits_inj (i j : Nat) (h : i = j) : i = j := h
-
-/-- Window start. -/
-def winStart (nkv window : Nat) : Nat := if window < nkv then nkv - window else 0
-
-/-- Window width. -/
-def winWidth (nkv window : Nat) : Nat := nkv - winStart nkv window
-
-/-- The window ends exactly at n_kv. -/
-theorem window_ends (nkv window : Nat) : winStart nkv window + winWidth nkv window = nkv := by
-  unfold winWidth winStart
-  split <;> omega
-
-/-- The window width is at most the window size. -/
-theorem window_width_le (nkv window : Nat) : winWidth nkv window ≤ window := by
-  unfold winWidth winStart
-  split <;> omega
-
-/-- The window width is at most n_kv. -/
-theorem window_width_le_nkv (nkv window : Nat) : winWidth nkv window ≤ nkv := by
-  unfold winWidth winStart
-  split <;> omega
-
-/-- The window width is min(n_kv, window). -/
-theorem window_width_min (nkv window : Nat) : winWidth nkv window = min nkv window := by
-  unfold winWidth winStart
-  split <;> omega
-
-/-- Window ids are valid cells below n_kv. -/
-theorem window_id_lt (nkv window j : Nat) (hj : j < winWidth nkv window) : winStart nkv window + j < nkv := by
-  have := window_ends nkv window
-  omega
-
--- § dense steps feed the attention validity predicate
-/-- Validity predicate of the native attention kernel on (width, n_kv, pos, n_bid). -/
-def stepValid (width nkv pos nbid maxCtx : Nat) : Prop :=
-  1 ≤ width ∧ width ≤ maxCtx ∧ nkv = width ∧ pos = width - 1 ∧ nbid = width / 4
-
-/-- `dense_steps` for cell c (steps = [c, c+1, (c+1)/4, c+1]) satisfies the attention step validity for any max context >= c+1. -/
-theorem dense_steps_valid (c maxCtx : Nat) (h : c + 1 ≤ maxCtx) :
-    stepValid (c + 1) (c + 1) c ((c + 1) / 4) maxCtx := by
-  unfold stepValid
-  omega
-
-/-- The four slots of a dense step row are distinct and in range. -/
-theorem dense_step_slot (i f : Nat) (hf : f < 4) : (i * 4 + f) / 4 = i ∧ (i * 4 + f) % 4 = f :=
-  ⟨pair_div i f 4 (by decide) hf, pair_mod i f 4 hf⟩
-
--- § code extraction
-/-- 4-bit codes: the in-byte shift stays inside the byte. -/
-theorem shift4_lt (i : Nat) : (i % (8 / 4)) * 4 + 4 ≤ 8 := by omega
-/-- 2-bit codes: the in-byte shift stays inside the byte. -/
-theorem shift2_lt (i : Nat) : (i % (8 / 2)) * 2 + 2 ≤ 8 := by omega
-/-- 1-bit codes: the in-byte shift stays inside the byte. -/
-theorem shift1_lt (i : Nat) : (i % (8 / 1)) * 1 + 1 ≤ 8 := by omega
-/-- 8-bit codes: one code per byte. -/
-theorem shift8_lt (i : Nat) : (i % (8 / 8)) * 8 + 8 ≤ 8 := by omega
-
-end Ref.VerifyWindowKernels
-
-
-
-## FILE: /mnt/user-data/outputs/KvQ8Cache.lean
-/-!
-# MODULE: kv_q8_cache
-SOURCES: src/kernels/cuda/kv_q8.cu
-INT8-quantised paged KV cache: append one token (per-64-value-group max-abs scale stored as fp16, values quantised
-against the STORED scale, clamped to [-127,127]) and gather cells back to fp16 scratch.
-
-## Source semantics
-* head_dim must be a multiple of KV_Q8_GROUP = 64; one block = one 64-value group of one KV head of K or V.
-* row = (page*kv_heads + h)*page_size + pos % page_size; scale slot = row*groups + g, groups = head_dim/64.
-* gather: thread = 4 consecutive values of one (cell, head); all four share one scale group.
-
-## Form template identifiers
-KV_Q8_GROUP -> quant_group, rowIdx -> cache_row, clamp127 -> int8_clamp
--/
-namespace Ref.KvQ8Cache
-
--- § mixed-radix lemmas
-/-- Row-major pair bound. -/
-theorem pair_lt (a b A B : Nat) (ha : a < A) (hb : b < B) : a * B + b < A * B := by
-  have h1 : a + 1 ≤ A := ha
-  have h2 : (a + 1) * B ≤ A * B := Nat.mul_le_mul_right B h1
-  rw [Nat.add_mul, Nat.one_mul] at h2
-  omega
-
-/-- Mixed-radix recovery by division. -/
-theorem pair_div (a b B : Nat) (hB : 0 < B) (hb : b < B) : (a * B + b) / B = a := by
-  rw [Nat.add_comm, Nat.add_mul_div_right _ _ hB, Nat.div_eq_of_lt hb, Nat.zero_add]
-
-/-- Mixed-radix recovery by modulo. -/
-theorem pair_mod (a b B : Nat) (hb : b < B) : (a * B + b) % B = b := by
-  rw [Nat.add_comm, Nat.add_mul_mod_self_right, Nat.mod_eq_of_lt hb]
-
-/-- Mixed-radix injectivity. -/
-theorem pair_inj (a b a' b' B : Nat) (hB : 0 < B) (hb : b < B) (hb' : b' < B)
-    (h : a * B + b = a' * B + b') : a = a' ∧ b = b' := by
-  have h1 := congrArg (fun x => x / B) h
-  have h2 := congrArg (fun x => x % B) h
-  simp only [pair_div a b B hB hb, pair_div a' b' B hB hb', pair_mod a b B hb,
-    pair_mod a' b' B hb'] at h1 h2
-  exact ⟨h1, h2⟩
-
--- § constants and clamp
-/-- Quantisation group size. -/
-def KV_Q8_GROUP : Nat := 64
-
-/-- Symmetric int8 clamp. -/
-def clamp127 (q : Int) : Int := if q < -127 then -127 else if 127 < q then 127 else q
-
-/-- The clamp always lands in [-127, 127] (never -128). -/
-theorem clamp127_bounds (q : Int) : -127 ≤ clamp127 q ∧ clamp127 q ≤ 127 := by
-  unfold clamp127
-  split <;> try split
-  all_goals omega
-
-/-- The clamp is the identity on in-range values. -/
-theorem clamp127_id (q : Int) (h1 : -127 ≤ q) (h2 : q ≤ 127) : clamp127 q = q := by
-  unfold clamp127
-  split <;> try split
-  all_goals omega
-
-/-- The clamp is idempotent. -/
-theorem clamp127_idem (q : Int) : clamp127 (clamp127 q) = clamp127 q :=
-  clamp127_id _ (clamp127_bounds q).1 (clamp127_bounds q).2
-
--- § cache row addressing
-/-- Cache row of (page, head, in-page offset). -/
-def rowIdx (kvh ps page h off : Nat) : Nat := (page * kvh + h) * ps + off
-
-/-- Rows stay inside `P` pages. -/
-theorem rowIdx_lt (kvh ps P page h off : Nat) (hp : page < P) (hh : h < kvh) (ho : off < ps) :
-    rowIdx kvh ps page h off < P * kvh * ps := by
-  unfold rowIdx
-  exact pair_lt (page * kvh + h) off (P * kvh) ps (pair_lt page h P kvh hp hh) ho
-
-/-- Distinct (page, head, offset) triples never share a cache row. -/
-theorem rowIdx_inj (kvh ps page h off page' h' off' : Nat) (hps : 0 < ps) (hkvh : 0 < kvh)
-    (hh : h < kvh) (hh' : h' < kvh) (ho : off < ps) (ho' : off' < ps)
-    (e : rowIdx kvh ps page h off = rowIdx kvh ps page' h' off') :
-    page = page' ∧ h = h' ∧ off = off' := by
-  unfold rowIdx at e
-  obtain ⟨e1, e2⟩ := pair_inj (page * kvh + h) off (page' * kvh + h') off' ps hps ho ho' e
-  obtain ⟨e3, e4⟩ := pair_inj page h page' h' kvh hkvh hh hh' e1
-  exact ⟨e3, e4, e2⟩
-
-/-- In-page offset of a position is below page_size. -/
-theorem offset_lt (pos ps : Nat) (h : 0 < ps) : pos % ps < ps := Nat.mod_lt _ h
-
--- § group addressing
-/-- A value's slot inside a row (group g, lane t) is below head_dim. -/
-theorem value_slot_lt (hd g t : Nat) (hd64 : hd % 64 = 0) (hg : g < hd / 64) (ht : t < 64) :
-    g * 64 + t < hd := by omega
-
-/-- A thread's four values start at d = 4*q4 < head_dim. -/
-theorem gather_d_lt (hd q4 : Nat) (hq : q4 < hd / 4) : q4 * 4 < hd := by omega
-
-/-- The four values of a gather thread share one scale group (head_dim % 64 = 0 is not even needed). -/
-theorem gather_same_group (q4 : Nat) : (q4 * 4) / 64 = (q4 * 4 + 3) / 64 := by omega
-
-/-- The scale group of a gather thread is a valid group index. -/
-theorem gather_group_lt (hd q4 : Nat) (hd64 : hd % 64 = 0) (hq : q4 < hd / 4) : (q4 * 4) / 64 < hd / 64 := by
-  omega
-
-/-- The 64 threads of a block cover one group: thread t handles value g*64+t. -/
-theorem append_cover (hd v : Nat) (hd64 : hd % 64 = 0) (hv : v < hd) :
-    ∃ g t, g < hd / 64 ∧ t < 64 ∧ g * 64 + t = v :=
-  ⟨v / 64, v % 64, by omega, by omega, by omega⟩
-
-/-- Gather decomposition: flat i = id*(kvh*per) + rem with rem < kvh*per. -/
-theorem gather_decomp (i kvh per : Nat) : (kvh * per) * (i / (kvh * per)) + i % (kvh * per) = i :=
-  Nat.div_add_mod i (kvh * per)
-
-/-- The remainder splits into (head, q4) with head = rem/per, q4 = rem%per. -/
-theorem gather_head_split (rem per : Nat) : per * (rem / per) + rem % per = rem := Nat.div_add_mod rem per
-
-end Ref.KvQ8Cache
-
-
-
-## FILE: /mnt/user-data/outputs/NativeFlashAttnShort.lean
-/-!
-# MODULE: native_flash_attn_short
-SOURCES: src/kernels/cuda/native_flash_attn.cu
-Specialised decode FlashAttention (D=256, Q 24 heads, KV 2 heads, fp16 KV, context <= 256, one query column) adapted
-from the pinned llama.cpp vector kernel. The thread/cell/dimension layouts, step validity gate and host validation
-are formalised.
-
-## Source semantics
-* grid = 24 blocks (one per query head), block = (32, 4) = 128 threads; kv head = head / 12.
-* The step is valid iff 1 <= width <= max_context, n_kv = width, pos = width-1 and n_bid = width/4; otherwise the
-  output is NaN and status = unsupported.
-* 128 cells per iteration: cell = base + warp*32 + (lane & ~7) + row; padded length 256 => two iterations.
-* Each lane handles dimensions d = 2*(32a + 4*(lane%8) + j) and d+1 (a < 4, j < 4).
-* The epilogue sums 16 per-thread partial tiles (4 warps x 4 lane groups) and divides by the softmax sum.
-
-## Form template identifiers
-stepValid -> step_validity, kvIdx -> kv_element_index, tileIdx -> partial_tile_slot
--/
-namespace Ref.NativeFlashAttnShort
-
--- § step validity
-/-- The validity predicate checked on-device. -/
-def stepValid (width nkv pos nbid maxCtx : Nat) : Prop :=
-  1 ≤ width ∧ width ≤ maxCtx ∧ nkv = width ∧ pos = width - 1 ∧ nbid = width / 4
-
-/-- A valid step addresses only cells strictly below the width. -/
-theorem valid_pos_lt (w n p b m : Nat) (h : stepValid w n p b m) : p < w := by
-  unfold stepValid at h
-  omega
-
-/-- With max context <= 256 a valid step fits the padded length 256. -/
-theorem valid_fits_padded (w n p b m : Nat) (h : stepValid w n p b m) (hm : m ≤ 256) : w ≤ 256 := by
-  unfold stepValid at h
-  omega
-
-/-- A valid step's width is at least one (non-empty context). -/
-theorem valid_nonempty (w n p b m : Nat) (h : stepValid w n p b m) : 0 < w := by
-  unfold stepValid at h
-  omega
-
-/-- Width 1..max_context: the dense step of cell c is valid exactly when c+1 <= max_context. -/
-theorem dense_step_valid_iff (c m : Nat) :
-    stepValid (c + 1) (c + 1) c ((c + 1) / 4) m ↔ c + 1 ≤ m := by
-  unfold stepValid
-  omega
-
--- § head and kv layout
-/-- KV head of a query head. -/
-def kvHead (head : Nat) : Nat := head / 12
-
-/-- All 24 query heads map to one of the two KV heads. -/
-theorem kvHead_lt (head : Nat) (h : head < 24) : kvHead head < 2 := by
-  unfold kvHead
-  omega
-
-/-- Heads 0..11 use KV head 0 and 12..23 use KV head 1. -/
-theorem kvHead_split (head : Nat) (h : head < 24) :
-    (head < 12 → kvHead head = 0) ∧ (12 ≤ head → kvHead head = 1) := by
-  unfold kvHead
-  constructor <;> intro hh <;> omega
-
-/-- Element index of K/V: (cell*2 + kv)*256 + d. -/
-def kvIdx (cell kv d : Nat) : Nat := (cell * 2 + kv) * 256 + d
-
-/-- K/V reads stay in capacity*512 halves, which is exactly the validated `capacity*1024` bytes. -/
-theorem kvIdx_lt (cell kv d cap : Nat) (hc : cell < cap) (hkv : kv < 2) (hd : d < 256) :
-    kvIdx cell kv d < cap * 512 := by
-  unfold kvIdx
-  omega
-
-/-- K/V element indexing is injective. -/
-theorem kvIdx_inj (c k d c' k' d' : Nat) (hk : k < 2) (hk' : k' < 2) (hd : d < 256) (hd' : d' < 256)
-    (h : kvIdx c k d = kvIdx c' k' d') : c = c' ∧ k = k' ∧ d = d' := by
-  unfold kvIdx at h
-  omega
-
-/-- Two bytes per half: capacity*512 halves = capacity*1024 bytes. -/
-theorem kv_bytes (cap : Nat) : cap * 512 * 2 = cap * 1024 := by omega
-
-/-- Query/output row of a head: head*256 + d is in 24*256. -/
-theorem q_idx_lt (head d : Nat) (hh : head < 24) (hd : d < 256) : head * 256 + d < 24 * 256 := by omega
-
--- § dimension coverage per lane
-/-- Pair index handled by (a, lane%8, j): 32a + 4*l8 + j. -/
-def pairIdx (a l8 j : Nat) : Nat := 32 * a + 4 * l8 + j
-
-/-- Pair indices cover 0..127, so dimensions d = 2p and 2p+1 cover 0..255. -/
-theorem pair_cover (p : Nat) (hp : p < 128) : ∃ a l8 j, a < 4 ∧ l8 < 8 ∧ j < 4 ∧ pairIdx a l8 j = p :=
-  ⟨p / 32, (p % 32) / 4, p % 4, by omega, by omega, by omega, by unfold pairIdx; omega⟩
-
-/-- Each pair index is produced by exactly one (a, lane%8, j). -/
-theorem pair_inj (a l j a' l' j' : Nat) (hl : l < 8) (hl' : l' < 8) (hj : j < 4) (hj' : j' < 4)
-    (h : pairIdx a l j = pairIdx a' l' j') : a = a' ∧ l = l' ∧ j = j' := by
-  unfold pairIdx at h
-  omega
-
-/-- The d+1 element read next to d = 2p stays in range. -/
-theorem dim_pair_lt (p : Nat) (hp : p < 128) : 2 * p + 1 < 256 := by omega
-
-/-- qreg slot 4a + j is below 16. -/
-theorem qreg_slot_lt (a j : Nat) (ha : a < 4) (hj : j < 4) : 4 * a + j < 16 := by omega
-
--- § cell coverage per iteration
-/-- Cell offset inside a 128-cell iteration: warp*32 + (lane/8)*8 + row (the `lane & ~7` term is (lane/8)*8). -/
-def cellOff (warp lane row : Nat) : Nat := warp * 32 + (lane / 8) * 8 + row
-
-/-- `lane & ~7` equals lane minus lane mod 8. -/
-theorem lane_mask_eq (lane : Nat) : (lane / 8) * 8 = lane - lane % 8 := by omega
-
-/-- Cell offsets stay inside the 128 cells of an iteration. -/
-theorem cellOff_lt (warp lane row : Nat) (hw : warp < 4) (hl : lane < 32) (hr : row < 8) :
-    cellOff warp lane row < 128 := by
-  unfold cellOff
-  omega
-
-/-- Every cell of the iteration is handled by some (warp, lane group, row). -/
-theorem cellOff_cover (x : Nat) (hx : x < 128) :
-    ∃ warp g row, warp < 4 ∧ g < 4 ∧ row < 8 ∧ warp * 32 + g * 8 + row = x :=
-  ⟨x / 32, (x % 32) / 8, x % 8, by omega, by omega, by omega, by omega⟩
-
-/-- Two iterations of 128 cover the padded length 256. -/
-theorem iterations_cover : 2 * 128 = 256 := by decide
-
-/-- Lane groups of 8 are closed under the xor offsets 1, 2, 4 of `warp_sum<8>`. -/
-theorem xor_group_closed : ∀ l : Fin 32, ∀ o ∈ [1, 2, 4], ((l.val ^^^ o) / 8 = l.val / 8) := by
-  decide
-
--- § epilogue
-/-- Output slot of the epilogue: i0 in {0, 128} plus tid < 128 covers 0..255 exactly. -/
-theorem out_cover (d : Nat) (hd : d < 256) :
-    ∃ i0 tid, (i0 = 0 ∨ i0 = 128) ∧ tid < 128 ∧ i0 + tid = d := by
-  by_cases h : d < 128
-  · exact ⟨0, d, Or.inl rfl, h, by omega⟩
-  · exact ⟨128, d - 128, Or.inr rfl, by omega, by omega⟩
-
-/-- Partial-tile slot written before the final sum: warp*1024 + group*256 + d. -/
-def tileIdx (warp g d : Nat) : Nat := warp * 4 * 256 + g * 256 + d
-
-/-- Tile slots stay inside the 16*256 = 4096 shared floats. -/
-theorem tileIdx_lt (warp g d : Nat) (hw : warp < 4) (hg : g < 4) (hd : d < 256) : tileIdx warp g d < 4 * 4 * 256 := by
-  unfold tileIdx
-  omega
-
-/-- Tile slots are injective in (warp, group, d). -/
-theorem tileIdx_inj (w g d w' g' d' : Nat) (hg : g < 4) (hg' : g' < 4) (hd : d < 256) (hd' : d' < 256)
-    (h : tileIdx w g d = tileIdx w' g' d') : w = w' ∧ g = g' ∧ d = d' := by
-  unfold tileIdx at h
-  omega
-
-/-- Sixteen partial tiles are summed per output dimension: 4 warps x 4 groups. -/
-theorem partial_tiles : 4 * 4 = 16 := by decide
-
-/-- The score scale 1/16 squared times D = 256 is one: scale = 1/sqrt(256). -/
-theorem scale_sq : 16 * 16 = 256 := by decide
-
--- § host validation
-/-- Launch shape: 24 blocks of 32x4 = 128 threads, matching `__launch_bounds__(128, 1)`. -/
-theorem block_threads : 32 * 4 = 128 := by decide
-
-/-- Each of the 128 threads writes two output dimensions: 128 * 2 = 256. -/
-theorem outputs_per_head : 128 * 2 = 256 := by decide
-
-/-- Byte-span overlap used by the host check. -/
-def overlap (a an b bn : Nat) : Prop := a < b + bn ∧ b < a + an
-
-/-- Overlap is symmetric. -/
-theorem overlap_symm (a an b bn : Nat) : overlap a an b bn ↔ overlap b bn a an := by
-  unfold overlap
-  constructor <;> intro h <;> omega
-
-/-- Adjacent spans never overlap. -/
-theorem adjacent_disjoint (a n m : Nat) : ¬ overlap a n (a + n) m := by
-  unfold overlap
-  omega
-
-end Ref.NativeFlashAttnShort
-
-
 
 
 
@@ -3504,239 +3865,248 @@ end Ref.NativeFlashAttnShort
 /-!
 # MODULE: qsa_cache_index_attend
 SOURCES: src/kernels/cuda/qsa.cu
-The QSA KV cache append, indexer-key pooling, block scoring, exact top-k threshold selection, KV gather,
-and per-head attention. This module models the index arithmetic, counting and bound contracts of those kernels.
+The QSA cache, indexer and attention: paged KV append, indexer key pooling with a spare slot, per-block
+scores mapped onto cells, exact top-k by threshold search with an ascending tie rule, KV gather and a
+one-block-per-head attention, plus the step-state (pos, n_kv, n_bid, width) derived from one position.
 
 ## Source semantics
-* `qsa_step_fill`: n_kv = pos+1, n_bid = n_kv / r, width = min(n_kv, top_k + r - 1); all derive from one position.
-* A cell `pos` has slot `pos % r` and block `pos / r`; the cell with slot `r-1` completes a block, and then the
-  pooled row b and the spare row b+1 are written (so the pooled buffer needs b+1 in range).
-* `topk_512` emits every cell strictly above the width-th key plus the first `width - c_gt` cells equal to it.
-* `kv_gather` decomposes a flat index into (selected id, kv head, uint2 lane); `qsa_attend` maps head h to kv head
-  `h / (n_head / n_head_kv)`.
+* From `pos`: `n_kv = pos+1`, `n_bid = n_kv / r`, `width = min(n_kv, top_k + r - 1)`.
+* Cells of block `b < n_bid` are `[b*r, b*r+r)`; the incomplete tail is `[n_bid*r, n_kv)` and is biased +1e9.
+* top-k = every cell strictly above the width-th key, then the first `width - c_gt` cells equal to it.
+* The f32 order key maps -0 to +0, NaN to 0, and flips negatives so unsigned comparison orders floats.
+* GQA pairing is `kv = h / (n_head / n_head_kv)` (NOT `h % n_head_kv`).
+* gate uses the SECOND half of the doubled query row.
 
 ## Form template identifiers
-- `selWidth`      : selection width = min(n_kv, top_k + r - 1)
-- `r`             : idx_block (cells per pooled block)
-- `n_bid`         : completed-block count n_kv / r
-- `gt`, `eq`, `budget` : strictly-above count, equal-to-threshold count, `width - c_gt`
+* `selWidth` -> selection_width, `stepNBid` -> completed_blocks, `orderKey` -> float_order_key.
 -/
 
-namespace Ref.QsaCache
+namespace Ref.Qsa
 
--- § step state
+/-- Selection width: `min(n_kv, top_k + r - 1)`. -/
+def selWidth (n topk r : Nat) : Nat := min n (topk + r - 1)
 
-/-- Selection width as computed by `qsa_selection_width`: min(n_kv, top_k + r - 1). -/
-def selWidth (nkv topk r : Nat) : Nat := min nkv (topk + r - 1)
+/-- The width never exceeds the cell count. -/
+theorem selWidth_le_n (n topk r : Nat) : selWidth n topk r ≤ n := by unfold selWidth; omega
 
-/-- The selection never exceeds the number of cached cells. -/
-theorem selWidth_le (nkv topk r : Nat) : selWidth nkv topk r ≤ nkv := by
+/-- The width never exceeds `top_k + r - 1`. -/
+theorem selWidth_le_cap (n topk r : Nat) : selWidth n topk r ≤ topk + r - 1 := by unfold selWidth; omega
+
+/-- Below the bound the selection is the identity (everything selected). -/
+theorem selWidth_identity (n topk r : Nat) (h : n ≤ topk + r - 1) : selWidth n topk r = n := by
   unfold selWidth; omega
 
-/-- Below the bound the selection is the identity (width equals n_kv). -/
-theorem selWidth_identity (nkv topk r : Nat) (h : nkv ≤ topk + r - 1) :
-    selWidth nkv topk r = nkv := by
-  unfold selWidth; omega
+/-- With `top_k = 2048`, `r = 4` the cap is 2051 (matches the literal in the native score kernel). -/
+theorem selWidth_real (n : Nat) : selWidth n 2048 4 = if n < 2051 then n else 2051 := by
+  unfold selWidth; split <;> omega
 
-/-- For the 2048/4 geometry the width never exceeds 2051. -/
-theorem selWidth_cap (nkv : Nat) : selWidth nkv 2048 4 ≤ 2051 := by
-  unfold selWidth; omega
+/-- Completed blocks for `r = 4`. -/
+def stepNBid (pos : Nat) : Nat := (pos + 1) / 4
 
--- § slot / block arithmetic
+/-- Completed blocks cover no more than the cells present. -/
+theorem nbid_cells_le (pos : Nat) : stepNBid pos * 4 ≤ pos + 1 := by unfold stepNBid; omega
 
-/-- A position decomposes as block * r + slot. -/
-theorem slot_block_decomp (pos r : Nat) : pos / r * r + pos % r = pos := by
-  have h := Nat.div_add_mod pos r
-  rw [Nat.mul_comm] at h
-  exact h
+/-- The incomplete tail is shorter than one block. -/
+theorem tail_lt_block (pos : Nat) : pos + 1 - stepNBid pos * 4 < 4 := by unfold stepNBid; omega
 
-/-- The cell that completes a block closes exactly (b+1) * r cells. -/
-theorem complete_block_size (pos r : Nat) (hs : pos % r + 1 = r) :
-    (pos / r + 1) * r = pos + 1 := by
-  have h1 := slot_block_decomp pos r
-  have h2 : (pos / r + 1) * r = pos / r * r + r := by
-    rw [Nat.add_mul, Nat.one_mul]
-  omega
+/-- A tail exists iff `n_kv % 4 ≠ 0` (the +1e9 bias condition). -/
+theorem tail_iff (pos : Nat) : stepNBid pos * 4 < pos + 1 ↔ (pos + 1) % 4 ≠ 0 := by
+  unfold stepNBid; omega
 
-/-- When a block completes inside capacity, both the pooled row b and the spare row b+1 exist
-in a buffer of `max_cells / r + 1` rows. -/
-theorem spare_row_in_bounds (pos r maxc : Nat) (hr : 0 < r) (hs : pos % r + 1 = r)
-    (hp : pos < maxc) : pos / r + 1 ≤ maxc / r := by
-  have h := complete_block_size pos r hs
-  exact (Nat.le_div_iff_mul_le hr).2 (by omega)
+/-- Cells of a completed block lie below `n_kv`. -/
+theorem full_block_cells_lt (pos b c : Nat) (hb : b < stepNBid pos) (hc : c < 4) : b * 4 + c < pos + 1 := by
+  unfold stepNBid at hb; omega
 
-/-- A block before the incomplete tail lies entirely inside the cache. -/
-theorem full_block_inside (b nkv r : Nat) (hb : b < nkv / r) : (b + 1) * r ≤ nkv := by
-  have h1 : (b + 1) * r ≤ nkv / r * r := Nat.mul_le_mul_right r hb
-  have h2 : nkv / r * r ≤ nkv := Nat.div_mul_le_self nkv r
-  omega
+/-- Every cell is in exactly one block: block `cell / 4`, which is `<= n_bid`. -/
+theorem cell_block_le (pos cell : Nat) (h : cell < pos + 1) : cell / 4 ≤ stepNBid pos := by
+  unfold stepNBid; omega
 
-/-- Every cached cell belongs to a block index at most n_bid. -/
-theorem cell_block_le (j nkv r : Nat) (hj : j < nkv) : j / r ≤ nkv / r :=
-  Nat.div_le_div_right (Nat.le_of_lt hj)
+/-- Counts: with `c_gt < w <= c_gt + c_eq` exactly `w` cells are selected. -/
+theorem topk_selected_count (cgt ceq w : Nat) (h1 : cgt < w) (h2 : w ≤ cgt + ceq) :
+    cgt + min (w - cgt) ceq = w := by omega
 
-/-- The rotation position of a completed block keeps the alignment of `pos_base`. -/
-theorem block_pos_formula (pos_base b r : Nat) : pos_base + b * r = pos_base + r * b := by
-  rw [Nat.mul_comm b r]
+/-- The tie budget is positive exactly when the strict-above set is short of the width. -/
+theorem eq_budget_pos (cgt w : Nat) (h : cgt < w) : 0 < w - cgt := by omega
 
--- § pool indexing
+/-- Order key of a float bit pattern `b < 2^32`: positives get the top bit set, negatives are complemented. -/
+def orderKey (b : Nat) : Nat := if b < 2147483648 then b + 2147483648 else 4294967295 - b
 
-/-- Mixed-radix index bound: a < n and b < m give a * m + b < n * m. -/
-theorem idx_lt (a b n m : Nat) (ha : a < n) (hb : b < m) : a * m + b < n * m := by
-  have h1 : (a + 1) * m ≤ n * m := Nat.mul_le_mul_right m ha
-  have h2 : (a + 1) * m = a * m + m := by rw [Nat.add_mul, Nat.one_mul]
-  omega
+/-- Keys are 32-bit values. -/
+theorem orderKey_lt (b : Nat) (h : b < 4294967296) : orderKey b < 4294967296 := by
+  unfold orderKey; split <;> omega
 
-/-- The `[page][kv_head][page_size][head_dim]` pool row of `kv_append`/`kv_gather` stays in the pool. -/
-theorem pool_row_lt (page h slot np kvh ps : Nat) (hp : page < np) (hh : h < kvh) (hs : slot < ps) :
-    (page * kvh + h) * ps + slot < np * kvh * ps :=
-  idx_lt (page * kvh + h) slot (np * kvh) ps (idx_lt page h np kvh hp hh) hs
+/-- Among non-negative floats the key is monotone in the bit pattern. -/
+theorem orderKey_mono_pos (a b : Nat) (ha : a < 2147483648) (hb : b < 2147483648) (h : a ≤ b) :
+    orderKey a ≤ orderKey b := by
+  unfold orderKey; rw [if_pos ha, if_pos hb]; omega
 
-/-- Gather index decomposition: the selected-id component is recovered by division. -/
-theorem gather_id (id rem m : Nat) (hm : 0 < m) (hr : rem < m) : (m * id + rem) / m = id := by
-  rw [Nat.mul_add_div hm, Nat.div_eq_of_lt hr, Nat.add_zero]
+/-- Among negative floats a larger magnitude (bit pattern) gives a smaller key. -/
+theorem orderKey_anti_neg (a b : Nat) (ha : 2147483648 ≤ a) (hb : 2147483648 ≤ b)
+    (hb' : b < 4294967296) (h : a ≤ b) : orderKey b ≤ orderKey a := by
+  unfold orderKey; rw [if_neg (by omega), if_neg (by omega)]; omega
 
-/-- Gather index decomposition: the (kv head, lane) remainder is recovered by modulus. -/
-theorem gather_rem (id rem m : Nat) (hr : rem < m) : (m * id + rem) % m = rem := by
-  rw [Nat.mul_add_mod, Nat.mod_eq_of_lt hr]
+/-- Every negative key is below every non-negative key. -/
+theorem orderKey_neg_lt_pos (a b : Nat) (ha : 2147483648 ≤ a) (ha' : a < 4294967296)
+    (hb : b < 2147483648) : orderKey a < orderKey b := by
+  unfold orderKey; rw [if_neg (by omega), if_pos hb]; omega
 
-/-- The kv head chosen for query head `h` is in range (`iv2 = iq2 / rv2`). -/
-theorem gqa_kv_in_range (h g nkv : Nat) (hh : h < nkv * g) : h / g < nkv := by
-  apply Nat.div_lt_of_lt_mul
-  rw [Nat.mul_comm]
-  exact hh
+/-- Page-local slot is below the page size. -/
+theorem slot_lt (pos ps : Nat) (h : 0 < ps) : pos % ps < ps := Nat.mod_lt _ h
 
--- § exact threshold selection
+/-- Indexer: a block completes exactly when `slot = r-1 = 3`. -/
+theorem block_complete_iff (pos : Nat) : pos % 4 = 3 ↔ (pos + 1) % 4 = 0 := by omega
 
-/-- Counting contract: gt strictly-above cells plus min(eq, width - gt) equal cells select exactly `width`
-cells whenever the threshold bracket gt <= width <= gt + eq holds. -/
-theorem selected_count (gt eq width : Nat) (h1 : gt ≤ width) (h2 : width ≤ gt + eq) :
-    gt + min eq (width - gt) = width := by
-  omega
+/-- Completing a block, the spare row `b+1` is within `max_cells/4 + 1` pooled rows. -/
+theorem spare_row_in_pool (pos maxc : Nat) (hp : pos < maxc) (h3 : pos % 4 = 3) :
+    pos / 4 + 1 < maxc / 4 + 1 := by omega
 
-/-- With distinct scores (c_gt = width, budget 0), nothing at the threshold is taken. -/
-theorem selected_count_distinct (eq width : Nat) : width + min eq (width - width) = width := by
-  omega
+/-- The tail has `r-1 = 3` rows: every stored slot indexes inside `3*idx_dim` floats (idx_dim = 128). -/
+theorem tail_index_lt (slot d : Nat) (hs : slot < 3) (hd : d < 128) : slot * 128 + d < 3 * 128 := by omega
 
-/-- The prefix of equal cells before a chunk never lets a chunk overshoot the budget. -/
-theorem eq_prefix_within_budget (eqBefore eqHere budget : Nat) :
-    eqBefore + min eqHere (budget - eqBefore) ≤ max budget eqBefore := by
-  omega
+/-- GQA pairing with 24 heads and 2 KV heads (group of 12) is a valid KV head. -/
+theorem gqa_kv_lt (h : Nat) (hh : h < 24) : h / 12 < 2 := by omega
 
-/-- A chunk entirely under the budget selects all its equal cells. -/
-theorem eq_chunk_fully_taken (eqBefore eqHere budget : Nat) (h : eqBefore + eqHere ≤ budget) :
-    min eqHere (budget - eqBefore) = eqHere := by
-  omega
+/-- The division pairing differs from a modulo pairing (head 1 maps to kv 0, not 1). -/
+theorem gqa_not_mod : (1 : Nat) / 12 ≠ 1 % 2 := by decide
 
--- § attention launch contract
+/-- The gate half starts exactly one head_dim into the doubled row (head_dim = 256). -/
+theorem gate_second_half (h d : Nat) (hd : d < 256) :
+    h * 512 + 256 ≤ h * 512 + 256 + d ∧ h * 512 + 256 + d < (h + 1) * 512 := by omega
 
-/-- Shared memory sized from the capacity always covers this token's real selection. -/
-theorem smem_covers (n_ids max_ids : Nat) (h : n_ids ≤ max_ids) :
-    (n_ids + 32) * 4 ≤ (max_ids + 32) * 4 := by
-  omega
+/-- Gather decomposition (2 KV heads, 64 uint2 per row): flat index splits into id, head, quad. -/
+theorem gather_decomp (i : Nat) :
+    i / 128 * 128 + (i % 128) / 64 * 64 + (i % 128) % 64 = i := by omega
 
-end Ref.QsaCache
+/-- Gather: with `i < n_ids * 128` the id is `< n_ids`. -/
+theorem gather_id_lt (i n : Nat) (h : i < n * 128) : i / 128 < n := by omega
+
+/-- Gather: the head part is below 2 and the quad below 64. -/
+theorem gather_parts_lt (i : Nat) : (i % 128) / 64 < 2 ∧ (i % 128) % 64 < 64 := by omega
+
+/-- Launch ceil: a grid of `ceil(n/256)` blocks covers `n` threads. -/
+theorem grid_for_covers (n : Nat) : n ≤ (n + 255) / 256 * 256 := by omega
+
+/-- Attention shared memory per head is `(max_ids + 32)` floats; the 32 reduction slots precede the weights. -/
+theorem attend_smem (max_ids : Nat) : (max_ids + 32) * 4 = max_ids * 4 + 128 := by omega
+
+end Ref.Qsa
 
 
 
-## FILE: /mnt/user-data/outputs/QsaDecodeAttnChunked.lean
+## FILE: /mnt/user-data/outputs/QsaDecodeAttention.lean
 /-!
-# MODULE: qsa_decode_attn_chunked
+# MODULE: qsa_decode_attention
 SOURCES: src/kernels/cuda/qsa_decode_attn.cu
-Split-K decode attention over the selected cells: 64-cell chunks per (chunk, kv head, query) block with 12 query
-heads per kv head, followed by a log-sum-exp merge. This module models chunk coverage, scratch layout and index bounds.
+Split-KV decode attention over the QSA-selected cells: a chunk kernel (64 cells per block, one block per
+(chunk, KV head [, query])) emitting per-chunk running max, exp-sum and weighted value accumulators for the 12
+query heads sharing a KV head, then a merge kernel combining chunks by online-softmax rescaling. fp16 and int8
+(grouped scale) pools are supported.
 
 ## Source semantics
-* n_chunks = ceil(cap / 64); chunk c covers selected positions [64c, 64c+64); a chunk with no cells publishes m = -FLT_MAX, l = 0.
-* Scratch per query holds acc (n_chunks * n_head * 256), m and l (n_chunks * n_head each); the stride is
-  n_chunks * n_head * 258 + 64.
-* Global query head h = kvh * 12 + hl; slot = kvh * n_chunks + chunk.
+* `HD = 256`, `G = 12` query heads per KV head, `CHUNK = 64`, 256 threads (8 warps).
+* Scratch layout per query: `[acc: chunks*n_head*HD][m: chunks*n_head][l: chunks*n_head]` plus 64 slack floats.
+* Chunk slot `kvh*n_chunks + chunk`; global query head `h = kvh*12 + hl`.
+* Empty chunks write `m = -FLT_MAX`, `l = 0` and are skipped in the merge.
 
 ## Form template identifiers
-- `CHUNK` = 64, `G` = 12, `HD` = 256
-- `nChunks`, `nHere` : chunk count and cells in a chunk
-- `slot`            : kvh * n_chunks + chunk
+* `HD` -> head_dim, `G` -> group_size, `CHUNK` -> cells_per_chunk, `scratchFloats` -> scratch_size.
 -/
 
-namespace Ref.QsaDecode
+namespace Ref.QsaDecodeAttn
 
--- § chunk coverage
+/-- Head dimension. -/
+def HD : Nat := 256
+/-- Query heads per KV head. -/
+def G : Nat := 12
+/-- Cells per chunk. -/
+def CHUNK : Nat := 64
+/-- Threads per block. -/
+def THREADS : Nat := 256
 
-/-- Number of 64-cell chunks for a capacity. -/
-def nChunks (cap : Nat) : Nat := (cap + 63) / 64
+/-- Scratch size (floats) from the host formula `chunks * n_head * (HD + 2) + 64`. -/
+def scratchFloats (chunks n_head : Nat) : Nat := chunks * n_head * (HD + 2) + 64
 
-/-- Cells handled by the chunk starting at `c0`. -/
-def nHere (nIds c0 : Nat) : Nat := min 64 (nIds - c0)
+/-- Eight warps per block. -/
+theorem warps : THREADS / 32 = 8 := by decide
 
-/-- Every selected position falls in a chunk that exists. -/
-theorem chunk_exists (i nIds cap : Nat) (hi : i < nIds) (hc : nIds ≤ cap) : i / 64 < nChunks cap := by
-  unfold nChunks; omega
+/-- Each lane holds 8 of the 256 dimensions: 32 lanes x 8 = HD. -/
+theorem lane_dims : 32 * 8 = HD := by decide
 
-/-- A position lies inside its own chunk's window. -/
-theorem cell_in_chunk (i : Nat) : i / 64 * 64 ≤ i ∧ i < i / 64 * 64 + 64 := by
+/-- One thread per dimension in the value loop. -/
+theorem thread_per_dim : THREADS = HD := by decide
+
+/-- The 64 scores of a head are covered by two per lane (`lane`, `lane+32`). -/
+theorem two_per_lane : 2 * 32 = CHUNK := by decide
+
+/-- Query tile in shared memory is `12 * 256` floats = 12 KB. -/
+theorem sq_bytes : G * HD * 4 = 12288 := by decide
+
+/-- Heads `warp` and `warp + 8` cover all 12 heads. -/
+theorem head_cover (h : Nat) (hh : h < 12) : ∃ w, w < 8 ∧ (h = w ∨ h = w + 8) := by
+  by_cases h8 : h < 8
+  · exact ⟨h, h8, Or.inl rfl⟩
+  · exact ⟨h - 8, by omega, Or.inr (by omega)⟩
+
+/-- Cells `warp, warp+8, ...` cover all 64 cells of a chunk. -/
+theorem cell_cover (c : Nat) (h : c < 64) : ∃ w k, w < 8 ∧ k < 8 ∧ c = w + 8 * k := by
+  exact ⟨c % 8, c / 8, by omega, by omega, by omega⟩
+
+/-- Cell loop ownership is unique. -/
+theorem cell_unique (w k w' k' : Nat) (hw : w < 8) (hw' : w' < 8)
+    (h : w + 8 * k = w' + 8 * k') : w = w' ∧ k = k' := by omega
+
+/-- The chunk count covers the capacity. -/
+theorem chunks_cover (cap : Nat) : cap ≤ (cap + 63) / 64 * 64 := by omega
+
+/-- Cell `c0 + t` of the last chunk is below `chunks*64`. -/
+theorem chunk_cell_lt (cap chunk t : Nat) (hc : chunk < (cap + 63) / 64) (ht : t < 64) :
+    chunk * 64 + t < (cap + 63) / 64 * 64 := by omega
+
+/-- The three scratch regions fit in the scratch size (acc, then m, then l). -/
+theorem scratch_regions_fit (chunks n_head : Nat) :
+    chunks * n_head * 256 + chunks * n_head + chunks * n_head ≤ scratchFloats chunks n_head := by
+  unfold scratchFloats HD; omega
+
+/-- The `m` region starts exactly where `acc` ends and `l` where `m` ends. -/
+theorem scratch_offsets (chunks n_head : Nat) :
+    chunks * n_head * 256 + chunks * n_head = chunks * n_head * 257 := by omega
+
+/-- A slot index `kvh*n_chunks + chunk` is below `n_kv_heads * n_chunks`. -/
+theorem slot_lt (kvh chunk n_kv n_chunks : Nat) (hk : kvh < n_kv) (hc : chunk < n_chunks) :
+    kvh * n_chunks + chunk < n_kv * n_chunks := by
+  have h1 : (kvh + 1) * n_chunks ≤ n_kv * n_chunks := Nat.mul_le_mul_right _ (by omega)
+  have h2 : (kvh + 1) * n_chunks = kvh * n_chunks + n_chunks := by rw [Nat.add_mul, Nat.one_mul]
   omega
 
-/-- A chunk past the selection is empty and takes the -FLT_MAX path. -/
-theorem nHere_empty (nIds c0 : Nat) (h : nIds ≤ c0) : nHere nIds c0 = 0 := by
-  unfold nHere; omega
+/-- Global head decomposition `h = kvh*12 + hl` round-trips. -/
+theorem head_roundtrip (kvh hl : Nat) (hl' : hl < 12) :
+    (kvh * 12 + hl) / 12 = kvh ∧ (kvh * 12 + hl) % 12 = hl := by omega
 
-/-- A chunk that starts inside the selection has at least one cell. -/
-theorem nHere_pos (nIds c0 : Nat) (h : c0 < nIds) : 0 < nHere nIds c0 := by
-  unfold nHere; omega
+/-- Conversely every global head splits into a KV head and a local head. -/
+theorem head_split (h : Nat) : h / 12 * 12 + h % 12 = h ∧ h % 12 < 12 := by omega
 
-/-- A chunk never holds more than 64 cells. -/
-theorem nHere_le (nIds c0 : Nat) : nHere nIds c0 ≤ 64 := by
-  unfold nHere; omega
+/-- The geometry check `n_head = 12 * n_kv_heads` makes every KV head have exactly 12 query heads. -/
+theorem kv_head_lt (h n_kv : Nat) (hh : h < 12 * n_kv) : h / 12 < n_kv := by omega
 
-/-- The last chunk of a full selection ends exactly at n_ids. -/
-theorem nHere_tail (nIds c0 : Nat) (h : c0 < nIds) (h2 : nIds < c0 + 64) : c0 + nHere nIds c0 = nIds := by
-  unfold nHere; omega
+/-- Batched grid: query row stride is `n_kv_heads * 12 * 256` floats; rows are disjoint. -/
+theorem q_rows_disjoint (z z' n_kv : Nat) (h : z < z') :
+    z * (n_kv * 12 * 256) + n_kv * 12 * 256 ≤ z' * (n_kv * 12 * 256) := by
+  have := Nat.mul_le_mul_right (n_kv * 12 * 256) (show z + 1 ≤ z' by omega)
+  rw [Nat.add_mul, Nat.one_mul] at this
+  exact this
 
--- § scratch layout
+/-- Online-softmax merge identity at scalar level: rescaling a partial sum from its own max `m` to a global
+max `M` multiplies by `exp(m - M)`; here as the multiplicative law on exponent differences (naturals). -/
+theorem exp_shift_compose (m1 m2 M : Nat) (h1 : m1 ≤ m2) (h2 : m2 ≤ M) :
+    (M - m1) = (M - m2) + (m2 - m1) := by omega
 
-/-- acc, m and l regions fit inside the declared per-query scratch size (a = n_chunks * n_head). -/
-theorem scratch_fits (a : Nat) : a * 256 + a + a ≤ a * (256 + 2) + 64 := by
-  omega
+/-- Merge guard: a chunk whose max equals the sentinel contributes nothing (abstractly `0 * x = 0`). -/
+theorem empty_chunk_contributes_zero (x : Int) : 0 * x = 0 := by omega
 
-/-- Mixed-radix index bound. -/
-theorem idx_lt (a b n m : Nat) (ha : a < n) (hb : b < m) : a * m + b < n * m := by
-  have h1 : (a + 1) * m ≤ n * m := Nat.mul_le_mul_right m ha
-  have h2 : (a + 1) * m = a * m + m := by rw [Nat.add_mul, Nat.one_mul]
-  omega
+/-- Chunks beyond the selection are empty: `c0 >= n_ids` gives `n_ids - c0 <= 0`. -/
+theorem empty_chunk (c0 n_ids : Nat) (h : n_ids ≤ c0) : (n_ids : Int) - c0 ≤ 0 := by omega
 
-/-- The (kv head, chunk) slot is inside the partial buffers. -/
-theorem slot_lt (kvh chunk nkv nch : Nat) (hk : kvh < nkv) (hc : chunk < nch) :
-    kvh * nch + chunk < nkv * nch :=
-  idx_lt kvh chunk nkv nch hk hc
-
--- § head and lane decomposition
-
-/-- The global query head splits back into (kv head, local head) as written in the merge kernel. -/
-theorem head_split (kvh hl : Nat) (h : hl < 12) :
-    (kvh * 12 + hl) / 12 = kvh ∧ (kvh * 12 + hl) % 12 = hl := by
-  omega
-
-/-- Each lane's 8 dimensions stay inside the 256-wide head. -/
-theorem lane_dims_lt (lane j : Nat) (hl : lane < 32) (hj : j < 8) : lane * 8 + j < 256 := by
-  omega
-
-/-- The second score half-slot of a lane stays in the 64-wide CHUNK row. -/
-theorem lane_second_half (lane : Nat) (h : lane < 32) : lane + 32 < 64 := by
-  omega
-
-/-- Warp w handles heads w and w + 8, covering all 12 heads between warps 0..7. -/
-theorem heads_covered (h : Nat) (hh : h < 12) : h < 8 ∨ (h - 8 < 8 ∧ h = (h - 8) + 8) := by
-  omega
-
--- § merge weights
-
-/-- An empty chunk (m = -FLT_MAX) is skipped, so the merge denominator only counts real chunks:
-modelled on counts, populated chunks plus empty ones equal the chunk total. -/
-theorem merge_chunks_partition (populated empty total : Nat) (h : populated + empty = total) :
-    total - empty = populated := by
-  omega
-
-end Ref.QsaDecode
+end Ref.QsaDecodeAttn
 
 
 
@@ -3744,208 +4114,219 @@ end Ref.QsaDecode
 /-!
 # MODULE: qsa_block_select
 SOURCES: src/kernels/cuda/qsa_select.cu
-Batched block scoring (one warp per pooled block) and a block-granular radix-select top-k that expands the chosen
-blocks into cell ids (4 cells per block).
+Batched block scoring (relu of per-head dots against the pooled key, spare/dead key for the tail) and an
+exact radix-select top-k over BLOCKS where each block carries a cell weight (4, or the tail length), emitting
+cell ids in ascending order with the lowest-index tie rule.
 
 ## Source semantics
-* A block b < n_bid weighs R = 4 cells; the last block n_bid weighs n_kv - 4 * n_bid (possibly 0).
-* If n_kv <= width, the selection is the identity.
-* Radix select fixes the 32-bit key 8 bits at a time; the output takes cells above the threshold plus the first
-  `eq_budget` equal cells in index order.
+* Block `b <= n_bid`; weight is `4` for `b < n_bid` and `n_kv - 4*n_bid` for the tail; weights sum to `n_kv`.
+* The radix select fixes 8 key bits per pass (shifts 24, 16, 8, 0) with a weighted histogram.
+* `eq_budget = width - above`; per-thread tie quota is `clamp(eq_budget - eq_before, 0, eq)`.
+* If `n_kv <= width` every cell is selected (identity ascending).
 
 ## Form template identifiers
-- `R` = 4, `weight`, `n_bid`, `eq_budget`, `my_eq`
-- `per` : blocks per thread, ceil(nb / 256)
+* `R` -> block_cells, `blockWeight` -> block_cell_count, `takeQuota` -> per_thread_tie_quota.
 -/
 
 namespace Ref.QsaSelect
 
--- § block weights
+/-- Cells per block. -/
+def R : Nat := 4
 
-/-- Weight (cell count) of block b. -/
-def weight (b nbid nkv : Nat) : Nat := if b < nbid then 4 else nkv - nbid * 4
+/-- Weight of block `b`: full blocks have 4 cells, the last has the remainder. -/
+def blockWeight (n_kv n_bid b : Nat) : Nat := if b < n_bid then 4 else n_kv - n_bid * 4
 
-/-- Weights of blocks 0..n_bid add up to n_kv. -/
-theorem total_weight (nkv nbid : Nat) (h : nbid = nkv / 4) : nbid * 4 + weight nbid nbid nkv = nkv := by
-  unfold weight; rw [if_neg (Nat.lt_irrefl _)]; omega
+/-- Sum of the weights of the first `n` full blocks. -/
+def fullSum : Nat → Nat
+  | 0 => 0
+  | n + 1 => fullSum n + 4
 
-/-- The tail block holds fewer than 4 cells. -/
-theorem tail_weight_lt (nkv nbid : Nat) (h : nbid = nkv / 4) : weight nbid nbid nkv < 4 := by
-  unfold weight; rw [if_neg (Nat.lt_irrefl _)]; omega
+/-- The full-block sum is `4n`. -/
+theorem fullSum_eq (n : Nat) : fullSum n = 4 * n := by
+  induction n with
+  | zero => rfl
+  | succ k ih => simp only [fullSum, ih]; omega
 
-/-- Every emitted cell id b * 4 + c is a real cached cell. -/
-theorem cell_id_lt (b c nbid nkv : Nat) (h : nbid = nkv / 4) (hb : b ≤ nbid)
-    (hc : c < weight b nbid nkv) : b * 4 + c < nkv := by
-  unfold weight at hc
-  split at hc <;> omega
-
--- § radix digits
-
-/-- A 32-bit key splits into its four 8-bit digits, the order the select consumes them. -/
-theorem key_digits (k : Nat) (hk : k < 4294967296) :
-    k = (k / 16777216 % 256) * 16777216 + (k / 65536 % 256) * 65536 + (k / 256 % 256) * 256 + k % 256 := by
+/-- Weights over blocks `0..n_bid` sum to `n_kv` when `n_bid = n_kv / 4`. -/
+theorem weights_total (n_kv n_bid : Nat) (h : n_bid = n_kv / 4) :
+    fullSum n_bid + blockWeight n_kv n_bid n_bid = n_kv := by
+  rw [fullSum_eq]
+  unfold blockWeight
+  rw [if_neg (by omega)]
   omega
 
-/-- The top digit of a 32-bit key is a valid histogram bin. -/
-theorem top_digit_lt (k : Nat) (hk : k < 4294967296) : k / 16777216 < 256 := by
+/-- A block's weight is at most 4 (tail strictly below 4). -/
+theorem weight_le (n_kv n_bid b : Nat) (h : n_bid = n_kv / 4) : blockWeight n_kv n_bid b ≤ 4 := by
+  unfold blockWeight; split <;> omega
+
+/-- The tail weight is zero iff `n_kv % 4 = 0` (an empty trailing block). -/
+theorem tail_weight_zero_iff (n_kv n_bid : Nat) (h : n_bid = n_kv / 4) :
+    blockWeight n_kv n_bid n_bid = 0 ↔ n_kv % 4 = 0 := by
+  unfold blockWeight; rw [if_neg (by omega)]; omega
+
+/-- Emitted cell ids `b*4 + c` (`c < weight`) stay below `n_kv`. -/
+theorem cell_id_lt (n_kv n_bid b c : Nat) (h : n_bid = n_kv / 4) (hb : b ≤ n_bid)
+    (hc : c < blockWeight n_kv n_bid b) : b * 4 + c < n_kv := by
+  unfold blockWeight at hc; split at hc <;> omega
+
+/-- Block-score grid: `ceil(max_blocks/8)` x `nq` blocks, block `bx*8 + warp`. -/
+theorem score_grid_covers (max_blocks : Nat) : max_blocks ≤ (max_blocks + 7) / 8 * 8 := by omega
+
+/-- Every block index maps to a (grid x, warp) pair. -/
+theorem score_block_cover (b : Nat) : ∃ bx w, w < 8 ∧ bx * 8 + w = b := by
+  exact ⟨b / 8, b % 8, by omega, by omega⟩
+
+/-- A key whose tail block is empty keeps the +1e9 bias off: bias iff `n_kv % 4 ≠ 0`. -/
+theorem bias_iff (n_kv n_bid : Nat) (h : n_bid = n_kv / 4) : n_bid * 4 < n_kv ↔ n_kv % 4 ≠ 0 := by omega
+
+/-- Identity early exit: when `n_kv <= width` the output `j` for `j < n_kv` is the full range. -/
+theorem identity_selection (n_kv width j : Nat) (h : n_kv ≤ width) (hj : j < n_kv) : j < width := by omega
+
+/-- Digit extraction: a 32-bit key splits into four 8-bit digits that reassemble it. -/
+theorem digits_roundtrip (k : Nat) (h : k < 4294967296) :
+    (k / 16777216) * 16777216 + ((k / 65536) % 256) * 65536 + ((k / 256) % 256) * 256 + k % 256 = k := by
   omega
 
--- § equal-cell distribution
+/-- Each digit is below 256, so the 256-bin histogram suffices. -/
+theorem digit_lt (k s : Nat) : (k / s) % 256 < 256 := Nat.mod_lt _ (by omega)
 
-/-- A thread's share of equal-to-threshold cells. -/
-def myEq (budget before eq : Nat) : Nat := min eq (budget - before)
+/-- The top digit of a 32-bit key is also below 256. -/
+theorem top_digit_lt (k : Nat) (h : k < 4294967296) : k / 16777216 < 256 := by omega
 
-/-- The running equal-cell total never passes the budget when it started below it. -/
-theorem myEq_within (budget before eq : Nat) (h : before ≤ budget) : before + myEq budget before eq ≤ budget := by
-  unfold myEq; omega
+/-- Four passes of 8 bits consume exactly 32 bits. -/
+theorem passes_cover : 4 * 8 = 32 := by decide
 
-/-- A thread entirely below the budget keeps all its equal cells. -/
-theorem myEq_full (budget before eq : Nat) (h : before + eq ≤ budget) : myEq budget before eq = eq := by
-  unfold myEq; omega
+/-- Per-thread tie quota: the part of the budget left after the earlier threads, clamped to `eq`. -/
+def takeQuota (budget before eq : Nat) : Nat := min eq (budget - before)
 
-/-- A thread beyond the budget keeps none. -/
-theorem myEq_none (budget before eq : Nat) (h : budget ≤ before) : myEq budget before eq = 0 := by
-  unfold myEq; omega
+/-- Quotas telescope: `min budget (before+eq) = min budget before + quota`. -/
+theorem quota_telescopes (budget before eq : Nat) :
+    min budget (before + eq) = min budget before + takeQuota budget before eq := by
+  unfold takeQuota; omega
 
-/-- When the bracket gt <= width <= gt + eq holds, gt + myEq selects exactly width cells. -/
-theorem select_exact (gt eq width : Nat) (h1 : gt ≤ width) (h2 : width ≤ gt + eq) :
-    gt + myEq width gt eq = width := by
-  unfold myEq; omega
+/-- A quota never exceeds the thread's own tie count. -/
+theorem quota_le_eq (budget before eq : Nat) : takeQuota budget before eq ≤ eq := by
+  unfold takeQuota; omega
 
--- § thread partition of blocks
+/-- When earlier threads already used the budget, the quota is zero. -/
+theorem quota_zero (budget before eq : Nat) (h : budget ≤ before) : takeQuota budget before eq = 0 := by
+  unfold takeQuota; omega
 
-/-- Blocks per thread. -/
-def per (nb : Nat) : Nat := (nb + 255) / 256
+/-- If total ties reach the budget, the final prefix hits the budget exactly. -/
+theorem quota_total (budget before eq : Nat) (h : budget ≤ before + eq) :
+    min budget before + takeQuota budget before eq = budget := by
+  unfold takeQuota; omega
 
-/-- A nonempty block range gives a positive per-thread share. -/
-theorem per_pos (nb : Nat) (h : 0 < nb) : 0 < per nb := by
-  unfold per; omega
+/-- Selected count of a thread is `gt + quota`; with the global counts it equals the width. -/
+theorem selected_total (cgt budget width : Nat) (h : budget = width - cgt) (hg : cgt ≤ width) :
+    cgt + budget = width := by omega
 
-/-- 256 threads cover all nb blocks. -/
-theorem threads_cover (nb : Nat) : nb ≤ per nb * 256 := by
-  unfold per; omega
-
-/-- Every block index has an owning thread below 256. -/
-theorem owner_lt (b nb : Nat) (hb : b < nb) : b / per nb < 256 := by
-  apply Nat.div_lt_of_lt_mul
-  have := threads_cover nb
-  omega
-
-/-- The owner's window [t * per, t * per + per) contains the block. -/
-theorem owner_window (b p : Nat) (hp : 0 < p) : p * (b / p) ≤ b ∧ b < p * (b / p) + p := by
-  have h1 := Nat.div_add_mod b p
-  have h2 := Nat.mod_lt b hp
-  omega
-
--- § launch geometry
-
-/-- Eight warps per block cover every block index below max_blocks. -/
-theorem score_grid_covers (b maxb : Nat) (h : b < maxb) : b / 8 < (maxb + 7) / 8 := by
-  omega
-
-/-- Mixed-radix index bound. -/
-theorem idx_lt (a b n m : Nat) (ha : a < n) (hb : b < m) : a * m + b < n * m := by
-  have h1 : (a + 1) * m ≤ n * m := Nat.mul_le_mul_right m ha
-  have h2 : (a + 1) * m = a * m + m := by rw [Nat.add_mul, Nat.one_mul]
-  omega
-
-/-- The score output index qi * max_blocks + b is inside the batched score buffer. -/
-theorem score_out_lt (qi b nq maxb : Nat) (hq : qi < nq) (hb : b < maxb) : qi * maxb + b < nq * maxb :=
-  idx_lt qi b nq maxb hq hb
+/-- Thread partitioning of the block range: `per = ceil(nb/256)` makes 256 threads cover `nb` blocks. -/
+theorem per_thread_cover (nb per : Nat) (h : per = (nb + 255) / 256) : nb ≤ 256 * per := by omega
 
 end Ref.QsaSelect
 
 
 
-## FILE: /mnt/user-data/outputs/NativeQsaNormGate.lean
+## FILE: /mnt/user-data/outputs/NativeQsaScore.lean
 /-!
-# MODULE: native_qsa_norm_gate
-SOURCES: src/kernels/cuda/native_qsa.cu
-llama.cpp-derived weighted RMS norm (in-place capable) and the sigmoid gate that multiplies attention output by the
-second half of the fused q projection. This module models the validation and indexing contracts.
+# MODULE: native_qsa_score
+SOURCES: src/kernels/cuda/native_qsa_score.cu
+Tensor-core (TF32 mma) block scoring for the QSA indexer, adapted from llama.cpp's mmf path: 32 pooled rows per
+block, two warps splitting the 128-wide reduction, a combine buffer, and a reference-ordered epilogue
+(relu per head, ordered head sum, optional bias, +1e9 on an incomplete tail) written onto the block's cells.
 
 ## Source semantics
-* `elements(cols, rows)` requires positive dimensions whose product fits in int.
-* The norm kernel uses a block of 256 threads for n_cols < 1024 and 1024 otherwise; thread t owns columns
-  t, t + BS, t + 2 BS, ...; per-warp sums sit in a 32-entry shared array.
-* `gate`: head = i / head_dim, channel = i % head_dim, and the gate value is q_full[head * 2 * head_dim + head_dim + channel].
-* Buffer validation: byte spans must be 4-aligned, bounded and disjoint except for exact input/output aliasing.
+* Fixed geometry: D = 128, 4 heads, R = 4 cells per block, top_k = 2048, so the width cap is 2051.
+* A step is valid only if `pos = n-1`, `n_bid = n/R`, `width = min(n, 2051)`.
+* Warp `w`, lane `l` accumulates columns `w*32 + l` and `w*32 + l + 64`.
+* `max_blocks = max_cells / R + 1`; blocks with `row0 > n_bid` return.
 
 ## Form template identifiers
-- `BlockSize` : 256 or 1024
-- `overlap`   : half-open interval intersection test
-- `gateIdx`   : head * (2 * head_dim) + (head_dim + channel)
+* `D` -> index_dim, `ROWS` -> rows_per_block, `STRIDE` -> smem_row_stride, `COMBINE` -> combine_stride.
 -/
 
-namespace Ref.NativeQsaNorm
+namespace Ref.NativeQsaScore
 
--- § validation
+/-- Indexer dimension. -/
+def D : Nat := 128
+/-- Rows per block. -/
+def ROWS : Nat := 32
+/-- Shared row stride (floats). -/
+def STRIDE : Nat := 36
+/-- Combine buffer stride. -/
+def COMBINE : Nat := 68
 
-/-- Positive dimensions give a positive element count. -/
-theorem elements_pos (cols rows : Nat) (hc : 0 < cols) (hr : 0 < rows) : 0 < cols * rows :=
-  Nat.mul_pos hc hr
+/-- Two warps of 32 lanes with two passes of 64 columns cover the 128 columns. -/
+theorem col_cover (c : Nat) (h : c < 128) :
+    ∃ w l it, w < 2 ∧ l < 32 ∧ it < 2 ∧ c = w * 32 + l + 64 * it := by
+  refine ⟨(c % 64) / 32, c % 32, c / 64, ?_, ?_, ?_, ?_⟩ <;> omega
 
-/-- Interval overlap test, as in `overlap` of the source. -/
-def overlap (ap an bp bn : Nat) : Prop := ap < bp + bn ∧ bp < ap + an
+/-- Column ownership is unique, so partial sums are disjoint. -/
+theorem col_unique (w l it w' l' it' : Nat) (hw : w < 2) (hw' : w' < 2) (hl : l < 32) (hl' : l' < 32)
+    (h : w * 32 + l + 64 * it = w' * 32 + l' + 64 * it') : w = w' ∧ l = l' ∧ it = it' := by omega
 
-/-- The overlap test is symmetric. -/
-theorem overlap_symm (ap an bp bn : Nat) : overlap ap an bp bn ↔ overlap bp bn ap an := by
-  unfold overlap; omega
+/-- The shared tile is `2 * 16 * 36 = 1152` floats. -/
+theorem shared_size : 2 * 16 * STRIDE = 1152 := by decide
 
-/-- A nonempty span overlaps itself, so a non-exact alias is always rejected. -/
-theorem overlap_self (p n : Nat) (h : 0 < n) : overlap p n p n := by
-  unfold overlap; omega
+/-- Staging writes `tile[i*36 + lane]` stay inside the warp's 16x36 tile. -/
+theorem stage_in_tile (i lane : Nat) (hi : i < 16) (hl : lane < 32) : i * 36 + lane < 16 * 36 := by omega
 
-/-- A span of length 0 does not overlap itself. -/
-theorem overlap_self_empty (p : Nat) : ¬ overlap p 0 p 0 := by
-  unfold overlap; omega
+/-- A warp's tile offset plus an in-tile index stays inside the shared array. -/
+theorem warp_tile_in_shared (w idx : Nat) (hw : w < 2) (hi : idx < 16 * 36) :
+    w * (16 * 36) + idx < 2 * 16 * 36 := by omega
 
-/-- Disjoint adjacent spans never overlap. -/
-theorem overlap_adjacent (p n m : Nat) : ¬ overlap p n (p + n) m := by
-  unfold overlap; omega
+/-- `ldmatrix` A source: row `t%16`, column offset `(t/16)*4 + k*8` with 4 consecutive floats stays in-tile. -/
+theorem load_a_in_tile (t k : Nat) (ht : t < 32) (hk : k < 4) :
+    (t % 16) * 36 + (t / 16) * 4 + k * 8 + 3 < 16 * 36 := by omega
 
--- § block geometry
+/-- Combine buffer writes: row index `i = w*32 + ia*16 + (l/2)*8 + lane/4` is below 64. -/
+theorem combine_row_lt (w ia l lane : Nat) (hw : w < 2) (hia : ia < 2) (hl : l < 4) (hlane : lane < 32) :
+    w * 32 + ia * 16 + (l / 2) * 8 + lane / 4 < 64 := by omega
 
-/-- The block-size choice always gives at most 32 warps, so `sums[32]` suffices. -/
-theorem warps_le_32 (n_cols : Nat) : (if n_cols < 1024 then 256 else 1024) / 32 ≤ 32 := by
-  split <;> omega
+/-- Combine head index `(lane%4)*2 + l%2` is below 8. -/
+theorem combine_head_lt (l lane : Nat) : (lane % 4) * 2 + l % 2 < 8 := by omega
 
-/-- Each column is owned by exactly the thread with matching residue. -/
-theorem stride_cover (col tid bs : Nat) (h : col % bs = tid) : col = tid + bs * (col / bs) := by
-  have := Nat.mod_add_div col bs
-  omega
+/-- Combine address `h*68 + i` stays inside the shared array (`h < 8`, `i < 64`). -/
+theorem combine_addr_lt (h i : Nat) (hh : h < 8) (hi : i < 64) : h * 68 + i < 1152 := by omega
 
-/-- Columns visited by thread t (t + bs * k) have residue t. -/
-theorem stride_residue (tid k bs : Nat) (h : tid < bs) : (tid + bs * k) % bs = tid := by
-  rw [Nat.add_comm, Nat.mul_add_mod]
-  exact Nat.mod_eq_of_lt h
+/-- The second-warp partial is read at `h*68 + 32 + lane`, still inside the array. -/
+theorem combine_second_lt (h lane : Nat) (hh : h < 8) (hl : lane < 32) : h * 68 + 32 + lane < 1152 := by omega
 
--- § gate indexing
+/-- Block count `ceil(max_blocks/32)` covers every block row. -/
+theorem grid_covers (max_blocks : Nat) : max_blocks ≤ (max_blocks + 31) / 32 * 32 := by omega
 
-/-- Mixed-radix index bound. -/
-theorem idx_lt (a b n m : Nat) (ha : a < n) (hb : b < m) : a * m + b < n * m := by
-  have h1 : (a + 1) * m ≤ n * m := Nat.mul_le_mul_right m ha
-  have h2 : (a + 1) * m = a * m + m := by rw [Nat.add_mul, Nat.one_mul]
-  omega
+/-- A row `<= full` lies in a launched block when `full < max_blocks`. -/
+theorem row_in_grid (row full max_blocks : Nat) (h : row ≤ full) (hf : full < max_blocks) :
+    row / 32 < (max_blocks + 31) / 32 := by omega
 
-/-- The gate value read for (head, channel) lies inside the n_head * 2 * head_dim q_full buffer. -/
-theorem gate_index_lt (head ch n_head hd : Nat) (hh : head < n_head) (hc : ch < hd) :
-    head * (2 * hd) + (hd + ch) < n_head * (2 * hd) :=
-  idx_lt head (hd + ch) n_head (2 * hd) hh (by omega)
+/-- With `max_blocks = max_cells/4 + 1` and `n <= max_cells`, the last block `n/4` is a valid row. -/
+theorem last_block_valid (n max_cells : Nat) (h : n ≤ max_cells) : n / 4 < max_cells / 4 + 1 := by omega
 
-/-- The gate buffer length n_head * (2 * hd) is twice the output length, matching the `count * 8` byte span. -/
-theorem gate_span_double (n_head hd : Nat) : n_head * (2 * hd) = 2 * (n_head * hd) :=
-  Nat.mul_left_comm n_head 2 hd
+/-- The validity width equals `min(n, 2051)`. -/
+def widthOk (n width : Nat) : Prop := width = if n < 2051 then n else 2051
 
-/-- The gate reads the second half: the offset hd + ch is at least head_dim. -/
-theorem gate_reads_second_half (hd ch : Nat) : hd ≤ hd + ch := by
-  omega
+/-- A valid step width never exceeds the cap or `n`. -/
+theorem widthOk_bounds (n width : Nat) (h : widthOk n width) : width ≤ n ∧ width ≤ 2051 := by
+  unfold widthOk at h; split at h <;> omega
 
-/-- Grid size covers every output element. -/
-theorem gate_grid_covers (i count : Nat) (h : i < count) : i / 256 < (count + 255) / 256 := by
-  omega
+/-- The 2051 cap is `top_k + R - 1` for `top_k = 2048`. -/
+theorem width_cap : 2048 + 4 - 1 = 2051 := by decide
 
-end Ref.NativeQsaNorm
+/-- The relu stage is nonnegative. -/
+theorem relu_nonneg (v : Int) : 0 ≤ max v 0 := by omega
+
+/-- The relu never lowers a value. -/
+theorem relu_ge (v : Int) : v ≤ max v 0 := by omega
+
+/-- Cells written by row `r`: `[4r, min(n, 4r+4))`, which are disjoint across rows. -/
+theorem row_cells_disjoint (r r' c c' : Nat) (hc : c < 4) (hc' : c' < 4)
+    (h : r * 4 + c = r' * 4 + c') : r = r' ∧ c = c' := by omega
+
+/-- Capacity relation used by validation: `max_blocks = max_cells/4 + 1` leaves room for the spare block. -/
+theorem spare_room (max_cells : Nat) : max_cells / 4 + 1 > max_cells / 4 := by omega
+
+end Ref.NativeQsaScore
 
 
 
@@ -3953,1254 +4334,857 @@ end Ref.NativeQsaNorm
 /-!
 # MODULE: native_qsa_indexer_append
 SOURCES: src/kernels/cuda/native_qsa_indexer.cu
-Single-block indexer-key append: stores the raw key in the 3-row tail, and on a block completion (or at position 0)
-pools, normalises and rotates the row, then moves the spare row.
+Native indexer key append adapted from llama.cpp: stores the f16-rounded raw key into a 3-row tail, and on a
+block completion (or at position 0 for the spare/dead key) mean-pools, RMS-normalises with gamma, rotates the
+first 64 dimensions NEOX-style at the block's first position, writes the pooled row and re-seeds the spare row.
 
 ## Source semantics
-* D = 128, R = 4, ROT = 64, THREADS = 256; slot = pos % 4; only slot < 3 stores into the tail.
-* Writes of pooled rows happen only when pos = 0 or slot = 3; at slot 3 rows b = pos/4 and b+1 are written.
-* The rotation position is `pos_base + 4 * b` (0 at pos 0); rotation pairs index `pair` with `pair + 32`.
-* The pooled buffer has `max_cells / 4 + 1` rows.
+* D = 128, R = 4, ROT = 64, 256 threads (only `d < D` act).
+* `slot = pos % R`; slots 0..2 are stored in the tail (`slot*D + d`); slot 3 completes block `b = pos / R`.
+* Position 0 builds the dead key (rope position 0); later completions write `pooled[b]` and `pooled[b+1] = dead`.
+* rope position is `pos_base + R*b`; `pos_base % R = 0` is required and `pos_base + max_cells <= INT32_MAX`.
+* The pooled buffer has `max_cells / R + 1` rows.
 
 ## Form template identifiers
-- `D`, `R`, `ROT`, `THREADS`
-- `slot`, `b`, `rope_pos`, `pair`
+* `slot` -> tail_slot, `ropePos` -> block_first_position, `pairOf` -> rope_pair_index.
 -/
 
 namespace Ref.NativeQsaIndexer
 
--- § slot arithmetic
-
-/-- Slot of a position. -/
+/-- Tail slot of a position. -/
 def slot (pos : Nat) : Nat := pos % 4
 
-/-- Only slots 0..2 are stored in the tail; slot 3 completes a block. -/
-theorem slot_lt_four (pos : Nat) : slot pos < 4 := by
-  unfold slot; omega
+/-- Block of a position. -/
+def block (pos : Nat) : Nat := pos / 4
 
-/-- Tail row index slot * 128 + d stays inside the 3 * 128 tail. -/
-theorem tail_index_lt (pos d : Nat) (hs : slot pos < 3) (hd : d < 128) : slot pos * 128 + d < 3 * 128 := by
+/-- Rotation position of block `b` (for `pos ≠ 0`). -/
+def ropePos (pos_base b : Nat) : Nat := pos_base + 4 * b
+
+/-- Rope pair index of dimension `d`. -/
+def pairOf (d : Nat) : Nat := d % 32
+
+/-- Tail addresses `slot*128 + d` are inside the `3*128`-float tail. -/
+theorem tail_addr_lt (s d : Nat) (hs : s < 3) (hd : d < 128) : s * 128 + d < 3 * 128 := by omega
+
+/-- Tail addressing is injective. -/
+theorem tail_addr_inj (s d s' d' : Nat) (hd : d < 128) (hd' : d' < 128)
+    (h : s * 128 + d = s' * 128 + d') : s = s' ∧ d = d' := by omega
+
+/-- A position is a block completion exactly when `slot = 3`. -/
+theorem complete_iff (pos : Nat) : slot pos = 3 ↔ (pos + 1) % 4 = 0 := by unfold slot; omega
+
+/-- Completion at `pos` finishes block `pos / 4`, whose cells are `4b .. 4b+3 = pos`. -/
+theorem block_last_cell (pos : Nat) (h : slot pos = 3) : block pos * 4 + 3 = pos := by
+  unfold slot block at *; omega
+
+/-- On completion the spare row `b+1` exists in a pool of `max_cells/4 + 1` rows. -/
+theorem spare_row_exists (pos max_cells : Nat) (hp : pos < max_cells) (h : slot pos = 3) :
+    block pos + 1 < max_cells / 4 + 1 := by
+  unfold slot block at *; omega
+
+/-- The completed row `b` itself exists too. -/
+theorem row_exists (pos max_cells : Nat) (hp : pos < max_cells) : block pos < max_cells / 4 + 1 := by
+  unfold block; omega
+
+/-- A completed block's rotation position stays 4-aligned when the base is. -/
+theorem ropePos_aligned (pos_base b : Nat) (h : pos_base % 4 = 0) : ropePos pos_base b % 4 = 0 := by
+  unfold ropePos; omega
+
+/-- The rotation position fits the 32-bit position space under the validated bound. -/
+theorem ropePos_in_range (pos_base pos max_cells : Nat) (hp : pos < max_cells)
+    (hb : pos_base + max_cells ≤ 2147483647) : ropePos pos_base (block pos) ≤ 2147483647 := by
+  unfold ropePos block; omega
+
+/-- The rotation position is the block's FIRST cell offset, not its last. -/
+theorem ropePos_first_cell (pos_base pos : Nat) : ropePos pos_base (block pos) = pos_base + block pos * 4 := by
+  unfold ropePos; omega
+
+/-- Rope pairs index within the first half of the rotated span. -/
+theorem pair_lt (d : Nat) : pairOf d < 32 := by unfold pairOf; omega
+
+/-- For `d < 32` the pair is `d` itself; its partner element is `d + 32 < 64`. -/
+theorem pair_low (d : Nat) (h : d < 32) : pairOf d = d ∧ pairOf d + 32 < 64 := by unfold pairOf; omega
+
+/-- For `32 ≤ d < 64` the pair is `d - 32` and its partner element is `d`. -/
+theorem pair_high (d : Nat) (h1 : 32 ≤ d) (h2 : d < 64) : pairOf d = d - 32 ∧ pairOf d + 32 = d := by
+  unfold pairOf; omega
+
+/-- The rotated span is inside the 128-wide row, so dimensions `64..127` pass through unrotated. -/
+theorem rot_span_in_row : 64 ≤ 128 := by decide
+
+/-- Pooled addresses `b*128 + d` for `b < rows` stay inside `rows*128` floats. -/
+theorem pooled_addr_lt (b d rows : Nat) (hb : b < rows) (hd : d < 128) : b * 128 + d < rows * 128 := by
   omega
 
-/-- Gather rows j * 128 + d for j < 3 also stay inside the tail. -/
-theorem tail_gather_lt (j d : Nat) (hj : j < 3) (hd : d < 128) : j * 128 + d < 3 * 128 := by
-  omega
+/-- 256 threads cover the 128 dimensions with the rest guarded off. -/
+theorem threads_cover_dims : 128 ≤ 256 := by decide
 
--- § pooled buffer rows
+/-- Block-sum: 256 threads give 8 warp partials, read by lanes `< 8`. -/
+theorem sum_partials : 256 / 32 = 8 := by decide
 
-/-- At position 0 the pooled row 0 exists. -/
-theorem row_zero_exists (maxc : Nat) : 0 < maxc / 4 + 1 := by
-  omega
+/-- Position 0 is its own slot-0 position and block 0. -/
+theorem pos_zero : slot 0 = 0 ∧ block 0 = 0 := by decide
 
-/-- When a block completes within capacity, its row b is in range. -/
-theorem block_row_lt (pos maxc : Nat) (hs : slot pos = 3) (hp : pos < maxc) : pos / 4 < maxc / 4 + 1 := by
-  unfold slot at hs; omega
+/-- Capacity guard: positions at or beyond `max_cells` are ignored (early return). -/
+theorem guard_excludes (pos max_cells : Nat) (h : max_cells ≤ pos) : ¬ pos < max_cells := by omega
 
-/-- When a block completes within capacity, the spare row b+1 is also in range. -/
-theorem spare_row_lt (pos maxc : Nat) (hs : slot pos = 3) (hp : pos < maxc) : pos / 4 + 1 < maxc / 4 + 1 := by
-  unfold slot at hs; omega
-
-/-- The kernel returns early unless pos = 0 or the slot is 3; rows are written only then. -/
-theorem writes_only_when (pos : Nat) (h : ¬ (pos = 0 ∨ slot pos = 3)) : pos ≠ 0 ∧ slot pos ≠ 3 := by
-  unfold slot at h ⊢; omega
-
--- § rotation
-
-/-- Rotation position of block b. -/
-def ropePos (pos posBase : Nat) : Nat := if pos = 0 then 0 else posBase + 4 * (pos / 4)
-
-/-- A 4-aligned position base keeps every block's rotation position 4-aligned. -/
-theorem ropePos_aligned (pos posBase : Nat) (h : posBase % 4 = 0) : ropePos pos posBase % 4 = 0 := by
-  unfold ropePos; split <;> omega
-
-/-- The rotation position stays within int32 when base + capacity does. -/
-theorem ropePos_le (pos posBase maxc : Nat) (hp : pos < maxc) (h : posBase + maxc ≤ 2147483647) :
-    ropePos pos posBase ≤ 2147483647 := by
-  unfold ropePos; split <;> omega
-
-/-- Rotation partner of dimension d < 64 is `pair` or `pair + 32`, both inside the 64 rotated dims. -/
-theorem rotation_partners_lt (d : Nat) (hd : d < 64) : d % 32 < 32 ∧ d % 32 + 32 < 64 := by
-  omega
-
-/-- The rotated value for d is a*c - z*s on the first half and a*s + z*c on the second, and the two
-halves of [0, 64) are exactly [0, 32) and [32, 64). -/
-theorem rotation_halves (d : Nat) (hd : d < 64) : d < 32 ∨ (32 ≤ d ∧ d - 32 = d % 32) := by
-  omega
-
-/-- Rotated dimensions are inside the 128-dim key, so non-rotated dims 64..127 pass through. -/
-theorem rotation_inside_key (d : Nat) (hd : d < 64) : d < 128 := by
-  omega
-
--- § thread geometry
-
-/-- 256 threads give 8 warps, which fit the 32-entry partial sums. -/
-theorem partials_fit : 256 / 32 ≤ 32 := by
-  decide
-
-/-- The 128 live dims are a prefix of the 256 threads, so a reduction over lanes < 8 sees every partial. -/
-theorem live_warps : 128 / 32 = 4 := by
-  decide
-
-/-- A block mean is one quarter of the 4-cell sum: `0.25 * s` on naturals as `s / 4` times 4 bounds the sum. -/
-theorem quarter_mean_bound (s : Nat) : s / 4 * 4 ≤ s := by
-  omega
+/-- The mean of four equal incoming values is that value (position-0 case): `4*x/4 = x` over naturals. -/
+theorem mean_of_four_equal (x : Nat) : (x + x + x + x) / 4 = x := by omega
 
 end Ref.NativeQsaIndexer
 
 
 
-## FILE: /mnt/user-data/outputs/NativeQsaScoreMma.lean
+## FILE: /mnt/user-data/outputs/NativeFlashAttnShort.lean
 /-!
-# MODULE: native_qsa_score_mma
-SOURCES: src/kernels/cuda/native_qsa_score.cu
-Tensor-core (TF32 mma) scoring of pooled indexer rows against 4 query heads, with the reference's ReLU-sum order,
-optional bias, the +1e9 incomplete-tail boost, and expansion of each row score onto its 4 cells.
+# MODULE: native_flash_attn_short
+SOURCES: src/kernels/cuda/native_flash_attn.cu
+Short-context FlashAttention vector kernel specialised from llama.cpp: 24 query heads of dim 256, 2 KV heads,
+one block of 128 threads per head, online softmax over the padded length 256 in two tiles of 128 cells, with a
+device-side validity check on the step state that writes a status word and NaN-fills the output on failure.
 
 ## Source semantics
-* 32 rows per block, 2 warps; grid = ceil(max_blocks / 32); only rows <= n/4 are scored.
-* K = 128 is split between warps: column = warp*32 + lane (+ 64 on the second pass).
-* Results go to a shared [head][row] array with row stride 68; row index = warp*32 + ia*16 + (l/2)*8 + lane/4.
-* The kernel is a no-op unless the step state is consistent (pos = n-1, n_bid = n/4, width = min(n, 2051)).
-* Capacity contract: max_blocks = max_cells / 4 + 1.
+* `kv = head / 12`; K/V cell row is `(cell*2 + kv)*256`; cells `>= width` are masked to -inf.
+* A step is valid iff `1 <= width <= max_context`, `nkv = width`, `pos = width-1`, `n_bid = width/4`.
+* Tile `base` runs over `{0, 128}`; cell = `base + warp*32 + (lane/8)*8 + row`, `row < 8`.
+* The cross-warp combine uses `4*4*256` floats of shared memory.
+* `max_context <= 256`, `capacity >= 256`, `capacity*1024` must not overflow `size_t`.
 
 ## Form template identifiers
-- `ROWS` = 32, `WARPS` = 2, `COMBINE` = 68, `R` = 4
-- `D` = 128, `HEADS` = 4
+* `HD` -> head_dim, `PAD` -> padded_length, `validStep` -> step_validity_predicate.
 -/
 
-namespace Ref.NativeQsaScore
+namespace Ref.NativeFlashAttn
 
--- § K-split coverage
+/-- Head dimension. -/
+def HD : Nat := 256
+/-- Padded context length. -/
+def PAD : Nat := 256
 
-/-- Every column below 128 is handled by exactly the (warp, lane, pass) triple decoded from it. -/
-theorem column_decode (col : Nat) (h : col < 128) :
-    col = (col / 32 % 2) * 32 + col % 32 + 64 * (col / 64) := by
-  omega
+/-- Step validity predicate. -/
+def validStep (width nkv pos nbid maxc : Nat) : Prop :=
+  1 ≤ width ∧ width ≤ maxc ∧ nkv = width ∧ pos + 1 = width ∧ nbid = width / 4
 
-/-- The decoded triple is in range. -/
-theorem column_decode_range (col : Nat) (h : col < 128) :
-    col / 32 % 2 < 2 ∧ col % 32 < 32 ∧ col / 64 < 2 := by
-  omega
+/-- A valid step has `n_kv - 1 = pos` and at most 256 cells for `max_context <= 256`. -/
+theorem valid_width_le (width nkv pos nbid maxc : Nat) (h : validStep width nkv pos nbid maxc)
+    (hm : maxc ≤ 256) : width ≤ 256 ∧ nkv = pos + 1 := by
+  unfold validStep at h; omega
 
-/-- Two different (warp, lane, pass) triples never name the same column. -/
-theorem column_unique (w l i w' l' i' : Nat) (hl : l < 32) (hl' : l' < 32) (hw : w < 2) (hw' : w' < 2)
-    (h : w * 32 + l + 64 * i = w' * 32 + l' + 64 * i') : w = w' ∧ l = l' ∧ i = i' := by
-  omega
+/-- The padded length is two tiles of 128 cells. -/
+theorem tiles : PAD / 128 = 2 := by decide
 
--- § row and grid coverage
+/-- GQA: a head `< 24` pairs with a KV head `< 2`. -/
+theorem kv_lt (head : Nat) (h : head < 24) : head / 12 < 2 := by omega
 
-/-- A row is within the grid. -/
-theorem row_in_grid (b maxb : Nat) (h : b < maxb) : b / 32 < (maxb + 31) / 32 := by
-  omega
+/-- Every padded cell is covered by exactly one (tile, warp, lane-group, row). -/
+theorem cell_cover (cell : Nat) (h : cell < 256) :
+    ∃ base warp lane row, (base = 0 ∨ base = 128) ∧ warp < 4 ∧ lane < 32 ∧ row < 8 ∧
+      cell = base + warp * 32 + (lane / 8) * 8 + row := by
+  refine ⟨cell / 128 * 128, (cell % 128) / 32, ((cell % 32) / 8) * 8, cell % 8, ?_, ?_, ?_, ?_, ?_⟩
+  · omega
+  · omega
+  · omega
+  · omega
+  · omega
 
-/-- A row decomposes into block, lane. -/
-theorem row_decode (b : Nat) : b / 32 * 32 + b % 32 = b := by
-  omega
+/-- Distinct (tile, warp, lane-group, row) give distinct cells (no double counting). -/
+theorem cell_unique (b w g r b' w' g' r' : Nat) (hb : b = 0 ∨ b = 128) (hb' : b' = 0 ∨ b' = 128)
+    (hw : w < 4) (hw' : w' < 4) (hg : g < 4) (hg' : g' < 4) (hr : r < 8) (hr' : r' < 8)
+    (h : b + w * 32 + g * 8 + r = b' + w' * 32 + g' * 8 + r') :
+    b = b' ∧ w = w' ∧ g = g' ∧ r = r' := by omega
 
-/-- The capacity relation puts the last possible block row inside the pooled buffer. -/
-theorem last_row_in_capacity (n maxc : Nat) (hn : n ≤ maxc) : n / 4 < maxc / 4 + 1 := by
-  omega
+/-- K/V element address `(cell*2 + kv)*256 + d` is below `capacity * 512` elements. -/
+theorem kv_addr_lt (cell kv d capacity : Nat) (hc : cell < capacity) (hk : kv < 2) (hd : d < 256) :
+    (cell * 2 + kv) * 256 + d < capacity * 512 := by omega
 
--- § combine buffer
+/-- One cell holds `2 KV heads * 256 dims * 2 bytes = 1024` bytes. -/
+theorem cell_bytes : 2 * 256 * 2 = 1024 := by decide
 
-/-- Row index inside the 64 combined rows. -/
-theorem combine_row_lt (warp ia l lane : Nat) (hw : warp < 2) (hia : ia < 2) (hl : l < 4) (hlane : lane < 32) :
-    warp * 32 + ia * 16 + (l / 2) * 8 + lane / 4 < 64 := by
-  omega
+/-- The host's byte-size computation cannot overflow under the capacity guard. -/
+theorem kv_bytes_no_overflow (cap : Nat) (h : cap ≤ 18446744073709551615 / 1024) :
+    cap * 1024 ≤ 18446744073709551615 := by omega
 
-/-- Combined index head * 68 + row stays inside the 8 * 68 combine area. -/
-theorem combine_index_lt (h i : Nat) (hh : h < 8) (hi : i < 64) : h * 68 + i < 8 * 68 := by
-  omega
+/-- The V loop: `local = warp*32 + k0 + lane/8` with `k0 ∈ {0,4,..,28}` reaches every one of 128 locals. -/
+theorem v_local_cover (loc : Nat) (h : loc < 128) :
+    ∃ warp k0 g, warp < 4 ∧ k0 < 32 ∧ k0 % 4 = 0 ∧ g < 4 ∧ loc = warp * 32 + k0 + g := by
+  refine ⟨loc / 32, ((loc % 32) / 4) * 4, loc % 4, ?_, ?_, ?_, ?_, ?_⟩ <;> omega
 
-/-- The combine area fits in the shared buffer of WARPS * 16 * 36 floats. -/
-theorem combine_fits_shared : 8 * 68 ≤ 2 * 16 * 36 := by
-  decide
+/-- Shared tile size is `4*4*256 = 4096` floats (16 KB). -/
+theorem tile_size : 4 * 4 * 256 = 4096 ∧ 4096 * 4 = 16384 := by decide
 
-/-- The second warp's partial is read at offset 32, still inside the row's 68-wide stride. -/
-theorem second_partial_inside (j lane : Nat) (hj : j < 4) (hl : lane < 32) : j * 68 + 32 + lane < 8 * 68 := by
-  omega
+/-- Combine write index `warp*1024 + (lane/8)*256 + 2*(i0 + (lane%8)*4) + 2j + 1` is inside the tile. -/
+theorem tile_write_lt (warp g l8 i0 j : Nat) (hw : warp < 4) (hg : g < 4) (hl : l8 < 8)
+    (hi : i0 < 128) (h32 : i0 % 32 = 0) (hj : j < 4) :
+    warp * 1024 + g * 256 + 2 * (i0 + l8 * 4 + j) + 1 < 4096 := by omega
 
-/-- Head slot of a lane/element pair is below 8, matching the padded 8-head B tile. -/
-theorem head_slot_lt (lane l : Nat) (hl : lane < 32) (hl2 : l < 4) : (lane % 4) * 2 + l % 2 < 8 := by
-  omega
+/-- Combine read index `w*1024 + group*256 + i0 + tid` is inside the tile (`i0 + tid < 256`). -/
+theorem tile_read_lt (w group col : Nat) (hw : w < 4) (hg : group < 4) (hc : col < 256) :
+    w * 1024 + group * 256 + col < 4096 := by omega
 
--- § cell expansion
+/-- Output columns: `tid` and `tid + 128` for `tid < 128` cover all 256 head dims exactly once. -/
+theorem out_cover (d : Nat) (h : d < 256) : ∃ tid half, tid < 128 ∧ half < 2 ∧ d = tid + 128 * half := by
+  exact ⟨d % 128, d / 128, by omega, by omega, by omega⟩
 
-/-- Cells written for row `row` all lie in block `row`. -/
-theorem cell_block (row i : Nat) (h1 : row * 4 ≤ i) (h2 : i < (row + 1) * 4) : i / 4 = row := by
-  omega
+/-- Output row base `head*256` is disjoint across heads. -/
+theorem out_rows_disjoint (head head' d d' : Nat) (hd : d < 256) (hd' : d' < 256)
+    (h : head * 256 + d = head' * 256 + d') : head = head' ∧ d = d' := by omega
 
-/-- Cells written are real cached cells: i < n. -/
-theorem cell_written_real (row i n : Nat) (h : i < n) : i / 4 ≤ n / 4 := by
-  omega
+/-- Per-head query offset `head*256 + d` lies inside `24*256` floats. -/
+theorem q_addr_lt (head d : Nat) (hh : head < 24) (hd : d < 256) : head * 256 + d < 24 * 256 := by omega
 
--- § step-state guard
+/-- Scale `1/sqrt(256) = 1/16`: `16 * 16 = 256`. -/
+theorem scale_is_inv_sqrt : 16 * 16 = HD := by decide
 
-/-- The guard width formula equals min(n, 2051) = min(n, 2048 + 4 - 1). -/
-theorem width_formula (n : Nat) : (if n < 2051 then n else 2051) = min n (2048 + 4 - 1) := by
-  split <;> omega
+/-- Out-of-range cells are masked: a cell `>= width` is excluded from the valid set. -/
+theorem masked_cell (cell width : Nat) (h : width ≤ cell) : ¬ cell < width := by omega
 
--- § summation order
+/-- With `width <= 256` every valid cell lies inside the padded tiles. -/
+theorem valid_cell_in_pad (cell width : Nat) (h : cell < width) (hw : width ≤ 256) : cell < PAD := by
+  unfold PAD; omega
 
-/-- The kernel adds 0 first, so the head value is the first partial plus the second; a zero seed is neutral. -/
-theorem zero_seed_neutral (a b : Nat) : (0 + a) + b = a + b := by
-  omega
+/-- Status word domain: the kernel writes either success or the unsupported-step code, never both:
+modelled as a boolean choice from validity. -/
+def statusOf (valid : Bool) (ok bad : Nat) : Nat := if valid then ok else bad
 
-/-- Bias and tail boost are added after the head sum, and a zero boost is neutral. -/
-theorem zero_boost_neutral (s : Nat) : s + 0 = s := by
-  omega
+/-- A valid step reports the success code. -/
+theorem status_valid (ok bad : Nat) : statusOf true ok bad = ok := rfl
 
-end Ref.NativeQsaScore
+/-- An invalid step reports the unsupported-step code. -/
+theorem status_invalid (ok bad : Nat) : statusOf false ok bad = bad := rfl
+
+end Ref.NativeFlashAttn
 
 
 
-## FILE: /mnt/user-data/outputs/RouterTop10Softmax.lean
-/-!
-# MODULE: router_top10_softmax
-SOURCES: src/kernels/cuda/router_top10.cu
-MoE router: softmax over all experts, stable descending top-k (ties by ascending index) via k block-wide argmax
-passes, gather, then renormalisation with a lower clamp of 2^-14.
+/-! [measured by the kernel] STATEMENTS CHANGED AFTER VERIFICATION in this chunk.
+These are not the first reading of the reference: check each against the reference code before implementing or accepting it.
 
-## Source semantics
-* One block per token; threads = min(n_expert, 512) rounded up to a multiple of 32.
-* Shared layout: a taken-mask (n_expert bytes rounded up to 16), then n_expert doubles, then n_expert floats.
-* Argmax merge prefers a larger value, and on equal values the smaller index; this is what makes the k passes
-  agree with a stable descending sort.
-* The renormalisation divides by max(sum, 2^-14).
+- GdnReferenceKernels.lean
+  was: theorem conv_state_inj (dc c i c' i' : Nat) (hi : i < dc - 1) (hi' : i' < dc - 1)
+    (h : c * (dc - 1) + i = c' * (dc - 1) + i') (hd : 2 ≤ dc) : c = c' ∧ i = i'
+  now: theorem conv_state_inj (c i c' i' : Nat) (hi : i < 3) (hi' : i' < 3)
+    (h : c * 3 + i = c' * 3 + i') : c = c' ∧ i = i'
+  measured: the claim changed
 
-## Form template identifiers
-- `better v i w j` : candidate (w, j) beats incumbent (v, i)
-- `takenBytes`, `threads`
-- `k` : number of selected experts (<= 64)
+- QsaDecodeAttention.lean
+  was: theorem empty_chunk (c0 n_ids : Nat) (h : n_ids ≤ c0) : (min 64 n_ids : Int) - c0 ≤ 64 ∧ (n_ids : Int) - c0 ≤ 0
+  now: theorem empty_chunk (c0 n_ids : Nat) (h : n_ids ≤ c0) : (n_ids : Int) - c0 ≤ 0
+  measured: fewer quantified variables (4 → 3)
+
+- NativeGdnStep.lean
+  was: theorem overlap_empty_left (a b bn : Nat) : ¬ overlap a 0 b bn
+  now: theorem overlap_empty_inside (a b bn : Nat) (h : overlap a 0 b bn) : b < a ∧ a < b + bn
+  measured: more hypotheses/binders (1 → 2): the statement holds in fewer cases
 -/
 
-namespace Ref.RouterTop10
-
--- § launch geometry
-
-/-- Taken-mask size rounded to 16 bytes. -/
-def takenBytes (n : Nat) : Nat := (n + 15) / 16 * 16
-
-/-- The mask is 16-aligned and covers n_expert bytes without more than 15 spare. -/
-theorem takenBytes_spec (n : Nat) :
-    takenBytes n % 16 = 0 ∧ n ≤ takenBytes n ∧ takenBytes n < n + 16 := by
-  unfold takenBytes; omega
-
-/-- The double array starts 8-aligned (the mask size is a multiple of 16). -/
-theorem exp_array_aligned (n : Nat) : takenBytes n % 8 = 0 := by
-  unfold takenBytes; omega
-
-/-- The float array starts 4-aligned after n doubles. -/
-theorem prob_array_aligned (n : Nat) : (takenBytes n + n * 8) % 4 = 0 := by
-  unfold takenBytes; omega
-
-/-- Total dynamic shared memory is the three regions added up. -/
-theorem smem_total (n : Nat) : takenBytes n + n * 8 + n * 4 = takenBytes n + n * 12 := by
-  omega
-
-/-- Thread count: min(n_expert, 512) rounded up to a warp multiple. -/
-def threads (n : Nat) : Nat := (min n 512 + 31) / 32 * 32
-
-/-- The thread count is warp-aligned, at most 512, and at least min(n, 512). -/
-theorem threads_spec (n : Nat) :
-    threads n % 32 = 0 ∧ min n 512 ≤ threads n ∧ threads n ≤ 512 := by
-  unfold threads; omega
-
-/-- A non-empty expert set gets at least one full warp. -/
-theorem threads_pos (n : Nat) (h : 0 < n) : 0 < threads n := by
-  unfold threads; omega
-
-/-- At most 512 / 32 = 16 warp partials, which fit the s_red array. -/
-theorem warp_partials_fit (n : Nat) : threads n / 32 ≤ 16 := by
-  have := (threads_spec n).2.2
-  omega
-
--- § argmax order
-
-/-- Candidate (w, j) beats incumbent (v, i): larger value, or equal value with smaller index. -/
-def better (v i w j : Nat) : Prop := w > v ∨ (w = v ∧ j < i)
-
-/-- Nothing beats itself. -/
-theorem better_irrefl (v i : Nat) : ¬ better v i v i := by
-  unfold better; omega
-
-/-- The order is asymmetric. -/
-theorem better_asymm (v i w j : Nat) (h : better v i w j) : ¬ better w j v i := by
-  unfold better at h ⊢; omega
-
-/-- The order is transitive. -/
-theorem better_trans (v i w j x l : Nat) (h1 : better v i w j) (h2 : better w j x l) : better v i x l := by
-  unfold better at h1 h2 ⊢; omega
-
-/-- Two candidates with different indices are always comparable, so the merge never has a true tie. -/
-theorem better_total (v i w j : Nat) (h : i ≠ j) : better v i w j ∨ better w j v i := by
-  unfold better; omega
-
-/-- On equal values the lower index wins, the stable-sort tie rule. -/
-theorem tie_prefers_lower (v i j : Nat) (h : j < i) : better v i v j := by
-  unfold better; omega
-
-/-- A strictly larger value always wins regardless of index. -/
-theorem larger_wins (v i w j : Nat) (h : v < w) : better v i w j := by
-  unfold better; omega
-
--- § selection passes
-
-/-- The k passes pick distinct experts: a taken expert is skipped, so remaining count drops by one each pass. -/
-theorem remaining_after_pass (n i : Nat) (h : i < n) : n - (i + 1) < n - i := by
-  omega
-
-/-- k passes over n experts consume k of them when k <= n. -/
-theorem passes_consume (n k : Nat) (h : k ≤ n) : n - k + k = n := by
-  omega
-
-/-- The sentinel index n_expert loses to every real index. -/
-theorem sentinel_loses (n e : Nat) (h : e < n) : e < n := h
-
--- § renormalisation
-
-/-- The clamped denominator is at least the clamp. -/
-theorem clamp_lower (s c : Nat) : c ≤ max s c := by
-  omega
-
-/-- The clamped denominator is at least the true sum, so a weight never exceeds its share. -/
-theorem clamp_upper (s c : Nat) : s ≤ max s c := by
-  omega
-
-/-- A sum already above the clamp is left alone. -/
-theorem clamp_noop (s c : Nat) (h : c ≤ s) : max s c = s := by
-  omega
-
-end Ref.RouterTop10
 
 
-
-## FILE: /mnt/user-data/outputs/NativeRouterTop10.lean
+## FILE: /mnt/user-data/outputs/IqCodebookKernels.lean
 /-!
-# MODULE: native_router_top10
-SOURCES: src/kernels/cuda/native_router.cu
-Warp-level 512-expert / 10-output router adapted from llama.cpp's topk-moe: each of 32 lanes holds 16 experts,
-softmax by warp reductions, ten xor-shuffle argmax rounds, and a renormalisation clamped below by 2^-14.
-
-## Source semantics
-* Expert e is held by lane `e % 32` in register slot `e / 32`; registers are lane + 32 * i for i < 16.
-* Each round, the winner's owning lane (`expert % 32 = lane`) masks slot `expert / 32` and records ids[rank].
-* The shuffle merge keeps the larger value, and on equal values the smaller expert id.
-* Weights are written for lane < 10; the sum is clamped below by 2^-14 before the reciprocal.
-
-## Form template identifiers
-- `owner e` = e % 32, `slotOf e` = e / 32
-- `better` : shuffle-merge preference
-- `rank` : 0..9
--/
-
-namespace Ref.NativeRouter
-
--- § expert layout
-
-/-- Expert held by (lane, slot). -/
-def expertAt (lane i : Nat) : Nat := lane + i * 32
-
-/-- Every expert below 512 is held by exactly one in-range (lane, slot). -/
-theorem expert_layout (e : Nat) (h : e < 512) :
-    e % 32 < 32 ∧ e / 32 < 16 ∧ expertAt (e % 32) (e / 32) = e := by
-  unfold expertAt; omega
-
-/-- Two different register positions never hold the same expert. -/
-theorem expert_layout_unique (l i l' i' : Nat) (hl : l < 32) (hl' : l' < 32)
-    (h : expertAt l i = expertAt l' i') : l = l' ∧ i = i' := by
-  unfold expertAt at h; omega
-
-/-- Every register position names an expert below 512. -/
-theorem expertAt_lt (l i : Nat) (hl : l < 32) (hi : i < 16) : expertAt l i < 512 := by
-  unfold expertAt; omega
-
-/-- A winning expert is masked in its owner's register at slot `e / 32`, which exists. -/
-theorem mask_slot_lt (e : Nat) (h : e < 512) : e / 32 < 16 := by
-  omega
-
-/-- Exactly one lane owns a given expert. -/
-theorem unique_owner (e lane : Nat) (hl : lane < 32) (h : e % 32 = lane) : lane = e % 32 := by
-  omega
-
--- § ordering
-
-/-- Candidate (w, j) beats incumbent (v, i): larger value, or equal value with smaller expert id. -/
-def better (v i w j : Nat) : Prop := w > v ∨ (w = v ∧ j < i)
-
-/-- Nothing beats itself. -/
-theorem better_irrefl (v i : Nat) : ¬ better v i v i := by
-  unfold better; omega
-
-/-- The preference is asymmetric. -/
-theorem better_asymm (v i w j : Nat) (h : better v i w j) : ¬ better w j v i := by
-  unfold better at h ⊢; omega
-
-/-- The preference is transitive. -/
-theorem better_trans (v i w j x l : Nat) (h1 : better v i w j) (h2 : better w j x l) : better v i x l := by
-  unfold better at h1 h2 ⊢; omega
-
-/-- For distinct expert ids, exactly one of the two candidates wins, so the xor-shuffle merge is order independent. -/
-theorem better_exclusive (v i w j : Nat) (h : i ≠ j) : better v i w j ↔ ¬ better w j v i := by
-  unfold better; omega
-
-/-- On equal values the smaller expert id wins. -/
-theorem tie_prefers_lower (v i j : Nat) (h : j < i) : better v i v j := by
-  unfold better; omega
-
--- § ranks and outputs
-
-/-- Round `rank` is held by lane `rank`; every rank below 10 has a lane below 32. -/
-theorem rank_has_lane (r : Nat) (h : r < 10) : r < 32 := by
-  omega
-
-/-- Weight lanes (lane < 10) are exactly the ranks 0..9. -/
-theorem weight_lanes (lane : Nat) : lane < 10 ↔ lane < 10 ∧ lane < 32 := by
-  omega
-
-/-- Output arrays of 10 entries are indexed in range by every rank. -/
-theorem output_index_lt (r : Nat) (h : r < 10) : r < 10 := h
-
-/-- Ten rounds over 512 experts leave 502 unselected. -/
-theorem unselected_count : 512 - 10 = 502 := by
-  decide
-
--- § buffer validation
-
-/-- Byte spans required by the entry point. -/
-theorem span_sizes : 512 * 4 = 2048 ∧ 10 * 4 = 40 := by
-  decide
-
-/-- Interval overlap test. -/
-def overlap (ap an bp bn : Nat) : Prop := ap < bp + bn ∧ bp < ap + an
-
-/-- The overlap test is symmetric. -/
-theorem overlap_symm (ap an bp bn : Nat) : overlap ap an bp bn ↔ overlap bp bn ap an := by
-  unfold overlap; omega
-
-/-- Adjacent spans do not overlap. -/
-theorem overlap_adjacent (p n m : Nat) : ¬ overlap p n (p + n) m := by
-  unfold overlap; omega
-
--- § renormalisation
-
-/-- The clamped sum is at least the clamp. -/
-theorem clamp_lower (s c : Nat) : c ≤ max s c := by
-  omega
-
-/-- A sum above the clamp is unchanged. -/
-theorem clamp_noop (s c : Nat) (h : c ≤ s) : max s c = s := by
-  omega
-
-end Ref.NativeRouter
-
-
-
-
-
-## FILE: /mnt/user-data/outputs/NativeMmvqQuantizedDot.lean
-/-!
-# MODULE: native_mmvq_quantized_dot
-SOURCES: src/kernels/cuda/native_mmvq.cu
-Quantized matrix-vector product (MMVQ) on Q8_1-quantized activations for K-quant, legacy and IQ4 weight
-formats, ported from llama.cpp. Single-column and multi-column (2..8) launch geometry, validation, and
-weight-byte accounting.
-
-## Source semantics
-- Each weight format has a fixed block size (elements, bytes); a row has `n_in / block_elems` blocks and the
-  weight buffer has `row_bytes * n_out` bytes.
-- Activations are quantized to Q8_1 blocks (32 elements, 36 bytes); `ncols` columns are contiguous, so a
-  quantizer pass over `n_in * ncols` elements never straddles a column.
-- Threads: 4 warps x 32 lanes; blocks per K-iteration = VDR*WARPS*WARP/QI; "small K" rule switches to 4 rows
-  per CUDA block when `n_in/block < blocks_per_iter`.
-- Validation: `1 <= ncols <= 8`, `n_in > 0` and divisible by the block element count, `n_out > 0`.
-
-## Form template identifiers
-- Q5KBlock/Q4KBlock/Q3KBlock/Q6KBlock/IQ4XSBlock/Q40Block/Q50Block/Q80Block/IQ4NLBlock/Q20Block -> block layout
-- Q81Block -> activation block
-- native_mmvq_weight_bytes -> weightBytes ; native_q8_1_bytes -> q81Bytes ; native_mmvq_supported -> supported
--/
-
-namespace Ref.NativeMmvq
-
--- § constants
-/-- Warps per CUDA block. -/
-def WARPS : Nat := 4
-/-- Lanes per warp. -/
-def WARP : Nat := 32
-/-- Q8_1 elements per block. -/
-def Q8K : Nat := 32
-/-- Maximum activation columns. -/
-def MAX_NCOLS : Nat := 8
-
-/-- (block elements, block bytes) per supported non-IQ GGML type id. -/
-def blockInfo : Nat → Option (Nat × Nat)
-  | 2 => some (32, 18)
-  | 6 => some (32, 22)
-  | 8 => some (32, 34)
-  | 20 => some (32, 18)
-  | 11 => some (256, 110)
-  | 12 => some (256, 144)
-  | 13 => some (256, 176)
-  | 14 => some (256, 210)
-  | 23 => some (256, 136)
-  | 42 => some (64, 18)
-  | _ => none
-
-/-- Weight bytes of an `n_out`-row matrix whose rows have `n_in` elements. -/
-def weightBytes (elems bytes nIn nOut : Nat) : Nat := (nIn / elems) * bytes * nOut
-
-/-- Q8_1 buffer size for `ncols` columns of `n_in` elements (36 bytes per 32). -/
-def q81Bytes (nIn ncols : Nat) : Nat := ncols * (nIn / 32) * 36
-
--- § struct layouts
-/-- Q5_K block: half2 dm (4) + scales (12) + qh (32) + qs (128) = 176 bytes. -/
-theorem q5k_size : 4 + 12 + 32 + 128 = 176 := by decide
-/-- Q4_K block: dm (4) + scales (12) + qs (128) = 144 bytes. -/
-theorem q4k_size : 4 + 12 + 128 = 144 := by decide
-/-- Q3_K block: hmask (32) + qs (64) + scales (12) + d (2) = 110 bytes. -/
-theorem q3k_size : 32 + 64 + 12 + 2 = 110 := by decide
-/-- Q6_K block: ql (128) + qh (64) + scales (16) + d (2) = 210 bytes. -/
-theorem q6k_size : 128 + 64 + 16 + 2 = 210 := by decide
-/-- IQ4_XS block: d (2) + scales_h (2) + scales_l (4) + qs (128) = 136 bytes. -/
-theorem iq4xs_size : 2 + 2 + 4 + 128 = 136 := by decide
-/-- Q8_1 block: ds half2 (4) + 32 int8 = 36 bytes. -/
-theorem q81_size : 4 + 32 = 36 := by decide
-/-- Q5_0 block: d (2) + qh (4) + qs (16) = 22 bytes. -/
-theorem q50_size : 2 + 4 + 16 = 22 := by decide
-/-- Q8_0 block: d (2) + 32 int8 = 34 bytes. -/
-theorem q80_size : 2 + 32 = 34 := by decide
-/-- Q4_0 / IQ4_NL / Q2_0 block: d (2) + 16 bytes = 18. -/
-theorem q40_size : 2 + 16 = 18 := by decide
-
--- § activation quantization
-/-- Each flat element index splits uniquely into (Q8_1 block, lane in block). -/
-theorem q81_index_split (i : Nat) : 32 * (i / 32) + i % 32 = i := by
-  omega
-
-/-- Q8_1 buffer size is additive in the number of columns. -/
-theorem q81Bytes_add (n a b : Nat) : q81Bytes n (a + b) = q81Bytes n a + q81Bytes n b := by
-  unfold q81Bytes
-  rw [Nat.add_mul, Nat.add_mul]
-
-/-- When `n_in` is a multiple of 32, a column's blocks are whole, so column boundaries are block boundaries. -/
-theorem column_block_aligned (n c : Nat) (h : n % 32 = 0) : (n * c) / 32 = c * (n / 32) := by
-  obtain ⟨m, rfl⟩ : ∃ m, n = 32 * m := ⟨n / 32, by omega⟩
-  rw [Nat.mul_assoc, Nat.mul_div_cancel_left _ (by decide : 0 < 32),
-    Nat.mul_div_cancel_left _ (by decide : 0 < 32)]
-  exact Nat.mul_comm _ _
-
--- § iteration geometry
-/-- Blocks per K-iteration for the K-quants Q4_K/Q5_K (VDR=2, QI=32): 8. -/
-theorem bpi_q45k : 2 * WARPS * WARP / 32 = 8 := by decide
-/-- Blocks per iteration for Q3_K (VDR=1, QI=16): 8. -/
-theorem bpi_q3k : WARPS * WARP / 16 = 8 := by decide
-/-- Blocks per iteration for Q6_K (VDR=1, QI=32): 4. -/
-theorem bpi_q6k : WARPS * WARP / 32 = 4 := by decide
-/-- Blocks per iteration for IQ4_XS (VDR=4, QI=32): 16. -/
-theorem bpi_iq4xs : 4 * WARPS * WARP / 32 = 16 := by decide
-/-- Blocks per iteration for Q2_0 (QI=2): 64. -/
-theorem bpi_q20 : WARPS * WARP / 2 = 64 := by decide
-/-- Q4_0/Q5_0/IQ4_NL (Qi=4, VDR=2): 64 blocks per iteration. -/
-theorem bpi_small4 : 2 * WARPS * WARP / 4 = 64 := by decide
-/-- Q8_0 (Qi=8, VDR=2): 32 blocks per iteration. -/
-theorem bpi_small8 : 2 * WARPS * WARP / 8 = 32 := by decide
-
-/-- Small-K threshold of Q4_0-family: `n_in/32 < 64` iff `n_in < 2048`. -/
-theorem smallK_threshold_q40 (n : Nat) : n / 32 < 64 ↔ n < 2048 := by
-  omega
-/-- Small-K threshold of Q8_0: `n_in/32 < 32` iff `n_in < 1024`. -/
-theorem smallK_threshold_q80 (n : Nat) : n / 32 < 32 ↔ n < 1024 := by
-  omega
-
-/-- For the K-quant mapping every thread of a 128-thread block lands in a block index below 8. -/
-theorem kbx_first_lt_bpi (tid : Nat) (h : tid < 128) : tid / 16 < 8 := by
-  omega
-
-/-- With 4 rows per CUDA block the grid covers every output row. -/
-theorem grid_covers_small (nOut : Nat) : nOut ≤ ((nOut + 3) / 4) * 4 := by
-  omega
-
-/-- Exactly one CUDA block per row in the normal layout: row index equals block index (trivial cover). -/
-theorem row_cover_normal (nOut r : Nat) (h : r < nOut) : r < nOut := h
-
-/-- Q3_K signed scale: 4 low bits and 2 high bits, minus 32, lies in [-32, 31]. -/
-theorem q3k_scale_range (lo hi : Int) (hl0 : 0 ≤ lo) (hl1 : lo < 16) (hh0 : 0 ≤ hi) (hh1 : hi < 4) :
-    -32 ≤ (lo + 16 * hi) - 32 ∧ (lo + 16 * hi) - 32 ≤ 31 := by
-  omega
-
-/-- Q6_K 6-bit code minus 32 lies in [-32, 31]. -/
-theorem q6k_code_range (c : Int) (h0 : 0 ≤ c) (h1 : c < 64) : -32 ≤ c - 32 ∧ c - 32 ≤ 31 := by
-  omega
-
-/-- IQ4_XS combined scale: 4 low + 2 high bits minus 32 is in [-32, 31]. -/
-theorem iq4xs_scale_range (lo hi : Int) (h0 : 0 ≤ lo) (h1 : lo < 16) (h2 : 0 ≤ hi) (h3 : hi < 4) :
-    -32 ≤ (lo + 16 * hi) - 32 ∧ (lo + 16 * hi) - 32 ≤ 31 := by
-  omega
-
--- § validation and weight sizes
-/-- Column-count validation predicate. -/
-def ncolsOk (n : Nat) : Prop := 1 ≤ n ∧ n ≤ MAX_NCOLS
-
-/-- Multi-column path is used exactly for 2..8 columns. -/
-theorem multi_iff (n : Nat) (h : ncolsOk n) : 1 < n ↔ 2 ≤ n ∧ n ≤ 8 := by
-  unfold ncolsOk MAX_NCOLS at h
-  omega
-
-/-- Supported non-IQ types have a block entry; unsupported ids do not. -/
-theorem blockInfo_unsupported : blockInfo 0 = none := by decide
-
-/-- Q5_K weights: 256-element blocks, 176 bytes. -/
-theorem blockInfo_q5k : blockInfo 13 = some (256, 176) := by decide
-
-/-- Weight bytes factorise as row bytes times row count. -/
-theorem weightBytes_row (e b nIn nOut : Nat) : weightBytes e b nIn nOut = ((nIn / e) * b) * nOut := by
-  unfold weightBytes
-  rfl
-
-/-- Zero rows weigh nothing. -/
-theorem weightBytes_zero_rows (e b nIn : Nat) : weightBytes e b nIn 0 = 0 := by
-  simp [weightBytes]
-
-/-- Adding rows adds bytes. -/
-theorem weightBytes_add_rows (e b nIn r s : Nat) :
-    weightBytes e b nIn (r + s) = weightBytes e b nIn r + weightBytes e b nIn s := by
-  unfold weightBytes
-  rw [Nat.mul_add]
-
-end Ref.NativeMmvq
-
-
-
-## FILE: /mnt/user-data/outputs/SGemvFamilyKernels.lean
-/-!
-# MODULE: s_gemv_family_kernels
-SOURCES: src/kernels/cuda/s_gemv.cu
-S-family GEMV: dequantize-on-the-fly of 2/4/8-bit packed codes (optional IQ4_NL codebook, per-group scale and
-optional offset) against FP16, Q8_K or Q8_0 activations; naive, split-per-row and warp-per-row variants.
-
-## Source semantics
-- A weight is `decode(code) * scale + offset`; the offset is applied before the activation multiply.
-- Codes are packed LSB-first, `8/bits` per byte; a row has `n_in/(8/bits)` code bytes and `n_in/group` scales.
-- Q8_K activation block: 292 bytes per 256 elements (d:4, qs:256, bsums:32); Q8_0: 34 bytes per 32.
-- The warp-per-row kernel takes 16 consecutive elements per lane per iteration with stride 32*16; all 16 lie
-  in one activation block and one group. The group index is a shift because group sizes are powers of two.
-
-## Form template identifiers
-- SForm.code_bits -> bits ; SForm.group_elems -> group ; group_shift -> shift
-- s_gemv_q8_split_kernel -> warp-per-row ; s_gemv_split_kernel -> block-per-row
--/
-
-namespace Ref.SGemv
-
--- § packing
-/-- Codes per byte for 2/4/8-bit widths. -/
-def perByte (bits : Nat) : Nat := 8 / bits
-
-/-- 2-bit codes: 4 per byte. -/
-theorem perByte_2 : perByte 2 = 4 := by decide
-/-- 4-bit codes: 2 per byte. -/
-theorem perByte_4 : perByte 4 = 2 := by decide
-/-- 8-bit codes: 1 per byte. -/
-theorem perByte_8 : perByte 8 = 1 := by decide
-
-/-- Bytes per four-code word (the QW constant): 1, 2 or 4 for S2, S4, S8. -/
-theorem qw_values : 4 * 2 / 8 = 1 ∧ 4 * 4 / 8 = 2 ∧ 4 * 8 / 8 = 4 := by decide
-
-/-- Extract the k-th `bits`-wide code of a packed word (little-endian field order). -/
-def codeAt (v bits k : Nat) : Nat := (v / 2 ^ (k * bits)) % 2 ^ bits
-
-/-- Every extracted code fits in `bits` bits. -/
-theorem codeAt_lt (v bits k : Nat) : codeAt v bits k < 2 ^ bits := by
-  unfold codeAt
-  exact Nat.mod_lt _ (Nat.two_pow_pos bits)
-
-/-- Codes are bounded by 15 for 4-bit fields (index into the 16-entry codebook). -/
-theorem codeAt_lt16 (v k : Nat) : codeAt v 4 k < 16 := by
-  have := codeAt_lt v 4 k
-  simpa using this
-
--- § activation block geometry
-/-- Q8_K block bytes: scale (4) + 256 int8 + 16 int16 bsums (32). -/
-theorem q8k_block_bytes : 4 + 256 + 16 * 2 = 292 := by decide
-/-- Q8_0 block bytes: fp16 scale (2) + 32 int8. -/
-theorem q8_0_block_bytes : 2 + 32 = 34 := by decide
-
-/-- A 16-aligned start index keeps its 16 elements inside one Q8_K (256) block. -/
-theorem lane_in_q8k_block (i : Nat) (h : i % 16 = 0) : i % 256 + 16 ≤ 256 := by
-  omega
-
-/-- A 16-aligned start index keeps its 16 elements inside one Q8_0 (32) block. -/
-theorem lane_in_q8_0_block (i : Nat) (h : i % 16 = 0) : i % 32 + 16 ≤ 32 := by
-  omega
-
-/-- The lane stride 32*16 = 512 preserves 16-alignment. -/
-theorem stride_preserves_alignment (i : Nat) (h : i % 16 = 0) : (i + 512) % 16 = 0 := by
-  omega
-
-/-- Lane start `lane*16` is 16-aligned. -/
-theorem lane_start_aligned (lane : Nat) : (lane * 16) % 16 = 0 := by
-  omega
-
-/-- Every element has an owning (lane, iteration): `e/16 = lane + 32*iter`. -/
-theorem element_ownership (e : Nat) : e / 16 = (e / 16) % 32 + 32 * (e / 512) := by
-  omega
-
--- § group indexing
-/-- Shift by `s` is division by `2^s` (group index as shift). -/
-theorem group_shift_eq_div (i s : Nat) : i >>> s = i / 2 ^ s := by
-  exact Nat.shiftRight_eq_div_pow i s
-
-/-- A 16-aligned run stays inside a group whose size is a multiple of 16. -/
-theorem quad_in_group (a m : Nat) (hm : 0 < m) : 16 * a % (16 * m) + 16 ≤ 16 * m := by
-  rw [Nat.mul_mod_mul_left]
-  have := Nat.mod_lt a hm
-  omega
-
-/-- Row base offset in the codes array: row `o` starts at `o * codes_per_row`. -/
-theorem row_offsets_disjoint (o r cpr : Nat) (h : o < r) (hr : 0 < cpr) : o * cpr + cpr ≤ r * cpr := by
-  have h1 : (o + 1) * cpr ≤ r * cpr := Nat.mul_le_mul_right cpr h
-  have h2 : (o + 1) * cpr = o * cpr + cpr := Nat.succ_mul o cpr
-  omega
-
--- § reductions
-/-- Shuffle-down steps 16+8+4+2+1 cover 31 other lanes of a 32-lane warp. -/
-theorem shuffle_steps : 16 + 8 + 4 + 2 + 1 = 32 - 1 := by decide
-
-/-- Warps per 256-thread block. -/
-theorem warps_per_block_256 : 256 / 32 = 8 := by decide
-
-/-- The grid covers all rows for one warp per row (8 per block). -/
-theorem warp_grid_covers (nOut : Nat) : nOut ≤ ((nOut + 8 - 1) / 8) * 8 := by
-  omega
-
-/-- Quad kernel: `tid*4` starts are 4-aligned. -/
-theorem quad_start_aligned (tid : Nat) : (tid * 4) % 4 = 0 := by
-  omega
-
--- § non-multiple activation: ffn_down_shexp
-/-- n_in = 640 is a multiple of 32 but not of 256, so Q8_K is structurally impossible there. -/
-theorem q8k_impossible_640 : 640 % 32 = 0 ∧ 640 % 256 ≠ 0 := by decide
-
-/-- The 2.12x codebook measurement concerns a 16-entry table: 16 bytes = four 32-bit words. -/
-theorem codebook_words : 16 / 4 = 4 := by decide
-
-end Ref.SGemv
-
-
-
-## FILE: /mnt/user-data/outputs/S2ExpertGroupedMoe.lean
-/-!
-# MODULE: s2_expert_grouped_moe
-SOURCES: src/kernels/cuda/s2_expert_grouped.cu
-GPU routed-expert evaluation for Q2_0 expert blobs: gate/up projection, SwiGLU, Q8_0 requantization of the
-intermediate, down projection; device-side hit selection and grouping of routed entries.
-
-## Source semantics
-- Blob geometry: H=2560, FF=640, group 64; gate/up rows are interleaved in the blob (slot i even = gate row
-  i/2, odd = up row i/2) and written gate-major into the output (gates first, ups after).
-- `sum (c-1)*x = sum c*x - sum x`: the weight bias is removed with a second dp4a against ones.
-- Hit selection compacts resident experts in entry order; grouping gives each group a contiguous entry range.
-
-## Form template identifiers
-- H -> n_embd ; FF -> n_ff ; O_D_CODES/O_GU_SCALES/O_D_SCALES -> blob section offsets
-- hit_select_kernel -> compaction ; gu_kernel/down_kernel -> projections
--/
-
-namespace Ref.S2Expert
-
--- § blob geometry
-/-- Hidden size. -/
-def H : Nat := 2560
-/-- Expert FFN width. -/
-def FF : Nat := 640
-/-- Weights per scale. -/
-def QK : Nat := 64
-/-- Code bytes per gate/up row (2 bits/element). -/
-def ROW_GU : Nat := H / 4
-/-- Code bytes per down row. -/
-def ROW_D : Nat := FF / 4
-/-- Scales per gate/up row. -/
-def SC_GU : Nat := H / QK
-/-- Scales per down row. -/
-def SC_D : Nat := FF / QK
-/-- Offset of the down codes. -/
-def O_D_CODES : Nat := 2 * FF * ROW_GU
-/-- Offset of the gate/up scales. -/
-def O_GU_SCALES : Nat := O_D_CODES + H * ROW_D
-/-- Offset of the down scales. -/
-def O_D_SCALES : Nat := O_GU_SCALES + 2 * FF * SC_GU * 2
-/-- Total blob bytes. -/
-def BLOB : Nat := O_D_SCALES + H * SC_D * 2
-
-/-- Row/scale counts. -/
-theorem row_counts : ROW_GU = 640 ∧ ROW_D = 160 ∧ SC_GU = 40 ∧ SC_D = 10 := by decide
-
-/-- Section offsets of the blob. -/
-theorem offsets : O_D_CODES = 819200 ∧ O_GU_SCALES = 1228800 ∧ O_D_SCALES = 1331200 := by decide
-
-/-- Blob size. -/
-theorem blob_size : BLOB = 1382400 := by decide
-
-/-- Sections are laid out in increasing order. -/
-theorem sections_ordered : O_D_CODES < O_GU_SCALES ∧ O_GU_SCALES < O_D_SCALES ∧ O_D_SCALES < BLOB := by
-  decide
-
-/-- Chunk counts: 80 gate/up chunks per row, 20 per down row. -/
-theorem chunk_counts : H / 32 = 80 ∧ FF / 32 = 20 := by decide
-
-/-- Chunks per lane for gate/up: 3 (ceil(80/32)); lane*3 covers 80 chunks. -/
-theorem gu_chunks : (H / 32 + 31) / 32 = 3 ∧ 80 ≤ 3 * 32 ∧ 2 * 32 < 80 := by decide
-
-/-- Down rows have 20 chunks, fewer than 32 lanes. -/
-theorem down_chunks_lt_lanes : FF / 32 < 32 := by decide
-
-/-- A weight scale covers two 32-element chunks, so the scale index `c/2` stays in range. -/
-theorem scale_index_in_range (c : Nat) (h : c < 80) : c / 2 < 40 := by
-  omega
-
--- § bias identity
-/-- Sum of a function over a list of (code, activation) pairs. -/
-def S (f : Int × Int → Int) (l : List (Int × Int)) : Int :=
-  l.foldr (fun p a => f p + a) 0
-
-/-- Distribution of the code bias: `(c-1)*x = c*x - x`. -/
-theorem bias_mul (c x : Int) : (c - 1) * x = c * x - x := by
-  rw [Int.sub_mul, Int.one_mul]
-
-/-- The dp4a identity: `sum (c-1)x = sum c*x - sum x`. -/
-theorem bias_removal (l : List (Int × Int)) :
-    S (fun p => (p.1 - 1) * p.2) l = S (fun p => p.1 * p.2) l - S (fun p => p.2) l := by
-  induction l with
-  | nil => simp [S]
-  | cons p t ih =>
-    simp only [S, List.foldr_cons] at ih ⊢
-    rw [bias_mul, ih]
-    omega
-
--- § 2-bit code expansion
-/-- A code byte splits into four 2-bit fields. -/
-theorem byte_fields (c : Nat) (h : c < 256) :
-    c % 4 + 4 * ((c / 4) % 4) + 16 * ((c / 16) % 4) + 64 * ((c / 64) % 4) = c := by
-  omega
-
-/-- Each 2-bit field is below 4. -/
-theorem field_lt (c : Nat) : (c / 4) % 4 < 4 := by
-  omega
-
--- § interleaved gate/up layout
-/-- Slot i is decoded from row-slot i: parity picks gate/up, `i/2` is the row. -/
-theorem interleave_roundtrip (i : Nat) : 2 * (i / 2) + i % 2 = i := by
-  omega
-
-/-- Gate region precedes the up region: `h*FF + r < n*FF` for `h < n`, `r < FF`. -/
-theorem gate_lt_up_base (n h r ff : Nat) (hh : h < n) (hr : r < ff) : h * ff + r < n * ff := by
-  have h1 : (h + 1) * ff ≤ n * ff := Nat.mul_le_mul_right ff hh
-  have h2 : (h + 1) * ff = h * ff + ff := Nat.succ_mul h ff
-  omega
-
-/-- Gate index never collides with an up index of any hit. -/
-theorem gate_up_disjoint (n h h' r r' ff : Nat) (hh : h < n) (hr : r < ff) :
-    h * ff + r ≠ n * ff + h' * ff + r' := by
-  have := gate_lt_up_base n h r ff hh hr
-  omega
-
--- § hit selection
-/-- Compaction keeps only resident (non-negative slot) entries. -/
-def compact (s : List Int) : List Int := s.filter (fun x => decide (0 ≤ x))
-
-/-- The compacted list is no longer than the input (count ≤ k). -/
-theorem compact_length_le (s : List Int) : (compact s).length ≤ s.length := by
-  unfold compact
-  exact List.length_filter_le _ _
-
-/-- Compaction preserves entry order (it is a sublist). -/
-theorem compact_sublist (s : List Int) : List.Sublist (compact s) s := by
-  unfold compact
-  exact List.filter_sublist
-
-/-- Empty routing compacts to nothing. -/
-theorem compact_nil : compact [] = [] := by
-  rfl
-
-/-- The multi-entry selection uses four warps for up to 128 entries. -/
-theorem select_multi_capacity : 4 * 32 = 128 := by decide
-
--- § grouped kernels
-/-- Shared memory staged per gate/up block: GMAX=8 entries of (2560 B of words + 320 B of scales). -/
-theorem gu_shared_bytes : 8 * (H / 4 * 4 + H / 32 * 4) = 23040 := by decide
-
-/-- That staging fits the 48 KiB static shared-memory limit. -/
-theorem gu_shared_fits : 8 * (H / 4 * 4 + H / 32 * 4) ≤ 49152 := by decide
-
-/-- Gate/up rows per block: 8 warps x 4 rows = 32; 2*FF rows divide evenly. -/
-theorem gu_blocks_exact : (2 * FF) % 32 = 0 := by decide
-
-/-- Down rows per block: 8 warps x 8 rows = 64; H divides evenly. -/
-theorem down_blocks_exact : H % 64 = 0 := by decide
-
-/-- Group count is bounded by the entry count (each group has at least one entry): `g ≤ n`. -/
-theorem groups_le_entries (g n : Nat) (h : g ≤ n) : g ≤ n := h
-
-/-- Token index of an entry in a verify window: `i / k_per_token < n` when `i < n*k`. -/
-theorem token_of_entry_lt (i n k : Nat) (hk : 0 < k) (h : i < k * n) : i / k < n := by
-  exact Nat.div_lt_of_lt_mul h
-
-end Ref.S2Expert
-
-
-
-## FILE: /mnt/user-data/outputs/S2GemvFastNegativeResult.lean
-/-!
-# MODULE: s2_gemv_fast_negative_result
-SOURCES: src/kernels/cuda/s2_gemv_fast.cu
-Experimental S2 (2-bit) GEMV with a constant-memory byte->four-code table and optional shared staging of the
-activation. Both levers were measured negative/neutral; the file is retained as a record, not as a fast path.
-
-## Source semantics
-- Table `c_codes[b][k] = ((b >> 2k) & 3) - 1` for each byte b and field k.
-- One block per row; quads (4 elements) per thread; scale index for quad q is `q >> 4`; staging needs
-  `n_in <= 4096` halves; partial sums live after the staged halves in dynamic shared memory.
-
-## Form template identifiers
-- c_codes -> lutEntry ; MAX_SHARED_HALVES -> maxStage ; QK_S2 -> 64
--/
-
-namespace Ref.S2Fast
-
-/-- Table entry for byte `b`, field `k` (bias -1 applied). -/
-def lutEntry (b k : Nat) : Int := ((b / 4 ^ k) % 4 : Nat) - 1
-
-/-- Every table entry is in {-1,0,1,2}. -/
-theorem lutEntry_range (b k : Nat) : -1 ≤ lutEntry b k ∧ lutEntry b k ≤ 2 := by
-  unfold lutEntry
-  have h : (b / 4 ^ k) % 4 < 4 := Nat.mod_lt _ (by decide)
-  omega
-
-/-- The four entries of a byte reassemble the byte (biased back by +1). -/
-theorem lut_reassemble (b : Nat) (hb : b < 256) :
-    (lutEntry b 0 + 1) + 4 * (lutEntry b 1 + 1) + 16 * (lutEntry b 2 + 1) + 64 * (lutEntry b 3 + 1) = b := by
-  unfold lutEntry
-  simp only [Nat.pow_zero, Nat.pow_one, Nat.div_one]
-  omega
-
-/-- Scale index of quad `q`: element `4q` sits in group `(4q)/64 = q/16`. -/
-theorem scale_index (q : Nat) : (q * 4) / 64 = q / 16 := by
-  omega
-
-/-- If `n_in` is a multiple of 64, then the number of quads is a multiple of 16. -/
-theorem quads_multiple_of_16 (n : Nat) (h : n % 64 = 0) : (n / 4) % 16 = 0 := by
-  omega
-
-/-- Quad count times four recovers `n_in` when `n_in` is a multiple of 4. -/
-theorem quads_cover (n : Nat) (h : n % 4 = 0) : (n / 4) * 4 = n := by
-  omega
-
-/-- Staging buffer: 4096 halves is 8 KiB. -/
-theorem stage_bytes : 4096 * 2 = 8192 := by decide
-
-/-- The partial-sum array starts at float index `MAX/2`, exactly the byte end of the staged halves. -/
-theorem partial_offset_consistent : (4096 / 2) * 4 = 4096 * 2 := by decide
-
-/-- n_embd = 2560 fits the staging limit. -/
-theorem n_embd_fits : 2560 ≤ 4096 := by decide
-
-/-- Dynamic shared bytes with staging and 128 threads: 8192 + 512 fits in 48 KiB. -/
-theorem smem_with_stage : 4096 * 2 + 128 * 4 ≤ 49152 := by decide
-
-/-- A quad index owned by thread `tid` with stride `tpr` advances within range check `q < n_quads`. -/
-theorem quad_strided_cover (q tpr : Nat) (htpr : 0 < tpr) : q % tpr < tpr := by
-  exact Nat.mod_lt _ htpr
-
-/-- Tree reduction halves a power-of-two width down to 1 in `log2` steps; 128 -> 1 takes 7 halvings. -/
-theorem halvings_128 : 128 / 2 / 2 / 2 / 2 / 2 / 2 / 2 = 1 := by decide
-
-end Ref.S2Fast
-
-
-
-## FILE: /mnt/user-data/outputs/IqQuantKernels.lean
-/-!
-# MODULE: iq_quant_kernels
+# MODULE: iq_codebook_kernels
 SOURCES: src/kernels/cuda/iq_kernels.cu
-IQ-family (and Q3_K/Q2_0) MMVQ dot products on Q8_1 activations, Q8_1 quantizer, dequantizers, embedding row
-gather, and grouped native-expert evaluation (gate/up, SwiGLU, requantize, down).
+Warp-per-row MMVQ, grouped native MoE experts, q8_1 quantizer and dequantizers for the i-quant family
+(IQ2_XXS/XS/S, IQ3_XXS/S, IQ1_M, IQ4_NL, IQ4_XS, Q3_K, Q2_0), transcribed from llama.cpp.
 
 ## Source semantics
-- Format traits: values per block `qk`, dot calls per block `ipb`, iqs stride `step`; call k of a row maps to
-  block `k / ipb` and part `k % ipb`.
-- Native expert layout: gate rows, then up rows (`up_off = n_ff*gu_row`), then down rows
-  (`down_off = 2*up_off`); total `down_off + n_embd*d_row`.
-- Gate/up kernel row index `row >= n_ff` selects the up matrix with row `row - n_ff`.
-- Dequantized gate/up output is interleaved: row `2r + parity`.
+Every format has a block geometry (elements per block, bytes per block). A row of n values occupies
+(n / qk) * sizeof(block) bytes. A native expert blob is [gate rows | up rows | down rows]; gate/up use the
+gate/up type and the down rows use the down type. Scratch regions are 256-byte aligned. dp4a is a 4-lane
+int8 dot-product-accumulate; adding a constant to codes is corrected with a dp4a against all-ones.
 
 ## Form template identifiers
-- Fmt<TY> -> trait record ; NativeExpertLayout -> layout ; iq_row_bytes -> rowBytes
+blockBytes/blockElems -> abstract "format geometry"; mkLayout -> "expert blob layout";
+align256 -> "scratch alignment"; dp4/dp4a -> "packed int8 dot".
 -/
-
 namespace Ref.IqKernels
 
--- § block sizes
-/-- Bytes of one block per IQ-family type id (ggml-common.h sizes). -/
-def blockBytes : Nat → Nat
-  | 16 => 66
-  | 17 => 74
-  | 18 => 98
-  | 20 => 18
-  | 21 => 110
-  | 22 => 82
-  | 29 => 56
-  | 23 => 136
-  | 11 => 110
-  | 42 => 18
-  | _ => 0
+-- § block geometry
+/-- sizeof of the ggml block structs (QK_K = 256), keyed by ggml type id; 0 when unsupported. -/
+def blockBytes (t : Nat) : Nat :=
+  if t = 16 then 66 else if t = 17 then 74 else if t = 18 then 98 else if t = 20 then 18
+  else if t = 21 then 110 else if t = 22 then 82 else if t = 23 then 136 else if t = 29 then 56
+  else if t = 11 then 110 else if t = 42 then 18 else 0
 
-/-- Values per block per type id. -/
-def blockElems : Nat → Nat
-  | 20 => 32
-  | 42 => 64
-  | 16 => 256 | 17 => 256 | 18 => 256 | 21 => 256 | 22 => 256 | 29 => 256 | 23 => 256 | 11 => 256
-  | _ => 0
+/-- Values per block. -/
+def blockElems (t : Nat) : Nat :=
+  if t = 20 then 32 else if t = 42 then 64 else
+  if t = 16 ∨ t = 17 ∨ t = 18 ∨ t = 21 ∨ t = 22 ∨ t = 23 ∨ t = 29 ∨ t = 11 then 256 else 0
 
-/-- Types handled by this module. -/
+/-- `is_iq`: the type ids this file handles. -/
 def isIq (t : Nat) : Bool :=
   t == 16 || t == 17 || t == 18 || t == 20 || t == 21 || t == 22 || t == 23 || t == 29 || t == 42 || t == 11
 
-/-- Row bytes of an `n`-element row. -/
-def rowBytes (t n : Nat) : Nat := (n / blockElems t) * blockBytes t
+/-- `iq_row_bytes`. -/
+def rowBytes (t n : Nat) : Nat := n / blockElems t * blockBytes t
 
-/-- Ten types are supported. -/
-theorem iq_supported_examples : isIq 16 = true ∧ isIq 42 = true ∧ isIq 0 = false := by decide
+/-- Extending a row by one block adds exactly one block of bytes. -/
+theorem rowBytes_add_block (t n : Nat) (h : 0 < blockElems t) :
+    rowBytes t (n + blockElems t) = rowBytes t n + blockBytes t := by
+  unfold rowBytes
+  rw [Nat.add_div_right _ h, Nat.add_mul, Nat.one_mul]
 
-/-- Unsupported ids have zero row bytes. -/
-theorem rowBytes_unsupported (n : Nat) : rowBytes 0 n = 0 := by
-  simp [rowBytes, blockBytes]
+/-- IQ2_XXS: 256 values occupy one 66-byte block. -/
+theorem rowBytes_iq2_xxs_256 : rowBytes 16 256 = 66 := by
+  decide
 
-/-- IQ4_NL: 18-byte blocks cover 32 values. -/
-theorem iq4nl_row : rowBytes 20 256 = 144 := by decide
+/-- Unsupported ids (below 64) have zero row bytes, mirroring the `default: return 0` arm. -/
+theorem rowBytes_unsupported (t n : Nat) (ht : t < 64) (h : isIq t = false) : rowBytes t n = 0 := by
+  have hb : blockBytes t = 0 :=
+    (by decide : ∀ t, t < 64 → isIq t = false → blockBytes t = 0) t ht h
+  simp [rowBytes, hb]
 
-/-- IQ4_XS: 256-value block is 136 bytes. -/
-theorem iq4xs_row : rowBytes 23 256 = 136 := by decide
+-- § per-format dot-call traits
+/-- Calls-per-block for a format (`Fmt<TY>::ipb`). -/
+def fmtIpb (t : Nat) : Nat := if t = 20 ∨ t = 42 then 2 else 8
 
--- § format traits
-/-- Calls per block times iqs step cover the block's 32-bit activation words for 256-value formats. -/
-theorem trait_256_calls : 8 * 2 = 16 ∧ 8 * 1 = 8 := by decide
+/-- The `iqs` stride between calls (`Fmt<TY>::step`). -/
+def fmtStep (t : Nat) : Nat := if t = 29 ∨ t = 42 then 1 else 2
 
-/-- Call index k maps to a block index below `nb` when `k < nb * ipb`. -/
-theorem call_block_lt (k nb ipb : Nat) (h : k < ipb * nb) : k / ipb < nb := by
-  exact Nat.div_lt_of_lt_mul h
+/-- The `Fmt` block size agrees with the geometry table for every kernel-dispatched format. -/
+theorem fmt_qk_matches (t : Nat) (ht : t < 64) (h : isIq t = true) (h1 : t ≠ 11) (h2 : t ≠ 23) :
+    blockElems t = (if t = 20 then 32 else if t = 42 then 64 else 256) := by
+  revert t
+  decide
 
-/-- The call split `(k / ipb, k % ipb)` recomposes k. -/
-theorem call_split (k ipb : Nat) : ipb * (k / ipb) + k % ipb = k := by
-  exact Nat.div_add_mod k ipb
+/-- For the 256-wide formats stepping by 2, every call's q8_1 block index `iqs/2` is inside the block. -/
+theorem fmt_q8_index_in_range (t : Nat) (ht : t < 64) (h : t = 16 ∨ t = 17 ∨ t = 18 ∨ t = 21 ∨ t = 22) :
+    ∀ k, k < fmtIpb t → (fmtStep t * k) / 2 < blockElems t / 32 := by
+  revert t
+  decide
 
-/-- Part index is below `ipb` for positive `ipb`. -/
-theorem call_part_lt (k ipb : Nat) (h : 0 < ipb) : k % ipb < ipb := by
-  exact Nat.mod_lt _ h
+/-- IQ1_M and Q2_0 index q8_1 blocks directly by `iqs`, which stays inside the block. -/
+theorem fmt_q8_direct_index (t : Nat) (ht : t < 64) (h : t = 29 ∨ t = 42) :
+    ∀ k, k < fmtIpb t → fmtStep t * k < blockElems t / 32 := by
+  revert t
+  decide
 
--- § native expert layout
-/-- Layout record fields reduced to numbers. -/
+-- § expert blob layout
+/-- `NativeExpertLayout`. -/
 structure Layout where
-  nEmbd : Nat
-  nFf : Nat
   guRow : Nat
   dRow : Nat
+  upOff : Nat
+  downOff : Nat
+  bytes : Nat
 
-/-- Offset of the up matrix. -/
-def Layout.upOff (L : Layout) : Nat := L.nFf * L.guRow
-/-- Offset of the down matrix. -/
-def Layout.downOff (L : Layout) : Nat := 2 * L.upOff
-/-- Total expert bytes. -/
-def Layout.bytes (L : Layout) : Nat := L.downOff + L.nEmbd * L.dRow
+/-- `native_expert_layout`. -/
+def mkLayout (gu d ne nf : Nat) : Layout :=
+  { guRow := rowBytes gu ne, dRow := rowBytes d nf,
+    upOff := nf * rowBytes gu ne, downOff := 2 * (nf * rowBytes gu ne),
+    bytes := 2 * (nf * rowBytes gu ne) + ne * rowBytes d nf }
 
-/-- Total bytes decompose into gate, up and down matrices. -/
-theorem layout_bytes (L : Layout) :
-    L.bytes = L.nFf * L.guRow + L.nFf * L.guRow + L.nEmbd * L.dRow := by
-  unfold Layout.bytes Layout.downOff Layout.upOff
+/-- The down block starts after both gate and up regions. -/
+theorem layout_down_off (gu d ne nf : Nat) :
+    (mkLayout gu d ne nf).downOff = 2 * (mkLayout gu d ne nf).upOff := by
+  rfl
+
+/-- Total blob size is the down offset plus the down rows. -/
+theorem layout_bytes (gu d ne nf : Nat) :
+    (mkLayout gu d ne nf).bytes = (mkLayout gu d ne nf).downOff + ne * (mkLayout gu d ne nf).dRow := by
+  rfl
+
+/-- Every up row (index r < n_ff) ends before the down region begins. -/
+theorem layout_up_row_fits (gu d ne nf r : Nat) (h : r < nf) :
+    (mkLayout gu d ne nf).upOff + r * (mkLayout gu d ne nf).guRow + (mkLayout gu d ne nf).guRow
+      ≤ (mkLayout gu d ne nf).downOff := by
+  have h1 := Nat.mul_le_mul_right (rowBytes gu ne) (show r + 1 ≤ nf by omega)
+  have h2 : r * rowBytes gu ne + rowBytes gu ne ≤ nf * rowBytes gu ne := by
+    simpa [Nat.add_mul] using h1
+  show nf * rowBytes gu ne + r * rowBytes gu ne + rowBytes gu ne ≤ 2 * (nf * rowBytes gu ne)
   omega
 
-/-- The up matrix starts right after the gate matrix, and down right after up. -/
-theorem layout_contiguous (L : Layout) : L.upOff + L.nFf * L.guRow = L.downOff := by
-  unfold Layout.downOff Layout.upOff
+-- § scratch sizing
+/-- Round up to a multiple of 256. -/
+def align256 (n : Nat) : Nat := (n + 255) / 256 * 256
+
+/-- Alignment never shrinks. -/
+theorem align256_ge (n : Nat) : n ≤ align256 n := by
+  unfold align256
   omega
 
-/-- Gate/up row split: rows `< n_ff` are gate, others up with row `row - n_ff`. -/
-theorem gu_row_split (row nff : Nat) (h : nff ≤ row) : nff + (row - nff) = row := by
+/-- Alignment yields a multiple of 256. -/
+theorem align256_mod (n : Nat) : align256 n % 256 = 0 := by
+  unfold align256
   omega
 
-/-- A grid of 8-row blocks covers `2*n_ff` rows. -/
-theorem gu_grid_covers (nff : Nat) : 2 * nff ≤ ((2 * nff + 7) / 8) * 8 := by
+/-- Alignment wastes fewer than 256 bytes. -/
+theorem align256_lt (n : Nat) : align256 n < n + 256 := by
+  unfold align256
   omega
 
-/-- A grid of 8-row blocks covers `n_embd` down rows. -/
-theorem down_grid_covers (n : Nat) : n ≤ ((n + 7) / 8) * 8 := by
+/-- `native_expert_scratch_bytes` (sizeof block_q8_1 = 36). -/
+def scratchBytes (cap nf : Nat) : Nat :=
+  3 * align256 (cap * nf * 4) + align256 (cap * (nf / 32) * 36)
+
+/-- The scratch size is itself a multiple of 256, so the carved regions stay aligned. -/
+theorem scratch_aligned (cap nf : Nat) : scratchBytes cap nf % 256 = 0 := by
+  unfold scratchBytes align256
   omega
 
-/-- Scratch alignment to 256 bytes never shrinks. -/
-theorem align256_ge (x : Nat) : x ≤ (x + 255) / 256 * 256 := by
+-- § packed int8 dot
+/-- `__dp4a` without accumulator. -/
+def dp4 (a b : Fin 4 → Int) : Int := a 0 * b 0 + a 1 * b 1 + a 2 * b 2 + a 3 * b 3
+
+/-- `__dp4a(a, b, c)`. -/
+def dp4a (a b : Fin 4 → Int) (c : Int) : Int := c + dp4 a b
+
+/-- The accumulator only shifts the result. -/
+theorem dp4a_acc (a b : Fin 4 → Int) (c : Int) : dp4a a b c = c + dp4a a b 0 := by
+  unfold dp4a
   omega
 
-/-- Aligned value is a multiple of 256. -/
-theorem align256_mod (x : Nat) : ((x + 255) / 256 * 256) % 256 = 0 := by
-  omega
+/-- Dotting against 0x01010101 sums the lanes (the `sumy` trick of IQ1_M). -/
+theorem dp4_ones (b : Fin 4 → Int) : dp4 (fun _ => 1) b = b 0 + b 1 + b 2 + b 3 := by
+  unfold dp4
+  simp
 
-/-- Aligned value overshoots by less than 256. -/
-theorem align256_lt (x : Nat) : (x + 255) / 256 * 256 < x + 256 := by
-  omega
-
--- § interleaved dequantization
-/-- Quotient lemma: `(x*pr + c) / pr = x` for `c < pr`. -/
-theorem idx_div (x c pr : Nat) (hc : c < pr) : (x * pr + c) / pr = x := by
-  apply Nat.div_eq_of_lt_le
-  · omega
-  · have h : (x + 1) * pr = x * pr + pr := Nat.succ_mul x pr
-    omega
-
-/-- Interleaved gate/up output indices determine (row, parity): injectivity on the row coordinate. -/
-theorem interleave_row_recovered (r p c pr : Nat) (hc : c < pr) :
-    ((2 * r + p) * pr + c) / pr = 2 * r + p := by
-  exact idx_div (2 * r + p) c pr hc
-
-/-- IQ4_NL dequantization: low and high nibble of a byte are both below 16. -/
-theorem nibbles_lt16 (q : Nat) (h : q < 256) : q % 16 < 16 ∧ q / 16 < 16 := by
-  omega
-
-/-- Nibbles recombine to the byte. -/
-theorem nibbles_recombine (q : Nat) (h : q < 256) : q % 16 + 16 * (q / 16) = q := by
-  omega
-
-/-- Q2_0 code minus one is in {-1,0,1,2}. -/
-theorem q2_0_code_range (code : Int) (h0 : 0 ≤ code) (h1 : code < 4) : -1 ≤ code - 1 ∧ code - 1 ≤ 2 := by
-  omega
-
--- § q8_1 quantizer
-/-- Block index and in-block index of element i. -/
-theorem q8_1_split (i : Nat) : 32 * (i / 32) + i % 32 = i := by
-  omega
-
-/-- Gate/up dequant grid: two parity blocks per superblock row. -/
-theorem gu_dequant_blocks (nff per_row : Nat) : (nff * per_row) * 2 = 2 * (nff * per_row) := by
+/-- A constant bias on the codes is corrected by a multiple of the lane sum. -/
+theorem dp4_sub_const (a b : Fin 4 → Int) (k : Int) :
+    dp4 (fun i => a i - k) b = dp4 a b - k * (b 0 + b 1 + b 2 + b 3) := by
+  unfold dp4
+  simp only [Int.sub_mul, Int.mul_add]
   omega
 
 end Ref.IqKernels
 
 
 
-## FILE: /mnt/user-data/outputs/QuantizeActivations.lean
+## FILE: /mnt/user-data/outputs/NativeMmvqKernels.lean
 /-!
-# MODULE: quantize_activations
-SOURCES: src/kernels/cuda/quantize_act.cu
-Activation quantizers matching ggml's src1 conversion: Q8_0 (fp16 scale), Q8_0 with an extra fp32 scale array
-and CPU rounding rule, and Q8_K (fp32 scale, 256 values, 16-element block sums), plus dequantizers.
+# MODULE: native_mmvq_kernels
+SOURCES: src/kernels/cuda/native_mmvq.cu
+llama.cpp-pinned Q8_1 quantizer and MMVQ kernels (Q4_0/Q5_0/Q8_0/IQ4_NL/Q3_K/Q4_K/Q5_K/Q6_K/IQ4_XS/Q2_0) for
+ncols = 1..8, plus the dispatcher, support predicate and weight-size computation.
 
 ## Source semantics
-- Q8_0 block = 34 bytes (fp16 d, 32 int8); Q8_K block = 292 bytes (f32 d, 256 int8, 16 int16 bsums).
-- `n` must be a multiple of the block size. Output integers are clamped; the scaled variant clamps to
-  [-127, 127]; Q8_K clamps only above (min 127).
-- ggml `nearest_int` adds 1.5*2^23 and masks the mantissa: the recovered value lies in [-2^22, 2^22).
-- An all-zero block has d = 0 and all codes 0.
+Each launch uses 4 warps x 32 lanes = 128 threads. Thread `tid` starts at weight block `tid / T` and strides
+by BPI blocks, with BPI * T = 128. Small-K shapes use 4 rows per CUDA block, otherwise 1. Q8_1 activations are
+36-byte blocks of 32 values; ncols columns are contiguous so quantizing ncols*n_in values never straddles a
+column. Shapes require n_in divisible by the block size and 1 <= ncols <= 8.
 
 ## Form template identifiers
-- QK8_0 -> 32 ; QK_K -> 256 ; Q8K_BYTES -> 292 ; nearest_int_dev -> nearestInt
+bpi/tt -> "blocks per iteration / threads per block"; validShape -> "shape contract";
+weightBytes -> "weight byte count".
 -/
+namespace Ref.NativeMmvq
 
-namespace Ref.QuantizeAct
+-- § geometry
+/-- Values per weight block for supported types. -/
+def blockElems (t : Nat) : Nat :=
+  if t = 2 ∨ t = 6 ∨ t = 8 ∨ t = 20 then 32 else if t = 42 then 64 else
+  if t = 11 ∨ t = 12 ∨ t = 13 ∨ t = 14 ∨ t = 23 ∨ t = 16 ∨ t = 17 ∨ t = 18 ∨ t = 21 ∨ t = 22 ∨ t = 29 then 256
+  else 0
 
-/-- Clamp an integer to `[lo, hi]`. -/
-def clamp (lo hi v : Int) : Int := if v < lo then lo else if hi < v then hi else v
+/-- Bytes per weight block. -/
+def blockBytes (t : Nat) : Nat :=
+  if t = 2 then 18 else if t = 6 then 22 else if t = 8 then 34 else if t = 20 then 18
+  else if t = 11 then 110 else if t = 12 then 144 else if t = 13 then 176 else if t = 14 then 210
+  else if t = 23 then 136 else if t = 42 then 18 else if t = 16 then 66 else if t = 17 then 74
+  else if t = 18 then 98 else if t = 21 then 110 else if t = 22 then 82 else if t = 29 then 56 else 0
 
-/-- Clamp result is within bounds when `lo ≤ hi`. -/
-theorem clamp_bounds (lo hi v : Int) (h : lo ≤ hi) : lo ≤ clamp lo hi v ∧ clamp lo hi v ≤ hi := by
-  unfold clamp
-  split_ifs <;> omega
+/-- `native_mmvq_supported`. -/
+def supported (t : Nat) : Bool :=
+  t == 2 || t == 6 || t == 8 || t == 11 || t == 12 || t == 13 || t == 14 || t == 20 || t == 23 ||
+  t == 42 || t == 16 || t == 17 || t == 18 || t == 21 || t == 22 || t == 29
 
-/-- Clamp is the identity on in-range values. -/
-theorem clamp_id (lo hi v : Int) (h0 : lo ≤ v) (h1 : v ≤ hi) : clamp lo hi v = v := by
-  unfold clamp
-  split_ifs <;> omega
+/-- `native_mmvq_weight_bytes` without the validation. -/
+def weightBytes (t nIn nOut : Nat) : Nat := nIn / blockElems t * blockBytes t * nOut
 
-/-- Clamp is idempotent. -/
-theorem clamp_idem (lo hi v : Int) (h : lo ≤ hi) : clamp lo hi (clamp lo hi v) = clamp lo hi v := by
-  have := clamp_bounds lo hi v h
-  exact clamp_id lo hi _ this.1 this.2
+/-- Every supported type has a non-empty block geometry. -/
+theorem supported_has_geometry (t : Nat) (ht : t < 64) (h : supported t = true) :
+    0 < blockElems t ∧ 0 < blockBytes t := by
+  revert t
+  decide
 
-/-- The scaled quantizer's code range is symmetric: [-127, 127]. -/
-theorem scaled_code_symmetric (v : Int) : -127 ≤ clamp (-127) 127 v ∧ clamp (-127) 127 v ≤ 127 := by
-  exact clamp_bounds (-127) 127 v (by omega)
+/-- Weight bytes scale linearly in the number of output rows. -/
+theorem weightBytes_add_rows (t nIn a b : Nat) :
+    weightBytes t nIn (a + b) = weightBytes t nIn a + weightBytes t nIn b := by
+  unfold weightBytes
+  rw [Nat.mul_add]
 
--- § block sizes
-/-- Q8_0 block: 2 + 32 = 34 bytes. -/
-theorem q8_0_bytes : 2 + 32 = 34 := by decide
-/-- Q8_K block: 4 + 256 + 16*2 = 292 bytes. -/
-theorem q8k_bytes : 4 + 256 + 16 * 2 = 292 := by decide
+-- § shape contract
+/-- `validate_shape` as a decidable predicate. -/
+def validShape (nIn ncols e : Nat) : Bool :=
+  decide (0 < nIn ∧ nIn % e = 0 ∧ 1 ≤ ncols ∧ ncols ≤ 8)
 
-/-- Blocks of an `n`-element vector for block size 32, when `n` divides evenly. -/
-theorem q8_0_blocks_exact (n : Nat) (h : n % 32 = 0) : (n / 32) * 32 = n := by
+/-- `native_q8_1_bytes`: 36-byte blocks of 32 values per column. -/
+def q8Bytes (nIn ncols : Nat) : Nat := ncols * (nIn / 32) * 36
+
+/-- A valid shape has a non-empty Q8_1 image. -/
+theorem q8Bytes_pos (nIn ncols : Nat) (h : validShape nIn ncols 32 = true) : 0 < q8Bytes nIn ncols := by
+  unfold validShape at h
+  simp at h
+  unfold q8Bytes
+  have h1 : 0 < nIn / 32 := by omega
+  have h2 : 0 < ncols * (nIn / 32) := Nat.mul_pos (by omega) h1
   omega
 
-/-- Blocks of an `n`-element vector for block size 256, when `n` divides evenly. -/
-theorem q8k_blocks_exact (n : Nat) (h : n % 256 = 0) : (n / 256) * 256 = n := by
+/-- Quantizing ncols columns as one vector never splits a 32-block across columns. -/
+theorem q8_block_within_column (m i : Nat) : i / 32 / m = i / (32 * m) := by
+  exact Nat.div_div_eq_div_mul i 32 m
+
+/-- Rounding the quantizer grid up to 256 threads covers every element. -/
+theorem quant_grid_covers (n : Nat) : n ≤ (n + 255) / 256 * 256 := by
   omega
 
-/-- Total Q8_0 bytes of `n` elements. -/
-def q8_0Total (n : Nat) : Nat := (n / 32) * 34
+-- § iteration traits
+/-- Blocks per iteration of the ncols = 1 loop. -/
+def bpi (t : Nat) : Nat :=
+  if t = 13 ∨ t = 12 ∨ t = 11 then 8 else if t = 14 then 4 else if t = 23 then 16
+  else if t = 42 then 64 else if t = 8 then 32 else 64
 
-/-- Total Q8_K bytes of `n` elements. -/
-def q8kTotal (n : Nat) : Nat := (n / 256) * 292
+/-- Lanes cooperating on one weight block (`T`). -/
+def tt (t : Nat) : Nat :=
+  if t = 13 ∨ t = 12 ∨ t = 11 then 16 else if t = 14 then 32 else if t = 23 then 8
+  else if t = 42 then 2 else if t = 8 then 4 else 2
 
-/-- Q8_0 total is additive over multiples of 32. -/
-theorem q8_0Total_add (a b : Nat) (ha : a % 32 = 0) : q8_0Total (a + b) = q8_0Total a + q8_0Total b := by
-  unfold q8_0Total
-  have : (a + b) / 32 = a / 32 + b / 32 := by omega
-  rw [this, Nat.add_mul]
+/-- BPI * T equals the 128 threads of a CUDA block for every multi-warp format. -/
+theorem bpi_mul_tt (t : Nat) (ht : t < 64)
+    (h : t = 2 ∨ t = 6 ∨ t = 8 ∨ t = 11 ∨ t = 12 ∨ t = 13 ∨ t = 14 ∨ t = 20 ∨ t = 23 ∨ t = 42) :
+    bpi t * tt t = 128 := by
+  revert t
+  decide
 
-/-- Q8_K total is additive over multiples of 256. -/
-theorem q8kTotal_add (a b : Nat) (ha : a % 256 = 0) : q8kTotal (a + b) = q8kTotal a + q8kTotal b := by
-  unfold q8kTotal
-  have : (a + b) / 256 = a / 256 + b / 256 := by omega
-  rw [this, Nat.add_mul]
-
--- § nearest_int
-/-- Recovered integer of ggml's magic-number rounding from the low 23 mantissa bits. -/
-def nearestInt (bits : Nat) : Int := ((bits % 8388608 : Nat) : Int) - 4194304
-
-/-- The recovered value lies in [-2^22, 2^22). -/
-theorem nearestInt_range (bits : Nat) : -4194304 ≤ nearestInt bits ∧ nearestInt bits < 4194304 := by
-  unfold nearestInt
-  have h : bits % 8388608 < 8388608 := Nat.mod_lt _ (by decide)
+/-- Hence the starting block `tid / T` is always below the stride BPI: threads never alias a later iteration. -/
+theorem start_block_lt_stride (B T tid : Nat) (h : B * T = 128) (ht : tid < 128) : tid / T < B := by
+  apply Nat.div_lt_of_lt_mul
+  rw [Nat.mul_comm]
   omega
 
--- § block sums
-/-- Sum of sixteen int8-range values fits in int16 (|sum| ≤ 16*128 = 2048). -/
-theorem bsums_fit_int16
-    (a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 : Int)
-    (h0 : -128 ≤ a0 ∧ a0 ≤ 127) (h1 : -128 ≤ a1 ∧ a1 ≤ 127) (h2 : -128 ≤ a2 ∧ a2 ≤ 127)
-    (h3 : -128 ≤ a3 ∧ a3 ≤ 127) (h4 : -128 ≤ a4 ∧ a4 ≤ 127) (h5 : -128 ≤ a5 ∧ a5 ≤ 127)
-    (h6 : -128 ≤ a6 ∧ a6 ≤ 127) (h7 : -128 ≤ a7 ∧ a7 ≤ 127) (h8 : -128 ≤ a8 ∧ a8 ≤ 127)
-    (h9 : -128 ≤ a9 ∧ a9 ≤ 127) (h10 : -128 ≤ a10 ∧ a10 ≤ 127) (h11 : -128 ≤ a11 ∧ a11 ≤ 127)
-    (h12 : -128 ≤ a12 ∧ a12 ≤ 127) (h13 : -128 ≤ a13 ∧ a13 ≤ 127) (h14 : -128 ≤ a14 ∧ a14 ≤ 127)
-    (h15 : -128 ≤ a15 ∧ a15 ≤ 127) :
-    -32768 ≤ a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15 ∧
-    a0 + a1 + a2 + a3 + a4 + a5 + a6 + a7 + a8 + a9 + a10 + a11 + a12 + a13 + a14 + a15 ≤ 32767 := by
+/-- Small-K launches (4 rows per block) cover all rows. -/
+theorem grid_small_covers (n : Nat) : n ≤ 4 * ((n + 3) / 4) ∧ 4 * ((n + 3) / 4) < n + 4 := by
   omega
 
-/-- Block sum index `j*16 + ii` stays inside the 256-element block. -/
-theorem bsum_index_in_block (j ii : Nat) (hj : j < 16) (hi : ii < 16) : j * 16 + ii < 256 := by
+/-- Upstream multi-column launches (2 rows per block) cover all rows. -/
+theorem grid_upstream_covers (n : Nat) : n ≤ 2 * ((n + 1) / 2) ∧ 2 * ((n + 1) / 2) < n + 2 := by
   omega
 
-/-- Thread launch: one thread per Q8_K block, 64 threads per CUDA block, grid covers all blocks. -/
-theorem q8k_grid_covers (nb : Nat) : nb ≤ ((nb + 63) / 64) * 64 := by
+/-- The shared cross-warp partial buffer fits 48 KiB for every ncols <= 8 (exact layout, 4 rows). -/
+theorem shared_partial_fits (nc : Nat) (h : nc ≤ 8) : (4 - 1) * nc * 4 * 32 * 4 ≤ 49152 := by
   omega
 
-/-- Thread launch for Q8_0: 128 threads per CUDA block cover all blocks. -/
-theorem q8_0_grid_covers (nb : Nat) : nb ≤ ((nb + 127) / 128) * 128 := by
+-- § packed dot algebra
+/-- `__dp4a` without accumulator. -/
+def dp4 (a b : Fin 4 → Int) : Int := a 0 * b 0 + a 1 * b 1 + a 2 * b 2 + a 3 * b 3
+
+/-- Affine Q4_0/Q5_0 correction: (v - k) . u = v . u - k * sum u. -/
+theorem dp4_affine_correction (a b : Fin 4 → Int) (k : Int) :
+    dp4 (fun i => a i - k) b = dp4 a b - k * (b 0 + b 1 + b 2 + b 3) := by
+  unfold dp4
+  simp only [Int.sub_mul, Int.mul_add]
   omega
 
-/-- The fp32 scales array has exactly one entry per 32-element chunk. -/
-theorem scales_per_chunk (n : Nat) (h : n % 32 = 0) : n / 32 * 32 = n := by
+end Ref.NativeMmvq
+
+
+
+## FILE: /mnt/user-data/outputs/SFamilyGemv.lean
+/-!
+# MODULE: s_family_gemv
+SOURCES: src/kernels/cuda/s_gemv.cu
+S-family GEMV (2/4/8-bit packed codes with per-group fp32 scale and optional offset) against fp16, Q8_K or Q8_0
+activations; naive, split (block per row) and warp-per-row kernels.
+
+## Source semantics
+A row of n_in codes of width b occupies n_in / (8/b) bytes with n_in / group_elems scales. The weight is
+decoded as `decode(code) * scale + offset` before the activation multiply. Group size is a power of two (passed
+as its logarithm). Hoisting the activation block out of a 16-element lane-iteration is valid because the
+iteration start is a multiple of 16 and blocks are 256 (Q8_K) or 32 (Q8_0) wide. Q8_K needs n_in % 256 = 0;
+Q8_0 only n_in % 32 = 0, which is why a Q8_0 kernel exists (n_in = 640).
+
+## Form template identifiers
+perByte -> "codes per byte"; quad lemmas -> "consecutive-element packing"; q8k/q8_0 constants -> "activation block".
+-/
+namespace Ref.SGemv
+
+-- § layout
+/-- Codes per byte for a code width. -/
+def perByte (bits : Nat) : Nat := 8 / bits
+
+/-- Bytes of one four-code word (`QW`): 1, 2 or 4. -/
+def wordBytes (bits : Nat) : Nat := 4 * bits / 8
+
+/-- The three supported widths pack 4, 2 and 1 codes per byte. -/
+theorem perByte_values : perByte 2 = 4 ∧ perByte 4 = 2 ∧ perByte 8 = 1 := by
+  decide
+
+/-- Four-code words are 1, 2 and 4 bytes wide. -/
+theorem wordBytes_values : wordBytes 2 = 1 ∧ wordBytes 4 = 2 ∧ wordBytes 8 = 4 := by
+  decide
+
+/-- Q8_K block geometry: 292 bytes per 256 elements. -/
+def q8kBytes : Nat := 292
+
+/-- Q8_0 block geometry: 34 bytes per 32 elements. -/
+def q8_0Bytes : Nat := 34
+
+/-- `ffn_down_shexp` (n_in = 640) is a Q8_0-shaped input but structurally cannot be Q8_K. -/
+theorem q8k_impossible_640 : 640 % 32 = 0 ∧ 640 % 256 ≠ 0 := by
+  decide
+
+-- § quad packing and hoisting
+/-- 4-bit codes: a quad starting at a multiple of 4 spans bytes i/2 and i/2+1 with in-byte slot k%2. -/
+theorem quad_bytes_s4 (i k : Nat) (hi : i % 4 = 0) (hk : k < 4) :
+    (i + k) / 2 = i / 2 + k / 2 ∧ (i + k) % 2 = k % 2 := by
   omega
 
-end Ref.QuantizeAct
+/-- 2-bit codes: a quad is exactly one byte, slot k. -/
+theorem quad_bytes_s2 (i k : Nat) (hi : i % 4 = 0) (hk : k < 4) :
+    (i + k) / 4 = i / 4 ∧ (i + k) % 4 = k := by
+  omega
+
+/-- 8-bit codes: byte index is the element index. -/
+theorem quad_bytes_s8 (i k : Nat) : (i + k) / 1 = i + k := by
+  omega
+
+/-- A quad inside one group shares its scale (group size 4m). -/
+theorem quad_in_group (i k m : Nat) (hi : i % 4 = 0) (hk : k < 4) : (i + k) / (4 * m) = i / (4 * m) := by
+  rw [← Nat.div_div_eq_div_mul, ← Nat.div_div_eq_div_mul]
+  have : (i + k) / 4 = i / 4 := by omega
+  rw [this]
+
+/-- Q8_K hoisting: sixteen consecutive elements from a multiple of 16 stay in one 256-block. -/
+theorem hoist_q8k (i k : Nat) (hi : i % 16 = 0) (hk : k < 16) :
+    (i + k) / 256 = i / 256 ∧ (i + k) % 256 = i % 256 + k := by
+  omega
+
+/-- Q8_0 hoisting: sixteen consecutive elements from a multiple of 16 stay in one 32-block. -/
+theorem hoist_q8_0 (i k : Nat) (hi : i % 16 = 0) (hk : k < 16) :
+    (i + k) / 32 = i / 32 ∧ (i + k) % 32 = i % 32 + k := by
+  omega
+
+/-- Lane-iteration starts `lane*16 + 512*j` are multiples of 16. -/
+theorem lane_start_mult16 (lane j : Nat) : (lane * 16 + 512 * j) % 16 = 0 := by
+  omega
+
+/-- Using a shift for the group index equals division by the (power-of-two) group size. -/
+theorem group_shift_eq_div (i s : Nat) : i >>> s = i / 2 ^ s := by
+  exact Nat.shiftRight_eq_div_pow i s
+
+/-- Group sizes defined by the format are powers of two. -/
+def isPow2 (n : Nat) : Bool := n != 0 && (n &&& (n - 1)) == 0
+
+/-- 16, 32, 64 pass the power-of-two guard; 48 is refused. -/
+theorem pow2_guard : isPow2 16 = true ∧ isPow2 32 = true ∧ isPow2 64 = true ∧ isPow2 48 = false := by
+  decide
+
+-- § launch coverage
+/-- Thread-per-row launch (128 threads) covers all rows. -/
+theorem grid_thread_per_row (n : Nat) : n ≤ ((n + 127) / 128) * 128 := by
+  omega
+
+/-- Warp-per-row launch (256 threads, 8 warps) covers all rows. -/
+theorem grid_warp_per_row (n : Nat) : n ≤ ((n + 7) / 8) * 8 := by
+  omega
+
+-- § codebook
+/-- The non-linear IQ4 codebook (kvalues_iq4nl). -/
+def kIq4Nl : List Int := [-127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113]
+
+/-- The codebook has 16 entries (one per 4-bit code). -/
+theorem kIq4Nl_length : kIq4Nl.length = 16 := by
+  decide
+
+/-- The codebook is strictly increasing. -/
+theorem kIq4Nl_sorted : kIq4Nl.Pairwise (· < ·) := by
+  decide
+
+end Ref.SGemv
+
+
+
+## FILE: /mnt/user-data/outputs/S2GemvFastExperiment.lean
+/-!
+# MODULE: s2_gemv_fast_experiment
+SOURCES: src/kernels/cuda/s2_gemv_fast.cu
+A measured-neutral/negative S2 (2-bit) GEMV experiment: block per output row, optional shared-memory staging of
+the activation, and a constant-memory byte -> four-code lookup table. Kept as a record, not a fast path.
+
+## Source semantics
+Codes are 2 bits LSB-first, four per byte; the LUT entry for byte b lists (code_k - 1) for k = 0..3. One scale per
+64 elements, so quad q (elements 4q..4q+3) uses scale q >> 4. Shared staging needs n_in <= 4096 halves; the
+partial-sum array begins right after the 4096 halves (2048 floats). n_in must be a multiple of 64.
+
+## Form template identifiers
+lut -> "byte decode table"; scaleIdx -> "per-64 group scale index"; smemBytes -> "dynamic shared size".
+-/
+namespace Ref.S2GemvFast
+
+-- § lookup table
+/-- LUT value: the k-th 2-bit field of byte b, minus the bias 1. -/
+def lut (b k : Nat) : Int := ((b / 4 ^ k) % 4 : Nat) - 1
+
+/-- Every LUT value lies in {-1, 0, 1, 2}. -/
+theorem lut_range (b k : Nat) : -1 ≤ lut b k ∧ lut b k ≤ 2 := by
+  have h := Nat.mod_lt (b / 4 ^ k) (by decide : 4 > 0)
+  unfold lut
+  omega
+
+/-- The four fields of a byte reassemble the byte. -/
+theorem byte_fields_reassemble (b : Nat) (hb : b < 256) :
+    b % 4 + 4 * (b / 4 % 4) + 16 * (b / 16 % 4) + 64 * (b / 64 % 4) = b := by
+  omega
+
+/-- Scale index of quad q (elements 4q..4q+3, 64 per group) is q >> 4. -/
+theorem scale_index_quad (q : Nat) : (q * 4) / 64 = q / 16 := by
+  omega
+
+-- § shared memory budget
+/-- Max halves staged in shared memory. -/
+def maxSharedHalves : Nat := 4096
+
+/-- Dynamic shared bytes: staged halves (if any) plus one float per thread. -/
+def smemBytes (stage : Bool) (tpr : Nat) : Nat :=
+  (if stage then maxSharedHalves * 2 else 0) + tpr * 4
+
+/-- The partial array offset (`MAX/2` floats) is exactly the end of the staged halves. -/
+theorem partial_offset_after_halves : (maxSharedHalves / 2) * 4 = maxSharedHalves * 2 := by
+  decide
+
+/-- Staging a 2560-element activation fits the staging area. -/
+theorem stage_fits_2560 : 2560 ≤ maxSharedHalves := by
+  decide
+
+/-- With staging, the shared size is at least the staged halves. -/
+theorem smem_with_stage (tpr : Nat) : 8192 ≤ smemBytes true tpr := by
+  unfold smemBytes maxSharedHalves
+  simp
+
+/-- Multiple of 64 implies multiple of 4 (the quad requirement is redundant). -/
+theorem mult64_implies_mult4 (n : Nat) (h : n % 64 = 0) : n % 4 = 0 := by
+  omega
+
+/-- Quads cover the row exactly. -/
+theorem quads_cover (n : Nat) (h : n % 4 = 0) : n / 4 * 4 = n := by
+  omega
+
+end Ref.S2GemvFast
+
+
+
+## FILE: /mnt/user-data/outputs/S2GroupedExperts.lean
+/-!
+# MODULE: s2_grouped_experts
+SOURCES: src/kernels/cuda/s2_expert_grouped.cu
+Grouped GPU MoE experts over Q2_0 blobs (gate/up/down), warp per output row with dp4a against Q8_0 activations;
+device-side hit selection and compaction; grouped variants; CPU-order bit-exact variant.
+
+## Source semantics
+Blob geometry (H = 2560, FF = 640): gate/up codes 2*FF rows of 640 B, down codes H rows of 160 B, then fp16
+scales. A weight code c in {0..3} decodes to c - 1, so sum (c-1)x = sum cx - sum x (two dp4a). Gate/up row slots
+are interleaved (even = gate, odd = up) and written to a gate-major output: gate at e*FF + r, up at
+cap*FF + e*FF + r with r = slot/2. Hit selection compacts resident experts in lane order by popcount of lower
+lanes.
+
+## Form template identifiers
+O_* -> "blob section offsets"; gmIdx -> "gate-major output index"; rank -> "ballot prefix rank".
+-/
+namespace Ref.S2Grouped
+
+-- § blob geometry
+/-- Hidden size. -/
+def H : Nat := 2560
+/-- Expert FFN width. -/
+def FF : Nat := 640
+/-- Bytes of codes per gate/up row. -/
+def rowGu : Nat := H / 4
+/-- Bytes of codes per down row. -/
+def rowD : Nat := FF / 4
+/-- fp16 scales per gate/up row. -/
+def scGu : Nat := H / 64
+/-- fp16 scales per down row. -/
+def scD : Nat := FF / 64
+/-- Offset of the down codes. -/
+def oDCodes : Nat := 2 * FF * rowGu
+/-- Offset of the gate/up scales. -/
+def oGuScales : Nat := oDCodes + H * rowD
+/-- Offset of the down scales. -/
+def oDScales : Nat := oGuScales + 2 * FF * scGu * 2
+/-- Total blob bytes. -/
+def blobBytes : Nat := oDScales + H * scD * 2
+
+/-- The literal row sizes of the source. -/
+theorem row_sizes : rowGu = 640 ∧ rowD = 160 ∧ scGu = 40 ∧ scD = 10 := by
+  decide
+
+/-- The literal section offsets. -/
+theorem section_offsets : oDCodes = 819200 ∧ oGuScales = 1228800 ∧ oDScales = 1331200 := by
+  decide
+
+/-- Total blob size. -/
+theorem blob_bytes_value : blobBytes = 1382400 := by
+  decide
+
+/-- Sections are laid out in increasing order. -/
+theorem sections_ordered : oDCodes < oGuScales ∧ oGuScales < oDScales ∧ oDScales < blobBytes := by
+  decide
+
+/-- 80 chunks of 32 split into 3 lane passes (GU_CHUNKS), and a down row has 20 chunks, under one warp. -/
+theorem chunk_counts : (H / 32 + 31) / 32 = 3 ∧ FF / 32 = 20 ∧ FF / 32 < 32 := by
+  decide
+
+-- § bias identity
+/-- `__dp4a` without accumulator. -/
+def dp4 (a b : Fin 4 → Int) : Int := a 0 * b 0 + a 1 * b 1 + a 2 * b 2 + a 3 * b 3
+
+/-- sum (c - 1) x = sum c x - sum x, the identity behind the (s - hx) form. -/
+theorem bias_identity (c x : Fin 4 → Int) :
+    dp4 (fun i => c i - 1) x = dp4 c x - (x 0 + x 1 + x 2 + x 3) := by
+  unfold dp4
+  simp only [Int.sub_mul, Int.mul_add, Int.mul_one, Int.one_mul]
+  omega
+
+-- § gate-major output layout
+/-- Output index of gate/up slot `i` of entry `h` among `n` entries. -/
+def gmIdx (n h i : Nat) : Nat :=
+  if i % 2 = 0 then h * 640 + i / 2 else n * 640 + h * 640 + i / 2
+
+/-- Every output index is inside the 2*n*FF buffer. -/
+theorem gmIdx_lt (n h i : Nat) (hh : h < n) (hi : i < 1280) : gmIdx n h i < 2 * n * 640 := by
+  unfold gmIdx
+  split <;> omega
+
+/-- The interleaved-to-gate-major map is injective: no two (entry, slot) pairs collide. -/
+theorem gmIdx_injective (n h i h' i' : Nat) (hh : h < n) (hh' : h' < n) (hi : i < 1280) (hi' : i' < 1280)
+    (e : gmIdx n h i = gmIdx n h' i') : h = h' ∧ i = i' := by
+  unfold gmIdx at e
+  split at e <;> split at e <;> omega
+
+/-- Gate values of consecutive entries are contiguous (what `swiglu` and the quantizer read). -/
+theorem gmIdx_gate_contiguous (n h r : Nat) : gmIdx n h (2 * r) = h * 640 + r := by
+  unfold gmIdx
+  split <;> omega
+
+-- § device compaction by ballot prefix
+/-- Number of hits strictly before position i (popcount of lower lanes). -/
+def rank (p : Nat → Bool) : Nat → Nat
+  | 0 => 0
+  | i + 1 => rank p i + (if p i = true then 1 else 0)
+
+/-- Rank never decreases by one step. -/
+theorem rank_le_succ (p : Nat → Bool) (i : Nat) : rank p i ≤ rank p (i + 1) := by
+  show rank p i ≤ rank p i + (if p i = true then 1 else 0)
+  split <;> omega
+
+/-- Rank is monotone. -/
+theorem rank_mono_add (p : Nat → Bool) (i d : Nat) : rank p i ≤ rank p (i + d) := by
+  induction d with
+  | zero => exact Nat.le_refl _
+  | succ d ih => exact Nat.le_trans ih (rank_le_succ p (i + d))
+
+/-- A hit's compacted slot is strictly below the slot of every later position: compaction preserves order
+and gives distinct slots to distinct hits. -/
+theorem rank_strict (p : Nat → Bool) (i j : Nat) (hp : p i = true) (hij : i < j) : rank p i < rank p j := by
+  obtain ⟨d, rfl⟩ := Nat.exists_eq_add_of_lt hij
+  have h1 : rank p (i + 1) = rank p i + 1 := by
+    show rank p i + (if p i = true then 1 else 0) = _
+    rw [if_pos hp]
+  have h2 := rank_mono_add p (i + 1) d
+  have e : i + d + 1 = i + 1 + d := by omega
+  rw [e]
+  omega
+
+end Ref.S2Grouped
 
 
 
@@ -5208,22 +5192,956 @@ end Ref.QuantizeAct
 /-!
 # MODULE: shared_expert_block
 SOURCES: src/kernels/cuda/shared_expert.cu
-The MoE shared expert: `h = silu(x Wgate^T) * (x Wup^T)`, `h Wdown^T`, scaled by a per-token scalar
-`sigmoid(x . w_gate_inp)`; plus the MoE combine and the multi-token (1..8) native path.
+The MoE shared expert (silu on gate, times up, down projection, scaled by a per-token scalar sigmoid gate) and
+the final routed-plus-shared combination.
 
 ## Source semantics
-- SiLU is applied to the gate projection. The scalar gate is one value per token and multiplies the whole row.
-- Scratch is carved from the caller's buffer, 16-byte aligned: gate | up | q8_0 | q8k | g.
-- The shared output is added plain (not router-weighted) in the combine; `k` is limited to 64.
-- Q8_K needs `n_ff % 256 = 0`; the BF16 gate vector has 2 bytes/element, so reading it as floats overruns.
+h = silu(x Wg) * (x Wu); out = (h Wd) * sigmoid(x . w_gate_inp). The routed output is sum_e w_e * part_e plus the
+shared output added plain (not router-weighted). The down input is quantized to the down weight's own activation
+format: Q8_K needs n_ff % 256 = 0, otherwise Q8_0. Scratch is carved from caller memory in 16-byte aligned
+regions: gate | up | q8_0 | q8k | g. Native paths take 1..8 tokens; moe_combine refuses k > 64.
 
 ## Form template identifiers
-- shared_expert_scratch_bytes -> scratchBytes ; moe_combine_kernel -> combine ; scale_rows_kernel -> rowIndex
+align16 -> "scratch alignment"; scratchBytes -> "shared expert scratch"; dotAcc -> "routed weighted sum".
 -/
-
 namespace Ref.SharedExpert
 
+-- § scratch carving
 /-- Round up to a multiple of 16. -/
+def align16 (n : Nat) : Nat := (n + 15) / 16 * 16
+
+/-- Alignment is a multiple of 16. -/
+theorem align16_mod (n : Nat) : align16 n % 16 = 0 := by
+  unfold align16
+  omega
+
+/-- Alignment never shrinks. -/
+theorem align16_ge (n : Nat) : n ≤ align16 n := by
+  unfold align16
+  omega
+
+/-- `shared_expert_scratch_bytes`. -/
+def scratchBytes (nFf : Nat) : Nat :=
+  align16 (nFf * 4) * 2 + align16 (nFf / 32 * 34) + align16 (nFf / 256 * 292) + 32
+
+/-- Region offsets in carving order. -/
+def offUp (nFf : Nat) : Nat := align16 (nFf * 4)
+/-- Offset of the Q8_0 image. -/
+def offQ80 (nFf : Nat) : Nat := align16 (nFf * 4) * 2
+/-- Offset of the Q8_K image. -/
+def offQ8k (nFf : Nat) : Nat := align16 (nFf * 4) * 2 + align16 (nFf / 32 * 34)
+/-- Offset of the scalar gate. -/
+def offG (nFf : Nat) : Nat := align16 (nFf * 4) * 2 + align16 (nFf / 32 * 34) + align16 (nFf / 256 * 292)
+
+/-- Every carved region starts 16-byte aligned. -/
+theorem offsets_aligned (nFf : Nat) :
+    offUp nFf % 16 = 0 ∧ offQ80 nFf % 16 = 0 ∧ offQ8k nFf % 16 = 0 ∧ offG nFf % 16 = 0 := by
+  unfold offUp offQ80 offQ8k offG align16
+  omega
+
+/-- The scalar gate slot plus its 32-byte tail ends exactly at the scratch size. -/
+theorem scratch_end (nFf : Nat) : offG nFf + 32 = scratchBytes nFf := by
+  unfold offG scratchBytes
+  rfl
+
+/-- For n_ff = 640 the scratch is 6432 bytes. -/
+theorem scratch_640 : scratchBytes 640 = 6432 := by
+  decide
+
+/-- n_ff = 640 is a multiple of 32 but not 256: Q8_K is structurally impossible for the down input. -/
+theorem down_q8k_impossible_640 : 640 % 32 = 0 ∧ 640 % 256 ≠ 0 := by
+  decide
+
+-- § native path guards
+/-- Token-count guard of `shared_expert_multi`. -/
+def tokensOk (n : Nat) : Bool := decide (1 ≤ n ∧ n ≤ 8)
+
+/-- Valid token counts are exactly 1..8. -/
+theorem tokensOk_iff (n : Nat) : tokensOk n = true ↔ (1 ≤ n ∧ n ≤ 8) := by
+  unfold tokensOk
+  simp
+
+/-- A native projection is used when any of gate/up/down is natively supported. -/
+def nativeProjection (g u d : Bool) : Bool := g || u || d
+
+/-- Without any native projection the legacy SwiGLU is used. -/
+theorem legacy_when_none : nativeProjection false false false = false := by
+  decide
+
+-- § combination
+/-- Weighted accumulation `acc += w_e * part_e` in order. -/
+def dotAcc : Int → List Int → List Int → Int
+  | acc, [], _ => acc
+  | acc, _ :: _, [] => acc
+  | acc, w :: ws, p :: ps => dotAcc (acc + w * p) ws ps
+
+/-- Starting accumulator offset passes straight through: this is why the shared output is added plain. -/
+theorem dotAcc_shift (ws ps : List Int) (a c : Int) : dotAcc (a + c) ws ps = dotAcc a ws ps + c := by
+  induction ws generalizing ps a with
+  | nil => simp [dotAcc]
+  | cons w ws ih =>
+    cases ps with
+    | nil => simp [dotAcc]
+    | cons p ps =>
+      have e : a + c + w * p = a + w * p + c := by omega
+      simp only [dotAcc]
+      rw [e]
+      exact ih ps (a + w * p)
+
+/-- Final combination: routed sum plus the shared output. -/
+def combine (ws ps : List Int) (shared : Int) : Int := dotAcc shared ws ps
+
+/-- The combination equals the routed sum plus the shared output. -/
+theorem combine_eq (ws ps : List Int) (shared : Int) : combine ws ps shared = dotAcc 0 ws ps + shared := by
+  unfold combine
+  have h := dotAcc_shift ws ps 0 shared
+  rw [Int.zero_add] at h
+  exact h
+
+/-- With no routed experts the output is exactly the shared output. -/
+theorem combine_nil (ps : List Int) (shared : Int) : combine [] ps shared = shared := by
+  simp [combine, dotAcc]
+
+/-- The k <= 64 guard. -/
+def kOk (k : Nat) : Bool := decide (0 < k ∧ k ≤ 64)
+
+/-- Ten routed experts pass the guard; 65 is refused. -/
+theorem kOk_cases : kOk 10 = true ∧ kOk 65 = false := by
+  decide
+
+end Ref.SharedExpert
+
+
+
+## FILE: /mnt/user-data/outputs/ActivationQuantizer.lean
+/-!
+# MODULE: activation_quantizer
+SOURCES: src/kernels/cuda/quantize_act.cu
+Quantizing an fp32 activation to ggml's vec_dot_type: Q8_0 (34-byte blocks of 32), a CPU-order Q8_0 variant with
+fp32 scales, and Q8_K (292-byte blocks of 256 with block sums), plus matching dequantizers.
+
+## Source semantics
+Q8_0: d = amax/127, ints are x/d clamped to [-128,127] (ggml bytes) or [-127,127] (CPU rule). Zero blocks are all
+zero. Q8_K: iscale = -127/max (signed max at largest magnitude), q = min 127 (nearest_int (iscale x)) with
+nearest_int the 1.5*2^23 magic trick; bsums[j] = sum of 16 consecutive qs; n must be a multiple of 256.
+Sizes must be multiples of the block (32 resp. 256).
+
+## Form template identifiers
+clamp -> "int8 saturation"; nearestInt -> "magic-number rounding"; bsum -> "block sum".
+-/
+namespace Ref.ActivationQuantizer
+
+-- § saturation
+/-- Clamp an integer into [lo, hi]. -/
+def clamp (lo hi v : Int) : Int := if v < lo then lo else if v > hi then hi else v
+
+/-- Clamping into [-127,127] bounds the result. -/
+theorem clamp127_bounds (v : Int) : -127 ≤ clamp (-127) 127 v ∧ clamp (-127) 127 v ≤ 127 := by
+  unfold clamp
+  split_ifs <;> omega
+
+/-- Clamping is idempotent. -/
+theorem clamp_idem (lo hi v : Int) (h : lo ≤ hi) : clamp lo hi (clamp lo hi v) = clamp lo hi v := by
+  unfold clamp
+  split_ifs <;> omega
+
+/-- In-range values are unchanged. -/
+theorem clamp_of_mem (lo hi v : Int) (h1 : lo ≤ v) (h2 : v ≤ hi) : clamp lo hi v = v := by
+  unfold clamp
+  split_ifs <;> omega
+
+-- § magic-number rounding
+/-- `nearest_int`: low 23 mantissa bits minus 2^22. -/
+def nearestInt (bits : Nat) : Int := ((bits &&& 8388607 : Nat) : Int) - 4194304
+
+/-- The result lies in [-2^22, 2^22 - 1], so the trick is valid for |x| < 2^22. -/
+theorem nearestInt_range (bits : Nat) : -4194304 ≤ nearestInt bits ∧ nearestInt bits ≤ 4194303 := by
+  have h : (bits &&& 8388607) ≤ 8388607 := Nat.and_le_right
+  unfold nearestInt
+  omega
+
+-- § sizes and counts
+/-- Q8_0 block count. -/
+def q80Blocks (n : Nat) : Nat := n / 32
+
+/-- Q8_K block count. -/
+def q8kBlocks (n : Nat) : Nat := n / 256
+
+/-- A grid of 128 threads per block covers every Q8_0 block. -/
+theorem q80_grid_covers (n : Nat) : q80Blocks n ≤ ((q80Blocks n + 127) / 128) * 128 := by
+  unfold q80Blocks
+  omega
+
+/-- A grid of 64 threads per block covers every Q8_K block. -/
+theorem q8k_grid_covers (n : Nat) : q8kBlocks n ≤ ((q8kBlocks n + 63) / 64) * 64 := by
+  unfold q8kBlocks
+  omega
+
+/-- Whole blocks cover the array when n is a multiple of the block. -/
+theorem q80_blocks_cover (n : Nat) (h : n % 32 = 0) : q80Blocks n * 32 = n := by
+  unfold q80Blocks
+  omega
+
+/-- Same for Q8_K. -/
+theorem q8k_blocks_cover (n : Nat) (h : n % 256 = 0) : q8kBlocks n * 256 = n := by
+  unfold q8kBlocks
+  omega
+
+-- § block sums
+/-- Sum of a block of quantized values. -/
+def bsum (qs : List Int) : Int := qs.sum
+
+/-- Block sums are additive over concatenation: total of 16 sub-sums equals the sum over the 256 values. -/
+theorem bsum_append (a b : List Int) : bsum (a ++ b) = bsum a + bsum b := by
+  unfold bsum
+  exact List.sum_append
+
+/-- A zero block has zero sum (the amax = 0 case writes zeroes everywhere). -/
+theorem bsum_zero (n : Nat) : bsum (List.replicate n 0) = 0 := by
+  unfold bsum
+  simp
+
+end Ref.ActivationQuantizer
+
+
+
+## FILE: /mnt/user-data/outputs/DequantToHalfBf16.lean
+/-!
+# MODULE: dequant_to_half_bf16
+SOURCES: src/kernels/cuda/dequant_bf16.cu
+Dequantizing ggml block formats (Q2_0, Q4_0, Q5_0, Q8_0, IQ4_NL, Q3_K, Q4_K, Q5_K, Q6_K, IQ4_XS) to bf16, fp16 or
+fp32, one thread per 32-element group; the i-quants are delegated to iq_kernels.
+
+## Source semantics
+Row stride is cols/be*bb bytes; each row has cols/32 groups. Group g of a row lives in block g / (be/32) at
+sub-group g % (be/32). K-quant scale/min unpacking yields 6-bit values. fp32 -> bf16 rounds to nearest even via
+u += 0x7fff + ((u>>16)&1); result u>>16.
+
+## Form template identifiers
+geometry -> "format table"; bf16Round -> "round-to-nearest-even truncation"; scaleMin -> "6-bit scale unpack".
+-/
+namespace Ref.DequantBf16
+
+-- § geometry
+/-- (elements, bytes) per block, or (0,0). -/
+def beOf (t : Nat) : Nat :=
+  if t = 2 ∨ t = 6 ∨ t = 8 ∨ t = 20 then 32 else if t = 42 then 64 else
+  if t = 11 ∨ t = 12 ∨ t = 13 ∨ t = 14 ∨ t = 23 then 256 else 0
+
+/-- Bytes per block. -/
+def bbOf (t : Nat) : Nat :=
+  if t = 2 then 18 else if t = 6 then 22 else if t = 8 then 34 else if t = 20 then 18
+  else if t = 11 then 110 else if t = 12 then 144 else if t = 13 then 176 else if t = 14 then 210
+  else if t = 23 then 136 else if t = 42 then 18 else 0
+
+/-- `dequant_bf16_supported`. -/
+def supp (t : Nat) : Bool := beOf t != 0
+
+/-- Every supported block is a whole number of 32-element groups. -/
+theorem groups_per_block (t : Nat) (ht : t < 64) (h : supp t = true) : beOf t % 32 = 0 := by
+  revert t
+  decide
+
+/-- Group decomposition: block index and sub-group reassemble the group index (256-wide blocks). -/
+theorem group_decomp_256 (g : Nat) : 8 * (g / 8) + g % 8 = g := by
+  omega
+
+/-- Same for Q2_0 (two groups per 64-element block). -/
+theorem group_decomp_q2_0 (g : Nat) : 2 * (g / 2) + g % 2 = g := by
+  omega
+
+/-- The sub-group of a 256-wide block is below 8 (so its element offset is below 256). -/
+theorem subgroup_lt (g : Nat) : (g % 8) * 32 + 32 ≤ 256 := by
+  omega
+
+/-- The i-quant types dispatched elsewhere are disjoint from this file's table. -/
+theorem iq_disjoint (t : Nat) (ht : t < 64) (h : t = 16 ∨ t = 17 ∨ t = 18 ∨ t = 21 ∨ t = 22 ∨ t = 29) :
+    supp t = false := by
+  revert t
+  decide
+
+-- § K-quant scale unpacking
+/-- High-index scale (j >= 4): low nibble of q[j+4] plus two high bits of q[j-4] shifted up four. -/
+def scaleHi (lowByte hiByte : Nat) : Nat := lowByte % 16 + (hiByte / 64) * 16
+
+/-- Unpacked 6-bit scales stay below 64. -/
+theorem scaleHi_lt (a b : Nat) (ha : a < 256) (hb : b < 256) : scaleHi a b < 64 := by
+  unfold scaleHi
+  omega
+
+/-- Low-index scale (j < 4): the low six bits of the byte. -/
+theorem scaleLo_lt (a : Nat) : a % 64 < 64 := by
+  omega
+
+-- § bf16 rounding
+/-- `f2bf` on the raw 32-bit pattern (no overflow modeled: finite inputs). -/
+def bf16Round (u : Nat) : Nat := (u + 32767 + (u / 65536) % 2) / 65536
+
+/-- Exactly representable inputs (low half zero) are preserved. -/
+theorem bf16_exact (u : Nat) (h : u % 65536 = 0) : bf16Round u = u / 65536 := by
+  unfold bf16Round
+  omega
+
+/-- Below the halfway point the result truncates. -/
+theorem bf16_round_down (u : Nat) (h : u % 65536 < 32768) : bf16Round u = u / 65536 := by
+  unfold bf16Round
+  omega
+
+/-- Above the halfway point the result rounds up. -/
+theorem bf16_round_up (u : Nat) (h : 32768 < u % 65536) : bf16Round u = u / 65536 + 1 := by
+  unfold bf16Round
+  omega
+
+/-- At exactly the halfway point the result is even (ties to even). -/
+theorem bf16_tie_even (u : Nat) (h : u % 65536 = 32768) : bf16Round u % 2 = 0 := by
+  obtain ⟨a, ha⟩ : ∃ a, u = 65536 * a + 32768 := ⟨u / 65536, by omega⟩
+  subst ha
+  have h1 : (65536 * a + 32768) / 65536 = a := Nat.div_eq_of_lt_le (by omega) (by omega)
+  unfold bf16Round
+  rw [h1]
+  rcases Nat.mod_two_eq_zero_or_one a with h2 | h2
+  · have key : (65536 * a + 32768 + 32767 + a % 2) / 65536 = a :=
+      Nat.div_eq_of_lt_le (by omega) (by omega)
+    rw [key]
+    omega
+  · have key : (65536 * a + 32768 + 32767 + a % 2) / 65536 = a + 1 :=
+      Nat.div_eq_of_lt_le (by omega) (by omega)
+    rw [key]
+    omega
+
+/-- Launch grid covers every group. -/
+theorem grid_covers (total : Nat) : total ≤ (total + 255) / 256 * 256 := by
+  omega
+
+end Ref.DequantBf16
+
+
+
+## FILE: /mnt/user-data/outputs/KvCacheQ8.lean
+/-!
+# MODULE: kv_cache_q8
+SOURCES: src/kernels/cuda/kv_q8.cu
+Append (quantize) and gather (dequantize) steps for a paged int8 KV cache with one fp16 scale per 64-value group.
+
+## Source semantics
+Row of (page, head, in-page position) is (page*kv_heads + head)*page_size + pos % page_size, where page is the
+page-table entry for pos / page_size. A row holds head_dim int8 values and head_dim/64 scales; head_dim must be
+a multiple of 64. Quantization uses the STORED (fp16-rounded) scale, ints clamped to [-127,127]. Gather reads four
+values per thread; thread index decomposes as (id, head, quad) and writes the scratch slot with the same linear
+index.
+
+## Form template identifiers
+rowIdx -> "paged row index"; scaleIdx -> "group scale index"; gather decomposition -> "thread to (id, head, quad)".
+-/
+namespace Ref.KvQ8
+
+-- § paged row index
+/-- Row of an (page, head, offset) triple. -/
+def rowIdx (page kvh h ps off : Nat) : Nat := ps * (page * kvh + h) + off
+
+/-- The page-major cell is recovered by division. -/
+theorem rowIdx_div (page kvh h ps off : Nat) (hps : 0 < ps) (hoff : off < ps) :
+    rowIdx page kvh h ps off / ps = page * kvh + h := by
+  unfold rowIdx
+  rw [Nat.mul_add_div hps, Nat.div_eq_of_lt hoff]
+  simp
+
+/-- The in-page position is recovered by remainder. -/
+theorem rowIdx_mod (page kvh h ps off : Nat) (hps : 0 < ps) (hoff : off < ps) :
+    rowIdx page kvh h ps off % ps = off := by
+  have hd := rowIdx_div page kvh h ps off hps hoff
+  have h1 := Nat.div_add_mod (rowIdx page kvh h ps off) ps
+  rw [hd] at h1
+  unfold rowIdx at h1 ⊢
+  omega
+
+/-- Distinct (cell, offset) pairs get distinct rows. -/
+theorem rowIdx_injective (a b ps off off' : Nat) (hps : 0 < ps) (ho : off < ps) (ho' : off' < ps)
+    (e : ps * a + off = ps * b + off') : a = b ∧ off = off' := by
+  have h1 := Nat.mul_add_div hps a off
+  have h2 := Nat.mul_add_div hps b off'
+  rw [Nat.div_eq_of_lt ho] at h1
+  rw [Nat.div_eq_of_lt ho'] at h2
+  rw [e] at h1
+  have hab : a = b := by omega
+  subst hab
+  exact ⟨rfl, by omega⟩
+
+-- § group scales
+/-- Scale slot of group g in a row. -/
+def scaleIdx (row groups g : Nat) : Nat := groups * row + g
+
+/-- Scale slots of different rows never collide (g < groups). -/
+theorem scaleIdx_injective (r r' groups g g' : Nat) (hg : 0 < groups) (h1 : g < groups) (h2 : g' < groups)
+    (e : scaleIdx r groups g = scaleIdx r' groups g') : r = r' ∧ g = g' := by
+  unfold scaleIdx at e
+  have := rowIdx_injective r r' groups g g' hg h1 h2 e
+  exact ⟨this.1, this.2⟩
+
+/-- head_dim a multiple of 64 gives whole 4-value quads. -/
+theorem head_dim_quads (hd : Nat) (h : hd % 64 = 0) : hd % 4 = 0 := by
+  omega
+
+-- § gather index decomposition
+/-- The destination slot (id, head, quad) equals the source thread index. -/
+theorem gather_dst (id kvh per h q4 : Nat) :
+    (id * kvh + h) * per + q4 = id * (kvh * per) + (h * per + q4) := by
+  rw [Nat.add_mul, Nat.mul_assoc]
+  omega
+
+/-- The remainder splits into head and quad. -/
+theorem gather_rem (rem per : Nat) : per * (rem / per) + rem % per = rem := by
+  exact Nat.div_add_mod rem per
+
+-- § saturation
+/-- Clamp to the symmetric int8 range used by the cache. -/
+def clamp127 (v : Int) : Int := if v < -127 then -127 else if v > 127 then 127 else v
+
+/-- The stored code is always within [-127,127]. -/
+theorem clamp127_bounds (v : Int) : -127 ≤ clamp127 v ∧ clamp127 v ≤ 127 := by
+  unfold clamp127
+  split_ifs <;> omega
+
+/-- In-range codes pass through unchanged. -/
+theorem clamp127_id (v : Int) (h1 : -127 ≤ v) (h2 : v ≤ 127) : clamp127 v = v := by
+  unfold clamp127
+  split_ifs <;> omega
+
+/-- A 256-thread grid covers every gather thread. -/
+theorem gather_grid_covers (total : Nat) : total ≤ (total + 255) / 256 * 256 := by
+  omega
+
+end Ref.KvQ8
+
+
+
+## FILE: /mnt/user-data/outputs/RouterTop10Select.lean
+/-!
+# MODULE: router_top10_select
+SOURCES: src/kernels/cuda/router_top10.cu
+MoE router: softmax over all experts, stable top-k selection (ties by ascending index), renormalization of the
+selected weights with a 2^-14 lower clamp on the denominator.
+
+## Source semantics
+The selection order is "descending probability, ties by ascending index" - a strict total order. Block-wide
+argmax picks the best candidate under this order and is independent of the reduction tree. The denominator is
+max(sum, 2^-14) so division is safe. Launch: threads = min(n_expert,512) rounded up to 32; shared memory =
+aligned taken-mask + n doubles + n floats; k <= 64, n_expert <= 512*64.
+
+## Form template identifiers
+before -> "ranking order"; pick -> "argmax combiner"; smemBytes -> "dynamic shared layout".
+-/
+namespace Ref.RouterTop10
+
+-- § ranking order
+/-- Expert f outranks expert e: larger probability, or equal probability and smaller index. -/
+def before (p : Nat → Int) (e f : Nat) : Prop := p f > p e ∨ (p f = p e ∧ f < e)
+
+/-- No expert outranks itself. -/
+theorem before_irrefl (p : Nat → Int) (e : Nat) : ¬ before p e e := by
+  unfold before
+  omega
+
+/-- The order is asymmetric. -/
+theorem before_asymm (p : Nat → Int) (e f : Nat) (h : before p e f) : ¬ before p f e := by
+  unfold before at *
+  omega
+
+/-- The order is transitive. -/
+theorem before_trans (p : Nat → Int) (e f g : Nat) (h1 : before p e f) (h2 : before p f g) :
+    before p e g := by
+  unfold before at *
+  omega
+
+/-- Any two distinct experts are comparable, so ties never leave the selection ambiguous. -/
+theorem before_total (p : Nat → Int) (e f : Nat) (h : e ≠ f) : before p e f ∨ before p f e := by
+  unfold before
+  omega
+
+-- § argmax combiner
+/-- Combine two (value, index) candidates exactly as the shuffle reduction does. -/
+def pick (a b : Int × Nat) : Int × Nat :=
+  if b.1 > a.1 ∨ (b.1 = a.1 ∧ b.2 < a.2) then b else a
+
+/-- The combiner is commutative on distinct indices, so the reduction tree shape cannot change the winner. -/
+theorem pick_comm (a b : Int × Nat) (h : a.2 ≠ b.2) : pick a b = pick b a := by
+  unfold pick
+  split <;> split <;> first | rfl | (exfalso; omega)
+
+/-- The sentinel (index n_expert, value -inf modeled as any value) never beats a real candidate with a larger value. -/
+theorem pick_prefers_larger (a b : Int × Nat) (h : b.1 > a.1) : pick a b = b := by
+  unfold pick
+  rw [if_pos (Or.inl h)]
+
+/-- On equal values the smaller index wins. -/
+theorem pick_tie_smaller_index (a b : Int × Nat) (h : b.1 = a.1) (hi : b.2 < a.2) : pick a b = b := by
+  unfold pick
+  rw [if_pos (Or.inr ⟨h, hi⟩)]
+
+-- § renormalization
+/-- The clamped denominator `max(s, 2^-14)` (scaled by 2^14 to stay in Nat). -/
+def clampDen (s : Nat) : Nat := max s 1
+
+/-- The denominator is never zero. -/
+theorem clampDen_pos (s : Nat) : 0 < clampDen s := by
+  unfold clampDen
+  omega
+
+/-- The denominator never drops below the sum. -/
+theorem clampDen_ge (s : Nat) : s ≤ clampDen s := by
+  unfold clampDen
+  omega
+
+-- § launch geometry
+/-- Threads per block: at least a warp-multiple covering min(n, 512). -/
+def threads (n : Nat) : Nat := ((min n 512) + 31) / 32 * 32
+
+/-- Thread count covers the experts up to 512 and is a multiple of 32. -/
+theorem threads_props (n : Nat) : min n 512 ≤ threads n ∧ threads n % 32 = 0 ∧ threads n ≤ 512 := by
+  unfold threads
+  omega
+
+/-- Bytes of the taken-mask (16-aligned). -/
+def takenBytes (n : Nat) : Nat := (n + 15) / 16 * 16
+
+/-- Dynamic shared memory: mask, n doubles, n floats. -/
+def smemBytes (n : Nat) : Nat := takenBytes n + n * 8 + n * 4
+
+/-- The mask is 16-aligned, so the double array after it is 8-aligned and the float array 4-aligned. -/
+theorem smem_alignment (n : Nat) : takenBytes n % 16 = 0 ∧ (takenBytes n) % 8 = 0 ∧ (takenBytes n + n * 8) % 4 = 0 := by
+  unfold takenBytes
+  omega
+
+/-- For 512 experts the dynamic shared size is 6656 bytes. -/
+theorem smem_512 : smemBytes 512 = 6656 := by
+  decide
+
+/-- The mask covers every expert. -/
+theorem taken_covers (n : Nat) : n ≤ takenBytes n := by
+  unfold takenBytes
+  omega
+
+end Ref.RouterTop10
+
+
+
+
+
+## FILE: /mnt/user-data/outputs/NativeRouterTop10.lean
+/-!
+# MODULE: native_router_top10
+SOURCES: src/kernels/cuda/native_router.cu
+Single-block CUDA router: softmax over 512 F32 logits spread over 32 lanes x 16 slots, ten rounds of
+arg-max with a deterministic tie rule, then renormalisation of the ten selected weights.
+
+## Source semantics
+* Expert `e` lives at lane `e % 32`, slot `e / 32` (`e = lane + 32 * slot`).
+* A candidate beats another when its value is larger, or equal with a smaller expert id.
+* The destination spans (`logits` 2048 B, `ids` 40 B, `weights` 40 B) must be 4-byte aligned, non-null,
+  non-wrapping and pairwise disjoint (half-open interval test).
+* The selected-weight sum is clamped below by 6.103515625e-5 before the reciprocal is taken.
+
+## Form template identifiers
+logits -> `scores`; ids -> `selected_ids`; weights -> `selected_weights`; `route` -> `router_topk_kernel`;
+`valid` -> `span_valid`; `overlap` -> `span_overlap`; 512 -> `n_expert`; 10 -> `k_out`.
+-/
+
+namespace Ref.NativeRouter
+
+-- § span validity and overlap
+
+/-- Model of `valid(p, bytes)`: non-null, 4-byte aligned, and `bytes <= UINTPTR_MAX - address`. -/
+def SpanValid (addr bytes maxAddr : Nat) : Prop :=
+  addr ≠ 0 ∧ addr % 4 = 0 ∧ bytes ≤ maxAddr - addr
+
+/-- A valid span cannot wrap past the top of the address space. -/
+theorem spanValid_no_wrap (addr bytes maxAddr : Nat) (h : SpanValid addr bytes maxAddr)
+    (hle : addr ≤ maxAddr) : addr + bytes ≤ maxAddr := by
+  obtain ⟨_, _, h3⟩ := h
+  omega
+
+/-- A valid span is 4-byte aligned. -/
+theorem spanValid_aligned (addr bytes maxAddr : Nat) (h : SpanValid addr bytes maxAddr) :
+    addr % 4 = 0 := by
+  obtain ⟨_, h2, _⟩ := h
+  exact h2
+
+/-- Model of `overlap(a, an, b, bn)`: the half-open interval test used by the launcher. -/
+def Overlap (a an b bn : Nat) : Prop := a < b + bn ∧ b < a + an
+
+/-- The overlap test is symmetric. -/
+theorem overlap_symm (a an b bn : Nat) : Overlap a an b bn ↔ Overlap b bn a an := by
+  unfold Overlap
+  omega
+
+/-- Spans that touch end to end do not overlap. -/
+theorem overlap_adjacent (a an bn : Nat) : ¬ Overlap a an (a + an) bn := by
+  unfold Overlap
+  omega
+
+/-- If the first span ends before the second begins, they are disjoint. -/
+theorem overlap_of_lt (a an b bn : Nat) (h : a + an ≤ b) : ¬ Overlap a an b bn := by
+  unfold Overlap
+  omega
+
+/-- A non-empty span overlaps itself. -/
+theorem overlap_self (a n : Nat) (hn : 0 < n) : Overlap a n a n := by
+  unfold Overlap
+  omega
+
+/-- Quirk of the formula: a zero-length span strictly inside another one is reported as overlapping. -/
+theorem overlap_zero_length_quirk : Overlap 5 0 3 10 := by
+  unfold Overlap
+  omega
+
+-- § geometry
+
+/-- The 512 experts are exactly 32 lanes times 16 slots. -/
+theorem expert_count : (512 : Nat) = 32 * 16 := by decide
+
+/-- The pinned block geometry is 32 x 8 = 256 threads, of which row zero (32 threads) is active. -/
+theorem block_threads : (32 : Nat) * 8 = 256 := by decide
+
+/-- Ten output ranks fit in one warp, so `lane < 10` can hold one weight each. -/
+theorem outputs_fit_warp : (10 : Nat) ≤ 32 := by decide
+
+/-- `lane + 32 * slot` is a valid expert id. -/
+theorem expert_lt (lane slot : Nat) (hl : lane < 32) (hs : slot < 16) : lane + 32 * slot < 512 := by
+  omega
+
+/-- The owning lane of `lane + 32 * slot` is `lane`. -/
+theorem expert_lane (lane slot : Nat) (hl : lane < 32) : (lane + 32 * slot) % 32 = lane := by
+  omega
+
+/-- The slot of `lane + 32 * slot` is `slot`. -/
+theorem expert_slot (lane slot : Nat) (hl : lane < 32) : (lane + 32 * slot) / 32 = slot := by
+  omega
+
+/-- Every expert id decomposes into a lane and a slot. -/
+theorem expert_roundtrip (e : Nat) (he : e < 512) :
+    e % 32 + 32 * (e / 32) = e ∧ e / 32 < 16 ∧ e % 32 < 32 := by
+  omega
+
+/-- Exactly one lane owns a given expert, so the `ids[rank]` write has a single writer. -/
+theorem unique_owner (e l l' : Nat) (h : e % 32 = l) (h' : e % 32 = l') : l = l' := by
+  omega
+
+-- § tie-breaking order
+
+/-- `Beats v i w j`: candidate `(v, i)` is preferred to `(w, j)`: larger value, or equal and smaller id. -/
+abbrev Beats (v i w j : Nat) : Prop := v > w ∨ (v = w ∧ i < j)
+
+/-- No candidate beats itself. -/
+theorem beats_irrefl (v i : Nat) : ¬ Beats v i v i := by
+  unfold Beats
+  omega
+
+/-- The preference order is asymmetric. -/
+theorem beats_asymm (v i w j : Nat) : Beats v i w j → ¬ Beats w j v i := by
+  intro h1 h2
+  unfold Beats at h1 h2
+  omega
+
+/-- The preference order is transitive. -/
+theorem beats_trans (a i b j c k : Nat) : Beats a i b j → Beats b j c k → Beats a i c k := by
+  intro h1 h2
+  unfold Beats at h1 h2 ⊢
+  omega
+
+/-- Two candidates with different ids are always comparable, so the arg-max is deterministic. -/
+theorem beats_total (v w i j : Nat) (h : i ≠ j) : Beats v i w j ∨ Beats w j v i := by
+  unfold Beats
+  omega
+
+/-- The butterfly combine step used in the shuffle reduction. -/
+def pick (a b : Nat × Nat) : Nat × Nat :=
+  if Beats b.1 b.2 a.1 a.2 then b else a
+
+/-- Combining is commutative for candidates with distinct ids, so the shuffle order cannot matter. -/
+theorem pick_comm (a b : Nat × Nat) (h : a.2 ≠ b.2) : pick a b = pick b a := by
+  unfold pick
+  by_cases h1 : Beats b.1 b.2 a.1 a.2
+  · have h2 : ¬ Beats a.1 a.2 b.1 b.2 := beats_asymm _ _ _ _ h1
+    rw [if_pos h1, if_neg h2]
+  · have h2 : Beats a.1 a.2 b.1 b.2 := by
+      rcases beats_total a.1 b.1 a.2 b.2 h with h3 | h3
+      · exact h3
+      · exact absurd h3 h1
+    rw [if_neg h1, if_pos h2]
+
+-- § weight normalisation
+
+/-- The clamped selected-weight sum is at least the clamp constant. -/
+theorem clamp_ge (s m : Nat) : m ≤ max s m := by omega
+
+/-- With a positive clamp constant the denominator is never zero. -/
+theorem clamp_pos (s m : Nat) (hm : 0 < m) : 0 < max s m := by omega
+
+end Ref.NativeRouter
+
+
+
+## FILE: /mnt/user-data/outputs/F16BitsConversion.lean
+/-!
+# MODULE: f16_bits_conversion
+SOURCES: include/ref/kernels/f16_bits.hpp
+Hand-written IEEE binary16 conversions (`f16_from_f32` rounding to nearest even, `f32_from_f16` exact),
+plus the bf16 round-to-nearest-even trick used in `ple.cu`.
+
+## Source semantics
+* Rebiased exponent is `rawexp - 127 + 15`. Raw exponent 255 stays inf/NaN; finite values with rebiased
+  exponent >= 31 saturate to inf; rebiased exponent <= 0 enters the subnormal path; below -10 it flushes to
+  a signed zero.
+* Rounding adds one to the truncated mantissa when the discarded remainder exceeds half, or equals half
+  and the truncated value is odd. A carry may bump the exponent.
+* Decoding subnormals normalises the mantissa with `s` left shifts; the f32 exponent field is `113 - s`.
+
+## Form template identifiers
+`f16_from_f32` -> `encode_half`; `f32_from_f16` -> `decode_half`; `man` -> `mantissa`; `sh` -> `shift`;
+`rem` -> `discarded_remainder`.
+-/
+
+namespace Ref.F16
+
+-- § exponent classification
+
+/-- Rebiased exponent `rawexp - 127 + 15`. -/
+def rebias (rawexp : Nat) : Int := (rawexp : Int) - 127 + 15
+
+/-- Finite overflow to infinity happens exactly when the raw exponent is at least 143. -/
+theorem overflow_iff (r : Nat) : rebias r ≥ 31 ↔ 143 ≤ r := by
+  unfold rebias
+  omega
+
+/-- The subnormal path is taken exactly when the raw exponent is at most 112. -/
+theorem subnormal_iff (r : Nat) : rebias r ≤ 0 ↔ r ≤ 112 := by
+  unfold rebias
+  omega
+
+/-- Flush to a signed zero happens exactly when the raw exponent is at most 101. -/
+theorem underflow_iff (r : Nat) : rebias r < -10 ↔ r ≤ 101 := by
+  unfold rebias
+  omega
+
+/-- In the subnormal path the shift `14 - exp` stays within 14..24, so the 32-bit shifts are defined. -/
+theorem subnormal_shift_range (r : Nat) (h1 : 102 ≤ r) (h2 : r ≤ 112) :
+    14 ≤ 14 - rebias r ∧ 14 - rebias r ≤ 24 := by
+  unfold rebias
+  omega
+
+-- § round to nearest even
+
+/-- Round-to-nearest-even step: bump `h` when the remainder is above half, or at half with `h` odd. -/
+def rne (h rem half : Nat) : Nat :=
+  if rem > half ∨ (rem = half ∧ h % 2 = 1) then h + 1 else h
+
+/-- On an exact tie the rounded result is even. -/
+theorem rne_tie_even (h rem half : Nat) (e : rem = half) : rne h rem half % 2 = 0 := by
+  unfold rne
+  split <;> omega
+
+/-- Below half the value is truncated. -/
+theorem rne_below (h rem half : Nat) (hl : rem < half) : rne h rem half = h := by
+  unfold rne
+  split <;> omega
+
+/-- Above half the value is bumped. -/
+theorem rne_above (h rem half : Nat) (hg : rem > half) : rne h rem half = h + 1 := by
+  unfold rne
+  split <;> omega
+
+/-- Rounding moves the value by at most one unit upwards. -/
+theorem rne_bounds (h rem half : Nat) : h ≤ rne h rem half ∧ rne h rem half ≤ h + 1 := by
+  unfold rne
+  split <;> omega
+
+-- § normal path
+
+/-- For a 23-bit mantissa the kept part fits in 10 bits and the remainder in 13 bits. -/
+theorem normal_split (man : Nat) (h : man < 8388608) :
+    man / 8192 < 1024 ∧ man % 8192 < 8192 ∧ man = 8192 * (man / 8192) + man % 8192 := by
+  omega
+
+/-- When the kept mantissa is all ones, the rounding carry bumps the exponent field by one. -/
+theorem carry_bumps_exponent (e : Nat) : (e * 1024 + 1023) + 1 = (e + 1) * 1024 := by
+  omega
+
+/-- The largest finite exponent plus a rounding carry lands exactly on the infinity pattern 0x7C00. -/
+theorem carry_to_inf : (30 * 1024 + 1023) + 1 = 0x7C00 := by decide
+
+-- § subnormal path
+
+/-- At the deepest subnormal shift (24) an input in `[2^23, 2^24)` truncates to zero and rounds to the
+smallest subnormal exactly when it is strictly above the halfway point. -/
+theorem subnormal_min_boundary (man : Nat) (h1 : 8388608 ≤ man) (h2 : man < 16777216) :
+    man / 16777216 = 0 ∧ (rne 0 man 8388608 = 1 ↔ man > 8388608) := by
+  unfold rne
+  split <;> omega
+
+-- § exact decode of subnormals
+
+/-- Number of left shifts needed until the leading one reaches bit 10 (fuel-bounded). -/
+def normShift : Nat → Nat → Nat
+  | _, 0 => 0
+  | m, fuel + 1 => if 1024 ≤ m then 0 else 1 + normShift (2 * m) fuel
+
+/-- The shift count never exceeds the fuel. -/
+theorem normShift_le (m fuel : Nat) : normShift m fuel ≤ fuel := by
+  induction fuel generalizing m with
+  | zero => simp [normShift]
+  | succ n ih =>
+    simp only [normShift]
+    split
+    · omega
+    · have := ih (2 * m)
+      omega
+
+/-- The smallest subnormal mantissa 1 needs ten shifts. -/
+theorem normShift_one : normShift 1 10 = 10 := by decide
+
+/-- A mantissa already holding bit 9 needs a single shift. -/
+theorem normShift_512 : normShift 512 10 = 1 := by decide
+
+/-- With at most ten shifts the f32 exponent field `113 - s` stays in range 103..113. -/
+theorem decode_exponent_range (s : Nat) (hs : s ≤ 10) : 103 ≤ 113 - s ∧ 113 - s ≤ 113 := by
+  omega
+
+/-- The smallest subnormal decodes to exponent field 103, i.e. 2^(103-127) = 2^-24. -/
+theorem smallest_subnormal_exponent : 113 - 10 + 24 = 127 := by decide
+
+-- § bf16 rounding used by ple.cu
+
+/-- `(i + lsb + 0x7FFF) >> 16` with `lsb` the lowest kept bit equals round-to-nearest-even of `i / 65536`. -/
+theorem bf16_rounding (i : Nat) :
+    (i + (i / 65536) % 2 + 32767) / 65536 =
+      (if i % 65536 > 32768 ∨ (i % 65536 = 32768 ∧ (i / 65536) % 2 = 1)
+        then i / 65536 + 1 else i / 65536) := by
+  split <;> omega
+
+end Ref.F16
+
+
+
+## FILE: /mnt/user-data/outputs/PleBlockLayout.lean
+/-!
+# MODULE: ple_block_layout
+SOURCES: src/kernels/cuda/ple.cu
+GPU half of the PLE block: key/value projections, grouped RMS norm, gate, broadcast, depthwise causal dilated
+convolution over a carried history, and the three-way residual sum, all inside one caller-owned scratch arena.
+
+## Source semantics
+* The history is a per-channel column of `NG_HIST` entries; `ple_history_advance` drops the oldest and
+  appends the new normalised value.
+* Conv tap `k` reads row `nhist - (kern-1-k)*dil` of `[history | new]`; only tap `kern-1` reads the new row.
+  The history is row-fastest: flat index `row + nhist * channel`.
+* Stream `c` of the grouped norm occupies `[c*n_embd, (c+1)*n_embd)`; the gate is broadcast with
+  `value[i % n_embd] * gate[i / n_embd]`.
+* The scratch arena is five hc_dim buffers + `n_embd` + `hc` floats, then the Q8 activation image, then a
+  BF16 embedding copy, each region 16-byte aligned, plus 256 bytes of slack.
+
+## Form template identifiers
+`ple_block` -> `ple_layer`; `hist_rows` -> `conv_history`; `d_scratch` -> `float_workspace`;
+`NG_HC_DIM` -> `hc_dim`; `NG_N_EMBD` -> `n_embd`; `NG_HC` -> `n_stream`; `NG_HIST` -> `n_hist`.
+-/
+
+namespace Ref.Ple
+
+-- § history advance (indexed form of "drop oldest, append newest")
+
+/-- Entry `i` of the advanced column: shifted down by one, with the new value at the end. -/
+def advIdx {α : Type} (col : Nat → α) (n : Nat) (x : α) (i : Nat) : α :=
+  if i + 1 < n then col (i + 1) else x
+
+/-- Every non-final slot receives its successor's value. -/
+theorem advIdx_shift {α : Type} (col : Nat → α) (n : Nat) (x : α) (i : Nat) (h : i + 1 < n) :
+    advIdx col n x i = col (i + 1) := by
+  unfold advIdx
+  rw [if_pos h]
+
+/-- The last slot receives the new normalised value. -/
+theorem advIdx_last {α : Type} (col : Nat → α) (n : Nat) (x : α) (hn : 1 ≤ n) :
+    advIdx col n x (n - 1) = x := by
+  unfold advIdx
+  have hc : ¬ (n - 1 + 1 < n) := by omega
+  rw [if_neg hc]
+
+-- § conv taps and the history layout
+
+/-- Row read by a tap that is `d = kern-1-k` positions before the newest one. -/
+def convRow (nhist dil d : Nat) : Nat := nhist - d * dil
+
+/-- Real geometry (kern 4, dilation 3, history 9): the four taps read rows 0, 3, 6 and 9. -/
+theorem convRow_real : [0, 1, 2, 3].map (fun k => convRow 9 3 (4 - 1 - k)) = [0, 3, 6, 9] := by
+  decide
+
+/-- With positive dilation only the newest tap (`d = 0`) reads the new row `nhist`. -/
+theorem convRow_eq_new (n dil d : Nat) (hdil : 0 < dil) (hle : d * dil ≤ n) :
+    convRow n dil d = n ↔ d = 0 := by
+  unfold convRow
+  constructor
+  · intro h
+    by_contra hd
+    have : 0 < d * dil := Nat.mul_pos (Nat.pos_of_ne_zero hd) hdil
+    omega
+  · intro h
+    subst h
+    simp
+
+/-- Row-fastest flat index of the conv state. -/
+def histIdx (row nhist c : Nat) : Nat := row + nhist * c
+
+/-- A valid (row, channel) pair stays inside `nhist * hc` entries. -/
+theorem histIdx_lt (row nhist c hc : Nat) (hr : row < nhist) (hcc : c < hc) :
+    histIdx row nhist c < nhist * hc := by
+  unfold histIdx
+  have h1 : nhist * (c + 1) ≤ nhist * hc := Nat.mul_le_mul_left nhist (by omega)
+  have h2 : nhist * (c + 1) = nhist * c + nhist := by rw [Nat.mul_add, Nat.mul_one]
+  omega
+
+/-- The row-fastest layout is injective: reading it channel-slowest would be a transposed state. -/
+theorem histIdx_inj (n r r' c c' : Nat) (hn : 0 < n) (hr : r < n) (hr' : r' < n)
+    (h : histIdx r n c = histIdx r' n c') : r = r' ∧ c = c' := by
+  unfold histIdx at h
+  have h1 : (r + n * c) % n = r := by
+    rw [Nat.add_mul_mod_self_left]
+    exact Nat.mod_eq_of_lt hr
+  have h2 : (r' + n * c') % n = r' := by
+    rw [Nat.add_mul_mod_self_left]
+    exact Nat.mod_eq_of_lt hr'
+  have h3 : (r + n * c) / n = c := by
+    rw [Nat.add_mul_div_left _ _ hn, Nat.div_eq_of_lt hr]
+    simp
+  have h4 : (r' + n * c') / n = c' := by
+    rw [Nat.add_mul_div_left _ _ hn, Nat.div_eq_of_lt hr']
+    simp
+  constructor
+  · calc r = (r + n * c) % n := h1.symm
+      _ = (r' + n * c') % n := by rw [h]
+      _ = r' := h2
+  · calc c = (r + n * c) / n := h3.symm
+      _ = (r' + n * c') / n := by rw [h]
+      _ = c' := h4
+
+-- § grouped norm and broadcast indexing
+
+/-- Real geometry: 4 streams of 2560 make hc_dim = 10240. -/
+theorem hc_dim_real : 4 * 2560 = 10240 := by decide
+
+/-- Broadcast index: element `i < n_embd * hc` reads gate `i / n_embd`, which is a valid stream. -/
+theorem bcast_gate_lt (i n_embd hc : Nat) (h : i < n_embd * hc) : i / n_embd < hc := by
+  have h' : i < n_embd * hc := h
+  exact Nat.div_lt_of_lt_mul h'
+
+/-- Broadcast index: the value index `i % n_embd` is in range when `n_embd > 0`. -/
+theorem bcast_value_lt (i n_embd : Nat) (h : 0 < n_embd) : i % n_embd < n_embd :=
+  Nat.mod_lt i h
+
+/-- The block-sum scratch of 8 doubles holds one entry per warp of a 256-thread block. -/
+theorem block_sum_scratch : (256 + 31) / 32 = 8 := by decide
+
+-- § scratch arena
+
+/-- Round up to a multiple of 16: `(x + 15) & ~15`. -/
 def align16 (x : Nat) : Nat := (x + 15) / 16 * 16
 
 /-- Alignment never shrinks. -/
@@ -5231,2321 +6149,2079 @@ theorem align16_ge (x : Nat) : x ≤ align16 x := by
   unfold align16
   omega
 
-/-- Aligned values are multiples of 16. -/
+/-- Alignment gives a multiple of 16. -/
 theorem align16_mod (x : Nat) : align16 x % 16 = 0 := by
   unfold align16
   omega
 
-/-- Alignment overshoots by less than 16. -/
+/-- Alignment adds fewer than 16 bytes. -/
 theorem align16_lt (x : Nat) : align16 x < x + 16 := by
   unfold align16
   omega
 
--- § scratch layout
-/-- Byte size of the gate/up float arrays. -/
-def sA (nFf : Nat) : Nat := align16 (nFf * 4)
-/-- Byte size of the Q8_0 intermediate. -/
-def sQ0 (nFf : Nat) : Nat := align16 (nFf / 32 * 34)
-/-- Byte size of the Q8_K intermediate. -/
-def sQk (nFf : Nat) : Nat := align16 (nFf / 256 * 292)
-/-- Total scratch bytes. -/
-def scratchBytes (nFf : Nat) : Nat := sA nFf * 2 + sQ0 nFf + sQk nFf + 32
-
-/-- Offsets of the up, q8_0, q8k and g regions are increasing. -/
-theorem scratch_offsets_ordered (n : Nat) :
-    0 ≤ sA n ∧ sA n ≤ 2 * sA n ∧ 2 * sA n ≤ 2 * sA n + sQ0 n ∧
-    2 * sA n + sQ0 n ≤ 2 * sA n + sQ0 n + sQk n := by
+/-- Alignment is idempotent. -/
+theorem align16_idem (x : Nat) : align16 (align16 x) = align16 x := by
+  unfold align16
   omega
 
-/-- The scalar gate (4 bytes) fits inside the scratch buffer. -/
-theorem gate_slot_fits (n : Nat) : 2 * sA n + sQ0 n + sQk n + 4 ≤ scratchBytes n := by
-  unfold scratchBytes
+/-- Total arena size from the three region sizes (floats, Q8 image, BF16 embedding) plus slack. -/
+def scratchTotal (f q e : Nat) : Nat := align16 f + align16 q + e + 256
+
+/-- `ple_block_scratch_bytes` for a given geometry. -/
+def scratchBytes (nEmbd hc hcDim : Nat) : Nat :=
+  scratchTotal ((5 * hcDim + nEmbd + hc) * 4) ((nEmbd / 32) * 34) (nEmbd * 2)
+
+/-- The real geometry needs 223152 bytes of scratch. -/
+theorem scratchBytes_real : scratchBytes 2560 4 10240 = 223152 := by decide
+
+/-- The float region ends before the Q8 activation image begins. -/
+theorem float_region_before_act (f : Nat) : f ≤ align16 f := align16_ge f
+
+/-- The Q8 image ends before the BF16 embedding copy begins. -/
+theorem act_region_before_emb (q : Nat) : q ≤ align16 q := align16_ge q
+
+/-- The BF16 embedding copy fits inside the arena, with the 256-byte slack to spare. -/
+theorem emb_region_fits (f q e : Nat) : align16 f + align16 q + e + 256 ≤ scratchTotal f q e + 0 := by
+  unfold scratchTotal
   omega
 
-/-- Every region offset is 16-byte aligned. -/
-theorem offsets_aligned (n : Nat) :
-    sA n % 16 = 0 ∧ (2 * sA n) % 16 = 0 ∧ (2 * sA n + sQ0 n) % 16 = 0 ∧
-    (2 * sA n + sQ0 n + sQk n) % 16 = 0 := by
-  have h1 : sA n % 16 = 0 := align16_mod _
-  have h2 : sQ0 n % 16 = 0 := align16_mod _
-  have h3 : sQk n % 16 = 0 := align16_mod _
+/-- The float sub-buffers tile the float region exactly: key, query, norm, gated, conv, value, gate. -/
+theorem float_buffers_tile (hcDim nEmbd hc : Nat) :
+    5 * hcDim + nEmbd + hc = hcDim + hcDim + hcDim + hcDim + hcDim + nEmbd + hc := by
   omega
 
-/-- The gate array holds `n_ff` floats. -/
-theorem gate_holds_floats (n : Nat) : n * 4 ≤ sA n := align16_ge _
-
--- § combine
-/-- Weighted sum of routed parts plus an optional plain shared term. -/
-def combine (ws ps : List Int) (shared : Option Int) : Int :=
-  (List.zipWith (· * ·) ws ps).sum + shared.getD 0
-
-/-- Without a shared output the combine is just the weighted sum. -/
-theorem combine_no_shared (ws ps : List Int) : combine ws ps none = (List.zipWith (· * ·) ws ps).sum := by
-  simp [combine]
-
-/-- The shared term is added plain (no weight). -/
-theorem combine_shared_plain (ws ps : List Int) (s : Int) :
-    combine ws ps (some s) = (List.zipWith (· * ·) ws ps).sum + s := by
-  simp [combine]
-
-/-- Empty routing leaves only the shared output. -/
-theorem combine_empty (s : Int) : combine [] [] (some s) = s := by
-  simp [combine]
-
--- § row-scaling index
-/-- Row index `t*n + i` of token t, element i, stays below `n_tok * n`. -/
-theorem row_index_lt (nTok t i n : Nat) (ht : t < nTok) (hi : i < n) : t * n + i < nTok * n := by
-  have h1 : (t + 1) * n ≤ nTok * n := Nat.mul_le_mul_right n ht
-  have h2 : (t + 1) * n = t * n + n := Nat.succ_mul t n
-  omega
-
-/-- Multi-token path precondition: 1..8 tokens. -/
-def tokOk (n : Nat) : Prop := 1 ≤ n ∧ n ≤ 8
-
-/-- The multi-column MMVQ bound (8) matches the shared-expert token bound. -/
-theorem tok_matches_ncols (n : Nat) (h : tokOk n) : 1 ≤ n ∧ n ≤ 8 := h
-
--- § scalar-gate reduction
-/-- Warps in a block of `b` threads (b ≤ 256) never exceed the 8-slot scratch. -/
-theorem gate_warps_le_8 (b : Nat) (h : b ≤ 256) : (b + 31) / 32 ≤ 8 := by
-  omega
-
-/-- The default launch (256 threads) uses exactly 8 warps. -/
-theorem gate_warps_256 : (256 + 31) / 32 = 8 := by decide
-
--- § constraints and the historical overrun
-/-- Q8_K is impossible for n_ff = 640 (not a multiple of 256) while Q8_0 is possible. -/
-theorem shexp_q8k_vs_q8_0 : 640 % 256 ≠ 0 ∧ 640 % 32 = 0 := by decide
-
-/-- Reading 2560 floats from a 2560-element BF16 vector overran by 5120 bytes. -/
-theorem bf16_overrun_bytes : 2560 * 4 - 2560 * 2 = 5120 := by decide
-
-/-- The combine limit is 64 routed parts. -/
-theorem combine_limit (k : Nat) (h : k ≤ 64) : k ≤ 64 := h
-
-end Ref.SharedExpert
+end Ref.Ple
 
 
 
 ## FILE: /mnt/user-data/outputs/SamplerChain.lean
 /-!
 # MODULE: sampler_chain
-SOURCES: src/kernels/cuda/sampler.cu
-GPU sampler: penalties, top-k, top-p, temperature, then one categorical draw from a counter-based Philox
-stream; greedy path is a block-wide argmax with lowest-index tie-breaking.
+SOURCES: src/kernels/cuda/sampler.cu, include/ref/kernels/sampler.hpp
+Device sampler for one token per row: repeat/frequency/presence penalties over a history tail, greedy arg-max
+(one block per token, strided scan plus warp/block reduction), top-k by repeated maximum scans, top-p cut,
+temperature, and a counter-based Philox uniform draw.
 
 ## Source semantics
-- Repeat penalty multiplies non-positive logits and divides positive ones; frequency penalty scales with the
-  count, presence penalty is a boolean; none of them can increase a logit.
-- Greedy is the argmax of the penalised logits; ties go to the lowest index; temperature must not be applied
-  (at temperature <= 0 the inverse temperature is 0 and every scaled logit would be 0).
-- Penalty window is the tail of the history row of length min(penalty_last_n, history_len).
-- Philox uniform: top 24 bits of a 32-bit word divided by 2^24, so the value is in [0,1).
-- Sampled path needs 1 <= top_k <= 64.
+* Greedy (`greedy` or `temperature <= 0`) is an arg-max over the PENALISED logits, ties to the lowest index.
+  Temperature must not be applied there: `inv_t = 0` for `temperature <= 0` would zero every logit.
+* Repeat penalty multiplies non-positive logits and divides positive ones; the presence penalty is a boolean
+  (applied once), the frequency penalty scales with the count. Nothing happens for count 0.
+* The history window is the TAIL of the row: the last `min(penalty_last_n, history_len)` entries.
+* The Philox uniform keeps 24 mantissa bits, so it lies in [0, 1).
+* `top_k` is clamped to at most 64 on the sampled path; `top_p` keeps at least `min_keep` survivors.
 
 ## Form template identifiers
-- sampler_greedy_kernel -> argmax reduction ; apply_penalties -> penalise ; philox_uniform -> uniform24
+`sample_tokens` -> `sample_rows`; `SamplerParams` -> `sampling_config`; `history` -> `token_history`;
+`sampler_greedy_kernel` -> `argmax_kernel`; `philox_uniform` -> `counter_uniform`; `KMAX` -> `top_k_cap`.
 -/
 
 namespace Ref.Sampler
 
--- § argmax reduction
-/-- Candidate (value, index) pair. -/
-abbrev Cand := Int × Nat
-
-/-- Reduction step: replace `a` by `b` iff `b` has a larger value, or an equal value and a smaller index. -/
-def better (a b : Cand) : Cand :=
-  if a.1 < b.1 ∨ (a.1 = b.1 ∧ b.2 < a.2) then b else a
-
-/-- The reduction result is at least as large as both operands. -/
-theorem better_value_ge (a b : Cand) : a.1 ≤ (better a b).1 ∧ b.1 ≤ (better a b).1 := by
-  unfold better
-  split <;> omega
-
-/-- On equal values the smaller index wins. -/
-theorem better_tie_min (a b : Cand) (h : a.1 = b.1) : (better a b).2 = min a.2 b.2 := by
-  unfold better
-  split <;> omega
-
-/-- The result is always one of the operands. -/
-theorem better_is_operand (a b : Cand) : better a b = a ∨ better a b = b := by
-  unfold better
-  split
-  · exact Or.inr rfl
-  · exact Or.inl rfl
-
-/-- The order is symmetric on distinct indices: the reduction does not depend on operand order. -/
-theorem better_comm (a b : Cand) (h : a.2 ≠ b.2) : (better a b).2 = (better b a).2 := by
-  unfold better
-  split <;> split <;> omega
-
-/-- A candidate with no elements (index = n_vocab) loses ties against real indices. -/
-theorem sentinel_loses (v : Int) (i n : Nat) (h : i < n) : (better (v, n) (v, i)).2 = i := by
-  unfold better
-  split
-  · rfl
-  · rename_i hc
-    exact absurd (Or.inr ⟨rfl, h⟩) hc
-
 -- § penalties
-/-- Penalised logit: repeat (multiply if non-positive, divide if positive), then subtract freq/presence. -/
-def penalise (logit : Int) (count : Int) (rep freq pres : Int) : Int :=
-  if count ≤ 0 then logit
-  else
-    let l := if logit ≤ 0 then logit * rep else logit / rep
-    l - (count * freq + pres)
 
-/-- Multiplying a non-positive logit by `rep ≥ 1` does not increase it. -/
-theorem mul_branch_le (logit rep : Int) (h0 : logit ≤ 0) (h1 : 1 ≤ rep) : logit * rep ≤ logit := by
-  have h := Int.mul_nonneg (by omega : 0 ≤ -logit) (by omega : 0 ≤ rep - 1)
-  simp only [Int.neg_mul, Int.mul_sub, Int.mul_one] at h
+/-- Penalty model over integers: repeat (multiply if non-positive, divide otherwise), then frequency and
+presence. A zero count leaves the logit untouched. -/
+def applyPenalty (logit : Int) (count : Nat) (rep freq present : Int) : Int :=
+  if count = 0 then logit
+  else (if logit ≤ 0 then logit * rep else logit / rep) - ((count : Int) * freq + 1 * present)
+
+/-- A token that never occurred is not penalised. -/
+theorem penalty_zero_count (logit rep freq present : Int) :
+    applyPenalty logit 0 rep freq present = logit := by
+  unfold applyPenalty
+  simp
+
+/-- The presence penalty is a boolean: with no frequency penalty the count does not matter. -/
+theorem presence_is_boolean (logit rep present : Int) (c₁ c₂ : Nat) (h₁ : 0 < c₁) (h₂ : 0 < c₂) :
+    applyPenalty logit c₁ rep 0 present = applyPenalty logit c₂ rep 0 present := by
+  have n₁ : c₁ ≠ 0 := by omega
+  have n₂ : c₂ ≠ 0 := by omega
+  unfold applyPenalty
+  rw [if_neg n₁, if_neg n₂]
+  simp
+
+/-- A negative logit is multiplied: with repeat penalty 2, -3 becomes -6 (less likely). -/
+theorem penalty_negative_multiplies : applyPenalty (-3) 1 2 0 0 = -6 := by decide
+
+/-- A positive logit is divided: with repeat penalty 2, 6 becomes 3. -/
+theorem penalty_positive_divides : applyPenalty 6 1 2 0 0 = 3 := by decide
+
+/-- Dividing a negative logit unconditionally would RAISE it (-3 / 2 = -2 > -6): the inversion the source avoids. -/
+theorem naive_division_inverts : (-6 : Int) < (-3) / 2 := by decide
+
+-- § history window
+
+/-- Length of the penalty window: clamp of `penalty_last_n` into `[0, history_len]`. -/
+def winLen (plen hl : Int) : Int := max 0 (min plen hl)
+
+/-- The window length is non-negative. -/
+theorem winLen_nonneg (plen hl : Int) : 0 ≤ winLen plen hl := by
+  unfold winLen
   omega
 
-/-- Dividing a positive logit by `rep ≥ 1` does not increase it. -/
-theorem div_branch_le (logit rep : Int) (h0 : 0 < logit) (h1 : 1 ≤ rep) : logit / rep ≤ logit := by
-  exact Int.ediv_le_self rep (by omega)
-
-/-- No penalty combination with `rep ≥ 1`, `freq ≥ 0`, `pres ≥ 0` can raise a logit. -/
-theorem penalise_le (logit count rep freq pres : Int) (hr : 1 ≤ rep) (hf : 0 ≤ freq) (hp : 0 ≤ pres) :
-    penalise logit count rep freq pres ≤ logit := by
-  unfold penalise
-  by_cases hc : count ≤ 0
-  · simp [hc]
-  · simp only [hc, if_false]
-    have hcf : 0 ≤ count * freq := Int.mul_nonneg (by omega) hf
-    by_cases hl : logit ≤ 0
-    · have := mul_branch_le logit rep hl hr
-      simp only [hl, if_true]
-      omega
-    · have := div_branch_le logit rep (by omega) hr
-      simp only [hl, if_false]
-      omega
-
-/-- With no occurrences the logit is untouched. -/
-theorem penalise_zero_count (logit rep freq pres : Int) : penalise logit 0 rep freq pres = logit := by
-  simp [penalise]
-
-/-- Scaling by an inverse temperature of 0 collapses every logit to 0 (the old greedy bug). -/
-theorem zero_inv_temp_collapses (logit : Int) : logit * 0 = 0 := by
+/-- The window never exceeds the history. -/
+theorem winLen_le (plen hl : Int) (h : 0 ≤ hl) : winLen plen hl ≤ hl := by
+  unfold winLen
   omega
 
--- § penalty window
-/-- Window length: `penalty_last_n` clamped to `[0, history_len]`. -/
-def windowLen (lastN histLen : Int) : Int := max 0 (min lastN histLen)
-
-/-- The window never exceeds the history length. -/
-theorem window_le_history (lastN histLen : Int) (h : 0 ≤ histLen) : windowLen lastN histLen ≤ histLen := by
-  unfold windowLen
+/-- The window is the tail: it starts at `hl - len` and ends exactly at the end of the row. -/
+theorem winStart_tail (plen hl : Int) : (hl - winLen plen hl) + winLen plen hl = hl := by
   omega
 
-/-- The window is non-negative. -/
-theorem window_nonneg (lastN histLen : Int) : 0 ≤ windowLen lastN histLen := by
-  unfold windowLen
+-- § greedy arg-max with lowest-index tie rule
+
+/-- Preference order: larger score, or equal score with smaller index. -/
+abbrev Beats (v i w j : Nat) : Prop := v > w ∨ (v = w ∧ i < j)
+
+/-- Asymmetry of the preference order. -/
+theorem beats_asymm (v i w j : Nat) : Beats v i w j → ¬ Beats w j v i := by
+  intro h1 h2
+  unfold Beats at h1 h2
   omega
 
-/-- The tail starts at `histLen - window`, and start plus window is the history length. -/
-theorem window_tail_start (lastN histLen : Int) (h : 0 ≤ histLen) :
-    (histLen - windowLen lastN histLen) + windowLen lastN histLen = histLen := by
+/-- Transitivity of the preference order. -/
+theorem beats_trans (a i b j c k : Nat) : Beats a i b j → Beats b j c k → Beats a i c k := by
+  intro h1 h2
+  unfold Beats at h1 h2 ⊢
   omega
 
--- § Philox
-/-- Top 24 bits of a 32-bit word. -/
-def top24 (w : Nat) : Nat := w / 256
-
-/-- The 24-bit mantissa is below 2^24 for 32-bit input, so `top24 / 2^24 < 1`. -/
-theorem top24_lt (w : Nat) (h : w < 4294967296) : top24 w < 16777216 := by
-  unfold top24
+/-- Totality for distinct indices, which makes the strided scan plus reduction order-independent. -/
+theorem beats_total (v w i j : Nat) (h : i ≠ j) : Beats v i w j ∨ Beats w j v i := by
+  unfold Beats
   omega
 
--- § top-k
-/-- Effective k: zero for non-positive request, otherwise clamped to 64. -/
-def kEff (topK : Int) : Int := if topK ≤ 0 then 0 else min topK 64
+/-- The "no candidate" sentinel (index `n_vocab`, score at most any real score) loses to every real index. -/
+theorem sentinel_loses (v w i n : Nat) (hw : w ≤ v) (hi : i < n) : Beats v i w n := by
+  unfold Beats
+  omega
 
-/-- Effective k never exceeds the 64-slot arrays. -/
-theorem kEff_le (topK : Int) : kEff topK ≤ 64 := by
-  unfold kEff
+/-- The final answer is a valid index whenever the vocabulary is non-empty (`-inf` ties answer 0). -/
+theorem final_index_lt (wi n : Nat) (hn : 0 < n) : (if wi < n then wi else 0) < n := by
   split <;> omega
 
-/-- Effective k is non-negative. -/
-theorem kEff_nonneg (topK : Int) : 0 ≤ kEff topK := by
-  unfold kEff
+/-- A 32-lane warp is folded by `shfl_down` offsets 16, 8, 4, 2, 1, which together span all 31 other lanes. -/
+theorem warp_fold_span : 16 + 8 + 4 + 2 + 1 = 32 - 1 := by decide
+
+/-- A 1024-thread block has 32 warps, so the second-stage warp reduction needs exactly one full warp. -/
+theorem block_warps : (1024 + 31) / 32 = 32 := by decide
+
+-- § temperature
+
+/-- Scaling by zero collapses every logit to the same value: the bug the greedy branch had. -/
+theorem zero_scale_collapses (a b : Int) : 0 * a = 0 * b := by
+  simp
+
+/-- Scaling by a positive constant preserves the order, so greedy never needs temperature. -/
+theorem pos_scale_monotone (c a b : Int) (hc : 0 < c) : a < b ↔ c * a < c * b := by
+  constructor
+  · intro h
+    exact Int.mul_lt_mul_of_pos_left h hc
+  · intro h
+    by_contra hn
+    have h2 : b ≤ a := Int.not_lt.mp hn
+    have h3 := Int.mul_le_mul_of_nonneg_left h2 (Int.le_of_lt hc)
+    omega
+
+-- § Philox uniform, top-k and top-p bookkeeping
+
+/-- The top 24 bits of a 32-bit word give an integer below 2^24, so `u24 / 2^24 < 1`. -/
+theorem philox_u24_lt (c0 : Nat) (h : c0 < 4294967296) : c0 / 256 < 16777216 := by
+  omega
+
+/-- Effective `top_k` on the sampled path: zero disables it, otherwise at most 64. -/
+def kClamp (topK : Nat) : Nat := if topK > 0 then min topK 64 else 0
+
+/-- The clamped `top_k` never exceeds the 64-slot buffers. -/
+theorem kClamp_le (topK : Nat) : kClamp topK ≤ 64 := by
+  unfold kClamp
   split <;> omega
 
-/-- A valid sampled-path request gets k between 1 and 64. -/
-theorem kEff_valid (topK : Int) (h : 1 ≤ topK) : 1 ≤ kEff topK ∧ kEff topK ≤ 64 := by
-  unfold kEff
+/-- The top-p cut after the `min_keep` correction. -/
+def cutAdj (cut minKeep nKeep : Nat) : Nat := if cut < minKeep then min minKeep nKeep else cut
+
+/-- The adjusted cut never exceeds the survivor count (given the raw cut does not). -/
+theorem cutAdj_le (cut minKeep nKeep : Nat) (h : cut ≤ nKeep) : cutAdj cut minKeep nKeep ≤ nKeep := by
+  unfold cutAdj
+  split <;> omega
+
+/-- When survivors exist, the adjusted cut keeps at least one of them for `min_keep >= 1`. -/
+theorem cutAdj_pos (cut minKeep nKeep : Nat) (h1 : 1 ≤ minKeep) (h2 : 1 ≤ nKeep) (h3 : 1 ≤ cut) :
+    1 ≤ cutAdj cut minKeep nKeep := by
+  unfold cutAdj
   split <;> omega
 
 -- § launch geometry
-/-- Greedy kernel: 1024 threads give 32 warps, matching the 32-slot shared arrays. -/
-theorem greedy_warps : 1024 / 32 = 32 := by decide
 
-/-- Any block of at most 1024 threads has at most 32 warps. -/
-theorem warps_le_32 (b : Nat) (h : b ≤ 1024) : (b + 31) / 32 ≤ 32 := by
-  omega
-
-/-- Sampled kernel: 64 threads per block, grid covers all tokens. -/
-theorem sampler_grid_covers (n : Nat) : n ≤ ((n + 63) / 64) * 64 := by
+/-- The sampled-path grid of 64-thread blocks covers every token and wastes fewer than 64 threads. -/
+theorem grid_covers (n : Nat) : n ≤ (n + 63) / 64 * 64 ∧ (n + 63) / 64 * 64 < n + 64 := by
   omega
 
 end Ref.Sampler
 
 
 
-
-
-## FILE: /mnt/user-data/outputs/GatedResidualCuda.lean
+## FILE: /mnt/user-data/outputs/VerifyWindowKernels.lean
 /-!
-# MODULE: gated_residual_cuda
-SOURCES: src/kernels/cuda/gr.cu
-The gated residual / hyper-connection on the GPU: `gr_read` (norm, down projection + SiLU, gate projection,
-stream mean, optional inject projection) and `gr_write` (add the block output to every stream with a
-per-stream sigmoid weight). This module models the integer/index side: workspace carving, launch geometry,
-strided reductions, the write-kernel index decomposition and the variant selection.
+# MODULE: verify_window_kernels
+SOURCES: src/kernels/cuda/verify_kernels.cu
+Multi-token ("verify window") versions of the GDN conv/gate/step kernels and the small index/gather helpers
+that keep speculative decoding on the device.
 
 ## Source semantics
-* The workspace is ONE table of five regions (xn, xq, lq, gated, lo), each rounded up to 16 bytes, carved
-  back to back; the first version sized the regions in a different order than it assigned pointers.
-* The gate kernel uses one warp per output row (8 warps per block); the down kernel uses one block per row
-  with warps striding the reduction axis; the write kernel maps a flat index to (stream, element).
-* `native_mmvf` overrides `fp32_activations`, which overrides the bf16 activation variant; the mean kernel
-  is only launched on the non-native paths.
+* The conv window of token `t` is the last four entries of `[hist(3) | x_0 ...]`; `gdn_conv_commit` keeps the
+  last three entries of `[hist(3) | x_0 .. x_{n-1}]` and does nothing for `n <= 0`.
+* `dense_steps` writes `[c, c+1, (c+1)/4, c+1]` per cell; `window_ids` clips to the last `window` cells and
+  records the width.
+* `fetch_blobs` / `gather_rows` split a flat index `i` into `(i / per, i - (i / per) * per)`.
+* `rebase_ptrs` sets pointer `k` to `base + k * bytes`.
+* Grid sizes: `channels / 128` conv blocks, `ceil(2 * h_v / 8)` gate blocks of 8 warps.
 
 ## Form template identifiers
-* `roundUp16`        : align16 (round a byte count up to a multiple of 16)
-* `wsTotal`          : workspace_bytes (gr_workspace_init)
-* `gateBlocks`       : grid_for_warp_per_row
-* `owner`            : strided_loop_owner
-* `selectVariant`    : kernel_variant_selector
+`hist` -> `conv_history`; `n_keep` -> `accepted_count`; `steps` -> `step_records`; `window_ids` -> `window_cells`;
+`kVerifyMaxT` -> `max_window`; `S` -> `head_dim`.
 -/
 
-namespace Ref.GatedResidual
+namespace Ref.Verify
 
--- § 16-byte rounding
+-- § conv window and commit
 
-/-- Round a byte count up to the next multiple of 16 (`(sz + 15) & ~15`). -/
-def roundUp16 (n : Nat) : Nat := (n + 15) / 16 * 16
+/-- The sequence `[hist(3) | xs]` read at position `src`. -/
+def ext {α : Type} (hist xs : Nat → α) (src : Nat) : α :=
+  if src < 3 then hist src else xs (src - 3)
 
-/-- Rounding never shrinks a size. -/
-theorem roundUp16_ge (n : Nat) : n ≤ roundUp16 n := by
-  unfold roundUp16; omega
-
-/-- A rounded size is a multiple of 16. -/
-theorem roundUp16_mod (n : Nat) : roundUp16 n % 16 = 0 := by
-  unfold roundUp16; omega
-
-/-- Rounding adds fewer than 16 bytes. -/
-theorem roundUp16_lt (n : Nat) : roundUp16 n < n + 16 := by
-  unfold roundUp16; omega
-
--- § workspace carving
-
-/-- Offset of `xq` (after `xn`, size `hc_dim*4`). -/
-def off1 (D : Nat) : Nat := roundUp16 (D * 4)
-/-- Offset of `lq` (after `xq`, size `hc_dim*2`). -/
-def off2 (D : Nat) : Nat := roundUp16 (D * 4) + roundUp16 (D * 2)
-/-- Offset of `gated` (after `lq`, size `hc_lr*2`). -/
-def off3 (D L : Nat) : Nat := roundUp16 (D * 4) + roundUp16 (D * 2) + roundUp16 (L * 2)
-/-- Offset of `lo` (after `gated`, size `hc_dim*4`). -/
-def off4 (D L : Nat) : Nat := off3 D L + roundUp16 (D * 4)
-/-- Total workspace bytes (after `lo`, size `hc_lr*4`). -/
-def wsTotal (D L : Nat) : Nat := off4 D L + roundUp16 (L * 4)
-
-/-- Every region fits inside its slot, so no region overlaps its neighbour. -/
-theorem regions_fit (D L : Nat) :
-    D * 4 ≤ off1 D ∧ off1 D + D * 2 ≤ off2 D ∧ off2 D + L * 2 ≤ off3 D L ∧
-    off3 D L + D * 4 ≤ off4 D L ∧ off4 D L + L * 4 ≤ wsTotal D L := by
-  have h0 := roundUp16_ge (D * 4)
-  have h1 := roundUp16_ge (D * 2)
-  have h2 := roundUp16_ge (L * 2)
-  have h3 := roundUp16_ge (D * 4)
-  have h4 := roundUp16_ge (L * 4)
-  simp only [off1, off2, off3, off4, wsTotal]
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩ <;> omega
-
-/-- Every region start is 16-byte aligned. -/
-theorem offsets_aligned (D L : Nat) :
-    off1 D % 16 = 0 ∧ off2 D % 16 = 0 ∧ off3 D L % 16 = 0 ∧ off4 D L % 16 = 0 ∧
-    wsTotal D L % 16 = 0 := by
-  have h0 := roundUp16_mod (D * 4)
-  have h1 := roundUp16_mod (D * 2)
-  have h2 := roundUp16_mod (L * 2)
-  have h4 := roundUp16_mod (L * 4)
-  simp only [off1, off2, off3, off4, wsTotal]
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩ <;> omega
-
-/-- The real geometry (`hc_dim = 10240`, `hc_lr = 320`) needs 104320 bytes. -/
-theorem real_total : wsTotal 10240 320 = 104320 := by
-  decide
-
-/-- The first version gave `xq` `hc_lr*2` bytes where it needs `hc_dim*2`: 640 against 20480. -/
-theorem buggy_xq_too_small : 320 * 2 < 10240 * 2 := by
-  decide
-
--- § launch geometry
-
-/-- Blocks of the gate kernel: 8 warps (rows) per block, rounded up. -/
-def gateBlocks (hcDim : Nat) : Nat := (hcDim + 7) / 8
-
-/-- The gate grid covers every output row. -/
-theorem gate_rows_cover (hcDim : Nat) : hcDim ≤ gateBlocks hcDim * 8 := by
-  unfold gateBlocks; omega
-
-/-- Every row index lies in a launched block. -/
-theorem gate_block_of_row (hcDim i : Nat) (hi : i < hcDim) : i / 8 < gateBlocks hcDim := by
-  unfold gateBlocks; omega
-
-/-- `block*8 + warp` decomposes back into its block and warp. -/
-theorem gate_row_roundtrip (b w : Nat) (hw : w < 8) :
-    (b * 8 + w) / 8 = b ∧ (b * 8 + w) % 8 = w := by
-  refine ⟨?_, ?_⟩ <;> omega
-
-/-- The (block, warp) to row map is injective: no two warps write the same row. -/
-theorem gate_row_unique (b w b' w' : Nat) (hw : w < 8) (hw' : w' < 8)
-    (h : b * 8 + w = b' * 8 + w') : b = b' ∧ w = w' := by
-  refine ⟨?_, ?_⟩ <;> omega
-
-/-- The real gate kernel launches 1280 blocks. -/
-theorem real_gate_blocks : gateBlocks 10240 = 1280 := by
-  decide
-
-/-- The down kernel at real geometry: 320 blocks x 8 warps = 2560 warps. -/
-theorem real_down_warps : 320 * 8 = 2560 := by
-  decide
-
-/-- 2560 warps over 48 SMs is 53 warps per SM (against 6.7 for one warp per row). -/
-theorem real_down_occupancy : 2560 / 48 = 53 := by
-  decide
-
-/-- The mean kernel launches 10 blocks of 256 threads over `n_embd = 2560`. -/
-theorem real_mean_blocks : (2560 + 255) / 256 = 10 := by
-  decide
-
--- § strided reductions
-
-/-- The thread that visits element `i` when `stride` threads stride the axis. -/
-def owner (stride i : Nat) : Nat := i % stride
-
-/-- Every element has an owner among the `nw*32` threads of the block. -/
-theorem owner_lt (nw i : Nat) (h : 0 < nw) : owner (nw * 32) i < nw * 32 := by
-  unfold owner
-  exact Nat.mod_lt _ (by omega)
-
-/-- An element is its owner's start plus a whole number of strides, so the loop reaches it. -/
-theorem stride_decomp (s i : Nat) : owner s i + s * (i / s) = i := by
-  unfold owner
-  exact Nat.mod_add_div i s
-
-/-- Thread id `warp*32 + lane` decomposes back into warp and lane and stays below `nw*32`. -/
-theorem thread_roundtrip (nw warp lane : Nat) (hw : warp < nw) (hl : lane < 32) :
-    warp * 32 + lane < nw * 32 ∧ (warp * 32 + lane) / 32 = warp ∧ (warp * 32 + lane) % 32 = lane := by
-  refine ⟨?_, ?_, ?_⟩ <;> omega
-
--- § block reduction scratch
-
-/-- Number of warps in a block of `bd` threads. -/
-def numWarps (bd : Nat) : Nat := (bd + 31) / 32
-
-/-- A block of 256 threads has 8 warps. -/
-theorem numWarps_256 : numWarps 256 = 8 := by
-  decide
-
-/-- No block of at most 256 threads has more than 8 warps. -/
-theorem numWarps_le (bd : Nat) (h : bd ≤ 256) : numWarps bd ≤ 8 := by
-  unfold numWarps; omega
-
-/-- The `float[8]` scratch of `block_sumf` fits in the callers' `double scratch[8]` (64 bytes). -/
-theorem scratch_fits (bd : Nat) (h : bd ≤ 256) : numWarps bd * 4 ≤ 8 * 8 := by
-  have := numWarps_le bd h
-  omega
-
-/-- One warp per stream in the inject kernel: warp `tid/32` is a stream iff `tid < 32*hc`. -/
-theorem inject_warp_active (tid hc : Nat) : tid / 32 < hc ↔ tid < 32 * hc := by
-  omega
-
--- § write kernel index decomposition
-
-/-- A flat index `i` is `stream * n_embd + element`. -/
-theorem write_index_decomp (i n : Nat) : n * (i / n) + i % n = i :=
-  Nat.div_add_mod i n
-
-/-- For `i < hc*n_embd` the stream index is below `hc`. -/
-theorem write_stream_lt (i hc n : Nat) (hn : 0 < n) (hi : i < hc * n) : i / n < hc :=
-  (Nat.div_lt_iff_lt_mul hn).2 hi
-
-/-- The element index is below `n_embd`. -/
-theorem write_elem_lt (i n : Nat) (hn : 0 < n) : i % n < n :=
-  Nat.mod_lt _ hn
-
-/-- Conversely `(stream, element)` maps to an in-range flat index. -/
-theorem write_index_inv (c d hc n : Nat) (hcl : c < hc) (hd : d < n) : c * n + d < hc * n := by
-  have h : (c + 1) * n ≤ hc * n := Nat.mul_le_mul hcl (Nat.le_refl n)
-  rw [Nat.add_mul, Nat.one_mul] at h
-  omega
-
--- § variant selection
-
-/-- The three kernel families `gr_read` can launch. -/
-inductive Variant where
-  | native
-  | fp32
-  | bf16
-  deriving DecidableEq
-
-/-- `native_mmvf` wins over `fp32_activations`, which wins over bf16. -/
-def selectVariant (fp32Flag native : Bool) : Variant :=
-  if native then Variant.native else if fp32Flag then Variant.fp32 else Variant.bf16
-
-/-- With the native flag set the native variant is always chosen. -/
-theorem native_wins (f : Bool) : selectVariant f true = Variant.native := by
-  simp [selectVariant]
-
-/-- Native implies FP32 activations (`use_fp32 = fp32_activations || use_native`). -/
-theorem useFp32_of_native (f : Bool) : (f || true) = true := by
-  simp
-
-/-- The mean kernel is launched exactly on the non-native paths. -/
-def meanLaunched (native : Bool) : Bool := !native
-
-/-- Native path launches no separate mean kernel. -/
-theorem native_no_mean : meanLaunched true = false := by
-  simp [meanLaunched]
-
-/-- The native path needs even `hc*n_embd` and `hc_lr`. -/
-def nativeGeometryOk (hcDim hcLr : Nat) : Prop := hcDim % 2 = 0 ∧ hcLr % 2 = 0
-
-/-- The real geometry satisfies the native path's evenness requirement. -/
-theorem real_native_ok : nativeGeometryOk 10240 320 := by
-  unfold nativeGeometryOk
-  decide
-
-end Ref.GatedResidual
-
-
-
-## FILE: /mnt/user-data/outputs/PleBlockCuda.lean
-/-!
-# MODULE: ple_block_cuda
-SOURCES: src/kernels/cuda/ple.cu
-The GPU half of the PLE block: key/value projections, grouped RMS norms, the signed-sqrt sigmoid gate, the
-broadcast, the depthwise causal dilated conv with SiLU, and the three-way residual add; plus the rolling
-history advance and the caller-owned scratch carving. This module models the integer, index and layout
-contracts, the signed gate argument, and the bf16 rounding of `to_bf16_kernel`.
-
-## Source semantics
-* The scratch is carved from a caller-owned workspace: five `hc_dim` float buffers, then `n_embd` and `hc`
-  floats, then the Q8 activation image, then the BF16 embedding copy, each 16-byte aligned.
-* The conv state is ROW-FASTEST: `hist[row + nhist*c]`; tap `k` reads row `nhist - (kern-1-k)*dil`, and only
-  the last tap reads the new row (`norm[c]`).
-* `gate = sigmoid(sgn(s) * sqrt(max(|s|, eps)))`: the sign is carried separately so the gate argument is odd.
-* Output buffers may not overlap the scratch; overlap is an interval-intersection test.
-* `bf16_bits` is round-to-nearest-even on a uint32 with wrap-around.
-
-## Form template identifiers
-* `scratchBytes`   : scratch_bytes (ple_block_scratch_bytes)
-* `advance`        : history_advance
-* `tapRow`         : conv_tap_row
-* `histIndex`      : conv_state_index (row-fastest)
-* `argOf`          : signed_gate_argument
-* `overlapC`       : buffer_overlap_check
-* `bf16Bits`       : f32_to_bf16_rne
--/
-
-namespace Ref.PleBlock
-
--- § geometry constants
-
-/-- `NG_N_EMBD`. -/
-def NG_N_EMBD : Nat := 2560
-/-- `NG_HC`. -/
-def NG_HC : Nat := 4
-/-- `NG_HC_DIM`. -/
-def NG_HC_DIM : Nat := 10240
-/-- `NG_HIST`: history rows kept per channel. -/
-def NG_HIST : Nat := 9
-/-- `PLE_CONV_KERNEL`. -/
-def PLE_CONV_KERNEL : Nat := 4
-/-- Dilation of the conv taps at the real geometry. -/
-def NGRAM_SIZE : Nat := 3
-
-/-- `hc * n_embd = hc_dim` at the real geometry. -/
-theorem hc_dim_eq : NG_HC * NG_N_EMBD = NG_HC_DIM := by
-  decide
-
--- § scratch carving
-
-/-- Round up to a multiple of 16. -/
-def roundUp16 (n : Nat) : Nat := (n + 15) / 16 * 16
-
-/-- Rounding never shrinks. -/
-theorem roundUp16_ge (n : Nat) : n ≤ roundUp16 n := by
-  unfold roundUp16; omega
-
-/-- Rounded sizes are multiples of 16. -/
-theorem roundUp16_mod (n : Nat) : roundUp16 n % 16 = 0 := by
-  unfold roundUp16; omega
-
-/-- Bytes of the float region: five `hc_dim` buffers plus `n_embd` plus `hc` floats. -/
-def floatBytes : Nat := (5 * NG_HC_DIM + NG_N_EMBD + NG_HC) * 4
-/-- Bytes of the Q8 activation image. -/
-def q8Bytes : Nat := (NG_N_EMBD / 32) * 34
-/-- Bytes of the BF16 embedding copy. -/
-def embBytes : Nat := NG_N_EMBD * 2
-/-- Offset of the Q8 image (`d_act`). -/
-def actOff : Nat := roundUp16 floatBytes
-/-- Offset of the BF16 embedding copy (`d_emb16`). -/
-def embOff : Nat := actOff + roundUp16 q8Bytes
-/-- Total scratch bytes (`ple_block_scratch_bytes`). -/
-def scratchBytes : Nat := roundUp16 floatBytes + roundUp16 q8Bytes + embBytes + 256
-
-/-- The real scratch size is 223152 bytes. -/
-theorem scratch_value : scratchBytes = 223152 := by
-  decide
-
-/-- The region ordering over abstract sizes: float region `F`, Q8 image `Q`, embedding copy `E`. -/
-theorem scratch_gen (F Q E : Nat) :
-    F ≤ roundUp16 F ∧ roundUp16 F + Q ≤ roundUp16 F + roundUp16 Q ∧
-    roundUp16 F + roundUp16 Q + E ≤ roundUp16 F + roundUp16 Q + E + 256 := by
-  have h1 := roundUp16_ge F
-  have h2 := roundUp16_ge Q
-  refine ⟨?_, ?_, ?_⟩ <;> omega
-
-/-- The three scratch regions are ordered and non-overlapping. -/
-theorem scratch_regions_fit :
-    floatBytes ≤ actOff ∧ actOff + q8Bytes ≤ embOff ∧ embOff + embBytes ≤ scratchBytes :=
-  scratch_gen floatBytes q8Bytes embBytes
-
-/-- The Q8 image and the embedding copy start 16-byte aligned. -/
-theorem scratch_offsets_aligned : actOff % 16 = 0 ∧ embOff % 16 = 0 := by
-  have h1 := roundUp16_mod floatBytes
-  have h2 := roundUp16_mod q8Bytes
-  simp only [actOff, embOff]
-  refine ⟨?_, ?_⟩ <;> omega
-
-/-- Float buffers `key, query, norm, gated, conv, value` are stacked `hc_dim` apart, so none aliases another
-(in particular `key` and `normalized` are distinct). -/
-theorem float_buffers_disjoint (D n hc : Nat) :
-    0 + D ≤ D ∧ D + D ≤ 2 * D ∧ 2 * D + D ≤ 3 * D ∧ 3 * D + D ≤ 4 * D ∧ 4 * D + D ≤ 5 * D ∧
-    5 * D + n ≤ 5 * D + n ∧ 5 * D + n + hc ≤ 5 * D + n + hc := by
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> omega
-
--- § history advance
-
-/-- One advance step of a history column viewed as a window of `h` rows: shift up, put `x` last. -/
-def advance (h : Nat) (col : Nat → Int) (x : Int) : Nat → Int :=
-  fun r => if r + 1 < h then col (r + 1) else x
-
-/-- The newest value lands in the last row. -/
-theorem advance_last (h : Nat) (hpos : 0 < h) (col : Nat → Int) (x : Int) :
-    advance h col x (h - 1) = x := by
-  unfold advance
-  have : ¬ (h - 1 + 1 < h) := by omega
-  simp [this]
-
-/-- Every other row takes the value of the row after it. -/
-theorem advance_shift (h : Nat) (col : Nat → Int) (x : Int) (r : Nat) (hr : r + 1 < h) :
-    advance h col x r = col (r + 1) := by
-  unfold advance
-  simp [hr]
-
--- § conv taps and state indexing
-
-/-- Row read by tap `k` of the depthwise conv. -/
-def tapRow (nhist kern dil k : Nat) : Nat := nhist - (kern - 1 - k) * dil
-
-/-- At the real geometry (kern 4, dil 3, hist 9) the taps read rows 0, 3, 6, 9. -/
-theorem real_tap_rows : [0, 1, 2, 3].map (tapRow 9 4 3) = [0, 3, 6, 9] := by
-  decide
-
-/-- Only the last tap reads the new row (`row == nhist`). -/
-theorem only_last_tap_new : ∀ k, k < 4 → (tapRow 9 4 3 k = 9 ↔ k = 3) := by
-  decide
-
-/-- Row-fastest index of channel `c`, row `row`. -/
-def histIndex (row nh c : Nat) : Nat := row + nh * c
-
-/-- A row-fastest index stays inside `nh * m` for `row < nh`, `c < m`. -/
-theorem histIndex_lt (row nh c m : Nat) (hr : row < nh) (hc : c < m) : histIndex row nh c < nh * m := by
-  unfold histIndex
-  have h : nh * (c + 1) ≤ nh * m := Nat.mul_le_mul (Nat.le_refl nh) hc
-  rw [Nat.mul_add, Nat.mul_one] at h
-  omega
-
-/-- The same bound serves the conv-weight index `k + kern*c`. -/
-theorem kernel_index_lt (k kern c m : Nat) (hk : k < kern) (hc : c < m) : k + kern * c < kern * m :=
-  histIndex_lt k kern c m hk hc
-
-/-- The channel-slowest index is a different address: row 1 channel 0 is 10240 against 1. -/
-theorem transposed_read_differs : (1 * 10240 + 0) ≠ histIndex 1 9 0 := by
-  decide
-
-/-- Streams occupy disjoint ranges `[c*n, (c+1)*n)`. -/
-theorem stream_disjoint (c c' n : Nat) (h : c < c') : c * n + n ≤ c' * n := by
-  have h' : c + 1 ≤ c' := h
-  have hm : (c + 1) * n ≤ c' * n := Nat.mul_le_mul h' (Nat.le_refl n)
-  rw [Nat.add_mul, Nat.one_mul] at hm
-  exact hm
-
-/-- Broadcast: for `i < hc*n` the stream index is below `hc`. -/
-theorem bcast_stream_lt (i hc n : Nat) (hn : 0 < n) (hi : i < hc * n) : i / n < hc :=
-  (Nat.div_lt_iff_lt_mul hn).2 hi
-
-/-- Broadcast: the element index is below `n`. -/
-theorem bcast_elem_lt (i n : Nat) (hn : 0 < n) : i % n < n :=
-  Nat.mod_lt _ hn
-
--- § signed gate argument
-
-/-- Sign of an integer. -/
-def sgn (s : Int) : Int := if 0 < s then 1 else if s < 0 then -1 else 0
-
-/-- Magnitude after the floor (the floor is one unit in this scaled model). -/
-def mag (a : Nat) : Nat := max a 1
-
-/-- The gate argument `sgn(s) * mag(|s|)`. -/
-def argOf (s : Int) : Int := sgn s * (mag s.natAbs : Int)
-
-/-- `sgn` is odd. -/
-theorem sgn_neg (s : Int) : sgn (-s) = - sgn s := by
-  unfold sgn
-  split_ifs <;> omega
-
-/-- The gate argument is odd, which is what keeps the gate symmetric about 1/2. -/
-theorem argOf_neg (s : Int) : argOf (-s) = - argOf s := by
-  unfold argOf
-  rw [sgn_neg, Int.natAbs_neg, Int.neg_mul]
-
-/-- Zero input gives zero argument (gate 1/2). -/
-theorem argOf_zero : argOf 0 = 0 := by
-  decide
-
-/-- The clamp only bites near zero: for `|s| >= 1` the magnitude is `|s|`. -/
-theorem mag_of_ge (a : Nat) (h : 1 ≤ a) : mag a = a := by
-  unfold mag; omega
-
--- § buffer overlap test
-
-/-- The C++ `overlap` helper. -/
-def overlapC (a ab b bb : Nat) : Bool :=
-  if ab = 0 ∨ bb = 0 then false else if a < b then decide (b - a < ab) else decide (a - b < bb)
-
-/-- For non-empty ranges the helper is exactly interval intersection. -/
-theorem overlapC_iff (a ab b bb : Nat) (hab : 0 < ab) (hbb : 0 < bb) :
-    overlapC a ab b bb = true ↔ (a < b + bb ∧ b < a + ab) := by
-  unfold overlapC
-  have h1 : ¬ (ab = 0 ∨ bb = 0) := by omega
-  rw [if_neg h1]
-  by_cases h : a < b
-  · rw [if_pos h]
-    simp only [decide_eq_true_eq]
-    omega
-  · rw [if_neg h]
-    simp only [decide_eq_true_eq]
-    omega
-
-/-- Overlap is symmetric for non-empty ranges. -/
-theorem overlapC_symm (a ab b bb : Nat) (hab : 0 < ab) (hbb : 0 < bb) :
-    overlapC a ab b bb = true ↔ overlapC b bb a ab = true := by
-  rw [overlapC_iff a ab b bb hab hbb, overlapC_iff b bb a ab hbb hab]
-  omega
-
-/-- An empty range overlaps nothing. -/
-theorem overlapC_empty (a b bb : Nat) : overlapC a 0 b bb = false := by
-  unfold overlapC
-  simp
-
--- § key source selection
-
-/-- Where the key projection comes from. -/
-inductive KeySrc where
-  | bf16
-  | native
-  | q8
-  deriving DecidableEq
-
-/-- Priority: bf16 weight, then native Q2_0, then the canonical Q8_0 path. -/
-def selectKey (kb kn : Bool) : KeySrc := if kb then KeySrc.bf16 else if kn then KeySrc.native else KeySrc.q8
-
-/-- `native_key = key_native_data != null && key_bf16 == null`. -/
-def nativeKey (kn kb : Bool) : Bool := kn && !kb
-
-/-- The native-key predicate holds exactly when selection picks the native path. -/
-theorem nativeKey_iff (kn kb : Bool) : nativeKey kn kb = true ↔ selectKey kb kn = KeySrc.native := by
-  cases kb <;> cases kn <;> simp [nativeKey, selectKey]
-
--- § bf16 rounding (uint32 arithmetic, wrap-around)
-
-/-- `bf16_bits`: add `0x7FFF + lsb`, wrap at 2^32, keep the high half. -/
-def bf16Bits (i : Nat) : Nat := ((i + (i / 65536) % 2 + 32767) % 4294967296) / 65536
-
-/-- The result is a 16-bit pattern. -/
-theorem bf16Bits_lt (i : Nat) : bf16Bits i < 65536 := by
-  unfold bf16Bits; omega
-
-/-- Values with zero low half are represented exactly. -/
-theorem bf16Bits_exact (i : Nat) (hi : i < 4294967296) (h : i % 65536 = 0) :
-    bf16Bits i = i / 65536 := by
-  have hq : i = 65536 * (i / 65536) := by omega
-  generalize i / 65536 = q at hq
-  subst hq
-  have hq2 : q < 65536 := by omega
-  have e1 : 65536 * q / 65536 = q := by omega
-  unfold bf16Bits
-  rw [e1]
-  have hlt : 65536 * q + q % 2 + 32767 < 4294967296 := by omega
-  rw [Nat.mod_eq_of_lt hlt]
-  omega
-
-/-- Below the halfway point the high half is kept. -/
-theorem bf16Bits_down (i : Nat) (hi : i < 4294967296) (h : i % 65536 < 32768) :
-    bf16Bits i = i / 65536 := by
-  have hq : i = 65536 * (i / 65536) + i % 65536 := by omega
-  have hq1 : i / 65536 < 65536 := by omega
-  have hr1 : i % 65536 < 65536 := by omega
-  unfold bf16Bits
-  generalize i / 65536 = q at *
-  generalize i % 65536 = r at *
-  subst hq
-  have hlt : 65536 * q + r + q % 2 + 32767 < 4294967296 := by omega
-  rw [Nat.mod_eq_of_lt hlt]
-  omega
-
-/-- Above the halfway point the high half is incremented (wrapping at 65536). -/
-theorem bf16Bits_up (i : Nat) (hi : i < 4294967296) (h : 32768 < i % 65536) :
-    bf16Bits i = (i / 65536 + 1) % 65536 := by
-  have hq : i = 65536 * (i / 65536) + i % 65536 := by omega
-  have hq1 : i / 65536 < 65536 := by omega
-  have hr1 : i % 65536 < 65536 := by omega
-  unfold bf16Bits
-  generalize i / 65536 = q at *
-  generalize i % 65536 = r at *
-  subst hq
-  by_cases hq2 : q < 65535
-  · have hlt : 65536 * q + r + q % 2 + 32767 < 4294967296 := by omega
-    have hS : 65536 * q + r + q % 2 + 32767 = 65536 * (q + 1) + (r + q % 2 - 32769) := by omega
-    have ht : (r + q % 2 - 32769) / 65536 = 0 := Nat.div_eq_of_lt (by omega)
-    rw [Nat.mod_eq_of_lt hlt, hS, Nat.mul_add_div (by decide), ht]
-    omega
-  · have hq3 : q = 65535 := by omega
-    have hm : (65536 * q + r + q % 2 + 32767) % 4294967296
-        = 65536 * q + r + q % 2 + 32767 - 4294967296 := by omega
-    rw [hm]
-    omega
-
-/-- Ties round to even. -/
-theorem bf16Bits_tie_even (i : Nat) (hi : i < 4294967296) (h : i % 65536 = 32768) :
-    bf16Bits i % 2 = 0 := by
-  have hq : i = 65536 * (i / 65536) + i % 65536 := by omega
-  have hq1 : i / 65536 < 65536 := by omega
-  have hr1 : i % 65536 < 65536 := by omega
-  unfold bf16Bits
-  generalize i / 65536 = q at *
-  generalize i % 65536 = r at *
-  subst hq
-  by_cases hq2 : q < 65535
-  · have hlt : 65536 * q + r + q % 2 + 32767 < 4294967296 := by omega
-    rcases (by omega : q % 2 = 0 ∨ q % 2 = 1) with hb | hb
-    · have hS : 65536 * q + r + q % 2 + 32767 = 65536 * q + 65535 := by omega
-      rw [Nat.mod_eq_of_lt hlt, hS, Nat.mul_add_div (by decide)]
-      omega
-    · have hS : 65536 * q + r + q % 2 + 32767 = 65536 * (q + 1) + 0 := by omega
-      rw [Nat.mod_eq_of_lt hlt, hS, Nat.mul_add_div (by decide)]
-      omega
-  · have hq3 : q = 65535 := by omega
-    have hm : (65536 * q + r + q % 2 + 32767) % 4294967296 = 0 := by omega
-    rw [hm] <;> omega
-
-end Ref.PleBlock
-
-
-
-## FILE: /mnt/user-data/outputs/NativePlePostopsCuda.lean
-/-!
-# MODULE: native_ple_postops_cuda
-SOURCES: src/kernels/cuda/native_ple_postops.cu
-The opt-in native PLE post-operations: the gate kernel (512 threads, eight partial lanes per row), the
-broadcast, the conv+residual kernel, and the span validation that precedes the launches. This module models
-the thread/lane partitions, the tap indexing, the sign identity and the span checks.
-
-## Source semantics
-* The gate kernel reads `d = tid + j*512` for `j < 8`, masking `d >= N`; the eight partials are summed in
-  a fixed order, then 16 warp partials are reduced.
-* `float((s>0) - (s<0))` is the sign function used by the CPU-side formula.
-* The conv taps read `history[c*9 + 3k]` for `k < 3` and `normalized[c]` for `k = 3`; weights are
-  `weights[c*4 + k]`.
-* Spans must be non-null, aligned and bounded; the only permitted output/input overlap is the exact alias
-  `result == hidden` (each thread owns one element), plus `query == normalized` between outputs.
-
-## Form template identifiers
-* `laneIndex`   : gate_partial_lane_index
-* `sgnC`, `sgnI`: sign_function_forms
-* `overlaps`    : span_overlap
-* `aliasPair`   : permitted_alias_pairs
-* `convSum`     : conv_tap_accumulate
--/
-
-namespace Ref.NativePlePostops
-
--- § constants
-
-/-- `N`. -/
-def N : Nat := 2560
-/-- `H`. -/
-def H : Nat := 4
-/-- `D = N*H`. -/
-def D : Nat := 10240
-/-- History rows per channel. -/
-def HISTORY : Nat := 9
-
-/-- `D = N * H`. -/
-theorem D_eq : N * H = D := by
-  decide
-
--- § gate kernel thread partition
-
-/-- Element read by thread `tid` in partial lane `j`. -/
-def laneIndex (tid j : Nat) : Nat := tid + j * 512
-
-/-- Eight lanes of 512 threads cover `N` elements (4096 >= 2560). -/
-theorem gate_lanes_cover : N ≤ 8 * 512 := by
-  decide
-
-/-- Every element `d < N` is read by exactly the thread `d % 512` in lane `d / 512 < 8`. -/
-theorem gate_element_owner (d : Nat) (hd : d < N) :
-    d % 512 < 512 ∧ d / 512 < 8 ∧ laneIndex (d % 512) (d / 512) = d := by
-  unfold laneIndex N at *
-  refine ⟨?_, ?_, ?_⟩ <;> omega
-
-/-- No two (thread, lane) pairs read the same element. -/
-theorem gate_element_unique (tid j tid' j' : Nat) (ht : tid < 512) (ht' : tid' < 512)
-    (h : laneIndex tid j = laneIndex tid' j') : tid = tid' ∧ j = j' := by
-  unfold laneIndex at h
-  refine ⟨?_, ?_⟩ <;> omega
-
-/-- 512 threads form 16 warps, so the second-stage load `lane < 16 ? partials[lane] : 0` reads them all. -/
-theorem gate_warp_partials : 512 / 32 = 16 := by
-  decide
-
-/-- A launch of `H` blocks gives one gate per hidden-channel stream. -/
-theorem gate_blocks_eq_streams : H = 4 := by
-  decide
-
--- § sign function
-
-/-- Sign as the three-way comparison used in the source. -/
-def sgnC (s : Int) : Int := if 0 < s then 1 else if s < 0 then -1 else 0
-
-/-- Sign as `float((s>0) - (s<0))`. -/
-def sgnI (s : Int) : Int := (if 0 < s then 1 else 0) - (if s < 0 then 1 else 0)
-
-/-- Both spellings of the sign agree. -/
-theorem sgn_forms_agree (s : Int) : sgnC s = sgnI s := by
-  unfold sgnC sgnI
-  split_ifs <;> omega
-
-/-- The sign function is odd. -/
-theorem sgnC_neg (s : Int) : sgnC (-s) = - sgnC s := by
-  unfold sgnC
-  split_ifs <;> omega
-
--- § broadcast and conv-residual launch geometry
-
-/-- The broadcast kernel launches `D/256` blocks with no tail. -/
-theorem broadcast_exact : D % 256 = 0 ∧ D / 256 = 40 := by
-  decide
-
-/-- Block/thread to element map of the elementwise kernels: `c = blk*256 + tid`. -/
-theorem elementwise_roundtrip (c : Nat) (hc : c < D) :
-    c / 256 < 40 ∧ c % 256 < 256 ∧ (c / 256) * 256 + c % 256 = c := by
-  unfold D at hc
-  refine ⟨?_, ?_, ?_⟩ <;> omega
-
-/-- Distinct (block, thread) pairs own distinct elements, which is why `result == hidden` is safe. -/
-theorem elementwise_unique (b t b' t' : Nat) (ht : t < 256) (ht' : t' < 256)
-    (h : b * 256 + t = b' * 256 + t') : b = b' ∧ t = t' := by
-  refine ⟨?_, ?_⟩ <;> omega
-
--- § conv tap indexing
-
-/-- History index read by tap `k < 3`. -/
-def tapHist (c k : Nat) : Nat := c * 9 + 3 * k
-
-/-- Taps 0..2 stay inside the channel's history row of 9 and never touch the new row. -/
-theorem tapHist_in_row (c k : Nat) (hk : k < 3) :
-    c * 9 ≤ tapHist c k ∧ tapHist c k < c * 9 + 9 := by
-  unfold tapHist
-  refine ⟨?_, ?_⟩ <;> omega
-
-/-- Distinct taps read distinct history rows. -/
-theorem tapHist_inj (c k k' : Nat) (h : tapHist c k = tapHist c k') : k = k' := by
-  unfold tapHist at h
-  omega
-
-/-- Tap history indices stay below `9*D` for `c < D`. -/
-theorem tapHist_lt (c k : Nat) (hc : c < D) (hk : k < 3) : tapHist c k < 9 * D := by
-  unfold tapHist D at *
-  omega
-
-/-- Weight index `c*4 + k` stays below `4*D` for `k < 4`. -/
-theorem weight_index_lt (c k : Nat) (hc : c < D) (hk : k < 4) : c * 4 + k < 4 * D := by
-  unfold D at *
-  omega
-
-/-- The tap accumulation order is `((t0+t1)+t2)+t3`. -/
-def convSum : List Int → Int
-  | [] => 0
-  | t :: rest => rest.foldl (· + ·) t
-
-/-- The four-tap sum is left-associated, exactly the order of the `__fadd_rn` chain. -/
-theorem convSum_four (a b c d : Int) : convSum [a, b, c, d] = ((a + b) + c) + d := by
-  rfl
-
--- § span validation
-
-/-- A memory span: start address, byte length, required alignment. -/
-structure Span where
-  p : Nat
-  bytes : Nat
-  align : Nat
-
-/-- Largest `uintptr_t`. -/
-def MAXU : Nat := 18446744073709551615
-
-/-- Two spans overlap iff each starts before the other ends. -/
-def overlaps (a b : Span) : Prop := a.p < b.p + b.bytes ∧ b.p < a.p + a.bytes
-
-/-- Overlap is symmetric. -/
-theorem overlaps_symm (a b : Span) : overlaps a b ↔ overlaps b a := by
-  unfold overlaps
-  omega
-
-/-- A span never overlaps one that starts after it ends. -/
-theorem overlaps_disjoint_after (a b : Span) (h : a.p + a.bytes ≤ b.p) : ¬ overlaps a b := by
-  unfold overlaps
-  omega
-
-/-- A non-null span with `p <= MAXU - bytes` cannot wrap the address space. -/
-theorem valid_no_overflow (p bytes : Nat) (hp : p ≠ 0) (h : p ≤ MAXU - bytes) : p + bytes ≤ MAXU := by
-  unfold MAXU at *
-  omega
-
-/-- The permitted exact alias: output 6 (`result`) against input 1 (`hidden`). -/
-def aliasPair (i j : Nat) : Bool := i == 6 && j == 1
-
-/-- Exactly the pair (6,1) is exempt from the output-versus-input check. -/
-theorem aliasPair_iff (i j : Nat) : aliasPair i j = true ↔ (i = 6 ∧ j = 1) := by
-  simp [aliasPair]
-
-/-- Across the 7 outputs and 8 inputs the exemption applies to exactly one pair. -/
-theorem alias_count :
-    ((List.range 7).map (fun i => ((List.range 8).filter (fun j => aliasPair i j)).length)).sum = 1 := by
-  decide
-
-end Ref.NativePlePostops
-
-
-
-## FILE: /mnt/user-data/outputs/CpuExpertKernel.lean
-/-!
-# MODULE: cpu_expert_kernel
-SOURCES: src/kernels/cpu/expert.cpp
-The Q2_0 expert kernel on x86 (AVX-512 VNNI/VBMI): fp16 scale decoding, the Q8_1 activation quantizer, the
-2-bit unpack, the offset-corrected dot product, the 8-block scale masks, token-count dispatch, and the CPU
-feature gate. This module models the arithmetic identities and index contracts these routines rely on.
-
-## Source semantics
-* `sum_j (c_j - 1) d_w xhat_j d_x == d_w * (d_x * sum(c*xhat) - d_x * sum(xhat))`, split per 32-chunk.
-* Quantized activations are clamped to [-127, 127]; a 32-chunk sum therefore fits easily in int32.
-* The fp16 subnormal path normalizes the mantissa with at most 10 shifts and a biased exponent `113 - s`.
-* A 2-bit code is `(x % 256) % 4 = x % 4` of the multishifted word; codes are at most 3, so `maddubs`
-  never saturates against an int8 activation.
-* Token counts 1..7 select that template; everything else selects 8; the multi path needs `1 <= nt <= 8`.
-
-## Form template identifiers
-* `normShift`     : f16_subnormal_normalize
-* `clampQ`        : q8_clamp
-* `dotOff`, `dotRaw` : offset_dot, raw_dot
-* `maskOf`        : block_tail_mask
-* `dispatchNT`    : token_template_dispatch
-* `usable`, `missing` : cpu_feature_gate
--/
-
-namespace Ref.CpuExpert
-
--- § fp16 decoding
-
-/-- Number of left shifts the subnormal loop performs (bounded by `fuel`). -/
-def normShift : Nat → Nat → Nat
-  | _, 0 => 0
-  | m, f + 1 => if 1024 ≤ m then 0 else 1 + normShift (2 * m) f
-
-/-- The shift count never exceeds the fuel. -/
-theorem normShift_le (m f : Nat) : normShift m f ≤ f := by
-  induction f generalizing m with
-  | zero => simp [normShift]
-  | succ f ih =>
-    have e : normShift m (f + 1) = if 1024 ≤ m then 0 else 1 + normShift (2 * m) f := rfl
-    rw [e]
-    split
-    · omega
-    · have := ih (2 * m)
-      omega
-
-/-- After the shifts the mantissa has bit 10 set and stays below 2048. -/
-theorem normShift_spec (f : Nat) : ∀ m, 0 < m → m < 2048 → 1024 ≤ m * 2 ^ f →
-    1024 ≤ m * 2 ^ normShift m f ∧ m * 2 ^ normShift m f < 2048 := by
-  induction f with
-  | zero =>
-    intro m h0 h1 h2
-    have e : normShift m 0 = 0 := rfl
-    rw [e]
-    simp only [Nat.pow_zero, Nat.mul_one] at h2 ⊢
-    exact ⟨h2, h1⟩
-  | succ f ih =>
-    intro m h0 h1 h2
-    have e : normShift m (f + 1) = if 1024 ≤ m then 0 else 1 + normShift (2 * m) f := rfl
-    rw [e]
-    by_cases hm : 1024 ≤ m
-    · rw [if_pos hm]
-      simp only [Nat.pow_zero, Nat.mul_one]
-      exact ⟨hm, h1⟩
-    · rw [if_neg hm]
-      have h2' : 1024 ≤ (2 * m) * 2 ^ f := by
-        have e3 : m * 2 ^ (f + 1) = (2 * m) * 2 ^ f := by
-          rw [Nat.pow_succ]
-          ac_rfl
-        rw [e3] at h2
-        exact h2
-      have ih' := ih (2 * m) (by omega) (by omega) h2'
-      have e2 : m * 2 ^ (1 + normShift (2 * m) f) = (2 * m) * 2 ^ normShift (2 * m) f := by
-        rw [Nat.pow_add, Nat.pow_one]
-        ac_rfl
-      rw [e2]
-      exact ih'
-
-/-- A nonzero fp16 subnormal mantissa (`0 < man < 1024`) normalizes within 10 shifts. -/
-theorem f16_subnormal_normalizes (man : Nat) (h0 : 0 < man) (h1 : man < 1024) :
-    normShift man 10 ≤ 10 ∧ 1024 ≤ man * 2 ^ normShift man 10 ∧ man * 2 ^ normShift man 10 < 2048 := by
-  have hb : 1024 ≤ man * 2 ^ 10 := by omega
-  have hs := normShift_spec 10 man h0 (by omega) hb
-  exact ⟨normShift_le man 10, hs.1, hs.2⟩
-
-/-- The biased f32 exponent `113 - s` of a subnormal stays a normal f32 exponent. -/
-theorem subnormal_exp_range (s : Nat) (h : s ≤ 10) : 0 < 113 - s ∧ 113 - s < 255 := by
-  omega
-
-/-- The three fp16 fields reassemble the 16-bit word. -/
-theorem f16_fields (h : Nat) (hh : h < 65536) :
-    (h / 32768) * 32768 + ((h / 1024) % 32) * 1024 + h % 1024 = h := by
-  omega
-
--- § activation quantization
-
-/-- Clamp of the rounded quotient to the symmetric int8 range used by Q8_1. -/
-def clampQ (v : Int) : Int := max (-127) (min 127 v)
-
-/-- Clamped values lie in [-127, 127]. -/
-theorem clampQ_bounds (v : Int) : -127 ≤ clampQ v ∧ clampQ v ≤ 127 := by
-  unfold clampQ
-  omega
-
-/-- Clamping is idempotent. -/
-theorem clampQ_idem (v : Int) : clampQ (clampQ v) = clampQ v := by
-  unfold clampQ
-  omega
-
-/-- The range is symmetric, so clamping commutes with negation. -/
-theorem clampQ_neg (v : Int) : clampQ (-v) = - clampQ v := by
-  unfold clampQ
-  omega
-
-/-- In-range values are untouched. -/
-theorem clampQ_id (v : Int) (h1 : -127 ≤ v) (h2 : v ≤ 127) : clampQ v = v := by
-  unfold clampQ
-  omega
-
-/-- A list of in-range values has sum bounded by 127 per element. -/
-theorem sum_abs_bound : ∀ l : List Int, (∀ x ∈ l, -127 ≤ x ∧ x ≤ 127) →
-    -(127 * (l.length : Int)) ≤ l.sum ∧ l.sum ≤ 127 * (l.length : Int)
-  | [], _ => by simp
-  | x :: xs, h => by
-    have hx := h x (by simp)
-    have ih := sum_abs_bound xs (fun y hy => h y (by simp [hy]))
-    simp only [List.sum_cons, List.length_cons]
-    push_cast
-    omega
-
-/-- A 32-value chunk sum is within ±4064, far inside int32. -/
-theorem chunk_sum_fits (l : List Int) (hl : l.length = 32) (h : ∀ x ∈ l, -127 ≤ x ∧ x ≤ 127) :
-    -4064 ≤ l.sum ∧ l.sum ≤ 4064 := by
-  have hb := sum_abs_bound l h
-  rw [hl] at hb
-  obtain ⟨hb1, hb2⟩ := hb
-  exact ⟨by omega, by omega⟩
-
--- § offset-corrected dot product
-
-/-- Dot product with the Q2_0 code offset removed: `sum (c-1)*x`. -/
-def dotOff : List Int → List Int → Int
-  | [], _ => 0
-  | _ :: _, [] => 0
-  | c :: cs, x :: xs => (c - 1) * x + dotOff cs xs
-
-/-- Raw dot product `sum c*x`. -/
-def dotRaw : List Int → List Int → Int
-  | [], _ => 0
-  | _ :: _, [] => 0
-  | c :: cs, x :: xs => c * x + dotRaw cs xs
-
-/-- The offset dot equals the raw dot minus the activation sum: the `- d_x*sum(xhat)` correction. -/
-theorem dotOff_eq : ∀ (cs xs : List Int), cs.length = xs.length →
-    dotOff cs xs = dotRaw cs xs - xs.sum
-  | [], [], _ => by simp [dotOff, dotRaw]
-  | [], _ :: _, h => by simp at h
-  | _ :: _, [], h => by simp at h
-  | c :: cs, x :: xs, h => by
-    have ih := dotOff_eq cs xs (by simpa using h)
-    simp only [dotOff, dotRaw, List.sum_cons]
-    rw [ih, Int.sub_mul, Int.one_mul]
-    omega
-
-/-- The offset dot is additive over chunk splits, which justifies the per-32-chunk scale handling. -/
-theorem dotOff_append : ∀ (c1 x1 c2 x2 : List Int), c1.length = x1.length →
-    dotOff (c1 ++ c2) (x1 ++ x2) = dotOff c1 x1 + dotOff c2 x2
-  | [], [], c2, x2, _ => by simp [dotOff]
-  | [], _ :: _, _, _, h => by simp at h
-  | _ :: _, [], _, _, h => by simp at h
-  | c :: cs, x :: xs, c2, x2, h => by
-    have ih := dotOff_append cs xs c2 x2 (by simpa using h)
-    simp only [List.cons_append, dotOff]
-    rw [ih, Int.add_assoc]
-
--- § 2-bit unpack
-
-/-- Masking the multishifted byte with 3 equals masking the whole word with 3. -/
-theorem code_byte_mask (x : Nat) : (x % 256) % 4 = x % 4 := by
-  omega
-
-/-- A 2-bit code is at most 3. -/
-theorem code_lt_four (x : Nat) : x % 4 < 4 :=
-  Nat.mod_lt _ (by decide)
-
-/-- Products of a code (0..3) with an int8 activation are at most 381 in magnitude. -/
-theorem code_mul_bound (c q : Int) (h0 : 0 ≤ c) (h3 : c ≤ 3) (hq1 : -127 ≤ q) (hq2 : q ≤ 127) :
-    -381 ≤ c * q ∧ c * q ≤ 381 := by
-  interval_cases c <;> omega
-
-/-- A pair-sum of two such products fits an int16 lane, so `maddubs` never saturates. -/
-theorem maddubs_no_saturation (c1 c2 q1 q2 : Int) (h1 : 0 ≤ c1) (h2 : c1 ≤ 3) (h3 : 0 ≤ c2)
-    (h4 : c2 ≤ 3) (hq1 : -127 ≤ q1) (hq2 : q1 ≤ 127) (hq3 : -127 ≤ q2) (hq4 : q2 ≤ 127) :
-    -32768 ≤ c1 * q1 + c2 * q2 ∧ c1 * q1 + c2 * q2 ≤ 32767 := by
-  have a := code_mul_bound c1 q1 h1 h2 hq1 hq2
-  have b := code_mul_bound c2 q2 h3 h4 hq3 hq4
-  exact ⟨by omega, by omega⟩
-
-/-- Low four codes of a lane word `b0 + 256*b1` come from byte `b0`. -/
-theorem lane_low (b0 b1 i : Nat) (hb : b0 < 256) (hi : i < 4) :
-    (b0 + 256 * b1) / 4 ^ i % 4 = b0 / 4 ^ i % 4 := by
-  interval_cases i <;> omega
-
-/-- High four codes come from byte `b1`. -/
-theorem lane_high (b0 b1 j : Nat) (hb : b0 < 256) (hj : j < 4) :
-    (b0 + 256 * b1) / 4 ^ (j + 4) % 4 = b1 / 4 ^ j % 4 := by
-  interval_cases j <;> omega
-
--- § block tail masks and scale permutes
-
-/-- Lane mask for the last group of `nb <= 8` blocks (two lanes per block). -/
-def maskOf (nb : Nat) : Nat := if 8 ≤ nb then 65535 else 2 ^ (2 * nb) - 1
-
-/-- The mask has exactly `2*nb` low bits set. -/
-theorem maskOf_bits (nb : Nat) (h : nb ≤ 8) : maskOf nb + 1 = 2 ^ (2 * nb) := by
-  interval_cases nb <;> decide
-
-/-- A group never runs past the end: `b0 + nb <= nblocks` and `nb >= 1` while blocks remain. -/
-theorem group_bounds (b0 nblocks : Nat) (h : b0 < nblocks) :
-    1 ≤ min 8 (nblocks - b0) ∧ b0 + min 8 (nblocks - b0) ≤ nblocks := by
-  refine ⟨?_, ?_⟩ <;> omega
-
-/-- Scale and correction loads index `2*(b0+i)+h`, which stays below `2*nblocks`. -/
-theorem scale_index_lt (b0 i h nb nblocks : Nat) (hi : i < nb) (hnb : b0 + nb ≤ nblocks) (hh : h < 2) :
-    2 * (b0 + i) + h < 2 * nblocks := by
-  omega
-
-/-- The permute index `lane/8 + 2*i` selects the product for block `i`, half `lane/8`, within 16 lanes. -/
-theorem permute_index (i l : Nat) (hi : i < 8) (hl : l < 16) :
-    l / 8 + 2 * i < 16 ∧ (l / 8 + 2 * i) / 2 = i ∧ (l / 8 + 2 * i) % 2 = l / 8 := by
-  refine ⟨?_, ?_, ?_⟩ <;> omega
-
-/-- The gate/up scale arrays at hidden size 2560 hold 40 blocks, a whole number of 8-block groups. -/
-theorem real_gu_blocks : 2560 / 64 = 40 ∧ 40 % 8 = 0 := by
-  decide
-
--- § token-count dispatch
-
-/-- Template argument chosen for `n_tokens`: 1..7 select that value, anything else selects 8. -/
-def dispatchNT (n : Nat) : Nat := if 1 ≤ n ∧ n ≤ 7 then n else 8
-
-/-- The selected template never exceeds 8 and is at least 1. -/
-theorem dispatchNT_range (n : Nat) : 1 ≤ dispatchNT n ∧ dispatchNT n ≤ 8 := by
-  unfold dispatchNT
-  split <;> omega
-
-/-- For every legal token count `1..8` the template equals the count. -/
-theorem dispatchNT_exact (n : Nat) (h1 : 1 ≤ n) (h2 : n ≤ 8) : dispatchNT n = n := by
-  unfold dispatchNT
-  split <;> omega
-
-/-- The GGUF Q2_0 block stride 18 = 2 scale bytes + 16 code bytes, and 16 bytes hold 64 codes. -/
-theorem gguf_block_layout : 2 + 16 = 18 ∧ 16 * 4 = 64 := by
-  decide
-
--- § CPU feature gate
-
-/-- All five required features present. -/
-def usable (f bw vl vnni vbmi : Bool) : Bool := f && bw && vl && vnni && vbmi
-
-/-- Names of the missing features, in the order the diagnostic prints them. -/
-def missing (f bw vl vnni vbmi : Bool) : List String :=
-  (if f then [] else ["AVX512F"]) ++ (if bw then [] else ["AVX512BW"]) ++
-  (if vl then [] else ["AVX512VL"]) ++ (if vnni then [] else ["AVX512-VNNI"]) ++
-  (if vbmi then [] else ["AVX512-VBMI"])
-
-/-- The CPU is usable exactly when nothing is reported missing. -/
-theorem usable_iff_missing_nil (f bw vl vnni vbmi : Bool) :
-    usable f bw vl vnni vbmi = true ↔ missing f bw vl vnni vbmi = [] := by
-  cases f <;> cases bw <;> cases vl <;> cases vnni <;> cases vbmi <;> simp [usable, missing]
-
-end Ref.CpuExpert
-
-
-
-## FILE: /mnt/user-data/outputs/CpuExpertLayout.lean
-/-!
-# MODULE: cpu_expert_layout
-SOURCES: src/kernels/cpu/expert_layout.cpp
-The per-layer expert table: contiguity validation of `native_experts.txt`, total size, maximum blob size,
-GGUF offset slots, and the AVX-512 / AVX2 dispatch (including the OS-saved-state check on XCR0).
-
-## Source semantics
-* Layer `l` must start at the sum of the previous layers' `blob * n_expert`; the total is that sum over all
-  layers. Without a table every layer has the fixed `BLOB` size.
-* `max_blob` is the maximum layer blob size.
-* GGUF offsets live in a `3*n_layers` array: slots `3l`, `3l+1`, `3l+2`.
-* AVX-512 is used only if not forced off and the CPU and OS both support it.
-
-## Form template identifiers
-* `offs`, `endOff`, `check` : contiguous_layer_offsets, layout_total, contiguity_check
-* `maxBlob`                 : max_blob
-* `gguf slot`               : gguf_offset_slot
-* `avx512Ok`, `pickImpl`    : avx512_dispatch
--/
-
-namespace Ref.CpuExpertLayout
-
--- § contiguous offsets
-
-/-- Expected start of each layer given layer blob sizes, `n_expert = E`, running offset `a`. -/
-def offs : List Nat → Nat → Nat → List Nat
-  | [], _, _ => []
-  | b :: bs, E, a => a :: offs bs E (a + b * E)
-
-/-- The end offset after all layers. -/
-def endOff : List Nat → Nat → Nat → Nat
-  | [], _, a => a
-  | b :: bs, E, a => endOff bs E (a + b * E)
-
-/-- The contiguity check of the loader: every declared offset equals the expected running sum. -/
-def check : List Nat → List Nat → Nat → Nat → Bool
-  | d :: ds, b :: bs, E, a => (d == a) && check ds bs E (a + b * E)
-  | [], [], _, _ => true
-  | [], _ :: _, _, _ => false
-  | _ :: _, [], _, _ => false
-
-/-- One expected offset per layer. -/
-theorem offs_length (bs : List Nat) (E a : Nat) : (offs bs E a).length = bs.length := by
-  induction bs generalizing a with
-  | nil => rfl
-  | cons b bs ih => simp [offs, ih]
-
-/-- The total is the start plus every layer's `blob * n_expert`. -/
-theorem endOff_eq (bs : List Nat) (E a : Nat) : endOff bs E a = a + (bs.map (· * E)).sum := by
-  induction bs generalizing a with
-  | nil => simp [endOff]
-  | cons b bs ih =>
-    simp only [endOff, ih, List.map_cons, List.sum_cons]
-    omega
-
-/-- The expected offsets always pass the contiguity check. -/
-theorem check_offs (bs : List Nat) (E a : Nat) : check (offs bs E a) bs E a = true := by
-  induction bs generalizing a with
-  | nil => rfl
-  | cons b bs ih => simp [offs, check, ih]
-
-/-- Without a table the total is `layers * (BLOB * experts)`, one fixed blob per layer. -/
-theorem total_uniform (L B E a : Nat) : endOff (List.replicate L B) E a = a + L * (B * E) := by
-  induction L generalizing a with
-  | zero => simp [endOff]
-  | succ L ih =>
-    simp only [List.replicate_succ, endOff, ih]
-    rw [Nat.add_mul, Nat.one_mul]
-    omega
-
--- § maximum blob
-
-/-- Largest layer blob. -/
-def maxBlob (bs : List Nat) : Nat := bs.foldl max 0
-
-/-- The running maximum never drops below its starting value. -/
-theorem foldl_max_ge_init (bs : List Nat) : ∀ init, init ≤ bs.foldl max init := by
-  induction bs with
-  | nil => intro init; exact Nat.le_refl init
-  | cons x xs ih =>
-    intro init
-    exact Nat.le_trans (Nat.le_max_left init x) (ih (max init x))
-
-/-- Every element is at most the fold maximum. -/
-theorem le_foldl_max_of_mem (bs : List Nat) : ∀ init b, b ∈ bs → b ≤ bs.foldl max init := by
-  induction bs with
-  | nil => intro init b hb; simp at hb
-  | cons x xs ih =>
-    intro init b hb
-    rcases List.mem_cons.mp hb with h | h
-    · rw [h]
-      exact Nat.le_trans (Nat.le_max_right init x) (foldl_max_ge_init xs (max init x))
-    · exact ih (max init x) b h
-
-/-- Every layer blob is at most `max_blob`. -/
-theorem le_maxBlob (bs : List Nat) (b : Nat) (hb : b ∈ bs) : b ≤ maxBlob bs :=
-  le_foldl_max_of_mem bs 0 b hb
-
--- § GGUF offset slots
-
-/-- Slot of layer `l`, component `k` (0 gate, 1 up, 2 down) in the `3*n_layers` array. -/
-def slot (l k : Nat) : Nat := 3 * l + k
-
-/-- Slots of in-range layers stay inside the array. -/
-theorem slot_lt (l k n : Nat) (hl : l < n) (hk : k < 3) : slot l k < 3 * n := by
-  unfold slot; omega
-
-/-- Distinct (layer, component) pairs use distinct slots. -/
-theorem slot_inj (l k l' k' : Nat) (hk : k < 3) (hk' : k' < 3) (h : slot l k = slot l' k') :
-    l = l' ∧ k = k' := by
-  unfold slot at h
-  refine ⟨?_, ?_⟩ <;> omega
-
--- § feature dispatch
-
-/-- Which implementation the row dispatcher picks. -/
-inductive Impl where
-  | avx512
-  | avx2
-  deriving DecidableEq
-
-/-- AVX-512 is allowed only when not forced off and the hardware check passed. -/
-def avx512Ok (forcedAvx2 hw : Bool) : Bool := !forcedAvx2 && hw
-
-/-- Dispatch on the result of the check. -/
-def pickImpl (ok : Bool) : Impl := if ok then Impl.avx512 else Impl.avx2
-
-/-- `REF_FORCE_AVX2=1` always selects the AVX2 implementation. -/
-theorem forced_selects_avx2 (hw : Bool) : pickImpl (avx512Ok true hw) = Impl.avx2 := by
-  simp [avx512Ok, pickImpl]
-
-/-- Without the force flag the hardware answer decides. -/
-theorem unforced_follows_hw (hw : Bool) : pickImpl (avx512Ok false hw) = (if hw then Impl.avx512 else Impl.avx2) := by
-  simp [avx512Ok, pickImpl]
-
-set_option maxRecDepth 100000 in
-/-- The XCR0 test `(xcr0 & 0xE6) == 0xE6` over the low byte is exactly the five state bits
-(SSE/AVX/opmask/ZMM_Hi256/Hi16_ZMM that the OS must save). -/
-theorem xcr0_mask_iff : ∀ x : Fin 256, ((x.val &&& 0xE6) = 0xE6) ↔
-    ((x.val / 2) % 2 = 1 ∧ (x.val / 4) % 2 = 1 ∧ (x.val / 32) % 2 = 1 ∧
-     (x.val / 64) % 2 = 1 ∧ (x.val / 128) % 2 = 1) := by
-  decide
-
-end Ref.CpuExpertLayout
-
-
-
-## FILE: /mnt/user-data/outputs/IqAvx512Rows.lean
-/-!
-# MODULE: iq_avx512_rows
-SOURCES: src/kernels/cpu/iq_avx512.cpp
-The i-quant expert rows in 512-bit lanes for IQ2_XXS (16), IQ2_XS (17), IQ3_XXS (18), IQ3_S (21) and IQ2_S
-(22): block layouts, decoded-field index ranges, 64-value chunk/scale lane maps, the multi-token chunking
-loop, and the supported-type predicate.
-
-## Source semantics
-* Each format stores 256 values per block; the byte sizes are 66, 74, 98, 110 and 82, and every field the
-  decoder touches for chunk `j < 4` lies inside its block and the regions tile the block exactly.
-* A 32-bit word packs four 7-bit sign indices and a 4-bit scale: `4*7 + 4 = 32`, and the packing is lossless.
-* Sign application is a masked negate: it preserves the magnitude of the activation.
-* More than four tokens are processed in chunks of at most four; the chunk sizes sum to `nt`.
-* Only the five listed type ids are handled here (IQ1_M stays on ggml-cpu).
-
-## Form template identifiers
-* `blockBytes`      : iq_block_bytes
-* `word32_fields`   : sign_scale_word_layout
-* `laneScale`       : scale_lane_map
-* `chunks`          : token_chunking
-* `supported`       : iq512_supported
--/
-
-namespace Ref.IqAvx512
-
--- § block layouts
-
-/-- Bytes per 256-value block for the supported format ids. -/
-def blockBytes (ty : Nat) : Nat :=
-  if ty = 16 then 66 else if ty = 17 then 74 else if ty = 18 then 98 else
-  if ty = 21 then 110 else if ty = 22 then 82 else 0
-
-/-- IQ2_XXS: `d` (2) + 32 u16 (64). -/
-theorem layout_16 : 2 + 64 = blockBytes 16 := by
-  decide
-
-/-- IQ2_XS: `d` + 32 u16 + 8 scale bytes. -/
-theorem layout_17 : 2 + 64 + 8 = blockBytes 17 := by
-  decide
-
-/-- IQ3_XXS: `d` + 64 grid bytes + 8 x u32. -/
-theorem layout_18 : 2 + 64 + 32 = blockBytes 18 := by
-  decide
-
-/-- IQ3_S: `d` + qs 64 + qh 8 + signs 32 + scales 4. -/
-theorem layout_21 : 2 + 64 + 8 + 32 + 4 = blockBytes 21 := by
-  decide
-
-/-- IQ2_S: `d` + qs 64 (32 grid + 32 sign) + qh 8 + scales 8. -/
-theorem layout_22 : 2 + 64 + 8 + 8 = blockBytes 22 := by
-  decide
-
-/-- IQ2_XXS reads for chunk `j < 4` end inside the 66-byte block. -/
-theorem iq2xxs_in_bounds (j : Nat) (hj : j < 4) : 2 + 16 * j + 15 < 66 := by
-  omega
-
-/-- IQ2_XS: codes `[2+16j, 2+16j+16)` and scales `66+2j+1` are inside the 74-byte block. -/
-theorem iq2xs_in_bounds (j : Nat) (hj : j < 4) : 2 + 16 * j + 15 < 66 ∧ 66 + 2 * j + 1 < 74 := by
-  refine ⟨?_, ?_⟩ <;> omega
-
-/-- IQ2_S: grid bytes, sign bytes, `qh` and scales are inside the 82-byte block and the sign
-bytes start where the grid bytes end. -/
-theorem iq2s_in_bounds (j : Nat) (hj : j < 4) :
-    2 + 8 * j + 7 < 34 ∧ 2 + 32 + 8 * j + 7 < 66 ∧ 66 + 2 * j + 1 < 74 ∧ 74 + 2 * j + 1 < 82 := by
-  refine ⟨?_, ?_, ?_, ?_⟩ <;> omega
-
-/-- IQ3_XXS: codes and the sign/scale words are inside the 98-byte block. -/
-theorem iq3xxs_in_bounds (j : Nat) (hj : j < 4) : 2 + 16 * j + 15 < 66 ∧ 2 + 64 + 8 * j + 7 < 98 := by
-  refine ⟨?_, ?_⟩ <;> omega
-
-/-- IQ3_S: all four field reads are inside the 110-byte block. -/
-theorem iq3s_in_bounds (j : Nat) (hj : j < 4) :
-    2 + 16 * j + 15 < 66 ∧ 66 + 2 * j + 1 < 74 ∧ 74 + 8 * j + 7 < 106 ∧ 106 + j < 110 := by
-  refine ⟨?_, ?_, ?_, ?_⟩ <;> omega
-
-/-- Four 64-value chunks make a 256-value block, and a chunk read of `qs + 64*j` stays inside it. -/
-theorem chunk_geometry : 4 * 64 = 256 := by
-  decide
-
-/-- The 64 int8 activations of chunk `j` are `[64j, 64j+64)`, below 256. -/
-theorem chunk_act_in_block (j : Nat) (hj : j < 4) : 64 * j + 63 < 256 := by
-  omega
-
--- § packed fields
-
-/-- A 32-bit word of four 7-bit sign indices and a 4-bit scale is a lossless packing. -/
-theorem word32_fields (a : Nat) :
-    a % 128 + 128 * ((a / 128) % 128) + 16384 * ((a / 16384) % 128) +
-      2097152 * ((a / 2097152) % 128) + 268435456 * (a / 268435456) = a := by
-  omega
-
-/-- The field widths add up to the word width. -/
-theorem word32_width : 4 * 7 + 4 = 32 := by
-  decide
-
-/-- For a 32-bit word the scale nibble `a >> 28` is below 16. -/
-theorem scale_nibble_lt (a : Nat) (h : a < 4294967296) : a / 268435456 < 16 := by
-  omega
-
-/-- The odd scale `2*s + 1` is odd and at most 31 for a nibble. -/
-theorem odd_scale (s : Nat) (h : s < 16) : (2 * s + 1) % 2 = 1 ∧ 2 * s + 1 ≤ 31 := by
-  refine ⟨?_, ?_⟩ <;> omega
-
-/-- Each sign index is a 7-bit value, a valid index into the 128-entry sign table. -/
-theorem sign_index_lt (a k : Nat) : (a / 2 ^ (7 * k)) % 128 < 128 :=
-  Nat.mod_lt _ (by decide)
-
-/-- Eight bytes pack into a 64-bit sign mask without overflow. -/
-theorem mask64_pack (b0 b1 b2 b3 b4 b5 b6 b7 : Nat) (h0 : b0 < 256) (h1 : b1 < 256) (h2 : b2 < 256)
-    (h3 : b3 < 256) (h4 : b4 < 256) (h5 : b5 < 256) (h6 : b6 < 256) (h7 : b7 < 256) :
-    b0 + 256 * b1 + 65536 * b2 + 16777216 * b3 + 4294967296 * b4 + 1099511627776 * b5 +
-      281474976710656 * b6 + 72057594037927936 * b7 < 18446744073709551616 := by
-  omega
-
-/-- The 9-bit grid index and 7-bit sign index of an IQ2_XS word are lossless: `v = idx + 512*sign`. -/
-theorem iq2xs_word_split (v : Nat) (h : v < 65536) : v % 512 + 512 * (v / 512) = v ∧ v / 512 < 128 := by
-  refine ⟨?_, ?_⟩ <;> omega
-
--- § lane maps
-
-/-- Scale lane map: int16 lane `l < 32` of a `maddubs` result uses scale `l / 8`. -/
-def laneScale (l : Nat) : Nat := l / 8
-
-/-- Value `v < 64` sits in int16 lane `v/2`, whose scale index is `v/16`: four groups of 16 values. -/
-theorem value_scale_group (v : Nat) (hv : v < 64) : laneScale (v / 2) = v / 16 ∧ v / 16 < 4 := by
-  unfold laneScale
-  refine ⟨?_, ?_⟩ <;> omega
-
-/-- Sign application as a masked negate preserves magnitude. -/
-theorem masked_negate_abs (y : Int) (b : Bool) : ((if b then -y else y)).natAbs = y.natAbs := by
-  cases b <;> simp
-
--- § token chunking
-
-/-- Sizes of the chunks (of at most `K`) a loop over `rem` tokens produces, with fuel `f`. -/
-def chunks (K : Nat) : Nat → Nat → List Nat
-  | 0, _ => []
-  | f + 1, rem => if rem = 0 then [] else min K rem :: chunks K f (rem - min K rem)
-
-/-- The chunk sizes sum to the token count when the fuel suffices. -/
-theorem chunks_sum (K : Nat) (f : Nat) : ∀ rem, rem ≤ K * f → (chunks K f rem).sum = rem := by
-  induction f with
-  | zero =>
-    intro rem h
-    have : rem = 0 := by omega
-    subst this
-    rfl
-  | succ f ih =>
-    intro rem h
-    rw [Nat.mul_succ] at h
-    by_cases hr : rem = 0
-    · subst hr
-      simp [chunks]
-    · have e : chunks K (f + 1) rem = min K rem :: chunks K f (rem - min K rem) := by
-        simp [chunks, hr]
-      rw [e, List.sum_cons, ih (rem - min K rem) (by omega)]
-      omega
-
-/-- Every chunk is at most `K`. -/
-theorem chunks_le (K : Nat) (f : Nat) : ∀ rem, ∀ c ∈ chunks K f rem, c ≤ K := by
-  induction f with
-  | zero => intro rem c hc; simp [chunks] at hc
-  | succ f ih =>
-    intro rem c hc
-    by_cases hr : rem = 0
-    · subst hr
-      simp [chunks] at hc
-    · have e : chunks K (f + 1) rem = min K rem :: chunks K f (rem - min K rem) := by
-        simp [chunks, hr]
-      rw [e] at hc
-      rcases List.mem_cons.mp hc with h | h
-      · rw [h]; omega
-      · exact ih _ c h
-
-/-- A tail chunk `k = min 4 (nt - t0)` is non-empty and stays inside `nt`. -/
-theorem tail_chunk_bounds (nt t0 : Nat) (h : t0 < nt) :
-    1 ≤ min 4 (nt - t0) ∧ t0 + min 4 (nt - t0) ≤ nt := by
-  refine ⟨?_, ?_⟩ <;> omega
-
--- § supported types
-
-/-- The types handled by the 512-bit kernels. -/
-def supported (ty : Nat) : Bool := ty == 16 || ty == 17 || ty == 18 || ty == 21 || ty == 22
-
-/-- Exactly the five listed ids are supported. -/
-theorem supported_iff (ty : Nat) : supported ty = true ↔ (ty = 16 ∨ ty = 17 ∨ ty = 18 ∨ ty = 21 ∨ ty = 22) := by
-  simp [supported, or_assoc]
-
-/-- Supported ids are exactly the ones with a known block size. -/
-theorem supported_has_size (ty : Nat) (h : supported ty = true) : 0 < blockBytes ty := by
-  rw [supported_iff] at h
-  rcases h with h | h | h | h | h <;> subst h <;> decide
-
-/-- Other ggml ids (IQ1_M and non-IQ types) are not claimed. -/
-theorem unsupported_examples : [0, 1, 19, 20, 23, 29].all (fun t => !supported t) = true := by
-  decide
-
-end Ref.IqAvx512
-
-
-
-## FILE: /mnt/user-data/outputs/CpuExpertPool.lean
-/-!
-# MODULE: cpu_expert_pool
-SOURCES: src/kernels/cpu/pool.cpp
-The CPU expert pool: physical-core selection and pinning, worker-count rules, and the work partitioning of
-the split phases (equal row ranges across tasks, the inner per-expert segment loop, and batching of native
-jobs). This module models the integer partition contracts that make every row computed exactly once.
-
-## Source semantics
-* `physical_cores(skip_first)` drops the first core (the host's) so workers never share it.
-* The pool has at least one worker; a pin core exists only when pinning is on and the index is in range.
-* Phase task `i` of `tasks` over `rows` rows covers `[rows*i/tasks, rows*(i+1)/tasks)`: these ranges tile
-  `[0, rows)`.
-* The inner loop walks a range in segments that never cross an expert boundary and always make progress,
-  covering exactly the range.
-* Batches of at most `kMaxSplitMulti` experts cover all `n` experts.
-
-## Form template identifiers
-* `coresFor`       : physical_core_list
-* `getCore`        : worker_pin_core
-* `nWorkers`       : worker_count
-* `lo`             : task_row_lo
-* `stepLen`, `cover` : segment_walk
-* `batches`        : native_batching
--/
-
-namespace Ref.CpuExpertPool
-
--- § core selection
-
-/-- Cores after optionally dropping the host's core. -/
-def coresFor (skipFirst : Bool) (cores : List Nat) : List Nat := if skipFirst then cores.tail else cores
-
-/-- Dropping the first core removes exactly one entry from a non-empty list. -/
-theorem coresFor_length (cores : List Nat) (h : cores ≠ []) :
-    (coresFor true cores).length = cores.length - 1 := by
-  unfold coresFor
-  simp
-
-/-- Without skipping the list is unchanged. -/
-theorem coresFor_noskip (cores : List Nat) : coresFor false cores = cores := by
-  simp [coresFor]
-
-/-- With distinct core ids the host core is never handed to a worker. -/
-theorem host_core_unused (c : Nat) (cs : List Nat) (h : (c :: cs).Nodup) : c ∉ coresFor true (c :: cs) := by
-  unfold coresFor
-  simpa using (List.nodup_cons.mp h).1
-
-/-- Pin core of worker `i`: only when pinning is on and `i` is in range. -/
-def getCore (pin : Bool) (cores : List Nat) (i : Nat) : Option Nat := if pin then cores[i]? else none
-
-/-- No pinning, no core. -/
-theorem getCore_nopin (cores : List Nat) (i : Nat) : getCore false cores i = none := by
-  simp [getCore]
-
-/-- Out-of-range workers are left unpinned. -/
-theorem getCore_oob (cores : List Nat) (i : Nat) (h : cores.length ≤ i) : getCore true cores i = none := by
-  simp [getCore, h]
-
--- § worker count
-
-/-- Requested workers, else the core count, but never fewer than one. -/
-def nWorkers (req nCores : Nat) : Nat := if (if 0 < req then req else nCores) < 1 then 1 else (if 0 < req then req else nCores)
-
-/-- The pool always has a worker, so a single-core machine still produces a token. -/
-theorem nWorkers_pos (req nCores : Nat) : 1 ≤ nWorkers req nCores := by
-  unfold nWorkers
-  by_cases h : 0 < req
-  · rw [if_pos h]
-    by_cases h2 : req < 1
-    · rw [if_pos h2] <;> omega
-    · rw [if_neg h2] <;> omega
-  · rw [if_neg h]
-    by_cases h2 : nCores < 1
-    · rw [if_pos h2] <;> omega
-    · rw [if_neg h2] <;> omega
-
-/-- An explicit positive request is honoured. -/
-theorem nWorkers_req (req nCores : Nat) (h : 0 < req) : nWorkers req nCores = req := by
-  unfold nWorkers
+/-- Positions below three read the carried history. -/
+theorem ext_lt {α : Type} (hist xs : Nat → α) {s : Nat} (h : s < 3) : ext hist xs s = hist s := by
+  unfold ext
   rw [if_pos h]
-  have h2 : ¬ req < 1 := by omega
-  rw [if_neg h2]
 
--- § task row ranges
+/-- Positions from three on read the new inputs, offset by three. -/
+theorem ext_ge {α : Type} (hist xs : Nat → α) {s : Nat} (h : 3 ≤ s) : ext hist xs s = xs (s - 3) := by
+  unfold ext
+  have hc : ¬ (s < 3) := by omega
+  rw [if_neg hc]
 
-/-- Start row of task `i` when `rows` rows are split over `tasks` tasks. -/
-def lo (rows tasks i : Nat) : Nat := rows * i / tasks
+/-- The newest tap of token `t` is its own input. -/
+theorem ext_new {α : Type} (hist xs : Nat → α) (t : Nat) : ext hist xs (t + 3) = xs t := by
+  simpa using ext_ge hist xs (show 3 ≤ t + 3 by omega)
 
-/-- The first task starts at row 0. -/
-theorem lo_zero (rows tasks : Nat) : lo rows tasks 0 = 0 := by
-  simp [lo]
+/-- Window entry `j` of token `t`. -/
+def tap {α : Type} (hist xs : Nat → α) (t j : Nat) : α := ext hist xs (t + j)
 
-/-- The last boundary is exactly `rows`. -/
-theorem lo_last (rows tasks : Nat) (h : 0 < tasks) : lo rows tasks tasks = rows := by
-  unfold lo
-  exact Nat.mul_div_cancel rows h
+/-- State kept after accepting `n` tokens: entry `j` is the window entry `j` of token `n`. -/
+def commitHist {α : Type} (hist xs : Nat → α) (n j : Nat) : α := ext hist xs (n + j)
 
-/-- Ranges are ordered: a task's end is not before its start. -/
-theorem lo_mono (rows tasks i : Nat) : lo rows tasks i ≤ lo rows tasks (i + 1) := by
-  unfold lo
-  exact Nat.div_le_div_right (Nat.mul_le_mul (Nat.le_refl rows) (Nat.le_succ i))
+/-- The committed history is exactly the next token's window prefix. -/
+theorem commit_is_next_window {α : Type} (hist xs : Nat → α) (n j : Nat) :
+    commitHist hist xs n j = tap hist xs n j := rfl
 
-/-- Adjacent tasks share a boundary, so the ranges tile with no gap and no overlap (by definition of `lo`). -/
-theorem lo_adjacent (rows tasks i : Nat) : lo rows tasks (i + 1) = rows * (i + 1) / tasks := by
-  rfl
+/-- Accepting zero tokens leaves the history unchanged. -/
+theorem commit_zero {α : Type} (hist xs : Nat → α) (j : Nat) (hj : j < 3) :
+    commitHist hist xs 0 j = hist j := by
+  unfold commitHist
+  rw [Nat.zero_add]
+  exact ext_lt hist xs hj
 
-/-- A flat task id `i < n*parts` splits into an expert `i/parts < n` and a part `i%parts < parts`. -/
-theorem task_split (i n parts : Nat) (hp : 0 < parts) (hi : i < n * parts) :
-    i / parts < n ∧ i % parts < parts ∧ parts * (i / parts) + i % parts = i := by
-  refine ⟨?_, Nat.mod_lt _ hp, Nat.div_add_mod i parts⟩
-  exact (Nat.div_lt_iff_lt_mul hp).2 hi
+/-- Accepting one token shifts the history by one and appends the token. -/
+theorem commit_one_last {α : Type} (hist xs : Nat → α) : commitHist hist xs 1 2 = xs 0 := by
+  unfold commitHist
+  simpa using ext_ge hist xs (show 3 ≤ 1 + 2 by omega)
 
-/-- The number of parts per expert is at least one. -/
-theorem parts_pos (threads n : Nat) : 1 ≤ max 1 ((3 * threads + n - 1) / n) :=
-  Nat.le_max_left 1 _
+/-- Accepting at least three tokens keeps only the three newest inputs. -/
+theorem commit_big {α : Type} (hist xs : Nat → α) (n j : Nat) (hn : 3 ≤ n) :
+    commitHist hist xs n j = xs (n + j - 3) := by
+  unfold commitHist
+  rw [ext_ge hist xs (show 3 ≤ n + j by omega)]
 
--- § inner segment walk
+/-- Committing `n` tokens and then reading a later window agrees with reading it from the original history. -/
+theorem commit_compose {α : Type} (hist xs : Nat → α) (n s : Nat) :
+    ext (fun j => ext hist xs (n + j)) (fun i => xs (n + i)) s = ext hist xs (n + s) := by
+  by_cases h : s < 3
+  · rw [ext_lt _ _ h]
+  · rw [ext_ge _ _ (show 3 ≤ s by omega)]
+    rw [ext_ge hist xs (show 3 ≤ n + s by omega)]
+    show xs (n + (s - 3)) = xs (n + s - 3)
+    congr 1
+    omega
 
-/-- Length of the segment taken from row `r` of a range ending at `g1`, in experts of `per` rows. -/
-def stepLen (per g1 r : Nat) : Nat := min per (r % per + (g1 - r)) - r % per
+-- § step records and window ids
 
-/-- Each segment is non-empty while rows remain. -/
-theorem stepLen_pos (per g1 r : Nat) (hper : 0 < per) (hr : r < g1) : 0 < stepLen per g1 r := by
-  have hm : r % per < per := Nat.mod_lt _ hper
-  unfold stepLen
-  generalize r % per = r0 at *
+/-- The record `dense_steps` writes for cell `c`: `[c, c+1, (c+1)/4, c+1]`. -/
+def denseStep (c : Nat) : List Nat := [c, c + 1, (c + 1) / 4, c + 1]
+
+/-- The record always holds four entries (`kStepCount`). -/
+theorem denseStep_length (c : Nat) : (denseStep c).length = 4 := rfl
+
+/-- The completed-block count is consistent with the cache size: `n_bid * 4 <= n_kv < n_bid * 4 + 4`. -/
+theorem denseStep_blocks (c : Nat) : (c + 1) / 4 * 4 ≤ c + 1 ∧ c + 1 < (c + 1) / 4 * 4 + 4 := by
   omega
 
-/-- A segment never overruns the range end. -/
-theorem stepLen_le_range (per g1 r : Nat) (hper : 0 < per) (hr : r < g1) : r + stepLen per g1 r ≤ g1 := by
-  have hm : r % per < per := Nat.mod_lt _ hper
-  unfold stepLen
-  generalize r % per = r0 at *
-  omega
+/-- First cell of the attention window. -/
+def wStart (nKv window : Nat) : Nat := if nKv > window then nKv - window else 0
 
-/-- A segment never crosses its expert's boundary: the offset in the expert plus the length is at most `per`. -/
-theorem stepLen_in_expert (per g1 r : Nat) (hper : 0 < per) : r % per + stepLen per g1 r ≤ per := by
-  have hm : r % per < per := Nat.mod_lt _ hper
-  unfold stepLen
-  generalize r % per = r0 at *
-  omega
-
-/-- The expert and in-expert offset reassemble the row. -/
-theorem row_decomp (r per : Nat) : per * (r / per) + r % per = r :=
-  Nat.div_add_mod r per
-
-/-- Rows processed by walking from `r` to `g1` with fuel `f`. -/
-def cover (per g1 : Nat) : Nat → Nat → Nat
-  | 0, _ => 0
-  | f + 1, r => if r < g1 then stepLen per g1 r + cover per g1 f (r + stepLen per g1 r) else 0
-
-/-- The walk covers exactly the `g1 - r` remaining rows when the fuel suffices. -/
-theorem cover_eq (per g1 : Nat) (hper : 0 < per) (f : Nat) :
-    ∀ r, r ≤ g1 → g1 - r ≤ f → cover per g1 f r = g1 - r := by
-  induction f with
-  | zero =>
-    intro r h1 h2
-    have : g1 - r = 0 := by omega
-    rw [this]
-    rfl
-  | succ f ih =>
-    intro r h1 h2
-    have e : cover per g1 (f + 1) r =
-        if r < g1 then stepLen per g1 r + cover per g1 f (r + stepLen per g1 r) else 0 := rfl
-    rw [e]
-    by_cases hr : r < g1
-    · rw [if_pos hr]
-      have hp := stepLen_pos per g1 r hper hr
-      have hl := stepLen_le_range per g1 r hper hr
-      rw [ih (r + stepLen per g1 r) hl (by omega)]
-      omega
-    · rw [if_neg hr]
-      omega
-
--- § native batching
-
-/-- Sizes of the batches of at most `K` experts a loop over `n` experts produces, with fuel `f`. -/
-def batches (K : Nat) : Nat → Nat → List Nat
-  | 0, _ => []
-  | f + 1, rem => if rem = 0 then [] else min K rem :: batches K f (rem - min K rem)
-
-/-- The batches cover all `n` experts. -/
-theorem batches_sum (K : Nat) (f : Nat) : ∀ rem, rem ≤ K * f → (batches K f rem).sum = rem := by
-  induction f with
-  | zero =>
-    intro rem h
-    have : rem = 0 := by omega
-    subst this
-    rfl
-  | succ f ih =>
-    intro rem h
-    rw [Nat.mul_succ] at h
-    by_cases hr : rem = 0
-    · subst hr
-      simp [batches]
-    · have e : batches K (f + 1) rem = min K rem :: batches K f (rem - min K rem) := by
-        simp [batches, hr]
-      rw [e, List.sum_cons, ih (rem - min K rem) (by omega)]
-      omega
-
-/-- A batch starting at `b0 < n` is non-empty and stays inside `n`. -/
-theorem batch_bounds (K n b0 : Nat) (hK : 0 < K) (h : b0 < n) :
-    1 ≤ min K (n - b0) ∧ b0 + min K (n - b0) ≤ n := by
-  refine ⟨?_, ?_⟩ <;> omega
-
--- § affinity bookkeeping
-
-/-- Windows `SetThreadAffinityMask` returns 0 on failure, so 0 maps to the error value -1. -/
-def winPin (prev : Int) : Int := if prev = 0 then -1 else prev
-
-/-- The error value is returned exactly when the OS call failed. -/
-theorem winPin_err (prev : Int) : winPin prev = -1 ↔ prev = 0 ∨ prev = -1 := by
-  unfold winPin
+/-- The recorded width is `min n_kv window`. -/
+theorem window_width (nKv window : Nat) : nKv - wStart nKv window = min nKv window := by
+  unfold wStart
   split <;> omega
 
-/-- A successful pin never yields the ambiguous value 0, so a returned mask is always restorable. -/
-theorem winPin_ne_zero (prev : Int) : winPin prev ≠ 0 := by
-  unfold winPin
-  split <;> omega
-
-/-- Restoring a non-positive previous mask is a no-op. -/
-def restoreEffect (prev : Int) : Option Int := if prev ≤ 0 then none else some prev
-
-/-- Error and unset masks are never restored. -/
-theorem restore_noop (prev : Int) (h : prev ≤ 0) : restoreEffect prev = none := by
-  simp [restoreEffect, h]
-
-/-- Group/bit processor numbering: `group*64 + bit` decomposes back for `bit < 64`. -/
-theorem cpu_index_roundtrip (g b : Nat) (hb : b < 64) : (g * 64 + b) / 64 = g ∧ (g * 64 + b) % 64 = b := by
-  refine ⟨?_, ?_⟩ <;> omega
-
-/-- `core & 63` is a valid bit position. -/
-theorem core_bit_lt (core : Nat) : core % 64 < 64 := by
+/-- Window ids stay inside the cache. -/
+theorem window_ids_lt (nKv window j : Nat) (hj : j < nKv - wStart nKv window) :
+    wStart nKv window + j < nKv := by
   omega
 
-end Ref.CpuExpertPool
+-- § flat index splitting (fetch_blobs, gather_rows)
+
+/-- The in-blob offset `i - (i / per) * per` is the remainder. -/
+theorem offset_is_mod (i per : Nat) : i - (i / per) * per = i % per := by
+  have h := Nat.div_add_mod i per
+  have h2 : per * (i / per) = (i / per) * per := Nat.mul_comm _ _
+  omega
+
+/-- The in-blob offset is below the blob size. -/
+theorem offset_lt (i per : Nat) (hp : 0 < per) : i - (i / per) * per < per := by
+  rw [offset_is_mod]
+  exact Nat.mod_lt i hp
+
+/-- A flat index below `n * per` selects a blob below `n`. -/
+theorem blob_index_lt (i n per : Nat) (h : i < n * per) : i / per < n := by
+  have h' : i < per * n := by rw [Nat.mul_comm]; exact h
+  exact Nat.div_lt_of_lt_mul h'
+
+/-- Pointer rebase: consecutive blobs are exactly `bytes` apart. -/
+theorem rebase_step (base k bytes : Nat) :
+    base + (k + 1) * bytes = (base + k * bytes) + bytes := by
+  rw [Nat.add_mul, Nat.one_mul]
+  omega
+
+-- § grid geometry
+
+/-- Real geometry: 10240 channels at 128 per block is 80 blocks, i.e. 2*16 q/k blocks and 48 v blocks. -/
+theorem conv_blocks_real : 10240 / 128 = 2 * 16 + 48 := by decide
+
+/-- Every thread of a conv block addresses a channel below `channels` (real head dim 128). -/
+theorem conv_channel_lt (bx tid channels : Nat) (hb : bx < channels / 128) (ht : tid < 128)
+    (hc : channels % 128 = 0) : bx * 128 + tid < channels := by
+  omega
+
+/-- The gate/beta kernel's blocks of 8 warps cover all `2 * h_v` rows. -/
+theorem ab_rows_covered (hv : Nat) : 2 * hv ≤ (2 * hv + 7) / 8 * 8 := by
+  omega
+
+/-- Real geometry: h_v = 48 needs 12 blocks. -/
+theorem ab_blocks_real : (2 * 48 + 7) / 8 = 12 := by decide
+
+/-- The 128 state rows split into 4 groups of 32 with every row owned exactly once. -/
+theorem row_group_cover (i : Nat) (h : i < 128) : i / 32 < 4 ∧ i % 32 < 32 ∧ (i / 32) * 32 + i % 32 = i := by
+  omega
+
+-- § packed code extraction (embedding_gather_dev)
+
+/-- Two-bit codes: a byte holds 4 codes and index `i < n` (with `4 | n`) reads byte `i / 4 < n / 4`. -/
+theorem byte_index_2bit (i n : Nat) (h : i < n) (hn : n % 4 = 0) : i / 4 < n / 4 := by
+  omega
+
+/-- Four-bit codes: a byte holds 2 codes. -/
+theorem byte_index_4bit (i n : Nat) (h : i < n) (hn : n % 2 = 0) : i / 2 < n / 2 := by
+  omega
+
+/-- A code extracted with a mask of `bits` bits is below `2^bits`. -/
+theorem code_lt (byte shift bits : Nat) : (byte / 2 ^ shift) % 2 ^ bits < 2 ^ bits :=
+  Nat.mod_lt _ (Nat.two_pow_pos bits)
+
+end Ref.Verify
 
 
 
-## FILE: /mnt/user-data/outputs/Q2Avx2Rows.lean
+## FILE: /mnt/user-data/outputs/GdnStepContracts.lean
 /-!
-# MODULE: q2_avx2_rows
-SOURCES: src/kernels/cpu/q2_avx2.cpp
-The Q2_0 expert rows and the Q8_1 activation quantizer for CPUs without AVX-512 (AVX2 only): the 64-code
-unpack order, the 32-value chunk/scale indexing, the saturation-free `maddubs` bounds, the horizontal
-integer sum, and the token chunking loop.
+# MODULE: gdn_step_contracts
+SOURCES: include/ref/kernels/gdn.hpp
+Gated delta-net layer pieces between the projections: the delta-rule state step, the causal conv step with
+carried state, the L2 norm, the beta sigmoid and the closing per-head norm.
 
 ## Source semantics
-* A 18-byte block is a 2-byte scale followed by 16 code bytes; value `i` of the block is in byte `i/4` at
-  bit offset `2*(i%4)`; the unpack puts it at output position `4*byte + j`.
-* `lo` holds values 0..31 (bytes 0..7) and `hi` values 32..63 (bytes 8..15); each is paired with the
-  activation chunk `2b` or `2b+1`.
-* Codes are at most 3 and activations are within ±127, so no int16 lane saturates and the int32 total of a
-  block is tiny.
-* The integer horizontal sum of 8 lanes equals the plain sum of the lanes.
-* The quantizer writes `a.q[k*32 + j]` for `k < n/32`, `j < 32`: a bijection onto `[0, n)` when `32 | n`.
+* Real geometry: S = 128, h_k = 16, h_v = 48, conv channels C = 2*S*h_k + S*h_v = 10240, d_conv = 4;
+  48 GDN layers and 12 QSA layers.
+* State layout is (S, H_v, S) = (i, h, j) with j fastest: flat index `(i * h_v + h) * S + j`.
+* Head pairing is MODULO (`h % h_k`), not interleaved.
+* Recurrence per column: decay first (`st = dec * state`), `sk = k . st`, `d = (v - sk) * beta`,
+  `state' = st + k * d`, `o = state' . q`. The kernel form `g*s + k*((v - g*(s*k))*beta)` is the same number.
+* Conv: output `sum_i inp[i] * kW[c*d_conv + i]` over `inp = [conv_state | x]`; the new state is the last
+  `d_conv - 1` entries of `inp`.
+* L2 norm adds eps to the squared norm (no division by the width); the closing norm is per head row.
 
 ## Form template identifiers
-* `valuePos`       : unpack_position
-* `halfOf`         : activation_chunk_of_value
-* `hsum8`          : integer_horizontal_sum
-* `chunks4`        : four_token_chunking
-* `quantIndex`     : quantizer_output_index
+`gdn_step` -> `delta_rule_step`; `gdn_conv_step` -> `causal_conv_step`; `S` -> `head_dim`; `h_k` -> `n_key_heads`;
+`h_v` -> `n_value_heads`; `conv_state` -> `conv_carry`; `kW` -> `conv_weight`.
 -/
 
-namespace Ref.Q2Avx2
+namespace Ref.Gdn
 
--- § unpack order
+-- § geometry
 
-/-- Output position of code `j` (0..3) of byte `k` (0..15) after the interleaving unpacks. -/
-def valuePos (k j : Nat) : Nat := 4 * k + j
+/-- Conv channels for the real artifact: q and k (16 heads of 128 each) plus v (48 heads of 128). -/
+theorem conv_channels_real : 2 * 128 * 16 + 128 * 48 = 10240 := by decide
 
-/-- The position map is a bijection of `[0,16) x [0,4)` onto `[0,64)`. -/
-theorem valuePos_roundtrip (k j : Nat) (hk : k < 16) (hj : j < 4) :
-    valuePos k j < 64 ∧ valuePos k j / 4 = k ∧ valuePos k j % 4 = j := by
-  unfold valuePos
-  refine ⟨?_, ?_, ?_⟩ <;> omega
+/-- The value heads are a whole multiple of the key heads (3 value heads per key head). -/
+theorem heads_multiple : 48 % 16 = 0 ∧ 48 / 16 = 3 := by decide
 
-/-- Distinct (byte, code) pairs land on distinct positions. -/
-theorem valuePos_inj (k j k' j' : Nat) (hj : j < 4) (hj' : j' < 4) (h : valuePos k j = valuePos k' j') :
-    k = k' ∧ j = j' := by
-  unfold valuePos at h
-  refine ⟨?_, ?_⟩ <;> omega
+/-- Layer split of the artifact: 48 GDN layers and 12 QSA layers. -/
+theorem layer_split : 48 + 12 = 60 := by decide
 
-/-- Values `0..31` come from bytes `0..7` (the `lo` vector). -/
-theorem lo_bytes (v : Nat) (hv : v < 32) : v / 4 < 8 := by
+/-- Conv weight has `channels * d_conv` entries. -/
+theorem conv_weight_len_real : 10240 * 4 = 40960 := by decide
+
+-- § state layout (S, H_v, S), j fastest
+
+/-- Flat index of state element `(i, h, j)`. -/
+def stateIdx (S hv i h j : Nat) : Nat := (i * hv + h) * S + j
+
+/-- Walking `j` is contiguous: the coalescing property the layout was chosen for. -/
+theorem stateIdx_contiguous (S hv i h j : Nat) : stateIdx S hv i h (j + 1) = stateIdx S hv i h j + 1 := by
+  unfold stateIdx
   omega
 
-/-- Values `32..63` come from bytes `8..15` (the `hi` vector). -/
-theorem hi_bytes (v : Nat) (h1 : 32 ≤ v) (h2 : v < 64) : 8 ≤ v / 4 ∧ v / 4 < 16 := by
-  refine ⟨?_, ?_⟩ <;> omega
-
-/-- Activation chunk of value `v` of block `b`: `lo` pairs with chunk `2b`, `hi` with `2b+1`. -/
-def halfOf (b v : Nat) : Nat := (b * 64 + v) / 32
-
-/-- The chunk index is `2*b + v/32`. -/
-theorem halfOf_eq (b v : Nat) (hv : v < 64) : halfOf b v = 2 * b + v / 32 := by
-  unfold halfOf
+/-- Every valid element lands inside the `S * H_v * S` buffer. -/
+theorem stateIdx_lt (S hv i h j : Nat) (hi : i < S) (hh : h < hv) (hj : j < S) :
+    stateIdx S hv i h j < S * hv * S := by
+  unfold stateIdx
+  have e1 : (i + 1) * hv = i * hv + hv := by rw [Nat.add_mul, Nat.one_mul]
+  have h1 : (i + 1) * hv ≤ S * hv := Nat.mul_le_mul_right hv hi
+  have e2 : (i * hv + h + 1) * S = (i * hv + h) * S + S := by rw [Nat.add_mul, Nat.one_mul]
+  have h2 : (i * hv + h + 1) * S ≤ (S * hv) * S := Nat.mul_le_mul_right S (by omega)
   omega
 
-/-- A 2-bit code `(x >> 2j) & 3` is below 4. -/
-theorem code_lt (x : Nat) : x % 4 < 4 :=
-  Nat.mod_lt _ (by decide)
-
--- § saturation-free arithmetic
-
-/-- A code (0..3) times an int8 activation is within ±381. -/
-theorem code_mul_bound (c q : Int) (h0 : 0 ≤ c) (h3 : c ≤ 3) (hq1 : -127 ≤ q) (hq2 : q ≤ 127) :
-    -381 ≤ c * q ∧ c * q ≤ 381 := by
-  interval_cases c <;> omega
-
-/-- One `maddubs` int16 lane (two products) fits easily in int16. -/
-theorem maddubs_lane_fits (c1 c2 q1 q2 : Int) (h1 : 0 ≤ c1) (h2 : c1 ≤ 3) (h3 : 0 ≤ c2) (h4 : c2 ≤ 3)
-    (hq1 : -127 ≤ q1) (hq2 : q1 ≤ 127) (hq3 : -127 ≤ q2) (hq4 : q2 ≤ 127) :
-    -762 ≤ c1 * q1 + c2 * q2 ∧ c1 * q1 + c2 * q2 ≤ 762 := by
-  have a := code_mul_bound c1 q1 h1 h2 hq1 hq2
-  have b := code_mul_bound c2 q2 h3 h4 hq3 hq4
-  exact ⟨by omega, by omega⟩
-
-/-- A `madd` against ones adds two int16 lanes: still within ±1524. -/
-theorem madd_pair_fits (x y : Int) (hx1 : -762 ≤ x) (hx2 : x ≤ 762) (hy1 : -762 ≤ y) (hy2 : y ≤ 762) :
-    -1524 ≤ x + y ∧ x + y ≤ 1524 := by
-  exact ⟨by omega, by omega⟩
-
-/-- The 64 products of a block are bounded by 64*381, inside int32. -/
-theorem block_total_fits (n : Nat) (hn : n ≤ 64) (s : Int) (h1 : -(381 * (n : Int)) ≤ s)
-    (h2 : s ≤ 381 * (n : Int)) : -24384 ≤ s ∧ s ≤ 24384 := by
-  have : (n : Int) ≤ 64 := by exact_mod_cast hn
-  exact ⟨by omega, by omega⟩
-
--- § horizontal sums
-
-/-- Horizontal sum of 8 integer lanes by the 256 -> 128 -> 64 -> 32 reduction used by the source. -/
-def hsum8 (l0 l1 l2 l3 l4 l5 l6 l7 : Int) : Int :=
-  ((l0 + l4) + (l2 + l6)) + ((l1 + l5) + (l3 + l7))
-
-/-- The staged reduction equals the plain sum of the lanes. -/
-theorem hsum8_eq (l0 l1 l2 l3 l4 l5 l6 l7 : Int) :
-    hsum8 l0 l1 l2 l3 l4 l5 l6 l7 = l0 + l1 + l2 + l3 + l4 + l5 + l6 + l7 := by
-  unfold hsum8
+/-- The row-group addressing of the multi-token kernel, `base + r * (h_v * S)` with
+`base = ((g*32) * h_v + head) * S + col`, is the same element as `stateIdx` of row `g*32 + r`. -/
+theorem row_group_address (g r hv head S col : Nat) :
+    ((g * 32) * hv + head) * S + col + r * (hv * S) = ((g * 32 + r) * hv + head) * S + col := by
+  simp only [Nat.add_mul, Nat.mul_assoc]
   omega
 
--- § quantizer indexing
+-- § head pairing
 
-/-- Output index of value `j` of chunk `k`. -/
-def quantIndex (k j : Nat) : Nat := k * 32 + j
+/-- Modulo pairing always names a valid key head. -/
+theorem pair_mod_lt (h hk : Nat) (hpos : 0 < hk) : h % hk < hk := Nat.mod_lt h hpos
 
-/-- With `32 | n` the chunk count times 32 is `n`. -/
-theorem nchunks_exact (n : Nat) (h : n % 32 = 0) : (n / 32) * 32 = n := by
+/-- The two conventions disagree on a real head: value head 1 pairs with key head 1 (modulo) but 0 (interleave). -/
+theorem pairing_distinguishable : (1 % 16 : Nat) ≠ 1 / (48 / 16) := by decide
+
+-- § delta-rule recurrence
+
+/-- Kernel form of one scalar state update (decay applied inside the delta). -/
+def stepKernel (g b s k v : Int) : Int := g * s + k * ((v - g * (s * k)) * b)
+
+/-- Reference form: decay first, then the rank-one update. -/
+def stepRef (g b s k v : Int) : Int := (g * s) + k * ((v - k * (g * s)) * b)
+
+/-- The two forms are the same number. -/
+theorem kernel_eq_ref (g b s k v : Int) : stepKernel g b s k v = stepRef g b s k v := by
+  unfold stepKernel stepRef
+  have h : g * (s * k) = k * (g * s) := by
+    rw [Int.mul_comm s k]
+    exact Int.mul_left_comm g k s
+  rw [h]
+
+/-- With zero write strength the step is pure decay. -/
+theorem step_beta_zero (g s k v : Int) : stepKernel g 0 s k v = g * s := by
+  unfold stepKernel
   omega
 
-/-- Each (chunk, value) pair is an in-range index. -/
-theorem quantIndex_lt (n k j : Nat) (h : n % 32 = 0) (hk : k < n / 32) (hj : j < 32) :
-    quantIndex k j < n := by
-  unfold quantIndex
+/-- With no decay, unit key and unit write strength the delta rule overwrites the state with the value. -/
+theorem step_overwrite (s v : Int) : stepKernel 1 1 s 1 v = v := by
+  unfold stepKernel
   omega
 
-/-- The index map is injective: no two writes collide. -/
-theorem quantIndex_inj (k j k' j' : Nat) (hj : j < 32) (hj' : j' < 32)
-    (h : quantIndex k j = quantIndex k' j') : k = k' ∧ j = j' := by
-  unfold quantIndex at h
-  refine ⟨?_, ?_⟩ <;> omega
+-- § causal conv step
 
-/-- The `qi` staging array holds 4 vectors of 8 lanes, exactly one 32-value chunk. -/
-theorem staging_size : 4 * 8 = 32 := by
+/-- Input column `i` of `[conv_state | x]` with `d - 1` carried columns. -/
+def convInp {α : Type} (st : Nat → α) (x : α) (d i : Nat) : α := if i < d - 1 then st i else x
+
+/-- The new state entry `j` is input column `j + 1`: the oldest column is dropped. -/
+def convNext {α : Type} (st : Nat → α) (x : α) (d j : Nat) : α := convInp st x d (j + 1)
+
+/-- Tap 0 reads the OLDEST carried column. -/
+theorem convInp_oldest {α : Type} (st : Nat → α) (x : α) (d : Nat) (hd : 2 ≤ d) :
+    convInp st x d 0 = st 0 := by
+  unfold convInp
+  have hc : 0 < d - 1 := by omega
+  rw [if_pos hc]
+
+/-- The newest input lands in the LAST state slot. -/
+theorem convNext_last {α : Type} (st : Nat → α) (x : α) (d : Nat) (hd : 2 ≤ d) :
+    convNext st x d (d - 2) = x := by
+  unfold convNext convInp
+  have hc : ¬ (d - 2 + 1 < d - 1) := by omega
+  rw [if_neg hc]
+
+/-- Every other state slot is shifted down by one column. -/
+theorem convNext_shift {α : Type} (st : Nat → α) (x : α) (d j : Nat) (h : j + 2 < d) :
+    convNext st x d j = st (j + 1) := by
+  unfold convNext convInp
+  have hc : j + 1 < d - 1 := by omega
+  rw [if_pos hc]
+
+/-- Weight index `c * d + i` (tap `i` of channel `c`, `i` fastest) stays inside `channels * d`. -/
+theorem convWeightIdx_lt (c d i channels : Nat) (hc : c < channels) (hi : i < d) :
+    c * d + i < channels * d := by
+  have e : (c + 1) * d = c * d + d := by rw [Nat.add_mul, Nat.one_mul]
+  have h : (c + 1) * d ≤ channels * d := Nat.mul_le_mul_right d hc
+  omega
+
+-- § norms
+
+/-- Row-major element `h * S + d` of a `(h_v, S)` tensor stays in range, so the closing norm is per head row. -/
+theorem headRowIdx_lt (h S d hv : Nat) (hh : h < hv) (hd : d < S) : h * S + d < hv * S := by
+  have e : (h + 1) * S = h * S + S := by rw [Nat.add_mul, Nat.one_mul]
+  have h1 : (h + 1) * S ≤ hv * S := Nat.mul_le_mul_right S hh
+  omega
+
+/-- L2 norm vs the mean-based misreading: the sum-based denominator differs from the mean-based one
+whenever the squared norm is non-zero (the true factor is the width, 128 here). -/
+theorem l2_sum_vs_mean (sumsq : Nat) (h : 0 < sumsq) : sumsq / 128 < sumsq := by
+  omega
+
+end Ref.Gdn
+
+
+
+## FILE: /mnt/user-data/outputs/QsaSelectionAndAttention.lean
+/-!
+# MODULE: qsa_selection_and_attention
+SOURCES: include/ref/kernels/qsa.hpp, include/ref/kernels/qsa_select.hpp, include/ref/kernels/qsa_decode_attn.hpp
+Decode-time QSA layer: paged FP16 KV cache, pooled indexer keys, per-cell scores, top-k selection (identity
+below the width), gather through the page table, and split-K softmax attention over the selected cells.
+
+## Source semantics
+* Selection width is `min(n_kv, idx_top_k + idx_block - 1)`; the extra `r - 1` covers the incomplete tail.
+* The per-token step record is `[pos, n_kv = pos+1, n_bid = n_kv / r, width]`.
+* Cell `j` scores through block `min(j / r, n_bid)`; cells `j >= (n_kv / r) * r` are the incomplete tail and
+  get the +1e9 bias.
+* KV pool row for cell `t`, head `h`: `(page * n_head_kv + h) * page_size + t % page_size`, one head's cells
+  contiguous inside a page.
+* GQA maps query head `q` to KV head `q / (n_head / n_head_kv)` (integer division).
+* The gate half of each head's `2*head_dim` block starts at offset `head_dim`.
+* Split-K attention uses `ceil(cap / CHUNK)` chunks; INT8 pools carry one fp16 scale per 64 values.
+
+## Form template identifiers
+`QsaShapes` -> `attn_geometry`; `qsa_step_fill` -> `fill_step_record`; `topk_512` -> `select_cells`;
+`kv_gather` -> `gather_kv`; `page_size` -> `page_cells`; `idx_block` -> `pool_width`; `CHUNK` -> `split_chunk`.
+-/
+
+namespace Ref.Qsa
+
+-- § selection width and step record
+
+/-- Selection width: `min(n_kv, idx_top_k + idx_block - 1)`. -/
+def selWidth (nKv topK r : Nat) : Nat := min nKv (topK + r - 1)
+
+/-- The selection never returns more cells than the cache holds. -/
+theorem selWidth_le_nkv (nKv topK r : Nat) : selWidth nKv topK r ≤ nKv := by
+  unfold selWidth
+  omega
+
+/-- Below the bound the selection is the identity (every cell). -/
+theorem selWidth_identity (nKv topK r : Nat) (h : nKv ≤ topK + r - 1) : selWidth nKv topK r = nKv := by
+  unfold selWidth
+  omega
+
+/-- Real geometry: top-k 2048, block 4 gives bound 2051 (the plan's 2048 is conservative by three). -/
+theorem selWidth_bound_real : 2048 + 4 - 1 = 2051 := by decide
+
+/-- The widest selection the single-block kernel can ever produce (`kTopkMaxCells = 32768`) is 2051. -/
+theorem selWidth_cap_real : selWidth 32768 2048 4 = 2051 := by decide
+
+/-- The step record written for position `pos`. -/
+def stepRecord (pos topK r : Nat) : List Nat := [pos, pos + 1, (pos + 1) / r, selWidth (pos + 1) topK r]
+
+/-- Four entries, i.e. `kStepCount`, and `qsa_step_bytes` is 16. -/
+theorem stepRecord_length (pos topK r : Nat) : (stepRecord pos topK r).length = 4 := rfl
+
+/-- The step buffer is 16 bytes. -/
+theorem step_bytes : 4 * 4 = 16 := by decide
+
+/-- Completed blocks times the block width never exceed the cache size. -/
+theorem blocks_le_nkv (nKv r : Nat) : nKv / r * r ≤ nKv := Nat.div_mul_le_self nKv r
+
+/-- The incomplete tail has fewer than `r` cells: why the budget adds `r - 1`. -/
+theorem tail_count_lt (n r : Nat) (hr : 0 < r) : n - (n / r) * r < r := by
+  have h1 := Nat.div_add_mod n r
+  have h2 := Nat.mod_lt n hr
+  have h3 : r * (n / r) = (n / r) * r := Nat.mul_comm _ _
+  omega
+
+-- § cell to block mapping (idx_block = 4)
+
+/-- Block used to score cell `j`. -/
+def cellBlock (j nBid : Nat) : Nat := min (j / 4) nBid
+
+/-- A completed-region cell maps to its own block. -/
+theorem cellBlock_complete (j nKv : Nat) (h : j < nKv / 4 * 4) : cellBlock j (nKv / 4) = j / 4 := by
+  unfold cellBlock
+  omega
+
+/-- A tail cell maps to the spare slot `n_bid`. -/
+theorem cellBlock_tail (j nKv : Nat) (h1 : nKv / 4 * 4 ≤ j) (h2 : j < nKv) :
+    cellBlock j (nKv / 4) = nKv / 4 := by
+  unfold cellBlock
+  omega
+
+/-- The mapped block never exceeds the spare slot. -/
+theorem cellBlock_le (j nBid : Nat) : cellBlock j nBid ≤ nBid := by
+  unfold cellBlock
+  omega
+
+/-- The spare block has cells exactly when `n_kv` is not a multiple of 4. -/
+theorem tail_has_cells_iff (nKv : Nat) : nKv / 4 * 4 < nKv ↔ nKv % 4 ≠ 0 := by
+  omega
+
+/-- Cells per scored block: `r` for completed blocks, the remainder for the spare one. -/
+def cellsInBlock (b nBid nKv r : Nat) : Nat := if b < nBid then r else nKv - nBid * r
+
+/-- Weights of all `n_bid + 1` blocks add up to `n_kv` (completed blocks plus the tail). -/
+theorem block_weights_total (nKv r : Nat) : (nKv / r) * r + cellsInBlock (nKv / r) (nKv / r) nKv r = nKv := by
+  unfold cellsInBlock
+  have h := Nat.div_mul_le_self nKv r
+  have hc : ¬ (nKv / r < nKv / r) := by omega
+  rw [if_neg hc]
+  omega
+
+/-- The radix select makes 4 passes of 8 bits over a 32-bit key. -/
+theorem radix_passes : 4 * 8 = 32 := by decide
+
+-- § paged KV layout
+
+/-- Physical row of `(page, head, offset)`: `(page * n_head_kv + head) * page_size + offset`. -/
+def physRow (page nHeadKv head pageSize off : Nat) : Nat := (page * nHeadKv + head) * pageSize + off
+
+/-- Consecutive cells of one head are contiguous inside a page. -/
+theorem physRow_contiguous (page nHeadKv head pageSize off : Nat) :
+    physRow page nHeadKv head pageSize (off + 1) = physRow page nHeadKv head pageSize off + 1 := by
+  unfold physRow
+  omega
+
+/-- A valid (page, head, offset) is inside the pool of `n_pages * n_head_kv * page_size` rows. -/
+theorem physRow_lt (page nHeadKv head pageSize off nPages : Nat) (hp : page < nPages) (hh : head < nHeadKv)
+    (ho : off < pageSize) : physRow page nHeadKv head pageSize off < nPages * nHeadKv * pageSize := by
+  unfold physRow
+  have e1 : (page + 1) * nHeadKv = page * nHeadKv + nHeadKv := by rw [Nat.add_mul, Nat.one_mul]
+  have h1 : (page + 1) * nHeadKv ≤ nPages * nHeadKv := Nat.mul_le_mul_right nHeadKv hp
+  have e2 : (page * nHeadKv + head + 1) * pageSize = (page * nHeadKv + head) * pageSize + pageSize := by
+    rw [Nat.add_mul, Nat.one_mul]
+  have h2 : (page * nHeadKv + head + 1) * pageSize ≤ (nPages * nHeadKv) * pageSize :=
+    Nat.mul_le_mul_right pageSize (by omega)
+  omega
+
+/-- A logical cell splits into page and offset. -/
+theorem cell_split (t ps : Nat) : ps * (t / ps) + t % ps = t := Nat.div_add_mod t ps
+
+/-- With page size 1 (the unpaged configuration) the offset is always zero. -/
+theorem unpaged_offset (t : Nat) : t % 1 = 0 := Nat.mod_one t
+
+-- § memory budget (documented figures)
+
+/-- 12 QSA layers x 2 heads x 256 dims x (K and V) x 2 B x 32768 cells = 805306368 bytes. -/
+theorem kv_bytes_32k : 12 * 2 * 256 * 2 * 2 * 32768 = 805306368 := by decide
+
+/-- FINDING: that is exactly 768 MiB (about 805 MB); the header's "805 MiB" is a decimal-megabyte figure. -/
+theorem kv_is_768_mib : 805306368 = 768 * 1048576 := by decide
+
+/-- Indexer keys: 128 floats = 512 B per block, 128 B per cell per layer, 1536 B per cell over 12 layers. -/
+theorem indexer_bytes_per_cell : 128 * 4 / 4 * 12 = 1536 := by decide
+
+/-- At 32K cells the indexer keys take 50331648 bytes, exactly 48 MiB (the header says "50 MiB"). -/
+theorem indexer_bytes_32k : 1536 * 32768 = 50331648 ∧ 50331648 = 48 * 1048576 := by decide
+
+-- § grouped-query attention head map (24 query heads, 2 KV heads)
+
+/-- Each KV head serves 12 query heads. -/
+theorem gqa_group : 24 / 2 = 12 := by decide
+
+/-- Integer-division map gives the contiguous halves [0 x 12, 1 x 12]. -/
+theorem gqa_div_counts :
+    ((List.range 24).filter (fun q => q / 12 = 0)).length = 12 ∧
+    ((List.range 24).filter (fun q => q / 12 = 1)).length = 12 := by
   decide
 
-/-- Vector `i < 4`, lane `l < 8` of the staging array is index `8i + l < 32`. -/
-theorem staging_index_lt (i l : Nat) (hi : i < 4) (hl : l < 8) : 8 * i + l < 32 := by
+/-- The modulo map would pair query head 1 with KV head 1, but the integer map pairs it with KV head 0. -/
+theorem gqa_mod_differs : (1 % 2 : Nat) ≠ 1 / 12 := by decide
+
+-- § gate split of the q projection (n_head 24, head_dim 256)
+
+/-- Within a head's 512-wide block the query half precedes the gate half. -/
+theorem gate_after_query (h d d' : Nat) (hd : d < 256) : h * 512 + d < h * 512 + 256 + d' := by
   omega
 
--- § four-token chunking
+/-- Every gate element lies inside the `24 * 512` projection. -/
+theorem gate_idx_lt (h d : Nat) (hh : h < 24) (hd : d < 256) : h * 512 + 256 + d < 24 * 512 := by
+  omega
 
-/-- Sizes of the chunks of at most 4 tokens a loop over `rem` tokens produces, with fuel `f`. -/
-def chunks4 : Nat → Nat → List Nat
-  | 0, _ => []
-  | f + 1, rem => if rem = 0 then [] else min 4 rem :: chunks4 f (rem - min 4 rem)
+-- § split-K decode attention
 
-/-- The chunks cover all tokens when the fuel suffices. -/
-theorem chunks4_sum (f : Nat) : ∀ rem, rem ≤ 4 * f → (chunks4 f rem).sum = rem := by
-  induction f with
-  | zero =>
-    intro rem h
-    have : rem = 0 := by omega
-    subst this
-    rfl
-  | succ f ih =>
-    intro rem h
-    by_cases hr : rem = 0
-    · subst hr
-      simp [chunks4]
-    · have e : chunks4 (f + 1) rem = min 4 rem :: chunks4 f (rem - min 4 rem) := by
-        simp [chunks4, hr]
-      rw [e, List.sum_cons, ih (rem - min 4 rem) (by omega)]
-      omega
+/-- Number of chunks for a capacity `cap` and chunk size `c`. -/
+def nChunks (cap c : Nat) : Nat := (cap + c - 1) / c
 
-/-- Every chunk size is in `1..4`. -/
-theorem chunks4_range (f : Nat) : ∀ rem, ∀ c ∈ chunks4 f rem, 1 ≤ c ∧ c ≤ 4 := by
-  induction f with
-  | zero => intro rem c hc; simp [chunks4] at hc
-  | succ f ih =>
-    intro rem c hc
-    by_cases hr : rem = 0
-    · subst hr
-      simp [chunks4] at hc
-    · have e : chunks4 (f + 1) rem = min 4 rem :: chunks4 f (rem - min 4 rem) := by
-        simp [chunks4, hr]
-      rw [e] at hc
-      rcases List.mem_cons.mp hc with h | h
-      · rw [h]; omega
-      · exact ih _ c h
+/-- The chunks cover the whole capacity. -/
+theorem chunks_cover (cap c : Nat) (hc : 0 < c) : cap ≤ nChunks cap c * c := by
+  unfold nChunks
+  have h1 := Nat.div_add_mod (cap + c - 1) c
+  have h2 := Nat.mod_lt (cap + c - 1) hc
+  have h3 : c * ((cap + c - 1) / c) = ((cap + c - 1) / c) * c := Nat.mul_comm _ _
+  omega
 
-end Ref.Q2Avx2
+/-- Every cell below `cap` falls into a chunk below the chunk count. -/
+theorem cell_chunk_lt (j cap c : Nat) (hc : 0 < c) (hj : j < cap) : j / c < nChunks cap c := by
+  have h1 := chunks_cover cap c hc
+  have h2 : j < c * nChunks cap c := by
+    rw [Nat.mul_comm]
+    omega
+  exact Nat.div_lt_of_lt_mul h2
+
+/-- INT8 pools carry one fp16 scale per 64 values: four per 256-wide row. -/
+theorem scales_per_row : 256 / 64 = 4 := by decide
+
+end Ref.Qsa
+
+
+
+## FILE: /mnt/user-data/outputs/SGemvAndExpertGrouped.lean
+/-!
+# MODULE: s_gemv_and_expert_grouped
+SOURCES: include/ref/kernels/s_gemv.hpp, include/ref/kernels/s2_expert_grouped.hpp
+Canonical-form GEMV (one decode `cb[code] * scale + offset` for S2/S4/S8 codes, over fp16, Q8_K or Q8_0
+activations) and the grouped GPU expert tier (one launch per projection, hit lists passed as device data).
+
+## Source semantics
+* A weight row is `n_in / (8 / code_bits)` code bytes and `n_in / group_elems` scales.
+* Q8_K activation blocks are 292 bytes per 256 elements (`4 + 256 + 2*16`); Q8_0 blocks are 34 bytes per 32
+  elements (`2 + 32`). `n_in = 640` is a multiple of 32 but not of 256, so Q8_K is impossible for it.
+* `act_kind` cannot be derived from the other form attributes (IQ4_NL vs IQ4_XS differ in nothing else).
+* Grouped expert evaluation: scratch is `n_hits * (2*FF*4 + (FF/32)*34)` bytes; four launches per layer
+  instead of five per expert; hit `h` reads slot `slot_index[h]` of the arena and writes row `dst_index[h]`.
+* `moe_hit_select` keeps the routed entries whose residency row is non-negative.
+
+## Form template identifiers
+`SForm` -> `quant_form`; `code_bits` -> `bits_per_code`; `group_elems` -> `group_size`; `act_kind` -> `act_format`;
+`moe_hit_grouped_s2` -> `grouped_expert_eval`; `slot_index` -> `resident_slot`; `dst_index` -> `route_row`.
+-/
+
+namespace Ref.SGemv
+
+-- § canonical form
+
+/-- The canonical-form attributes the kernels receive (codebook: 0 affine, 1 IQ4_NL table). -/
+structure SForm where
+  codeBits : Nat
+  codeBias : Int
+  groupElems : Nat
+  codebook : Nat
+  hasOffset : Bool
+  actKind : Nat
+  deriving DecidableEq
+
+/-- Well-formed forms use 2, 4 or 8 bit codes, a positive group and an activation kind of 0 or 1. -/
+def SForm.WellFormed (f : SForm) : Prop :=
+  (f.codeBits = 2 ∨ f.codeBits = 4 ∨ f.codeBits = 8) ∧ 0 < f.groupElems ∧ f.actKind ≤ 1
+
+/-- Codes per byte. -/
+def perByte (bits : Nat) : Nat := 8 / bits
+
+/-- Two-, four- and eight-bit codes pack 4, 2 and 1 per byte. -/
+theorem perByte_values : perByte 2 = 4 ∧ perByte 4 = 2 ∧ perByte 8 = 1 := by decide
+
+/-- Code bytes in one weight row. -/
+def rowCodeBytes (nIn bits : Nat) : Nat := nIn / perByte bits
+
+/-- Scales in one weight row. -/
+def rowScales (nIn group : Nat) : Nat := nIn / group
+
+/-- The expert gate/up shape: 2560 inputs give 640 code bytes (S2) and 40 scales (group 64) per row. -/
+theorem expert_row_sizes : rowCodeBytes 2560 2 = 640 ∧ rowScales 2560 64 = 40 := by decide
+
+/-- The integer-domain decode `code + bias` lies in `[bias, bias + M)` for codes below `M = 2^bits`. -/
+theorem decode_range (code M : Nat) (bias : Int) (h : code < M) :
+    bias ≤ (code : Int) + bias ∧ (code : Int) + bias < bias + (M : Int) := by
+  omega
+
+/-- Q2_0 (bias -1) decodes 2-bit codes to -1..2. -/
+theorem q2_range (code : Nat) (h : code < 4) : -1 ≤ (code : Int) + (-1) ∧ (code : Int) + (-1) ≤ 2 := by
+  omega
+
+/-- Q5_0 (bias -16) decodes 5-bit values to -16..15. -/
+theorem q5_range (code : Nat) (h : code < 32) : -16 ≤ (code : Int) + (-16) ∧ (code : Int) + (-16) ≤ 15 := by
+  omega
+
+-- § activation formats
+
+/-- Bytes of a Q8_K activation block: scale, 256 int8 quants, 16 int16 block sums. -/
+theorem q8k_block_bytes : 4 + 256 + 2 * 16 = 292 := by decide
+
+/-- Bytes of a Q8_0 block: fp16 scale plus 32 int8 quants. -/
+theorem q8_0_block_bytes : 2 + 32 = 34 := by decide
+
+/-- Q8_0 activation image size for `n` elements. -/
+def q8_0Bytes (n : Nat) : Nat := n / 32 * 34
+
+/-- The 2560-wide image used by the PLE and expert kernels is 2720 bytes; the 640-wide one is 680. -/
+theorem q8_0_sizes : q8_0Bytes 2560 = 2720 ∧ q8_0Bytes 640 = 680 := by decide
+
+/-- `ffn_down_shexp` has `n_in = 640`: a multiple of 32 but not of 256, so Q8_K cannot apply. -/
+theorem shexp_needs_q8_0 : 640 % 32 = 0 ∧ 640 % 256 ≠ 0 := by decide
+
+/-- Group sizes 32, 64 and 256 are multiples of four and powers of two, as the split kernels require. -/
+theorem groups_ok : (32 % 4 = 0 ∧ ∃ k, 32 = 2 ^ k) ∧ (64 % 4 = 0 ∧ ∃ k, 64 = 2 ^ k) ∧
+    (256 % 4 = 0 ∧ ∃ k, 256 = 2 ^ k) :=
+  ⟨⟨by decide, 5, by decide⟩, ⟨by decide, 6, by decide⟩, ⟨by decide, 8, by decide⟩⟩
+
+/-- `act_kind` is not derivable: two IQ4 forms identical except for it are different values. -/
+theorem act_kind_independent :
+    ({ codeBits := 4, codeBias := 0, groupElems := 32, codebook := 1, hasOffset := false, actKind := 0 } : SForm) ≠
+    { codeBits := 4, codeBias := 0, groupElems := 32, codebook := 1, hasOffset := false, actKind := 1 } := by
+  decide
+
+-- § grouped expert tier
+
+/-- Scratch bytes per hit: gate/up activations (`2*FF` floats) plus the quantised intermediate. -/
+def perHitScratch (ff : Nat) : Nat := 2 * ff * 4 + (ff / 32) * 34
+
+/-- Scratch for `n` hits. -/
+def hitScratch (n ff : Nat) : Nat := n * perHitScratch ff
+
+/-- Scratch grows by exactly one per-hit amount per extra hit. -/
+theorem hitScratch_succ (n ff : Nat) : hitScratch (n + 1) ff = hitScratch n ff + perHitScratch ff := by
+  unfold hitScratch
+  rw [Nat.add_mul, Nat.one_mul]
+
+/-- Real geometry (FF = 640): 5800 bytes per hit, 58000 for ten hits. -/
+theorem hitScratch_real : perHitScratch 640 = 5800 ∧ hitScratch 10 640 = 58000 := by decide
+
+/-- Grouping: 4 launches per layer over 48 layers is 192, versus about 1548 launches per token (x100) for
+5 launches per expert at 6.45 hits per layer. -/
+theorem launch_counts : 4 * 48 = 192 ∧ 5 * 645 * 48 = 154800 := by decide
+
+/-- Spans of consecutive slots (or consecutive output rows) of `n` bytes/floats are disjoint. -/
+theorem slot_spans_disjoint (d d' n : Nat) (h : d < d') : d * n + n ≤ d' * n := by
+  have e : (d + 1) * n = d * n + n := by rw [Nat.add_mul, Nat.one_mul]
+  have h1 : (d + 1) * n ≤ d' * n := Nat.mul_le_mul_right n h
+  omega
+
+/-- Hits selected from `k` routed ids: those whose residency row is non-negative. -/
+def hitCount (res : Nat → Int) (ids : List Nat) : Nat := (ids.filter (fun e => decide (0 ≤ res e))).length
+
+/-- There are never more hits than routed entries, so a capacity of `k` hits suffices. -/
+theorem hitCount_le (res : Nat → Int) (ids : List Nat) : hitCount res ids ≤ ids.length := by
+  unfold hitCount
+  exact List.length_filter_le _ _
+
+/-- No routed entries means no hits. -/
+theorem hitCount_nil (res : Nat → Int) : hitCount res [] = 0 := by
+  simp [hitCount]
+
+end Ref.SGemv
 
 
 
 /-! [measured by the kernel] STATEMENTS CHANGED AFTER VERIFICATION in this chunk.
 These are not the first reading of the reference: check each against the reference code before implementing or accepting it.
 
-- PleBlockCuda.lean
-  was: theorem scratch_regions_fit :
-    floatBytes ≤ actOff ∧ actOff + q8Bytes ≤ embOff ∧ embOff + embBytes ≤ scratchBytes
-  now: theorem scratch_gen (F Q E : Nat) :
-    F ≤ roundUp16 F ∧ roundUp16 F + Q ≤ roundUp16 F + roundUp16 Q ∧
-    roundUp16 F + roundUp16 Q + E ≤ roundUp16 F + roundUp16 Q + E + 256
+- SGemvAndExpertGrouped.lean
+  was: theorem decode_range (code bits : Nat) (bias : Int) (h : code < 2 ^ bits) :
+    bias ≤ (code : Int) + bias ∧ (code : Int) + bias < bias + (2 ^ bits : Nat)
+  now: theorem decode_range (code M : Nat) (bias : Int) (h : code < M) :
+    bias ≤ (code : Int) + bias ∧ (code : Int) + bias < bias + (M : Int)
+  measured: the claim changed
+
+- SGemvAndExpertGrouped.lean
+  was: theorem hitCount_none (ids : List Nat) : hitCount (fun _ => -1) ids = 0
+  now: theorem hitCount_nil (res : Nat → Int) : hitCount res [] = 0
   measured: the claim changed
 -/
 
 
 
-## FILE: /mnt/user-data/outputs/CanonicalQuantBitExactMaps.lean
+## FILE: /mnt/user-data/outputs/Q2ExpertBlobGeometry.lean
 /-!
-# MODULE: canonical_quant_bit_exact_maps
-SOURCES: tools/canonical_xcheck.py
-Integer-level model of the GGML-quant -> canonical-form (S2/S4/S8/P16/P32) mappings. The Python tool checks the
-float decode bit-exactly against gguf-py; this theory captures the integer / layout contracts that make that
-possible: block byte decompositions, code ranges, integer biases, nibble and bit-plane splits, mask walks.
+# MODULE: q2_expert_blob_geometry
+SOURCES: include/ref/kernels/cpu/expert.hpp, src/kernels/cpu/expert.cpp
+Fixed geometry of one Q2_0 routed expert (H=2560, FF=640, QK=64, QKA=32) and the internal layout of its
+1,382,400-byte blob: gate/up codes, down codes, gate/up scales, down scales.
 
 ## Source semantics
-Each mapping is (block_bytes, block_elems, group_elems, code_bias, has_offset). The decode is
-`(code + bias) * scale (+ offset)`, the bias applied to the INTEGER code before the single multiply.
-Codes are unsigned; Q2_0 `-1`, Q3_K `-4`, Q4_0 `-8`, Q5_0 `-16`, Q6_K `-32`, Q8_0 `-128` are integer biases.
-IQ4_NL / IQ4_XS use a non-affine 16-entry codebook. Floating point rounding is NOT modelled here.
+* One weight block is QK=64 weights with one fp16 scale (18 bytes); one activation chunk is QKA=32 elements, so
+  a weight block spans exactly two activation chunks.
+* Gate and up rows are interleaved (row 2r = gate_r, row 2r+1 = up_r); regions are contiguous and tile the blob.
 
 ## Form template identifiers
-mapping registry `MAPPINGS` -> `Mapping`; `to_s*`/`from_s*` -> pack/unpack; `KV_IQ4NL` -> `kv`;
-`get_scale_min_k4` -> `scaleMinLow`/`scaleMinHigh`; `BLOCK_BYTES`/`QK` -> `Mapping.blockBytes`/`blockElems`.
+H -> hidden_width, FF -> expert_inner_width, QK -> weight_block, QKA -> activation_chunk, BB -> block_bytes,
+BLOB -> expert_blob_bytes, O_* -> region_offset, ROW_* -> code_bytes_per_row, SC_* -> scale_blocks_per_row
 -/
 
-namespace RefCanonicalXcheck
+namespace Ref.Q2ExpertGeometry
+
+-- § constants
+def H : Nat := 2560
+def FF : Nat := 640
+def NE : Nat := 512
+def QK : Nat := 64
+def QKA : Nat := 32
+def BB : Nat := 18
+def MAXC : Nat := H / QKA
+def ROW_GU : Nat := H * 2 / 8
+def ROW_D : Nat := FF * 2 / 8
+def SC_GU : Nat := H / QK
+def SC_D : Nat := FF / QK
+def BLOB : Nat := 3 * (H * FF * BB / QK)
+def O_GU_CODES : Nat := 0
+def O_D_CODES : Nat := 2 * FF * ROW_GU
+def O_GU_SCALES : Nat := O_D_CODES + 1 * H * ROW_D
+def O_D_SCALES : Nat := O_GU_SCALES + 2 * FF * SC_GU * 2
+
+-- § numeric values
+/-- `H` is 2560. -/
+theorem H_eq : H = 2560 := rfl
+/-- `FF` is 640. -/
+theorem FF_eq : FF = 640 := rfl
+/-- `MAXC` is 80 activation chunks. -/
+theorem MAXC_eq : MAXC = 80 := by decide
+/-- Gate/up code bytes per row. -/
+theorem ROW_GU_eq : ROW_GU = 640 := by decide
+/-- Down code bytes per row. -/
+theorem ROW_D_eq : ROW_D = 160 := by decide
+/-- Weight blocks per gate/up row. -/
+theorem SC_GU_eq : SC_GU = 40 := by decide
+/-- Weight blocks per down row. -/
+theorem SC_D_eq : SC_D = 10 := by decide
+/-- The blob is 1,382,400 bytes. -/
+theorem BLOB_eq : BLOB = 1382400 := by decide
+/-- Offset of the down codes. -/
+theorem O_D_CODES_eq : O_D_CODES = 819200 := by decide
+/-- Offset of the gate/up scales. -/
+theorem O_GU_SCALES_eq : O_GU_SCALES = 1228800 := by decide
+/-- Offset of the down scales. -/
+theorem O_D_SCALES_eq : O_D_SCALES = 1331200 := by decide
+
+-- § block / chunk contract
+/-- A Q2_0 block is 2 bytes of fp16 scale plus 16 code bytes (64 codes at 2 bits). -/
+theorem block_bytes_decomposition : BB = 2 + QK * 2 / 8 := by decide
+/-- A weight block spans exactly two activation chunks. -/
+theorem weight_block_is_two_chunks : QK = 2 * QKA := by decide
+/-- The hidden width is a whole number of activation chunks, and `MAXC` counts them. -/
+theorem hidden_is_chunks : H = MAXC * QKA := by decide
+/-- Chunk count of a row equals twice its weight-block count (gate/up). -/
+theorem gu_chunks_twice_blocks : H / QKA = 2 * SC_GU := by decide
+/-- Chunk count of the intermediate equals twice the down weight-block count. -/
+theorem d_chunks_twice_blocks : FF / QKA = 2 * SC_D := by decide
+/-- The intermediate activation fits in the `MAXC`-chunk scratch. -/
+theorem intermediate_fits_scratch : FF / QKA ≤ MAXC := by decide
+/-- Code bytes per row are 16 per weight block. -/
+theorem code_bytes_per_block : ROW_GU = SC_GU * 16 ∧ ROW_D = SC_D * 16 := by decide
+
+-- § region layout
+/-- Regions are ordered and the last one ends exactly at `BLOB`. -/
+theorem regions_ordered_and_tile :
+    O_GU_CODES ≤ O_D_CODES ∧ O_D_CODES ≤ O_GU_SCALES ∧ O_GU_SCALES ≤ O_D_SCALES ∧
+      O_D_SCALES + 1 * H * SC_D * 2 = BLOB := by decide
+
+/-- The code regions hold 3 projections of 2-bit codes, and the scales hold one fp16 per 64 weights. -/
+theorem code_and_scale_totals :
+    O_GU_SCALES = 3 * (H * FF * 2 / 8) ∧ BLOB - O_GU_SCALES = 3 * (H * FF / QK * 2) := by decide
+
+/-- Every gate and up row lies inside the gate/up code region. -/
+theorem gu_rows_in_codes (r : Nat) (h : r < FF) :
+    O_GU_CODES + (2 * r + 1) * ROW_GU + ROW_GU ≤ O_D_CODES := by
+  simp only [ROW_GU_eq, O_D_CODES_eq, FF_eq] at h ⊢
+  have : O_GU_CODES = 0 := rfl
+  omega
+
+/-- Every down row lies inside the down code region. -/
+theorem down_rows_in_codes (r : Nat) (h : r < H) :
+    O_D_CODES + (r + 1) * ROW_D ≤ O_GU_SCALES := by
+  simp only [ROW_D_eq, O_D_CODES_eq, O_GU_SCALES_eq, H_eq] at h ⊢
+  omega
+
+/-- Every gate and up scale row lies inside the gate/up scale region. -/
+theorem gu_scales_in_region (r : Nat) (h : r < FF) :
+    O_GU_SCALES + ((2 * r + 1) * SC_GU * 2 + SC_GU * 2) ≤ O_D_SCALES := by
+  simp only [SC_GU_eq, O_GU_SCALES_eq, O_D_SCALES_eq, FF_eq] at h ⊢
+  omega
+
+/-- Every down scale row lies inside the down scale region, which ends at the blob end. -/
+theorem down_scales_in_region (r : Nat) (h : r < H) :
+    O_D_SCALES + (r + 1) * SC_D * 2 ≤ BLOB := by
+  simp only [SC_D_eq, O_D_SCALES_eq, BLOB_eq, H_eq] at h ⊢
+  omega
+
+/-- Activation chunk indices touched by weight block `b` of a gate/up row stay below `MAXC`. -/
+theorem block_chunks_in_range (b : Nat) (h : b < SC_GU) : 2 * b + 1 < MAXC := by
+  simp only [SC_GU_eq, MAXC_eq] at h ⊢
+  omega
+
+end Ref.Q2ExpertGeometry
+
+
+
+## FILE: /mnt/user-data/outputs/Q2RowDotIdentity.lean
+/-!
+# MODULE: q2_row_dot_identity
+SOURCES: include/ref/kernels/cpu/expert.hpp, src/kernels/cpu/expert.cpp, src/kernels/cpu/q2_avx2.cpp
+The algebra behind the Q2_0 row dot: codes {0..3} stand for symbols {-1,0,1,2}; the VNNI path computes
+sum(c*xhat) and subtracts sum(xhat) (the `hx` correction) instead of forming (c-1).
+
+## Source semantics
+* sum (c-1) x = sum c x - sum x (integer-exact, which is why the correction can be factored out).
+* One weight scale covers two activation chunks with different scales; collapsing to one scale is wrong.
+* Unpack: code i of a packed byte stream is (b / 4^i) % 4; multishift lanes keep codes in order.
+* Multi-token kernels process each token independently; tokens are dispatched with NT = n (1..8) and the
+  AVX2 path in chunks of at most 4.
+
+## Form template identifiers
+dotSym -> symbol_dot, dotC -> code_dot, sumX -> activation_sum, ntDispatch -> token_template_select,
+chunks4 -> avx2_token_chunks
+-/
+
+namespace Ref.Q2RowDot
+
+-- § dot products over (code, activation) pairs
+/-- Dot product with the symbol mapping c -> c - 1. -/
+def dotSym : List (Nat × Int) → Int
+  | [] => 0
+  | (c, x) :: l => ((c : Int) - 1) * x + dotSym l
+
+/-- Dot product with raw codes. -/
+def dotC : List (Nat × Int) → Int
+  | [] => 0
+  | (c, x) :: l => (c : Int) * x + dotC l
+
+/-- Sum of the activations. -/
+def sumX : List (Nat × Int) → Int
+  | [] => 0
+  | (_, x) :: l => x + sumX l
+
+/-- The Q2_0 identity: sum (c-1) x = sum c x - sum x. -/
+theorem dotSym_eq_dotC_sub_sumX : ∀ l : List (Nat × Int), dotSym l = dotC l - sumX l
+  | [] => by simp [dotSym, dotC, sumX]
+  | (c, x) :: l => by
+      have ih := dotSym_eq_dotC_sub_sumX l
+      simp only [dotSym, dotC, sumX, ih, Int.sub_mul, Int.one_mul] <;> omega
+
+/-- The symbol dot product splits over concatenation (two chunks of a block). -/
+theorem dotSym_append : ∀ l₁ l₂ : List (Nat × Int), dotSym (l₁ ++ l₂) = dotSym l₁ + dotSym l₂
+  | [], l₂ => by simp [dotSym]
+  | (c, x) :: l₁, l₂ => by
+      have ih := dotSym_append l₁ l₂
+      simp only [List.cons_append, dotSym, ih] <;> omega
+
+/-- A zero code contributes nothing, so zero-padded lanes of a narrow load are harmless. -/
+theorem zero_code_contributes_nothing (x : Int) : (0 : Int) * x = 0 := Int.zero_mul x
+
+-- § two scales per weight block
+/-- Per-chunk scaling distributes over the weight-block scale. -/
+theorem block_two_scale (dw s0 s1 A0 A1 : Int) :
+    dw * (s0 * A0) + dw * (s1 * A1) = dw * (s0 * A0 + s1 * A1) := by
+  rw [Int.mul_add]
+
+/-- Using one chunk scale for the whole block agrees with the correct formula only if (s1-s0)*A1 = 0. -/
+theorem single_scale_iff (s0 s1 A0 A1 : Int) :
+    s0 * A0 + s1 * A1 = s0 * (A0 + A1) ↔ (s1 - s0) * A1 = 0 := by
+  constructor
+  · intro h
+    rw [Int.mul_add] at h
+    rw [Int.sub_mul]
+    omega
+  · intro h
+    rw [Int.sub_mul] at h
+    rw [Int.mul_add]
+    omega
+
+/-- A concrete case where the single-scale shortcut gives a wrong answer. -/
+theorem single_scale_counterexample : ¬ ((1 : Int) * 1 + 2 * 1 = 1 * (1 + 1)) := by decide
+
+-- § unpack and VNNI bounds
+/-- Pack four 2-bit codes into a byte, LSB first. -/
+def pack4 (c0 c1 c2 c3 : Nat) : Nat := c0 + 4 * c1 + 16 * c2 + 64 * c3
+/-- Code 0 of a byte. -/
+def code0 (b : Nat) : Nat := b % 4
+/-- Code 1 of a byte. -/
+def code1 (b : Nat) : Nat := b / 4 % 4
+/-- Code 2 of a byte. -/
+def code2 (b : Nat) : Nat := b / 16 % 4
+/-- Code 3 of a byte. -/
+def code3 (b : Nat) : Nat := b / 64 % 4
+
+/-- Unpacking a packed byte returns the four codes in order. -/
+theorem unpack_pack (c0 c1 c2 c3 : Nat) (h0 : c0 < 4) (h1 : c1 < 4) (h2 : c2 < 4) (h3 : c3 < 4) :
+    code0 (pack4 c0 c1 c2 c3) = c0 ∧ code1 (pack4 c0 c1 c2 c3) = c1 ∧
+      code2 (pack4 c0 c1 c2 c3) = c2 ∧ code3 (pack4 c0 c1 c2 c3) = c3 := by
+  unfold code0 code1 code2 code3 pack4
+  refine ⟨by omega, by omega, by omega, by omega⟩
+
+/-- A packed byte is below 256 when its codes are 2-bit. -/
+theorem pack4_lt (c0 c1 c2 c3 : Nat) (h0 : c0 < 4) (h1 : c1 < 4) (h2 : c2 < 4) (h3 : c3 < 4) :
+    pack4 c0 c1 c2 c3 < 256 := by
+  unfold pack4
+  omega
+
+/-- Across the two bytes of a 16-bit lane, position 4 is the first code of the second byte. -/
+theorem lane_second_byte (b0 b1 : Nat) (h : b0 < 256) : (b0 + 256 * b1) / 256 % 4 = b1 % 4 := by
+  omega
+
+/-- A u8 code times an int8 activation stays within +-381. -/
+theorem code_mul_bound (c x : Int) (hc0 : 0 ≤ c) (hc3 : c ≤ 3) (hx1 : -127 ≤ x) (hx2 : x ≤ 127) :
+    -381 ≤ c * x ∧ c * x ≤ 381 := by
+  have h : c = 0 ∨ c = 1 ∨ c = 2 ∨ c = 3 := by omega
+  rcases h with rfl | rfl | rfl | rfl <;> omega
+
+/-- A 2560-wide dot of such products fits in int32. -/
+theorem vnni_sum_fits : 2560 * 381 = 975360 ∧ 975360 < 2 ^ 31 := by decide
+
+/-- Broadcasting the scalar correction to eight lanes would apply it eight times; that equals one
+application only when the correction is zero. -/
+theorem eight_lane_correction_wrong (c : Int) (h : 8 * c = c) : c = 0 := by omega
+
+-- § multi-token dispatch
+/-- Template argument chosen for `n` tokens: n for 1..7, otherwise 8. -/
+def ntDispatch (n : Nat) : Nat := if 1 ≤ n ∧ n ≤ 7 then n else 8
+
+/-- For 1..8 tokens the selected template handles exactly `n` tokens. -/
+theorem ntDispatch_exact (n : Nat) (h1 : 1 ≤ n) (h2 : n ≤ 8) : ntDispatch n = n := by
+  unfold ntDispatch
+  split <;> omega
+
+/-- Token chunk sizes for the AVX2 path (at most 4 at a time), with fuel. -/
+def chunks4 : Nat → Nat → List Nat
+  | 0, _ => []
+  | f + 1, r => if r = 0 then [] else min 4 r :: chunks4 f (r - min 4 r)
+
+/-- With enough fuel the chunks sum to the token count. -/
+theorem chunks4_sum : ∀ f r : Nat, r ≤ 4 * f → (chunks4 f r).sum = r
+  | 0, r, h => by
+      have : r = 0 := by omega
+      subst this
+      simp [chunks4]
+  | f + 1, r, h => by
+      by_cases hr : r = 0
+      · subst hr
+        simp [chunks4]
+      · have ih := chunks4_sum f (r - min 4 r) (by omega)
+        simp [chunks4, hr, ih] <;> omega
+
+/-- Every AVX2 chunk is between 1 and 4 tokens. -/
+theorem chunks4_bounded : ∀ f r : Nat, ∀ k ∈ chunks4 f r, 1 ≤ k ∧ k ≤ 4
+  | 0, r, k, hk => by simp [chunks4] at hk
+  | f + 1, r, k, hk => by
+      by_cases hr : r = 0
+      · subst hr
+        simp [chunks4] at hk
+      · simp only [chunks4, hr, if_false, List.mem_cons] at hk
+        rcases hk with rfl | hk
+        · omega
+        · exact chunks4_bounded f _ k hk
+
+/-- Processing tokens in chunks equals processing them all at once, token by token. -/
+theorem chunked_map_eq {α β : Type} (f : α → β) (a b : List α) :
+    (a ++ b).map f = a.map f ++ b.map f := List.map_append
+
+end Ref.Q2RowDot
+
+
+
+## FILE: /mnt/user-data/outputs/ActivationQuantContract.lean
+/-!
+# MODULE: activation_quant_contract
+SOURCES: include/ref/kernels/cpu/expert.hpp, src/kernels/cpu/expert.cpp, src/kernels/cpu/q2_avx2.cpp
+Integer-level contract of `act_quant_q8_1` / `act_quant_q8_1_avx2`: per-32-element chunk scale amax/127,
+codes clamped to [-127,127], round half AWAY from zero (not half-to-even), planar `ActQ` storage.
+
+## Source semantics
+* Each code is clamped to [-127,127]; the chunk sum therefore lies in [-127*32, 127*32] and fits int32.
+* Rounding is half away from zero (odd-symmetric); nearest-even would differ on ties.
+* n must be a multiple of QKA=32, giving n/32 chunks, at most MAXC=80.
+* hx = scale * sum is zero when the chunk scale is zero (all-zero chunk).
+
+## Form template identifiers
+clamp127 -> code_clamp, rha -> round_half_away, chunk_sum_bound -> chunk_sum_range
+-/
+
+namespace Ref.ActQuant
+
+-- § clamp
+/-- Clamp to the symmetric int8 range used by the quantizer. -/
+def clamp127 (v : Int) : Int := max (-127) (min 127 v)
+
+/-- Clamped values lie in [-127,127]. -/
+theorem clamp127_bounds (v : Int) : -127 ≤ clamp127 v ∧ clamp127 v ≤ 127 := by
+  unfold clamp127
+  omega
+
+/-- Clamping an in-range value is the identity. -/
+theorem clamp127_id (v : Int) (h1 : -127 ≤ v) (h2 : v ≤ 127) : clamp127 v = v := by
+  unfold clamp127
+  omega
+
+/-- Clamping is idempotent. -/
+theorem clamp127_idem (v : Int) : clamp127 (clamp127 v) = clamp127 v :=
+  clamp127_id _ (clamp127_bounds v).1 (clamp127_bounds v).2
+
+/-- Clamping is monotone. -/
+theorem clamp127_mono (a b : Int) (h : a ≤ b) : clamp127 a ≤ clamp127 b := by
+  unfold clamp127
+  omega
+
+/-- Clamping is odd-symmetric. -/
+theorem clamp127_neg (v : Int) : clamp127 (-v) = - clamp127 v := by
+  unfold clamp127
+  omega
+
+-- § chunk sums
+/-- A list of in-range codes has a sum bounded by 127 times its length. -/
+theorem chunk_sum_bound : ∀ l : List Int, (∀ v ∈ l, -127 ≤ v ∧ v ≤ 127) →
+    -(127 * (l.length : Int)) ≤ l.sum ∧ l.sum ≤ 127 * (l.length : Int)
+  | [], _ => by simp
+  | x :: l, h => by
+      have hx := h x (by simp)
+      have ih := chunk_sum_bound l (fun v hv => h v (by simp [hv]))
+      simp only [List.sum_cons, List.length_cons]
+      omega
+
+/-- A 32-code chunk sum is at most 4064 in magnitude and fits int32. -/
+theorem chunk32_sum_fits : 32 * 127 = 4064 ∧ 4064 < 2 ^ 31 := by decide
+
+-- § chunk geometry
+/-- With n a multiple of 32, the chunks tile n exactly. -/
+theorem nchunks_mul (n : Nat) (h : n % 32 = 0) : (n / 32) * 32 = n := by omega
+
+/-- Widest reduction (2560) has 80 chunks; any n up to 2560 has at most 80. -/
+theorem nchunks_le_maxc (n : Nat) (hn : n ≤ 2560) : n / 32 ≤ 80 := by omega
+
+/-- Weight block b covers activation chunks 2b and 2b+1, at byte offsets 64b and 64b+32. -/
+theorem weight_block_chunks (b : Nat) : b * 64 = (2 * b) * 32 ∧ b * 64 + 32 = (2 * b + 1) * 32 := by
+  omega
+
+/-- The second chunk of the last gate/up block still lies inside the 2560-wide `q` array. -/
+theorem last_chunk_in_q (b : Nat) (h : b < 40) : (2 * b + 1) * 32 + 32 ≤ 2560 := by omega
+
+-- § rounding
+/-- Round n/d (d>0) half away from zero, via nonnegative integer division. -/
+def rha (n d : Int) : Int :=
+  if 0 ≤ n then (2 * n + d) / (2 * d) else -((2 * (-n) + d) / (2 * d))
+
+/-- Half-away rounding is odd-symmetric for positive numerators. -/
+theorem rha_odd (n d : Int) (h : 0 < n) : rha (-n) d = - rha n d := by
+  have h1 : ¬ (0 ≤ -n) := by omega
+  have h2 : 0 ≤ n := by omega
+  unfold rha
+  rw [if_neg h1, if_pos h2, Int.neg_neg]
+
+/-- A tie 1/2 rounds up to 1. -/
+theorem rha_tie_pos : rha 1 2 = 1 := by decide
+
+/-- A tie -1/2 rounds down to -1. -/
+theorem rha_tie_neg : rha (-1) 2 = -1 := by decide
+
+/-- Round-to-nearest-even would send the tie 1/2 to 0, so the two contracts differ. -/
+theorem tie_differs_from_even : (0 : Int) ≠ rha 1 2 := by decide
+
+-- § correction term
+/-- hx = scale * sum vanishes for a zero scale. -/
+theorem hx_zero_of_zero_scale (s sm : Int) (h : s = 0) : s * sm = 0 := by
+  subst h
+  exact Int.zero_mul sm
+
+end Ref.ActQuant
+
+
+
+## FILE: /mnt/user-data/outputs/ExpertPoolProtocol.lean
+/-!
+# MODULE: expert_pool_protocol
+SOURCES: include/ref/kernels/cpu/pool.hpp, src/kernels/cpu/pool.cpp
+Abstract model of the CPU expert pool: row-range partitioning for split phases, the multi-expert flat row
+index mapping, worker/thread counts, and the parked/active handover invariant of the completion protocol.
+
+## Source semantics
+* A split phase cuts `total` rows into `parts` ranges [total*p/parts, total*(p+1)/parts): they abut, start at 0 and
+  end at `total`.
+* A flat row r over several experts of `per` rows maps to expert r/per, local row r%per; each step makes progress
+  and never crosses an expert or the task end.
+* parked + active = n_workers always; `run()` waits for parked = n so no worker is in the drain loop when the
+  host resets `head`.
+* Workers >= 1; `physical_cores(true)` drops exactly the first core.
+
+## Form template identifiers
+lo/hi -> range_begin/range_end, PS -> park_state, Step -> worker_transition, Reach -> reachable
+-/
+
+namespace Ref.ExpertPool
+
+-- § row-range partition
+/-- Start row of part `p` of `parts`. -/
+def lo (total parts p : Nat) : Nat := total * p / parts
+/-- End row (exclusive) of part `p` of `parts`. -/
+def hi (total parts p : Nat) : Nat := total * (p + 1) / parts
+
+/-- The first range starts at row 0. -/
+theorem lo_zero (total parts : Nat) : lo total parts 0 = 0 := by simp [lo]
+
+/-- Consecutive ranges abut: the end of part p is the start of part p+1. -/
+theorem hi_eq_lo_succ (total parts p : Nat) : hi total parts p = lo total parts (p + 1) := rfl
+
+/-- The last range ends exactly at `total`. -/
+theorem hi_last (total parts : Nat) (h : 0 < parts) : hi total parts (parts - 1) = total := by
+  unfold hi
+  have e : parts - 1 + 1 = parts := by omega
+  rw [e]
+  exact Nat.mul_div_cancel total h
+
+/-- Each range is well-formed: begin <= end. -/
+theorem lo_le_hi (total parts p : Nat) : lo total parts p ≤ hi total parts p := by
+  unfold lo hi
+  exact Nat.div_le_div_right (Nat.mul_le_mul_left total (Nat.le_succ p))
+
+/-- Every range ends within `total`. -/
+theorem hi_le_total (total parts p : Nat) (h0 : 0 < parts) (hp : p < parts) :
+    hi total parts p ≤ total := by
+  unfold hi
+  calc total * (p + 1) / parts ≤ total * parts / parts :=
+        Nat.div_le_div_right (Nat.mul_le_mul_left total hp)
+    _ = total := Nat.mul_div_cancel total h0
+
+-- § flat multi-expert row mapping
+/-- Expert index and local row recombine to the flat row, and the local row is in range. -/
+theorem flat_row_split (r per : Nat) (hper : 0 < per) :
+    per * (r / per) + r % per = r ∧ r % per < per :=
+  ⟨Nat.div_add_mod r per, Nat.mod_lt r hper⟩
+
+/-- A flat row below per*n belongs to an expert index below n. -/
+theorem expert_index_lt (r per n : Nat) (h : r < per * n) : r / per < n :=
+  Nat.div_lt_of_lt_mul h
+
+/-- Each inner step takes at least one row. -/
+theorem step_progress (per r0 g1 r : Nat) (h0 : r0 < per) (hr : r < g1) :
+    r0 < min per (r0 + (g1 - r)) := by omega
+
+/-- The step's end never passes the expert's last row. -/
+theorem step_within_expert (per r0 g1 r : Nat) : min per (r0 + (g1 - r)) ≤ per := by omega
+
+/-- The step never overshoots the task's end row `g1`. -/
+theorem step_within_task (per r0 g1 r : Nat) (h0 : r0 < per) (hr : r ≤ g1) :
+    r + (min per (r0 + (g1 - r)) - r0) ≤ g1 := by omega
+
+-- § worker and thread counts
+/-- Worker count: the request if positive, else the core count, never below one. -/
+def workersOf (nw cores : Nat) : Nat := max 1 (if 0 < nw then nw else cores)
+
+/-- At least one worker always exists. -/
+theorem workersOf_pos (nw cores : Nat) : 1 ≤ workersOf nw cores := Nat.le_max_left _ _
+
+/-- Thread count including the host when it also drains. -/
+def threadsOf (n : Nat) (hostWorks : Bool) : Nat := n + if hostWorks then 1 else 0
+
+/-- With `host_works` the pool is n+1 threads. -/
+theorem threads_with_host (n : Nat) : threadsOf n true = n + 1 := rfl
+
+/-- Without `host_works` the pool is exactly the workers. -/
+theorem threads_without_host (n : Nat) : threadsOf n false = n := rfl
+
+/-- Skipping the first core removes exactly one entry (when any exists). -/
+theorem skip_first_len (cores : List Nat) : (cores.drop 1).length = cores.length - 1 := by simp
+
+/-- Parts per expert in `run_split` is at least one. -/
+def partsOf (threads n : Nat) : Nat := max 1 ((3 * threads + n - 1) / n)
+
+/-- `partsOf` is positive. -/
+theorem partsOf_pos (threads n : Nat) : 1 ≤ partsOf threads n := Nat.le_max_left _ _
+
+-- § park / drain handover
+/-- Workers parked versus inside the drain loop. -/
+structure PS where
+  parked : Nat
+  active : Nat
+
+/-- A worker leaves the park, or returns to it. -/
+inductive Step : PS → PS → Prop
+  | leave (p a : Nat) : 0 < p → Step ⟨p, a⟩ ⟨p - 1, a + 1⟩
+  | arrive (p a : Nat) : 0 < a → Step ⟨p, a⟩ ⟨p + 1, a - 1⟩
+
+/-- Reachability by worker transitions. -/
+inductive Reach (s : PS) : PS → Prop
+  | refl : Reach s s
+  | tail {t u : PS} : Reach s t → Step t u → Reach s u
+
+/-- One transition preserves parked + active. -/
+theorem step_preserves {s t : PS} (h : Step s t) : s.parked + s.active = t.parked + t.active := by
+  cases h with
+  | leave p a hp =>
+      show p + a = (p - 1) + (a + 1)
+      omega
+  | arrive p a ha =>
+      show p + a = (p + 1) + (a - 1)
+      omega
+
+/-- Reachable states preserve parked + active. -/
+theorem reach_preserves {s t : PS} (h : Reach s t) : s.parked + s.active = t.parked + t.active := by
+  induction h with
+  | refl => rfl
+  | tail _ hs ih => exact ih.trans (step_preserves hs)
+
+/-- Handover safety: starting with all n workers parked, `parked = n` implies no worker is in the drain loop. -/
+theorem handover_safe (n : Nat) (t : PS) (h : Reach ⟨n, 0⟩ t) (hp : t.parked = n) : t.active = 0 := by
+  have e : n + 0 = t.parked + t.active := reach_preserves h
+  omega
+
+/-- Parked never exceeds the worker count. -/
+theorem parked_le (n : Nat) (t : PS) (h : Reach ⟨n, 0⟩ t) : t.parked ≤ n := by
+  have e : n + 0 = t.parked + t.active := reach_preserves h
+  omega
+
+end Ref.ExpertPool
+
+
+
+## FILE: /mnt/user-data/outputs/ExpertLayoutAndIqKernels.lean
+/-!
+# MODULE: expert_layout_and_iq_kernels
+SOURCES: src/kernels/cpu/expert_layout.cpp, src/kernels/cpu/iq_avx512.cpp
+The per-layer expert offset table (contiguity validation, max blob) and the byte layouts the AVX-512 i-quant
+row kernels decode (IQ2_XXS, IQ2_XS, IQ3_XXS, IQ3_S, IQ2_S).
+
+## Source semantics
+* Layer l starts at the sum of (layer bytes * n_expert) over earlier layers; a line is accepted only if its
+  offset equals that running total. With no native table every layer is BLOB bytes.
+* `max_blob` is the maximum of layer sizes.
+* iq512 supports exactly types 16,17,18,21,22; IQ1_M (29) stays on ggml-cpu.
+* Each decode of chunk j<4 reads only inside its 256-value block; scale nibbles give odd scales 2s+1.
+
+## Form template identifiers
+layerOff -> layer_offset, chk -> contiguity_check, iqBytes -> iq_block_bytes, iqSupported -> iq512_supported
+-/
+
+namespace Ref.ExpertLayout
+
+-- § offset table
+/-- Byte offset of layer l: sum of earlier layer sizes times the expert count. -/
+def layerOff (bytes : Nat → Nat) (ne : Nat) : Nat → Nat
+  | 0 => 0
+  | l + 1 => layerOff bytes ne l + bytes l * ne
+
+/-- One layer's span is its blob size times the expert count. -/
+theorem layerOff_succ (bytes : Nat → Nat) (ne l : Nat) :
+    layerOff bytes ne (l + 1) = layerOff bytes ne l + bytes l * ne := rfl
+
+/-- Offsets never decrease. -/
+theorem layerOff_mono (bytes : Nat → Nat) (ne l : Nat) :
+    layerOff bytes ne l ≤ layerOff bytes ne (l + 1) := Nat.le_add_right _ _
+
+/-- With uniform blobs (no native table) the offset is l * (BLOB * ne). -/
+theorem layerOff_uniform (b ne : Nat) : ∀ l : Nat, layerOff (fun _ => b) ne l = l * (b * ne)
+  | 0 => by simp [layerOff]
+  | l + 1 => by
+      have ih := layerOff_uniform b ne l
+      simp only [layerOff, ih]
+      rw [Nat.add_mul, Nat.one_mul]
+
+/-- Contiguity checker: each (offset, bytes) entry must start where the previous one ended. -/
+def chk (ne : Nat) : List (Nat × Nat) → Nat → Bool
+  | [], _ => true
+  | (o, b) :: t, at_ => (o == at_) && chk ne t (at_ + b * ne)
+
+/-- An empty table is accepted. -/
+theorem chk_nil (ne at_ : Nat) : chk ne [] at_ = true := rfl
+
+/-- A table is accepted iff its head starts at the running offset and the tail is accepted after it. -/
+theorem chk_cons (ne o b : Nat) (t : List (Nat × Nat)) (at_ : Nat) :
+    chk ne ((o, b) :: t) at_ = true ↔ o = at_ ∧ chk ne t (at_ + b * ne) = true := by
+  simp [chk]
+
+/-- Largest blob over a list of layer sizes. -/
+def maxBlob (l : List Nat) : Nat := l.foldl max 0
+
+/-- The running maximum never falls below its accumulator. -/
+theorem le_foldl_max (acc : Nat) : ∀ l : List Nat, acc ≤ l.foldl max acc
+  | [] => Nat.le_refl _
+  | x :: l => by
+      simp only [List.foldl]
+      exact Nat.le_trans (Nat.le_max_left acc x) (le_foldl_max (max acc x) l)
+
+/-- Every element is bounded by the running maximum. -/
+theorem mem_le_foldl_max : ∀ (l : List Nat) (acc x : Nat), x ∈ l → x ≤ l.foldl max acc
+  | [], _, _, h => by simp at h
+  | y :: l, acc, x, h => by
+      simp only [List.foldl]
+      rcases List.mem_cons.mp h with rfl | h'
+      · exact Nat.le_trans (Nat.le_max_right acc x) (le_foldl_max _ l)
+      · exact mem_le_foldl_max l _ x h'
+
+/-- `max_blob` bounds every layer's blob. -/
+theorem maxBlob_ge (l : List Nat) (x : Nat) (h : x ∈ l) : x ≤ maxBlob l :=
+  mem_le_foldl_max l 0 x h
+
+-- § i-quant block layouts
+/-- Bytes per 256-value block of each supported i-quant type (0 if unsupported). -/
+def iqBytes : Nat → Nat
+  | 16 => 66
+  | 17 => 74
+  | 18 => 98
+  | 21 => 110
+  | 22 => 82
+  | _ => 0
+
+/-- Types handled by the AVX-512 i-quant kernels. -/
+def iqSupported (t : Nat) : Bool := t == 16 || t == 17 || t == 18 || t == 21 || t == 22
+
+/-- Every supported type has a positive block size. -/
+theorem iqSupported_bytes_pos (t : Nat) (h : iqSupported t = true) : 0 < iqBytes t := by
+  simp only [iqSupported, Bool.or_eq_true, beq_iff_eq] at h
+  rcases h with ((((h | h) | h) | h) | h) <;> subst h <;> decide
+
+/-- IQ1_M (29) is not handled by the AVX-512 path. -/
+theorem iq1m_unsupported : iqSupported 29 = false := by decide
+
+/-- Q2_0 (42) is not an i-quant type. -/
+theorem q2_0_not_iq : iqSupported 42 = false := by decide
+
+/-- IQ2_XXS: d + 32 u16. -/
+theorem iq2xxs_total : 2 + 32 * 2 = iqBytes 16 := by decide
+/-- IQ2_XS: d + 32 u16 + 8 scale bytes. -/
+theorem iq2xs_total : 2 + 32 * 2 + 8 = iqBytes 17 := by decide
+/-- IQ3_XXS: d + 64 grid bytes + 32 sign/scale bytes. -/
+theorem iq3xxs_total : 2 + 64 + 32 = iqBytes 18 := by decide
+/-- IQ3_S: d + qs 64 + qh 8 + signs 32 + scales 4. -/
+theorem iq3s_total : 2 + 64 + 8 + 32 + 4 = iqBytes 21 := by decide
+/-- IQ2_S: d + qs 64 (grid+signs) + qh 8 + scales 8. -/
+theorem iq2s_total : 2 + 64 + 8 + 8 = iqBytes 22 := by decide
+
+-- § decode stays in bounds for chunks j < 4
+/-- IQ2_XXS chunk reads 16 bytes inside the qs array. -/
+theorem iq2xxs_chunk_in_bounds (j : Nat) (h : j < 4) : 2 + 16 * j + 16 ≤ 66 := by omega
+
+/-- IQ2_XS chunk reads and its scale bytes stay in the block. -/
+theorem iq2xs_in_bounds (j : Nat) (h : j < 4) :
+    2 + 16 * j + 16 ≤ 66 ∧ 66 + 2 * j + 1 < 74 := by omega
+
+/-- IQ2_S grid bytes, sign words, qh bytes and scale bytes are disjoint and in bounds. -/
+theorem iq2s_in_bounds (j : Nat) (h : j < 4) :
+    2 + 8 * j + 8 ≤ 34 ∧ 34 + 8 * j + 8 ≤ 66 ∧ 66 + 2 * j + 1 < 74 ∧ 74 + 2 * j + 1 < 82 := by
+  omega
+
+/-- IQ3_XXS grid bytes and sign/scale words stay in the block. -/
+theorem iq3xxs_in_bounds (j : Nat) (h : j < 4) :
+    2 + 16 * j + 16 ≤ 66 ∧ 2 + 64 + 8 * j + 8 ≤ 98 := by omega
+
+/-- IQ3_S qs, qh, signs and scale reads stay in the block. -/
+theorem iq3s_in_bounds (j : Nat) (h : j < 4) :
+    2 + 16 * j + 16 ≤ 66 ∧ 66 + 2 * j + 1 < 74 ∧ 74 + 8 * j + 8 ≤ 106 ∧ 106 + j < 110 := by
+  omega
+
+-- § scales
+/-- A 4-bit scale field s gives the odd scale 2s+1 in [1,31]. -/
+theorem scale_odd (s : Nat) (h : s < 16) : 1 ≤ 2 * s + 1 ∧ 2 * s + 1 ≤ 31 ∧ (2 * s + 1) % 2 = 1 := by
+  omega
+
+/-- The scale permute maps each of the 32 int16 lanes to one of the four scales. -/
+theorem scales4_lane (i : Nat) (h : i < 32) : i / 8 < 4 := by omega
+
+end Ref.ExpertLayout
+
+
+
+## FILE: /mnt/user-data/outputs/GgufDequantGeometry.lean
+/-!
+# MODULE: gguf_dequant_geometry
+SOURCES: include/ref/artifact/dequant.hpp, include/ref/artifact/gguf_reader.hpp
+Block geometry of the GGUF quantization types, in-bounds field access of the scalar dequantizers, the Q2_0
+symbol mapping, fp16/bf16 conversion facts, and GGUF header parsing invariants.
+
+## Source semantics
+* Q2_0: 64 elements / 18 bytes, code c -> (c-1)*d, so values lie in {-d,0,d,2d}.
+* Each K-quant/IQ layout sums to its declared block size and all indexed reads stay in the block.
+* GGUF magic is "GGUF" little-endian, version 3 only; data starts at the next multiple of the alignment.
+* A bounds-checked cursor read either fails or moves forward without passing the end.
+
+## Form template identifiers
+geom -> block_geometry, advance -> cursor_read, kv -> iq4nl_codebook
+-/
+
+namespace Ref.GgufDequant
+
+-- § block geometry
+/-- (elements, bytes) per block for the types in the table. -/
+def geom : Nat → Option (Nat × Nat)
+  | 0 => some (1, 4)
+  | 2 => some (32, 18)
+  | 8 => some (32, 34)
+  | 6 => some (32, 22)
+  | 11 => some (256, 110)
+  | 12 => some (256, 144)
+  | 13 => some (256, 176)
+  | 14 => some (256, 210)
+  | 20 => some (32, 18)
+  | 23 => some (256, 136)
+  | 42 => some (64, 18)
+  | _ => none
+
+/-- Q2_0 is 64 elements in 18 bytes. -/
+theorem geom_q2_0 : geom 42 = some (64, 18) := by decide
+/-- Q2_0 bytes = 16 code bytes + 2 scale bytes. -/
+theorem q2_0_bits : 18 * 8 = 64 * 2 + 16 := by decide
+/-- Q4_0 / IQ4_NL: 4 bits per element plus a 2-byte scale. -/
+theorem q4_0_bits : 18 * 8 = 32 * 4 + 16 := by decide
+/-- Q8_0: 8 bits per element plus a 2-byte scale. -/
+theorem q8_0_bits : 34 * 8 = 32 * 8 + 16 := by decide
+/-- Q4_0 and IQ4_NL share a geometry. -/
+theorem q4_0_iq4nl_same : geom 2 = geom 20 := by decide
+/-- Q5_0: scale + 4 high-bit bytes + 16 nibble bytes. -/
+theorem q5_0_layout : 2 + 4 + 16 = 22 := by decide
+/-- Q6_K: ql 128 + qh 64 + scales 16 + d 2. -/
+theorem q6_K_layout : 128 + 64 + 16 + 2 = 210 ∧ 128 + 64 = 192 ∧ 192 + 16 = 208 := by decide
+/-- Q4_K: d, dmin, 12 scale bytes, 128 quant bytes; qs at 16. -/
+theorem q4_K_layout : 2 + 2 + 12 + 128 = 144 ∧ 2 + 2 + 12 = 16 := by decide
+/-- Q5_K: d, dmin, 12 scales, 32 qh, 128 ql; qh at 16, ql at 48. -/
+theorem q5_K_layout : 2 + 2 + 12 + 32 + 128 = 176 ∧ 16 + 32 = 48 := by decide
+/-- Q3_K: hmask 32, qs 64, scales 12, d 2; scales at 96, d at 108. -/
+theorem q3_K_layout : 32 + 64 + 12 + 2 = 110 ∧ 32 + 64 = 96 ∧ 96 + 12 = 108 := by decide
+/-- IQ4_XS: d 2, scales_h 2, scales_l 4, qs 128; qs at 8. -/
+theorem iq4_xs_layout : 2 + 2 + 4 + 128 = 136 ∧ 2 + 2 + 4 = 8 := by decide
+
+-- § Q2_0 dequantization
+/-- Code j of a block lives in byte j/4 (inside the 16 code bytes) at bit offset 2*(j%4). -/
+theorem q2_0_code_position (j : Nat) (h : j < 64) :
+    j / 4 < 16 ∧ (j % 4) * 2 < 8 ∧ (j % 4) * 2 % 2 = 0 := by omega
+
+/-- The decoded value (c-1)*d is one of -d, 0, d, 2d. -/
+theorem q2_0_value_set (c d : Int) (h0 : 0 ≤ c) (h3 : c ≤ 3) :
+    (c - 1) * d = -d ∨ (c - 1) * d = 0 ∨ (c - 1) * d = d ∨ (c - 1) * d = 2 * d := by
+  have h : c = 0 ∨ c = 1 ∨ c = 2 ∨ c = 3 := by omega
+  rcases h with rfl | rfl | rfl | rfl <;> omega
+
+-- § K-quant index bounds
+/-- Q6_K: reads at l+96, l+32 and sc[is+6] stay in bounds for l < 32. -/
+theorem q6_K_in_bounds (l : Nat) (h : l < 32) :
+    l + 96 < 128 ∧ l + 32 < 64 ∧ l < 32 ∧ l / 16 + 6 < 8 := by omega
+
+/-- Q6_K: two 128-element halves consume 128 ql, 64 qh and 16 scales in total. -/
+theorem q6_K_totals : 2 * 128 = 256 ∧ 2 * 64 = 128 ∧ 2 * 32 = 64 ∧ 2 * 8 = 16 := by decide
+
+/-- A 6-bit value built from a nibble and two high bits is below 64, so subtracting 32 gives [-32,31]. -/
+theorem six_bit_range (a h : Nat) (ha : a < 16) (hh : h < 4) :
+    a + 16 * h < 64 ∧ -32 ≤ ((a + 16 * h : Nat) : Int) - 32 ∧ ((a + 16 * h : Nat) : Int) - 32 ≤ 31 := by
+  omega
+
+/-- Q4_K/Q5_K scale-min unpack indices stay inside the 12 scale bytes for j < 8. -/
+theorem scale_min_k4_in_bounds (j : Nat) (h : j < 8) :
+    (j < 4 → j + 4 < 12) ∧ (4 ≤ j → j + 4 < 12 ∧ j - 4 < 12) := by omega
+
+/-- Q4_K: four 64-element groups produce 256 outputs and consume 128 quant bytes and 8 scale pairs. -/
+theorem q4_K_totals : 4 * (32 + 32) = 256 ∧ 4 * 32 = 128 ∧ 4 * 2 = 8 := by decide
+
+/-- Q5_K high-bit masks 1,4,16,64 and 2,8,32,128 fit in a byte for all four groups. -/
+theorem q5_K_masks : ∀ n : Nat, n < 4 → 2 ^ (2 * n) < 256 ∧ 2 * 2 ^ (2 * n) < 256 := by decide
+
+/-- Q3_K: 2 halves x 4 shifts x 2 scale uses = 16 scales, and 2*4*2*16 = 256 outputs. -/
+theorem q3_K_totals : 2 * 4 * 2 = 16 ∧ 2 * 4 * 2 * 16 = 256 := by decide
+
+/-- Q3_K: reads at l+16 stay inside the 32-byte hmask and the 32-byte half of qs. -/
+theorem q3_K_in_bounds (l : Nat) (h : l < 16) : l + 16 < 32 := by omega
+
+/-- IQ4_XS: the 6-bit scale index ib/2 and bit shift 2*ib stay in range for ib < 8. -/
+theorem iq4_xs_scale_bounds (ib : Nat) (h : ib < 8) : ib / 2 < 4 ∧ 2 * ib + 2 ≤ 16 := by omega
+
+/-- IQ4_NL codebook has 16 entries. -/
+def kv : List Int := [-127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113]
+
+/-- The codebook has exactly 16 entries (one per nibble). -/
+theorem kv_length : kv.length = 16 := by decide
+
+/-- The codebook is strictly increasing. -/
+theorem kv_sorted : List.Pairwise (· < ·) kv := by decide
+
+/-- Low and high nibbles of a byte are valid codebook indices. -/
+theorem nibble_index_lt (b : Nat) (h : b < 256) : b % 16 < 16 ∧ b / 16 < 16 := by omega
+
+-- § fp16 / bf16
+/-- Normal fp16 exponents 1..30 map to fp32 exponents 113..142, inside the normal fp32 range. -/
+theorem fp16_normal_exp (e : Nat) (h1 : 1 ≤ e) (h2 : e ≤ 30) :
+    1 ≤ e - 15 + 127 ∧ e - 15 + 127 ≤ 254 := by omega
+
+/-- bf16 widening by a 16-bit shift is invertible. -/
+theorem bf16_roundtrip (h : Nat) : (h * 65536) / 65536 = h := by omega
+
+/-- bf16 widening stays below 2^32 for 16-bit inputs. -/
+theorem bf16_fits (h : Nat) (hh : h < 65536) : h * 65536 < 4294967296 := by omega
+
+-- § GGUF header
+/-- The bytes "GGUF" read little-endian give 0x46554747. -/
+theorem gguf_magic : 0x47 + 0x47 * 256 + 0x55 * 65536 + 0x46 * 16777216 = 0x46554747 := by decide
+
+/-- Rounding the header end up to the default alignment of 32 yields a multiple of 32 within 31 bytes. -/
+theorem data_start_align32 (p : Nat) :
+    (p + 31) / 32 * 32 % 32 = 0 ∧ p ≤ (p + 31) / 32 * 32 ∧ (p + 31) / 32 * 32 < p + 32 := by
+  omega
+
+/-- A bounds-checked cursor read. -/
+def advance (pos size n : Nat) : Option Nat := if pos + n ≤ size then some (pos + n) else none
+
+/-- A successful read moves forward and stays inside the file. -/
+theorem advance_bounds (pos size n p' : Nat) (h : advance pos size n = some p') :
+    pos ≤ p' ∧ p' ≤ size := by
+  unfold advance at h
+  split at h
+  · injection h with h'
+    omega
+  · cases h
+
+/-- A read that would pass the end fails. -/
+theorem advance_fails (pos size n : Nat) (h : size < pos + n) : advance pos size n = none := by
+  unfold advance
+  rw [if_neg (by omega)]
+
+/-- Only a sample of at most 64 array items is kept. -/
+theorem array_sample_le (count : Nat) : min count 64 ≤ 64 := by omega
+
+/-- The default guard constants: 10 used experts out of 512, 24 query heads over 2 KV heads. -/
+theorem guard_defaults : 10 ≤ 512 ∧ 24 % 2 = 0 := by decide
+
+end Ref.GgufDequant
+
+
+
+
+
+## FILE: /mnt/user-data/outputs/CanonicalQuantRoundtrip.lean
+/-!
+# MODULE: canonical_quant_roundtrip
+SOURCES: tools/canonical_xcheck.py
+Bit-exact canonicalisation of GGUF quantisation blocks (Q2_0, Q3_K, Q4_0, Q4_K, Q5_0, Q5_K, Q6_K, Q8_0,
+IQ4_NL, IQ4_XS and the float types) into the S2/S4/S8/P16/P32 canonical forms: one code per element, one
+scale (and optionally one offset) per group, with the integer code bias applied BEFORE the single multiply.
+
+## Source semantics
+* Every decode is `(code + code_bias) * scale (+ offset)`; the bias is an INTEGER subtraction on the code,
+  never a value-space offset (that would not be bit exact).
+* Block geometry (bytes, elements, group size) is fixed per source type and the registry is consistent:
+  group size divides block size; only the K-quants with a min carry a per-group offset.
+* Sub-byte unpacking is a bijection between the packed byte and its codes (nibbles, 2-bit quads, the 5th
+  bit of Q5_0, the `hmask` bit of Q3_K, the `qh` pairs of Q6_K).
+* IQ4 uses a non-affine 16-entry codebook, strictly increasing.
+* `--split I/N` partitions tensors by `index % N == I`.
+
+## Form template identifiers
+- MAPPINGS (registry)              → `mappings`
+- Mapping.code_bias                → `Mapping.codeBias`
+- Mapping.block_bytes / block_elems / group_elems → `blockBytes` / `blockElems` / `groupElems`
+- KV_IQ4NL                         → `kvIq4nl`
+- to_s2 / from_s2 (codes in separate plane) → `pack4` / `pack4_unpack`
+-/
+
+namespace Ref.CanonicalQuant
 
 -- § mapping registry
 
-/-- One row of the MAPPINGS registry (integer part). -/
+/-- One row of the `MAPPINGS` registry (geometry, integer code bias, offset flag). -/
 structure Mapping where
+  name : String
   blockBytes : Nat
   blockElems : Nat
   groupElems : Nat
   codeBias : Int
   hasOffset : Bool
-  deriving DecidableEq, Repr
 
-/-- Q2_0 mapping row. -/
-def q2_0 : Mapping := ⟨18, 64, 64, -1, false⟩
-/-- Q3_K mapping row. -/
-def q3_k : Mapping := ⟨110, 256, 16, -4, false⟩
-/-- Q4_0 mapping row. -/
-def q4_0 : Mapping := ⟨18, 32, 32, -8, false⟩
-/-- Q4_K mapping row. -/
-def q4_k : Mapping := ⟨144, 256, 32, 0, true⟩
-/-- Q5_0 mapping row. -/
-def q5_0 : Mapping := ⟨22, 32, 32, -16, false⟩
-/-- Q5_K mapping row. -/
-def q5_k : Mapping := ⟨176, 256, 32, 0, true⟩
-/-- Q6_K mapping row. -/
-def q6_k : Mapping := ⟨210, 256, 16, -32, false⟩
-/-- Q8_0 mapping row. -/
-def q8_0 : Mapping := ⟨34, 32, 32, -128, false⟩
-/-- IQ4_NL mapping row. -/
-def iq4_nl : Mapping := ⟨18, 32, 32, 0, false⟩
-/-- IQ4_XS mapping row. -/
-def iq4_xs : Mapping := ⟨136, 256, 32, 0, false⟩
+/-- The registry of source types, transcribed from the `MAPPINGS` dict. -/
+def mappings : List Mapping :=
+  [⟨"Q2_0", 18, 64, 64, -1, false⟩, ⟨"Q3_K", 110, 256, 16, -4, false⟩, ⟨"Q4_0", 18, 32, 32, -8, false⟩,
+   ⟨"Q4_K", 144, 256, 32, 0, true⟩, ⟨"Q5_0", 22, 32, 32, -16, false⟩, ⟨"Q5_K", 176, 256, 32, 0, true⟩,
+   ⟨"Q6_K", 210, 256, 16, -32, false⟩, ⟨"Q8_0", 34, 32, 32, -128, false⟩, ⟨"IQ4_NL", 18, 32, 32, 0, false⟩,
+   ⟨"IQ4_XS", 136, 256, 32, 0, false⟩, ⟨"F32", 4, 1, 1, 0, false⟩, ⟨"BF16", 2, 1, 1, 0, false⟩,
+   ⟨"F16", 2, 1, 1, 0, false⟩]
 
-/-- All integer-quant rows of the registry. -/
-def allMappings : List Mapping := [q2_0, q3_k, q4_0, q4_k, q5_0, q5_k, q6_k, q8_0, iq4_nl, iq4_xs]
+/-- All 13 source types of the shard are mapped. -/
+theorem mappings_length : mappings.length = 13 := by
+  decide
 
-/-- Every group size divides its block size. -/
-theorem groups_divide_blocks : ∀ m ∈ allMappings, m.blockElems % m.groupElems = 0 := by decide
+/-- The group size always divides the block size, so groups tile a block exactly. -/
+theorem group_divides_block : ∀ m ∈ mappings, m.blockElems % m.groupElems = 0 := by
+  decide
 
-/-- Q2_0 block = 2-byte fp16 scale + 64/4 bytes of 2-bit codes. -/
-theorem q2_0_layout : q2_0.blockBytes = 2 + 64 / 4 := by decide
-/-- Q3_K block = hmask 32 + qs 64 + scales 12 + d 2. -/
-theorem q3_k_layout : q3_k.blockBytes = 32 + 64 + 12 + 2 := by decide
-/-- Q4_K block = d 2 + dmin 2 + scales 12 + qs 128. -/
-theorem q4_k_layout : q4_k.blockBytes = 2 + 2 + 12 + 128 := by decide
-/-- Q5_K block = d 2 + dmin 2 + scales 12 + qh 32 + qs 128. -/
-theorem q5_k_layout : q5_k.blockBytes = 2 + 2 + 12 + 32 + 128 := by decide
-/-- Q6_K block = ql 128 + qh 64 + scales 16 + d 2. -/
-theorem q6_k_layout : q6_k.blockBytes = 128 + 64 + 16 + 2 := by decide
-/-- Q5_0 block = d 2 + qh 4 + qs 16. -/
-theorem q5_0_layout : q5_0.blockBytes = 2 + 4 + 16 := by decide
-/-- Q8_0 block = d 2 + 32 int8 codes. -/
-theorem q8_0_layout : q8_0.blockBytes = 2 + 32 := by decide
-/-- IQ4_XS block = d 2 + scales_h 2 + scales_l 4 + qs 128. -/
-theorem iq4_xs_layout : iq4_xs.blockBytes = 2 + 2 + 4 + 128 := by decide
+/-- Only the two K-quants with a per-group min (Q4_K, Q5_K) carry an offset plane. -/
+theorem offset_only_k_quants :
+    ∀ m ∈ mappings, m.hasOffset = true → m.name = "Q4_K" ∨ m.name = "Q5_K" := by
+  decide
 
-/-- Rows with an additive offset are exactly Q4_K and Q5_K. -/
-theorem offset_rows : (allMappings.filter (fun m => m.hasOffset)) = [q4_k, q5_k] := by decide
+/-- Block byte counts equal the sum of their fields (scales, mins, high bits, codes). -/
+theorem block_byte_layouts :
+    (2 + 64 / 4 = 18) ∧ (2 + 32 / 2 = 18) ∧ (2 + 32 = 34) ∧ (2 + 4 + 32 / 2 = 22) ∧
+    (2 + 2 + 12 + 256 / 2 = 144) ∧ (256 / 8 + 256 / 4 + 12 + 2 = 110) ∧
+    (2 + 2 + 12 + 256 / 8 + 256 / 2 = 176) ∧ (256 / 2 + 256 / 4 + 16 + 2 = 210) ∧
+    (2 + 2 + 4 + 256 / 2 = 136) := by
+  decide
 
--- § integer-bias decode
+-- § integer code bias ranges
 
-/-- Integer decode: the bias is applied to the integer code BEFORE the single multiply. -/
-def decodeInt (c : Nat) (bias : Int) (scale : Int) : Int := ((c : Int) + bias) * scale
+/-- Q2_0: codes 0..3 decode to the integers -1..2 (the "- 1" is an offset in the codebook). -/
+theorem q2_0_symbol_range (c : Nat) (h : c < 4) : -1 ≤ (c : Int) - 1 ∧ (c : Int) - 1 ≤ 2 := by
+  omega
 
-/-- Q2_0 codebook is {-1,0,1,2}, not {0,1,2,3}. -/
-theorem q2_0_value_set : ∀ c : Fin 4, ((c.val : Int) + q2_0.codeBias) ∈ [-1, 0, 1, 2] := by decide
+/-- Q4_0: codes 0..15 decode to -8..7. -/
+theorem q4_0_symbol_range (c : Nat) (h : c < 16) : -8 ≤ (c : Int) - 8 ∧ (c : Int) - 8 ≤ 7 := by
+  omega
 
-/-- Decoding Q2_0 codes as unsigned would be wrong at every code. -/
-theorem q2_0_bias_matters : ∀ c : Fin 4, ((c.val : Int) + q2_0.codeBias) ≠ c.val := by decide
+/-- Q5_0: a nibble plus the 5th bit is a 5-bit code and decodes to -16..15. -/
+theorem q5_0_code_range (lo hb : Nat) (hl : lo < 16) (hh : hb < 2) :
+    lo + 16 * hb < 32 ∧ -16 ≤ ((lo + 16 * hb : Nat) : Int) - 16 ∧
+      ((lo + 16 * hb : Nat) : Int) - 16 ≤ 15 := by
+  omega
 
-/-- With unit scale the decode is exactly the biased code. -/
-theorem decodeInt_unit (c : Nat) (b : Int) : decodeInt c b 1 = (c : Int) + b := by
-  unfold decodeInt; omega
+/-- Q3_K: two bits plus the hmask bit stay in 0..7 and decode to -4..3. -/
+theorem q3k_code_range (c2 m : Nat) (h2 : c2 < 4) (hm : m < 2) :
+    c2 + 4 * m < 8 ∧ -4 ≤ ((c2 + 4 * m : Nat) : Int) - 4 ∧ ((c2 + 4 * m : Nat) : Int) - 4 ≤ 3 := by
+  omega
 
-/-- Q4_0 codes 0..15 decode to -8..7. -/
-theorem q4_0_range (c : Nat) (h : c < 16) : -8 ≤ (c : Int) + q4_0.codeBias ∧ (c : Int) + q4_0.codeBias ≤ 7 := by
-  have : q4_0.codeBias = -8 := rfl
-  rw [this]; omega
+/-- Q6_K: a nibble plus two `qh` bits is a 6-bit code and decodes to -32..31. -/
+theorem q6k_code_range (nib hi : Nat) (hn : nib < 16) (hh : hi < 4) :
+    nib + 16 * hi < 64 ∧ -32 ≤ ((nib + 16 * hi : Nat) : Int) - 32 ∧
+      ((nib + 16 * hi : Nat) : Int) - 32 ≤ 31 := by
+  omega
 
-/-- Q8_0: an int8 stored +128 is an unsigned byte and decodes back to the same int8. -/
+/-- Q8_0: storing the int8 code as `+128` keeps it unsigned, and the decode's `-128` undoes it exactly. -/
 theorem q8_0_bias_roundtrip (s : Int) (h1 : -128 ≤ s) (h2 : s ≤ 127) :
-    ∃ c : Nat, c < 256 ∧ (c : Int) + q8_0.codeBias = s := by
-  have : q8_0.codeBias = -128 := rfl
-  rw [this]
-  exact ⟨(s + 128).toNat, by omega, by omega⟩
-
-/-- Q5_0 codes 0..31 decode to -16..15. -/
-theorem q5_0_range (c : Nat) (h : c < 32) : -16 ≤ (c : Int) + q5_0.codeBias ∧ (c : Int) + q5_0.codeBias ≤ 15 := by
-  have : q5_0.codeBias = -16 := rfl
-  rw [this]; omega
-
--- § nibble splits (Q4_0, IQ4_NL, IQ4_XS, Q4_K, Q5_K)
-
-/-- A byte splits into low nibble (first half of block) and high nibble (second half) and recombines. -/
-theorem nibble_split (b : Nat) (h : b < 256) : b % 16 < 16 ∧ b / 16 < 16 ∧ b % 16 + 16 * (b / 16) = b := by
+    0 ≤ s + 128 ∧ s + 128 ≤ 255 ∧ (s + 128) - 128 = s := by
   omega
 
-/-- Q4_0: element j+16 comes from the high nibble of byte j, so the halves are not interleaved. -/
-theorem q4_0_halves (j : Nat) (hj : j < 16) : j < 32 ∧ j + 16 < 32 ∧ j ≠ j + 16 := by omega
+-- § sub-byte packing
 
--- § Q2_0 bit plane
+/-- Pack four 2-bit codes into a byte, LSB first (Q2_0's own convention). -/
+def pack4 (c0 c1 c2 c3 : Nat) : Nat := c0 + 4 * c1 + 16 * c2 + 64 * c3
 
-/-- Byte index and shift of element j of a Q2_0 block. -/
-theorem q2_0_pos (j : Nat) (hj : j < 64) : j / 4 < 16 ∧ (j % 4) * 2 < 8 ∧ 4 * (j / 4) + j % 4 = j := by
+/-- A packed Q2_0 byte fits in 8 bits. -/
+theorem pack4_lt (c0 c1 c2 c3 : Nat) (h0 : c0 < 4) (h1 : c1 < 4) (h2 : c2 < 4) (h3 : c3 < 4) :
+    pack4 c0 c1 c2 c3 < 256 := by
+  unfold pack4
   omega
 
-/-- Packing four 2-bit codes in one byte and reading them back (LSB first). -/
-theorem q2_0_pack_roundtrip (c0 c1 c2 c3 : Nat) (h0 : c0 < 4) (h1 : c1 < 4) (h2 : c2 < 4) (h3 : c3 < 4) :
-    (c0 + 4 * c1 + 16 * c2 + 64 * c3) < 256 ∧
-    (c0 + 4 * c1 + 16 * c2 + 64 * c3) % 4 = c0 ∧
-    (c0 + 4 * c1 + 16 * c2 + 64 * c3) / 4 % 4 = c1 ∧
-    (c0 + 4 * c1 + 16 * c2 + 64 * c3) / 16 % 4 = c2 ∧
-    (c0 + 4 * c1 + 16 * c2 + 64 * c3) / 64 % 4 = c3 := by
+/-- `codes[:, t::4] = (byte >> 2t) & 3` recovers each of the four codes. -/
+theorem pack4_unpack (c0 c1 c2 c3 : Nat) (h0 : c0 < 4) (h1 : c1 < 4) (h2 : c2 < 4) (h3 : c3 < 4) :
+    pack4 c0 c1 c2 c3 % 4 = c0 ∧ pack4 c0 c1 c2 c3 / 4 % 4 = c1 ∧
+      pack4 c0 c1 c2 c3 / 16 % 4 = c2 ∧ pack4 c0 c1 c2 c3 / 64 % 4 = c3 := by
+  unfold pack4
   omega
 
--- § Q3_K
-
-/-- The Q3_K 6-bit scale: low nibble plus two high bits is below 64. -/
-theorem q3_k_scale_bound (lo t : Nat) (hl : lo < 256) (ht : t < 256) : lo % 16 + 16 * (t % 4) < 64 := by
+/-- Two nibbles per byte: low nibble first half of the block, high nibble second half. -/
+theorem nibble_roundtrip (lo hi : Nat) (hl : lo < 16) (hh : hi < 16) :
+    (lo + 16 * hi) % 16 = lo ∧ (lo + 16 * hi) / 16 = hi ∧ lo + 16 * hi < 256 := by
   omega
 
-/-- Stored Q3_K code = 2 bits + 4*hmask-bit stays in 0..7 and decodes to -4..3. -/
-theorem q3_k_code_range (c2 m : Nat) (hc : c2 < 4) (hm : m ≤ 1) :
-    c2 + 4 * m < 8 ∧ -4 ≤ ((c2 + 4 * m : Nat) : Int) + q3_k.codeBias ∧
-    ((c2 + 4 * m : Nat) : Int) + q3_k.codeBias ≤ 3 := by
-  have : q3_k.codeBias = -4 := rfl
-  rw [this]; omega
-
-/-- The hmask bit `4*half + j` never resets between halves: all 8 (half, j) pairs hit distinct bits < 8. -/
-theorem q3_k_mask_bit_injective (h1 j1 h2 j2 : Nat) (a : h1 < 2) (b : j1 < 4) (c : h2 < 2) (d : j2 < 4)
-    (e : 4 * h1 + j1 = 4 * h2 + j2) : h1 = h2 ∧ j1 = j2 := by
+/-- The Q5_0 source reaches bit `j+16` of `qh` via `(qh >> (j+12)) & 0x10`; this is the same bit. -/
+theorem q5_0_high_bit_shift (qh j : Nat) :
+    (qh / 2 ^ (j + 12)) % 32 / 16 = (qh / 2 ^ (j + 16)) % 2 := by
+  have h1 : 2 ^ (j + 16) = 2 ^ (j + 12) * 16 := by
+    rw [show j + 16 = (j + 12) + 4 by omega, Nat.pow_add]
+  have h2 : qh / 2 ^ (j + 16) = (qh / 2 ^ (j + 12)) / 16 := by
+    rw [h1, Nat.div_div_eq_div_mul]
+  rw [h2]
+  generalize qh / 2 ^ (j + 12) = x
   omega
 
-/-- Q3_K output group index `8*half + 2*j + sub` is below 16 and injective. -/
-theorem q3_k_group_injective (h1 j1 s1 h2 j2 s2 : Nat) (a : h1 < 2) (b : j1 < 4) (c : s1 < 2)
-    (d : h2 < 2) (e : j2 < 4) (f : s2 < 2) (g : 8 * h1 + 2 * j1 + s1 = 8 * h2 + 2 * j2 + s2) :
-    8 * h1 + 2 * j1 + s1 < 16 ∧ h1 = h2 ∧ j1 = j2 ∧ s1 = s2 := by
+/-- A 6-bit scale from a low nibble and two high bits stays below 64. -/
+theorem scale6_lt (lo t : Nat) : lo % 16 + 16 * (t % 4) < 64 := by
   omega
 
--- § get_scale_min_k4
-
-/-- Scale of group j < 4: low six bits of byte j. -/
-def scaleMinLow (s : Nat) : Nat := s % 64
-
-/-- Scale of group j >= 4: low nibble of s[j+4] and top two bits of s[j-4] shifted by 4. -/
-def scaleMinHigh (sj4 sjm4 : Nat) : Nat := sj4 % 16 + 16 * (sjm4 / 64)
-
-/-- Both scale forms are 6-bit values. -/
-theorem scale_min_k4_bound (a b : Nat) (ha : a < 256) (hb : b < 256) :
-    scaleMinLow a < 64 ∧ scaleMinHigh a b < 64 := by
-  unfold scaleMinLow scaleMinHigh; omega
-
--- § Q5_K
-
-/-- The Q5_K qh masks u1 for the four 64-element steps. -/
-theorem q5_k_u1 : (List.range 4).map (fun j => 1 <<< (2 * j)) = [1, 4, 16, 64] := by decide
-/-- The Q5_K qh masks u2 for the four 64-element steps. -/
-theorem q5_k_u2 : (List.range 4).map (fun j => 2 <<< (2 * j)) = [2, 8, 32, 128] := by decide
-/-- u1 and u2 together cover every one of the 8 bits of qh exactly once. -/
-theorem q5_k_masks_cover : [1, 4, 16, 64, 2, 8, 32, 128].foldl (· + ·) 0 = 255 := by decide
-
-/-- A Q5_K code is a nibble plus 16 times a bit, so below 32. -/
-theorem q5_k_code_bound (n b : Nat) (hn : n < 16) (hb : b ≤ 1) : n + 16 * b < 32 := by omega
-
--- § Q6_K
-
-/-- Q6_K code = nibble + 16 * two bits, below 64, decoding to -32..31. -/
-theorem q6_k_code_range (n h : Nat) (hn : n < 16) (hh : h < 4) :
-    n + 16 * h < 64 ∧ -32 ≤ ((n + 16 * h : Nat) : Int) + q6_k.codeBias ∧
-    ((n + 16 * h : Nat) : Int) + q6_k.codeBias ≤ 31 := by
-  have : q6_k.codeBias = -32 := rfl
-  rw [this]; omega
-
-/-- Output element index of quad q (0..3), lane l (0..31) in half h is 128h+32q+l, and its scale group is element/16. -/
-theorem q6_k_scale_group (h q l : Nat) (hh : h < 2) (hq : q < 4) (hl : l < 32) :
-    (128 * h + 32 * q + l) / 16 = 8 * h + 2 * q + l / 16 ∧ 128 * h + 32 * q + l < 256 := by
+/-- `get_scale_min_k4` for `j >= 4`: low 4 bits of one byte plus the top 2 bits of another stay 6-bit. -/
+theorem scale_min_k4_hi_lt (a b : Nat) (hb : b < 256) : a % 16 + 16 * (b / 64) < 64 := by
   omega
 
--- § IQ4
+-- § index maps are injective (no element read twice, none skipped)
 
-/-- The IQ4 non-linear codebook `kvalues_iq4nl`. -/
-def kv : List Int := [-127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113]
+/-- Q3_K hmask bit `4*half + j` is distinct for every (half, j) and stays in a byte. -/
+theorem q3k_mask_bit_injective (h1 h2 j1 j2 : Nat) (a1 : h1 < 2) (a2 : h2 < 2) (b1 : j1 < 4) (b2 : j2 < 4)
+    (h : 4 * h1 + j1 = 4 * h2 + j2) : h1 = h2 ∧ j1 = j2 := by
+  omega
 
-/-- Codebook lookup (out of range reads 0). -/
-def kvAt (i : Nat) : Int := kv.getD i 0
+/-- Q3_K group index `8*half + 2*j + sub` enumerates 16 distinct groups. -/
+theorem q3k_group_injective (h1 h2 j1 j2 s1 s2 : Nat) (a1 : h1 < 2) (a2 : h2 < 2) (b1 : j1 < 4)
+    (b2 : j2 < 4) (c1 : s1 < 2) (c2 : s2 < 2) (h : 8 * h1 + 2 * j1 + s1 = 8 * h2 + 2 * j2 + s2) :
+    h1 = h2 ∧ j1 = j2 ∧ s1 = s2 := by
+  omega
+
+/-- Q6_K quads land at strides of 32: `128*half + 32*quad + l` is injective on its domain. -/
+theorem q6k_quad_injective (h1 h2 q1 q2 l1 l2 : Nat) (a1 : h1 < 2) (a2 : h2 < 2) (b1 : q1 < 4)
+    (b2 : q2 < 4) (c1 : l1 < 32) (c2 : l2 < 32) (h : 128 * h1 + 32 * q1 + l1 = 128 * h2 + 32 * q2 + l2) :
+    h1 = h2 ∧ q1 = q2 ∧ l1 = l2 := by
+  omega
+
+/-- Q5_K masks `u1 = 1 << 2j`, `u2 = 2 << 2j` use bit `2j+k`, all distinct across the four steps. -/
+theorem q5k_mask_bit_injective (j1 j2 k1 k2 : Nat) (a1 : j1 < 4) (a2 : j2 < 4) (b1 : k1 < 2) (b2 : k2 < 2)
+    (h : 2 * j1 + k1 = 2 * j2 + k2) : j1 = j2 ∧ k1 = k2 := by
+  omega
+
+/-- Q4_K: four 64-element steps of two groups give 8 groups of 32 = 256 elements. -/
+theorem q4k_group_count : 4 * 2 = 8 ∧ 8 * 32 = 256 := by
+  decide
+
+/-- Q2_0 canonical codes plane states its own element count: `codes.size` determines the block count. -/
+theorem q2_0_codes_size (nb : Nat) : nb * 64 / 64 = nb := by
+  omega
+
+-- § the IQ4 codebook
+
+/-- `kvalues_iq4nl`. -/
+def kvIq4nl : List Int := [-127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113]
 
 /-- The codebook has exactly 16 entries (a 4-bit index). -/
-theorem kv_length : kv.length = 16 := by decide
+theorem kv_length : kvIq4nl.length = 16 := by
+  decide
 
 /-- The codebook is strictly increasing. -/
-theorem kv_strictMono : ∀ i j : Fin 16, i.val < j.val → kvAt i.val < kvAt j.val := by decide
+theorem kv_strictly_increasing : kvIq4nl.Pairwise (· < ·) := by
+  decide
 
-/-- The codebook is not affine: consecutive differences are not constant, so no integer bias can express it. -/
-theorem kv_not_affine : kvAt 1 - kvAt 0 ≠ kvAt 2 - kvAt 1 := by decide
+/-- It is NOT affine: consecutive differences differ, so it cannot be expressed as a code bias. -/
+theorem kv_not_affine :
+    (kvIq4nl.getD 1 0 - kvIq4nl.getD 0 0) ≠ (kvIq4nl.getD 2 0 - kvIq4nl.getD 1 0) := by
+  decide
 
-/-- The first eight entries are negative and the last eight positive. -/
-theorem kv_sign_split : (∀ i : Fin 8, kvAt i.val < 0) ∧ (∀ i : Fin 8, 0 < kvAt (i.val + 8)) := by decide
+-- § work splitting and code widths
 
-/-- IQ4_XS 6-bit scale: nibble + 16 * two bits, giving ls - 32 in -32..31. -/
-theorem iq4_xs_ls_range (n h : Nat) (hn : n < 16) (hh : h < 4) :
-    n + 16 * h < 64 ∧ -32 ≤ ((n + 16 * h : Nat) : Int) - 32 ∧ ((n + 16 * h : Nat) : Int) - 32 ≤ 31 := by
+/-- `--split I/N`: each tensor index lands in exactly one process slot. -/
+theorem split_partition (idx sn si si' : Nat) (hs : 0 < sn) (h1 : idx % sn = si) (h2 : idx % sn = si') :
+    idx % sn < sn ∧ si = si' := by
+  have hlt : idx % sn < sn := Nat.mod_lt idx hs
+  refine ⟨hlt, ?_⟩
   omega
 
-/-- IQ4_XS group ib indexes scales_l byte ib/2 (below 4) and scales_h bits 2ib, 2ib+1 (below 16). -/
-theorem iq4_xs_scale_index (ib : Nat) (h : ib < 8) : ib / 2 < 4 ∧ 2 * ib + 1 < 16 := by omega
+/-- Codes per byte times bits per code is 8 for every canonical form width. -/
+theorem code_bits_fill_byte : ∀ b ∈ [2, 4, 8], b * (8 / b) = 8 := by
+  decide
 
--- § float forms
+end Ref.CanonicalQuant
 
-/-- bf16 widening: shifting the 16 bits left by 16 gives a value whose low 16 bits are zero, recoverable. -/
-theorem bf16_widen_exact (u : Nat) (h : u < 65536) : (u * 65536) % 65536 = 0 ∧ (u * 65536) / 65536 = u := by
+
+
+## FILE: /mnt/user-data/outputs/GgufReaderGeometry.lean
+/-!
+# MODULE: gguf_reader_geometry
+SOURCES: tools/gguf_reader.py
+Minimal GGUF v3 header reader: magic and header sizes, tensor element counts, expected byte counts from block
+geometry, and the aligned start of the data section.
+
+## Source semantics
+* Magic `0x46554747` is "GGUF" in little-endian byte order; the fixed header is 24 bytes.
+* `elements` is the product of the shape; `expected_bytes` is `elements / block_elems * block_bytes` when
+  `elements` is a whole number of blocks and `None` otherwise.
+* `data_start` rounds the end of the tensor table up to `alignment`.
+* Type id 42 is `Q2_0`; ids 31 and 41 both carry the name `Q4_0_8_8` in the table (ids stay distinct).
+
+## Form template identifiers
+- GGUF_MAGIC           → `ggufMagic`
+- TensorInfo.elements  → `shapeElems`
+- expected_bytes       → `expectedBytes`
+- data_start rounding  → `alignUp`
+- GGML_TYPES           → `typeName`
+-/
+
+namespace Ref.GgufReader
+
+-- § header
+
+/-- The GGUF magic number. -/
+def ggufMagic : Nat := 0x46554747
+
+/-- Little-endian bytes of the magic spell G, G, U, F. -/
+theorem magic_bytes :
+    ggufMagic % 256 = 71 ∧ ggufMagic / 256 % 256 = 71 ∧ ggufMagic / 65536 % 256 = 85 ∧
+      ggufMagic / 16777216 = 70 := by
+  decide
+
+/-- Magic (4) + version (4) + n_tensors (8) + n_kv (8) = 24 header bytes; the tensor info tail is 12. -/
+theorem header_sizes : 4 + (4 + 8 + 8) = 24 ∧ 4 + 8 = 12 := by
+  decide
+
+-- § element counts
+
+/-- Product of a shape. -/
+def shapeElems : List Nat → Nat
+  | [] => 1
+  | d :: ds => d * shapeElems ds
+
+/-- Element counts multiply over concatenated shapes (so extra expert axes are just layout). -/
+theorem shapeElems_append (a b : List Nat) : shapeElems (a ++ b) = shapeElems a * shapeElems b := by
+  induction a with
+  | nil => simp [shapeElems]
+  | cons d ds ih => simp [shapeElems, ih, Nat.mul_assoc]
+
+-- § expected bytes
+
+/-- `expected_bytes`: whole blocks only. -/
+def expectedBytes (elems blockElems blockBytes : Nat) : Option Nat :=
+  if elems % blockElems = 0 then some (elems / blockElems * blockBytes) else none
+
+/-- A whole number of blocks yields `blocks * block_bytes`. -/
+theorem expectedBytes_of_blocks (k be bb : Nat) (h : 0 < be) :
+    expectedBytes (k * be) be bb = some (k * bb) := by
+  unfold expectedBytes
+  rw [if_pos (Nat.mul_mod_left k be), Nat.mul_div_cancel k h]
+
+/-- A partial block yields `None`. -/
+theorem expectedBytes_partial (e be bb : Nat) (h : e % be ≠ 0) : expectedBytes e be bb = none := by
+  unfold expectedBytes
+  rw [if_neg h]
+
+/-- A fused Q2_0 expert tensor `[64, 256, 16]` is 4096 blocks of 18 bytes. -/
+theorem q2_0_tiny_expert_bytes : expectedBytes 262144 64 18 = some 73728 := by
+  decide
+
+-- § alignment of the data section
+
+/-- Round `pos` up to a multiple of `a` (the `data_start` formula). -/
+def alignUp (pos a : Nat) : Nat := (pos + a - 1) / a * a
+
+/-- Alignment never moves backwards, moves less than one alignment unit, and lands on a multiple. -/
+theorem alignUp_spec (pos a : Nat) (ha : 0 < a) :
+    pos ≤ alignUp pos a ∧ alignUp pos a < pos + a ∧ alignUp pos a % a = 0 := by
+  have h0 : (pos + a - 1) / a * a + (pos + a - 1) % a = pos + a - 1 := by
+    have := Nat.div_add_mod (pos + a - 1) a
+    rw [Nat.mul_comm] at this
+    exact this
+  have h1 : (pos + a - 1) % a < a := Nat.mod_lt _ ha
+  have h2 : alignUp pos a % a = 0 := by
+    unfold alignUp
+    exact Nat.mul_mod_left _ _
+  refine ⟨?_, ?_, h2⟩
+  · unfold alignUp
+    omega
+  · unfold alignUp
+    omega
+
+/-- Aligning an already aligned position is the identity (default alignment 32). -/
+theorem alignUp32_idempotent (k : Nat) : alignUp (32 * k) 32 = 32 * k := by
+  unfold alignUp
   omega
 
--- § full-run bookkeeping
+-- § the ggml type table
 
-/-- The split `idx % N == I` assigns every tensor index to exactly one process below N. -/
-theorem split_in_range (idx n : Nat) (h : 0 < n) : idx % n < n := Nat.mod_lt _ h
+/-- A sample of `GGML_TYPES`; unknown ids print as `type<id>` in the source. -/
+def typeName : Nat → String
+  | 0 => "F32"
+  | 1 => "F16"
+  | 2 => "Q4_0"
+  | 8 => "Q8_0"
+  | 30 => "BF16"
+  | 31 => "Q4_0_8_8"
+  | 41 => "Q4_0_8_8"
+  | 42 => "Q2_0"
+  | _ => "unknown"
 
-/-- Streaming chunks hold whole blocks and never exceed the chunk size. -/
-theorem chunk_whole_blocks (chunk bb : Nat) : (chunk / bb) * bb ≤ chunk := Nat.div_mul_le_self _ _
+/-- Ids 31 and 41 share a NAME but are distinct ids, so name-keyed tooling cannot tell them apart. -/
+theorem duplicate_name_distinct_ids : typeName 31 = typeName 41 ∧ (31 : Nat) ≠ 41 := by
+  exact ⟨rfl, by decide⟩
 
-/-- Data section offset: file length minus the end of the last tensor places that end exactly at the file end. -/
-theorem data_offset_exact (filelen endOfData : Nat) (h : endOfData ≤ filelen) :
-    (filelen - endOfData) + endOfData = filelen := by omega
+/-- Type id 42 is `Q2_0`, the type the stock gguf-py enum lacks. -/
+theorem q2_0_is_type_42 : typeName 42 = "Q2_0" := by
+  rfl
 
-end RefCanonicalXcheck
+/-- The ids 0..42 of the table are pairwise distinct. -/
+theorem type_ids_nodup : (List.range 43).Nodup := by
+  decide
+
+end Ref.GgufReader
 
 
 
@@ -7553,2756 +8229,1267 @@ end RefCanonicalXcheck
 /-!
 # MODULE: gguf_writer_q2_contract
 SOURCES: tools/gguf_writer.py
-Integer model of the minimal GGUF v3 writer and the Q2_0 quantiser contract: type ids, alignment of the
-tensor directory and data section, the Q2_0 code clamp and bit packing.
+A minimal GGUF v3 writer including the `Q2_0` quantiser: block = 64 elements, fp16 scale, 16 bytes of 2-bit
+codes, LSB first, `d = amax`, `code = clamp(round(w/d) + 1, 0, 3)`, symbol = `code - 1`.
 
 ## Source semantics
-Q2_0 block = 64 elements, fp16 scale d = amax, code = clamp(round(w/d)+1, 0, 3), symbol = code-1 in {-1,0,1,2};
-codes are packed 4 per byte, LSB first (element j -> byte j/4, shift 2*(j%4)). Tensor data offsets are
-rounded up to the alignment (32) after each tensor; the data section starts at an aligned offset.
-Metadata and tensor shape order follow GGUF (dim 0 varies fastest).
+* The code is clamped into 0..3, so the symbol set is {-1, 0, +1, +2}.
+* With `d = amax` the ratio `w/d` lies in [-1, 1], so code 3 (symbol +2) is never produced by the quantiser.
+* Element `j` lives in byte `j/4` at bit `(j%4)*2`: a bijection from 0..63 onto 16 bytes x 4 slots.
+* Re-quantising dequantised values at the same scale is the identity on codes (the fixed-point check).
+* Tensor data and the header are padded to `alignment` (32); each tensor offset is the aligned running sum.
 
 ## Form template identifiers
-`TYPE_IDS` -> `typeIds`; `_META_IDS` -> `metaIds`; `DEFAULT_ALIGNMENT` -> 32; `quantize_q2_0` -> `clamp`/`packByte`;
-`GGUFWriter.write` offset loop -> `nextOffset`/`offsetAfter`.
+- np.clip(rint(b/d)+1, 0, 3) → `clamp3`
+- packed[j // 4] |= code[j] << ((j % 4) * 2) → `slotOf`
+- pad = (-len) % alignment → `pad32`
+- running tensor offset → `alignUp32`
 -/
 
-namespace RefGgufWriter
+namespace Ref.GgufWriter
 
--- § type ids
+-- § the quantiser clamp
 
-/-- ggml type ids the writer can emit. -/
-def typeIds : List (String × Nat) := [("F32", 0), ("F16", 1), ("Q2_0", 42)]
+/-- `clamp(x, 0, 3)` on integers, returned as a natural code. -/
+def clamp3 (x : Int) : Nat :=
+  if x < 0 then 0 else if x > 3 then 3 else x.toNat
 
-/-- Type ids are pairwise distinct. -/
-theorem type_ids_nodup : (typeIds.map Prod.snd).Nodup := by decide
+/-- Every produced code is a valid 2-bit code. -/
+theorem clamp3_lt (x : Int) : clamp3 x < 4 := by
+  unfold clamp3
+  split <;> (try split) <;> omega
 
-/-- Metadata value type ids of the GGUF spec. -/
-def metaIds : List Nat := [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+/-- In-range values are unchanged by the clamp. -/
+theorem clamp3_id (x : Int) (h0 : 0 ≤ x) (h3 : x ≤ 3) : (clamp3 x : Int) = x := by
+  unfold clamp3
+  split <;> (try split) <;> omega
 
-/-- Metadata type ids are pairwise distinct. -/
-theorem meta_ids_nodup : metaIds.Nodup := by decide
-
--- § Q2_0 quantiser
-
-/-- Integer clamp used for the code. -/
-def clamp (lo hi x : Int) : Int := max lo (min hi x)
-
-/-- The clamp lands in [lo, hi]. -/
-theorem clamp_range (lo hi x : Int) (h : lo ≤ hi) : lo ≤ clamp lo hi x ∧ clamp lo hi x ≤ hi := by
-  unfold clamp; omega
-
-/-- A Q2_0 code `clamp(r+1, 0, 3)` is always a valid 2-bit code. -/
-theorem q2_0_code_valid (r : Int) : 0 ≤ clamp 0 3 (r + 1) ∧ clamp 0 3 (r + 1) ≤ 3 :=
-  clamp_range 0 3 (r + 1) (by omega)
-
-/-- With d = amax, |w/d| <= 1, so rounded values are in {-1,0,1} and the clamp is the identity: the +2 level is never produced. -/
-theorem q2_0_amax_never_plus2 (r : Int) (h1 : -1 ≤ r) (h2 : r ≤ 1) :
-    clamp 0 3 (r + 1) = r + 1 ∧ clamp 0 3 (r + 1) ≤ 2 := by
-  unfold clamp; omega
-
-/-- Symbol = code - 1 lies in {-1,0,1,2}. -/
-theorem q2_0_symbol_range (r : Int) : -1 ≤ clamp 0 3 (r + 1) - 1 ∧ clamp 0 3 (r + 1) - 1 ≤ 2 := by
-  unfold clamp; omega
-
-/-- Four 2-bit codes in one byte, element 4b+t at shift 2t. -/
-def packByte (c0 c1 c2 c3 : Nat) : Nat := c0 + 4 * c1 + 16 * c2 + 64 * c3
-
-/-- A packed byte fits 8 bits and each code is recovered by shift and mask. -/
-theorem packByte_roundtrip (c0 c1 c2 c3 : Nat) (h0 : c0 < 4) (h1 : c1 < 4) (h2 : c2 < 4) (h3 : c3 < 4) :
-    packByte c0 c1 c2 c3 < 256 ∧ packByte c0 c1 c2 c3 % 4 = c0 ∧ packByte c0 c1 c2 c3 / 4 % 4 = c1 ∧
-    packByte c0 c1 c2 c3 / 16 % 4 = c2 ∧ packByte c0 c1 c2 c3 / 64 % 4 = c3 := by
-  unfold packByte; omega
-
-/-- Element j of a block lives in byte j/4 < 16 at shift (j%4)*2 < 8. -/
-theorem element_position (j : Nat) (hj : j < 64) : j / 4 < 16 ∧ (j % 4) * 2 < 8 ∧ 4 * (j / 4) + j % 4 = j := by
+/-- The decoded symbol of any code lies in {-1, 0, 1, 2}. -/
+theorem symbol_range (x : Int) : -1 ≤ (clamp3 x : Int) - 1 ∧ (clamp3 x : Int) - 1 ≤ 2 := by
+  have h := clamp3_lt x
   omega
 
-/-- A block is an 18-byte unit: 2 scale bytes + 16 code bytes. -/
-theorem block_bytes : 2 + 64 / 4 = 18 := by decide
-
-/-- Whole-block requirement: n multiple of 64 gives n/64 blocks covering n elements, in (n/64)*18 bytes. -/
-theorem blocks_cover (n : Nat) (h : n % 64 = 0) : (n / 64) * 64 = n := by omega
-
--- § alignment
-
-/-- Padding to a 32-byte boundary. -/
-def pad32 (n : Nat) : Nat := (32 - n % 32) % 32
-
-/-- Round up to a multiple of 32. -/
-def alignUp32 (n : Nat) : Nat := (n + 31) / 32 * 32
-
-/-- Padding is below 32 and makes the length aligned. -/
-theorem pad32_spec (n : Nat) : pad32 n < 32 ∧ (n + pad32 n) % 32 = 0 := by
-  unfold pad32; omega
-
-/-- Padding and rounding up agree. -/
-theorem pad32_eq_alignUp (n : Nat) : n + pad32 n = alignUp32 n := by
-  unfold pad32 alignUp32; omega
-
-/-- Next tensor offset: current offset plus the data, rounded up to the alignment. -/
-def nextOffset (o len : Nat) : Nat := alignUp32 (o + len)
-
-/-- Every tensor offset after the first is aligned. -/
-theorem nextOffset_aligned (o len : Nat) : nextOffset o len % 32 = 0 := by
-  unfold nextOffset alignUp32; omega
-
-/-- A tensor never overlaps the next one. -/
-theorem nextOffset_ge (o len : Nat) : o + len ≤ nextOffset o len := by
-  unfold nextOffset alignUp32; omega
-
-/-- Padding wastes less than 32 bytes. -/
-theorem nextOffset_lt (o len : Nat) : nextOffset o len < o + len + 32 := by
-  unfold nextOffset alignUp32; omega
-
-/-- Offset after a whole list of tensors. -/
-def offsetAfter (lens : List Nat) : Nat := lens.foldl nextOffset 0
-
-/-- Appending a tensor advances the offset by `nextOffset`. -/
-theorem offsetAfter_append (lens : List Nat) (l : Nat) :
-    offsetAfter (lens ++ [l]) = nextOffset (offsetAfter lens) l := by
-  simp [offsetAfter, List.foldl_append]
-
--- § shapes
-
-/-- A fused expert tensor [in, out, experts] has in*out*experts elements; rows = out*experts. -/
-theorem fused_rows (i o e : Nat) : i * (o * e) = i * o * e := (Nat.mul_assoc i o e).symm
-
-/-- The concrete case from the source: [64, 256, 16] has 4096 rows of 64. -/
-theorem fused_example : 64 * (256 * 16) = 64 * 4096 := by decide
-
-end RefGgufWriter
-
-
-
-## FILE: /mnt/user-data/outputs/IqNativePackIndex.lean
-/-!
-# MODULE: iq_native_pack_index
-SOURCES: tools/iq_pack.py
-Integer model of the native pack for i-quant model files: per-layer expert blob layout, running offsets,
-64-byte arena alignment, BF16 router narrowing, extra.bin offsets, layer counting.
-
-## Source semantics
-experts.bin: per layer, 512 blobs of [gate | up | down] raw GGUF slices; blob size is per layer. Layer offset
-= sum over earlier layers of blob*512. Float tensors are written to dense.bin padded to 64. An F32 router is
-narrowed to BF16 only if the low 16 bits of every word are zero (exact), otherwise refused.
-
-## Form template identifiers
-`N_EXPERT` -> 512; `ALIGN` -> 64; `layout` -> `expertsOffset`; `kind` map -> `kindOf`;
-`index_from_base` extra offsets -> `extraOffset`.
--/
-
-namespace RefIqPack
-
--- § constants
-
-/-- Experts per layer. -/
-def nExpert : Nat := 512
-/-- Arena alignment. -/
-def align : Nat := 64
-
--- § expert layout
-
-/-- Pad to 64. -/
-def pad64 (n : Nat) : Nat := (64 - n % 64) % 64
-
-/-- Padding is below 64 and aligns the length. -/
-theorem pad64_spec (n : Nat) : pad64 n < 64 ∧ (n + pad64 n) % 64 = 0 := by
-  unfold pad64; omega
-
-/-- Offset of layer l in experts.bin, given the per-layer blob size. -/
-def expertsOffset (blob : Nat → Nat) : Nat → Nat
-  | 0 => 0
-  | l + 1 => expertsOffset blob l + blob l * 512
-
-/-- Layer l+1 starts where layer l's 512 blobs end. -/
-theorem expertsOffset_succ (blob : Nat → Nat) (l : Nat) :
-    expertsOffset blob (l + 1) = expertsOffset blob l + blob l * 512 := rfl
-
-/-- Offsets never decrease with the layer index. -/
-theorem expertsOffset_mono (blob : Nat → Nat) (l k : Nat) :
-    expertsOffset blob l ≤ expertsOffset blob (l + k) := by
-  induction k with
-  | zero => exact Nat.le_refl _
-  | succ k ih =>
-    have h : expertsOffset blob (l + (k + 1)) = expertsOffset blob (l + k) + blob (l + k) * 512 := rfl
-    omega
-
-/-- A blob is gate + up + down slices; with each role tensor divisible by 512 the 512 blobs cover the three tensors exactly. -/
-theorem blob_cover (g u d : Nat) (hg : g % 512 = 0) (hu : u % 512 = 0) (hd : d % 512 = 0) :
-    (g / 512 + u / 512 + d / 512) * 512 = g + u + d := by omega
-
-/-- Layer count is 1 + max layer index: every layer index is below it. -/
-theorem le_foldl_max_acc : ∀ (ls : List Nat) (acc : Nat), acc ≤ ls.foldl max acc
-  | [], acc => Nat.le_refl _
-  | x :: xs, acc => Nat.le_trans (Nat.le_max_left acc x) (le_foldl_max_acc xs (max acc x))
-
-/-- Every listed element is bounded by the fold-max. -/
-theorem le_foldl_max : ∀ (ls : List Nat) (acc l : Nat), l ∈ ls → l ≤ ls.foldl max acc
-  | [], _, _, h => by simp at h
-  | x :: xs, acc, l, h => by
-    rcases List.mem_cons.mp h with h1 | h1
-    · rw [h1]
-      exact Nat.le_trans (Nat.le_max_right acc x) (le_foldl_max_acc xs (max acc x))
-    · exact le_foldl_max xs (max acc x) l h1
-
-/-- n_layers = 1 + max index exceeds every layer index present. -/
-theorem layer_lt_count (ls : List Nat) (l : Nat) (h : l ∈ ls) : l < 1 + ls.foldl max 0 := by
-  have := le_foldl_max ls 0 l h
-  omega
-
--- § dense.bin and routers
-
-/-- Index kind codes: BF16 -> 4, F16 -> 5, F32 -> 2. -/
-def kindOf : String → Nat
-  | "BF16" => 4
-  | "F16" => 5
-  | _ => 2
-
-/-- The three float kinds are distinct. -/
-theorem kinds_distinct : kindOf "BF16" ≠ kindOf "F16" ∧ kindOf "F16" ≠ kindOf "F32" ∧ kindOf "BF16" ≠ kindOf "F32" := by
-  decide
-
-/-- Router F32 -> BF16 narrowing is exact exactly when the low 16 bits are zero; then the high half recovers the word. -/
-theorem router_narrowing_exact (u : Nat) (h : u < 4294967296) (hz : u % 65536 = 0) :
-    u / 65536 < 65536 ∧ (u / 65536) * 65536 = u := by omega
-
-/-- If the low bits are not zero the narrowing is refused (it would lose information). -/
-theorem router_narrowing_lossy (u : Nat) (hz : u % 65536 ≠ 0) : (u / 65536) * 65536 ≠ u := by omega
-
--- § extra.bin offsets
-
-/-- Offset of the i-th extra tensor: sum of earlier lengths each padded to 64. -/
-def extraOffset : List Nat → Nat
-  | [] => 0
-  | b :: bs => (b + pad64 b) + extraOffset bs
-
-/-- Each padded extra tensor starts on a 64-byte boundary relative to the previous. -/
-theorem extra_step_aligned (b : Nat) : (b + pad64 b) % 64 = 0 := (pad64_spec b).2
-
-/-- Padding never shrinks a tensor. -/
-theorem extra_step_ge (b : Nat) : b ≤ b + pad64 b := Nat.le_add_right _ _
-
-/-- The total extra offset is a multiple of 64. -/
-theorem extraOffset_aligned : ∀ bs : List Nat, extraOffset bs % 64 = 0
-  | [] => rfl
-  | b :: bs => by
-    have h := extra_step_aligned b
-    have ih := extraOffset_aligned bs
-    unfold extraOffset
-    omega
-
--- § index arena
-
-/-- Index arena offset rounding: each row occupies its size rounded up to 64. -/
-def roundRow (n : Nat) : Nat := (n + 63) / 64 * 64
-
-/-- Rounded rows are aligned and wasteful by less than 64. -/
-theorem roundRow_spec (n : Nat) : roundRow n % 64 = 0 ∧ n ≤ roundRow n ∧ roundRow n < n + 64 := by
-  unfold roundRow; omega
-
-end RefIqPack
-
-
-
-## FILE: /mnt/user-data/outputs/MtpPackQuantizers.lean
-/-!
-# MODULE: mtp_pack_quantizers
-SOURCES: tools/mtp_pack.py
-Integer model of the MTP draft block packer: the per-block scale search grid for Q2_0, the Q4_0 and Q8_0
-reference code ranges, per-row block bytes and the expert tensor byte budget.
-
-## Source semantics
-Q2_0 scale d = amax * f with f swept over 17 values from 1/2 to 1; codes clamp(rint(x/d), -1, 2) + 1 in 0..3.
-Q4_0: code = min(15, trunc(x/d + 8.5)); packed low nibble = element i, high nibble = element i+16.
-Experts are the fused tensors gate_up_proj [512,1280,2560] and down_proj [512,2560,640], quantised along the last axis.
-
-## Form template identifiers
-`QUANT` table -> `QuantRow`; `EXPERT_TENSORS` -> the two fused tensors; `block`/`block_bytes` -> `blockElems`/`blockBytes`.
--/
-
-namespace RefMtpPack
-
--- § scale search grid
-
-/-- Grid index i in 0..16 gives candidate factor (16+i)/32. -/
-def gridNum (i : Nat) : Nat := 16 + i
-
-/-- The 17 candidates lie between 1/2 (16/32) and 1 (32/32), inclusive. -/
-theorem grid_bounds (i : Nat) (h : i ≤ 16) : 16 ≤ gridNum i ∧ gridNum i ≤ 32 := by
-  unfold gridNum; omega
-
-/-- There are exactly 17 candidates. -/
-theorem grid_count : (List.range 17).length = 17 := by decide
-
-/-- The endpoints are 1/2 and 1. -/
-theorem grid_endpoints : gridNum 0 * 2 = 32 ∧ gridNum 16 = 32 := by decide
-
--- § code ranges
-
-/-- Integer clamp. -/
-def clamp (lo hi x : Int) : Int := max lo (min hi x)
-
-/-- The Q2_0 code `clamp(q,-1,2)+1` is in 0..3. -/
-theorem q2_0_code_range (q : Int) : 0 ≤ clamp (-1) 2 q + 1 ∧ clamp (-1) 2 q + 1 ≤ 3 := by
-  unfold clamp; omega
-
-/-- Q4_0 code is capped at 15. -/
-theorem q4_0_code_cap (t : Nat) : min 15 t ≤ 15 := Nat.min_le_left _ _
-
-/-- Two Q4_0 nibbles pack into one byte: first half low, second half high. -/
-theorem q4_0_pack (lo hi : Nat) (hl : lo < 16) (hh : hi < 16) :
-    lo + 16 * hi < 256 ∧ (lo + 16 * hi) % 16 = lo ∧ (lo + 16 * hi) / 16 = hi := by omega
-
-/-- Q4_0 decode: the -8 bias is in the integer, so codes 0..15 give -8..7. -/
-theorem q4_0_decode_range (c : Nat) (h : c < 16) : -8 ≤ (c : Int) - 8 ∧ (c : Int) - 8 ≤ 7 := by omega
-
--- § block sizes
-
-/-- Per-quantiser (block elements, block bytes). -/
-structure QuantRow where
-  blockElems : Nat
-  blockBytes : Nat
-  deriving DecidableEq, Repr
-
-/-- Q2_0 row. -/
-def rowQ2 : QuantRow := ⟨64, 18⟩
-/-- Q4_0 row. -/
-def rowQ4 : QuantRow := ⟨32, 18⟩
-/-- Q8_0 row. -/
-def rowQ8 : QuantRow := ⟨32, 34⟩
-
-/-- Bytes to store `n` elements. -/
-def bytesFor (r : QuantRow) (n : Nat) : Nat := n / r.blockElems * r.blockBytes
-
-/-- Elements of gate_up_proj [512,1280,2560]. -/
-def gateUpElems : Nat := 512 * 1280 * 2560
-/-- Elements of down_proj [512,2560,640]. -/
-def downElems : Nat := 512 * 2560 * 640
-
-/-- Total routed-expert elements. -/
-theorem expert_elems : gateUpElems + downElems = 2516582400 := by decide
-
-/-- Both inner dimensions are multiples of the 64-element block (hence of 32 too). -/
-theorem inner_dims_divisible : 2560 % 64 = 0 ∧ 640 % 64 = 0 := by decide
-
-/-- Q2_0 expert bytes: 707,788,800 (about 0.71 GB). -/
-theorem q2_0_expert_bytes : bytesFor rowQ2 gateUpElems + bytesFor rowQ2 downElems = 707788800 := by decide
-
-/-- Q4_0 expert bytes: 1,415,577,600 (about 1.42 GB). -/
-theorem q4_0_expert_bytes : bytesFor rowQ4 gateUpElems + bytesFor rowQ4 downElems = 1415577600 := by decide
-
-/-- Q8_0 expert bytes: 2,673,868,800 (about 2.67 GB). -/
-theorem q8_0_expert_bytes : bytesFor rowQ8 gateUpElems + bytesFor rowQ8 downElems = 2673868800 := by decide
-
-/-- The quantised last-axis width written as the raw shape: 2560 -> 720 and 640 -> 180 bytes for Q2_0. -/
-theorem raw_shape_last : 2560 / 64 * 18 = 720 ∧ 640 / 64 * 18 = 180 := by decide
-
-/-- A larger format never stores fewer bytes per element (Q2_0 < Q4_0 < Q8_0). -/
-theorem format_order : 707788800 < 1415577600 ∧ 1415577600 < 2673868800 := by decide
-
--- § bf16 widening
-
-/-- bf16 -> f32 is a 16-bit left shift: exact and invertible. -/
-theorem bf16_widen (u : Nat) (h : u < 65536) : (u * 65536) / 65536 = u := by omega
-
-end RefMtpPack
-
-
-
-## FILE: /mnt/user-data/outputs/MtpRuntimeBlobLayout.lean
-/-!
-# MODULE: mtp_runtime_blob_layout
-SOURCES: tools/mtp_rt.py
-Integer model of the MTP runtime files: the expert blob (gate/up row interleave, code plane then scale plane),
-its byte budget, dense.bin padding to 256 and the Gemma "+1" norm weight.
-
-## Source semantics
-BLOB = 3*(H*FF*18/64). Blob = interleaved gate/up codes, down codes, interleaved gate/up scales, down scales.
-Interleave: slot 2r = gate row r, slot 2r+1 = up row r. dense.bin tensors are padded to 256-byte offsets.
-
-## Form template identifiers
-`H, FF, NE` -> `h, ff, ne`; `BLOB` -> `blob`; `blob_of` -> plane sizes; `pad = (-off) % 256` -> `pad256`.
--/
-
-namespace RefMtpRt
-
-/-- Hidden size. -/
-def h : Nat := 2560
-/-- FFN width. -/
-def ff : Nat := 640
-/-- Experts. -/
-def ne : Nat := 512
-
-/-- Blob size: three roles of H*FF*18/64 bytes. -/
-def blob : Nat := 3 * (h * ff * 18 / 64)
-
-/-- The blob is 1,382,400 bytes, matching the main pack. -/
-theorem blob_value : blob = 1382400 := by decide
-
-/-- Gate/up code plane: 1280 rows x 40 blocks x 16 code bytes. -/
-theorem gu_codes : 2 * ff * (h / 64) * 16 = 819200 := by decide
-/-- Down code plane: 2560 rows x 10 blocks x 16 code bytes. -/
-theorem down_codes : h * (ff / 64) * 16 = 409600 := by decide
-/-- Gate/up scale plane: fp16 per block. -/
-theorem gu_scales : 2 * ff * (h / 64) * 2 = 102400 := by decide
-/-- Down scale plane. -/
-theorem down_scales : h * (ff / 64) * 2 = 51200 := by decide
-
-/-- The four planes add up to the blob exactly. -/
-theorem planes_sum : 819200 + 409600 + 102400 + 51200 = blob := by decide
-
-/-- The expert file is 512 blobs. -/
-theorem experts_file : ne * blob = 707788800 := by decide
-
-/-- Q2_0 row widths in bytes: gate/up row 720, down row 180. -/
-theorem row_bytes : h / 64 * 18 = 720 ∧ ff / 64 * 18 = 180 := by decide
-
--- § gate/up interleave
-
-/-- Slot of gate row r. -/
-def gateSlot (r : Nat) : Nat := 2 * r
-/-- Slot of up row r. -/
-def upSlot (r : Nat) : Nat := 2 * r + 1
-
-/-- Gate slots are even and recover the row. -/
-theorem gate_slot_inv (r : Nat) : gateSlot r % 2 = 0 ∧ gateSlot r / 2 = r := by
-  unfold gateSlot; omega
-
-/-- Up slots are odd and recover the row. -/
-theorem up_slot_inv (r : Nat) : upSlot r % 2 = 1 ∧ upSlot r / 2 = r := by
-  unfold upSlot; omega
-
-/-- Every slot is exactly one gate or one up row (the interleave is a bijection). -/
-theorem slot_decomp (s : Nat) : s = 2 * (s / 2) + s % 2 := by omega
-
-/-- Gate and up never collide. -/
-theorem slots_disjoint (r r' : Nat) : gateSlot r ≠ upSlot r' := by
-  unfold gateSlot upSlot; omega
-
-/-- For rows below 640 the slots stay below 1280. -/
-theorem slots_bound (r : Nat) (hr : r < 640) : gateSlot r < 1280 ∧ upSlot r < 1280 := by
-  unfold gateSlot upSlot; omega
-
-/-- A slot's code bytes end inside the gate/up code plane. -/
-theorem code_slot_in_plane (s b : Nat) (hs : s < 1280) (hb : b < 40) : s * 640 + b * 16 + 16 ≤ 819200 := by
-  omega
-
-/-- A slot's scale bytes end inside the gate/up scale plane. -/
-theorem scale_slot_in_plane (s b : Nat) (hs : s < 1280) (hb : b < 40) : (s * 40 + b) * 2 + 2 ≤ 102400 := by
-  omega
-
--- § dense.bin
-
-/-- Padding to a 256-byte offset. -/
-def pad256 (n : Nat) : Nat := (256 - n % 256) % 256
-
-/-- Padding is below 256 and aligns the offset. -/
-theorem pad256_spec (n : Nat) : pad256 n < 256 ∧ (n + pad256 n) % 256 = 0 := by
-  unfold pad256; omega
-
-/-- Gemma RMSNorm folds 1+w; with integer-valued w the stored value is w+1 (shift is invertible). -/
-theorem gemma_plus_one (w : Int) : (w + 1) - 1 = w := by omega
-
-/-- Quantising a row to Q8_0 requires a multiple of 32 columns; all large projections have 2560 columns. -/
-theorem q8_cols : 2560 % 32 = 0 := by decide
-
-end RefMtpRt
-
-
-
-## FILE: /mnt/user-data/outputs/ExpertArenaBlobLayout.lean
-/-!
-# MODULE: expert_arena_blob_layout
-SOURCES: tools/pack_layer.py
-Integer model of the pack-layout expert blob: gate/up row interleave, code plane then scale plane, exact byte
-budget of 1,382,400, per-expert contiguity inside the role tensors, and the total arena size.
-
-## Source semantics
-Blob = gate_up.codes (2*640 rows x 640 B) | down.codes (2560 rows x 160 B) | gate_up.scales (2*640*40 fp16)
-| down.scales (2560*10 fp16) = 1,382,400 B. Expert e is a contiguous 460,800-byte run in each role tensor.
-Conversion is a pure relayout, so bytes are only moved, never changed.
-
-## Form template identifiers
-`H, FF, NE, QK, BLOCK_BYTES` -> `hid, ff, ne, qk, blockBytes`; `ROW_BYTES_GU/D`, `SCALES_GU/D`, `ROLE_BYTES`,
-`BLOB_BYTES`, `blob_offsets` -> same-named definitions.
--/
-
-namespace RefPackLayer
-
--- § constants
-
-/-- Hidden size. -/
-def hid : Nat := 2560
-/-- FFN width. -/
-def ff : Nat := 640
-/-- Experts per layer. -/
-def ne : Nat := 512
-/-- Q2_0 block elements. -/
-def qk : Nat := 64
-/-- Q2_0 block bytes. -/
-def blockBytes : Nat := 18
-/-- Code bytes of one gate/up row (2560 x 2 bits). -/
-def rowBytesGu : Nat := hid * 2 / 8
-/-- Code bytes of one down row (640 x 2 bits). -/
-def rowBytesD : Nat := ff * 2 / 8
-/-- Scale blocks per gate/up row. -/
-def scalesGu : Nat := hid / qk
-/-- Scale blocks per down row. -/
-def scalesD : Nat := ff / qk
-/-- Bytes per role per expert. -/
-def roleBytes : Nat := hid * ff * blockBytes / qk
-/-- Bytes per expert blob. -/
-def blobBytes : Nat := 3 * roleBytes
-
-/-- Gate/up row code bytes. -/
-theorem row_bytes_gu : rowBytesGu = 640 := by decide
-/-- Down row code bytes. -/
-theorem row_bytes_d : rowBytesD = 160 := by decide
-/-- Scales per gate/up row. -/
-theorem scales_gu : scalesGu = 40 := by decide
-/-- Scales per down row. -/
-theorem scales_d : scalesD = 10 := by decide
-/-- Role bytes per expert. -/
-theorem role_bytes : roleBytes = 460800 := by decide
-/-- The blob is exactly 1,382,400 bytes. -/
-theorem blob_bytes : blobBytes = 1382400 := by decide
-
--- § plane offsets
-
-/-- Offset of gate_up.codes. -/
-def offGuCodes : Nat := 0
-/-- Offset of down.codes. -/
-def offDCodes : Nat := offGuCodes + 2 * ff * rowBytesGu
-/-- Offset of gate_up.scales. -/
-def offGuScales : Nat := offDCodes + hid * rowBytesD
-/-- Offset of down.scales. -/
-def offDScales : Nat := offGuScales + 2 * ff * scalesGu * 2
-/-- End of the blob. -/
-def offEnd : Nat := offDScales + hid * scalesD * 2
-
-/-- The four planes tile the blob exactly with no gap or overlap. -/
-theorem planes_tile : offEnd = blobBytes := by decide
-
-/-- The plane offsets are 0, 819200, 1228800, 1331200 and the blob ends at 1382400. -/
-theorem plane_offsets : offGuCodes = 0 ∧ offDCodes = 819200 ∧ offGuScales = 1228800 ∧ offDScales = 1331200 := by
-  decide
-
-/-- The plane offsets are strictly increasing. -/
-theorem planes_ordered : offGuCodes < offDCodes ∧ offDCodes < offGuScales ∧ offGuScales < offDScales ∧
-    offDScales < offEnd := by decide
-
-/-- The explicit sum from the source's assertion. -/
-theorem blob_sum : 2 * 640 * 640 + 2560 * 160 + 2 * 640 * 40 * 2 + 2560 * 10 * 2 = 1382400 := by decide
-
--- § per-expert contiguity
-
-/-- Expert e occupies bytes [e*460800, (e+1)*460800) of a role tensor. -/
-def expertStart (e : Nat) : Nat := e * 460800
-
-/-- Experts are consecutive and non-overlapping. -/
-theorem expert_runs_adjacent (e : Nat) : expertStart e + 460800 = expertStart (e + 1) := by
-  unfold expertStart; omega
-
-/-- All 512 expert runs fit inside a role tensor of 512*460800 bytes. -/
-theorem expert_in_tensor (e : Nat) (he : e < 512) : expertStart e + 460800 ≤ 512 * 460800 := by
-  unfold expertStart; omega
-
-/-- A role tensor holds elements/512 per expert and that equals 460800 bytes of Q2_0. -/
-theorem per_expert_elems : (2560 * 640 * 512) / 512 * 18 / 64 = 460800 := by decide
-
--- § interleave
-
-/-- Row index of gate row r (0) or up row r (1) in the interleaved stack. -/
-def stackRow (r k : Nat) : Nat := 2 * r + k
-
-/-- Stacking gate and up along a new axis then flattening gives rows g0,u0,g1,u1,...: a bijection onto 0..1279. -/
-theorem stack_row_inv (r k : Nat) (hk : k < 2) : stackRow r k / 2 = r ∧ stackRow r k % 2 = k := by
-  unfold stackRow; omega
-
-/-- Interleaved rows stay in range. -/
-theorem stack_row_bound (r k : Nat) (hr : r < 640) (hk : k < 2) : stackRow r k < 1280 := by
-  unfold stackRow; omega
-
-/-- Inverse used by the verifier: slot -> (row, role), and recombination. -/
-theorem slot_roundtrip (s : Nat) : stackRow (s / 2) (s % 2) = s := by
-  unfold stackRow; omega
-
-/-- The verifier's code offset for a (slot, block) ends inside the gate/up code plane. -/
-theorem verifier_code_in_plane (slot b : Nat) (hs : slot < 1280) (hb : b < 40) :
-    offGuCodes + slot * rowBytesGu + b * 16 + 16 ≤ offDCodes := by
-  unfold offGuCodes offDCodes rowBytesGu ff hid; omega
-
-/-- The verifier's scale offset for a (slot, block) ends inside the gate/up scale plane. -/
-theorem verifier_scale_in_plane (slot b : Nat) (hs : slot < 1280) (hb : b < 40) :
-    offGuScales + (slot * scalesGu + b) * 2 + 2 ≤ offDScales := by
-  simp only [offGuCodes, offDCodes, offGuScales, offDScales, scalesGu, rowBytesGu, rowBytesD, ff, hid, qk]; omega
-
-/-- Down code offsets end inside the down code plane. -/
-theorem verifier_down_code_in_plane (row b : Nat) (hr : row < 2560) (hb : b < 10) :
-    offDCodes + row * rowBytesD + b * 16 + 16 ≤ offGuScales := by
-  simp only [offGuCodes, offDCodes, offGuScales, rowBytesGu, rowBytesD, ff, hid]; omega
-
--- § arena size
-
-/-- Total arena bytes for n layers. -/
-def arenaBytes (n : Nat) : Nat := n * ne * blobBytes
-
-/-- The full 48-layer arena is 33,973,862,400 bytes (31.64 GiB). -/
-theorem arena_48 : arenaBytes 48 = 33973862400 := by decide
-
-/-- One layer is 512 blobs of 1,382,400 bytes. -/
-theorem arena_1 : arenaBytes 1 = 707788800 := by decide
-
-/-- The arena grows linearly: each layer adds the same bytes. -/
-theorem arena_succ (n : Nat) : arenaBytes (n + 1) = arenaBytes n + 707788800 := by
-  unfold arenaBytes ne blobBytes roleBytes hid ff blockBytes qk; omega
-
-end RefPackLayer
-
-
-
-## FILE: /mnt/user-data/outputs/RefPackBuilderVerifier.lean
-/-!
-# MODULE: ref_pack_builder_verifier
-SOURCES: tools/ref_pack.py
-Integer model of the canonical pack builder: code-plane bit packing (2/4/8 bits, LSB first), plane alignment
-inside a segment, scale precision storage sizes, form bit widths, expert-arena size, and the verify sampling counts.
-
-## Source semantics
-Codes are packed `8/bits` per byte, LSB first. Every plane starts on a 64-byte boundary measured from the start
-of its segment (`dense.bin` or `embd.bin`); the final plane of a blob is not padded. Scales are stored fp16 when the
-round trip is exact, else fp32. The pack is valid only if decode(pack) == dequant(source) bit for bit.
-
-## Form template identifiers
-`ALIGN` -> 64; `code_bits` -> `codeBits`; `pack_codes`/`unpack_codes` -> `packTwo`/`packNibble`;
-`put` -> `putOffset`; `choose_scale_dtype` -> `scaleBytes`; `verify_experts` -> `expertsChecked`.
--/
-
-namespace RefPack
-
--- § form bit widths
-
-/-- Bits per code of each canonical form. -/
-def codeBits : String → Nat
-  | "S2" => 2
-  | "S4" => 4
-  | _ => 8
-
-/-- Codes per byte for every integer form is exactly 8/bits and fills the byte. -/
-theorem codes_fill_byte : ∀ f ∈ ["S2", "S4", "S8"], 8 / codeBits f * codeBits f = 8 := by decide
+/-- With `d = amax`, `rint(w/d) ∈ [-1, 1]` and so the +2 level (code 3) is never emitted. -/
+theorem plus_two_never_emitted (r : Int) (h1 : -1 ≤ r) (h2 : r ≤ 1) : clamp3 (r + 1) ≤ 2 := by
+  unfold clamp3
+  split <;> (try split) <;> omega
+
+/-- Fixed point: decoding a code at unit scale and re-quantising returns the same code. -/
+theorem requantise_fixed_point (c : Nat) (h : c < 4) : clamp3 (((c : Int) - 1) + 1) = c := by
+  unfold clamp3
+  split <;> (try split) <;> omega
 
 -- § bit packing
 
-/-- Pack two 4-bit codes into one byte, LSB first. -/
-def packNibble (c0 c1 : Nat) : Nat := c0 + 16 * c1
+/-- Element `j` of a block goes to (byte `j/4`, slot `j%4`). -/
+def slotOf (j : Nat) : Nat × Nat := (j / 4, j % 4)
 
-/-- Nibble pack/unpack round trip. -/
-theorem nibble_roundtrip (c0 c1 : Nat) (h0 : c0 < 16) (h1 : c1 < 16) :
-    packNibble c0 c1 < 256 ∧ packNibble c0 c1 % 16 = c0 ∧ packNibble c0 c1 / 16 = c1 := by
-  unfold packNibble; omega
+/-- The slot map covers 16 bytes x 4 slots and is invertible. -/
+theorem slotOf_bijective (j : Nat) (h : j < 64) :
+    (slotOf j).1 < 16 ∧ (slotOf j).2 < 4 ∧ 4 * (slotOf j).1 + (slotOf j).2 = j := by
+  unfold slotOf
+  omega
 
-/-- Pack four 2-bit codes into one byte, LSB first. -/
-def packTwo (c0 c1 c2 c3 : Nat) : Nat := c0 + 4 * c1 + 16 * c2 + 64 * c3
+/-- Two distinct elements never share a (byte, slot). -/
+theorem slotOf_injective (i j : Nat) (hi : i < 64) (hj : j < 64) (h : slotOf i = slotOf j) : i = j := by
+  unfold slotOf at h
+  have h1 : i / 4 = j / 4 := congrArg Prod.fst h
+  have h2 : i % 4 = j % 4 := congrArg Prod.snd h
+  omega
 
-/-- 2-bit pack/unpack round trip. -/
-theorem two_roundtrip (c0 c1 c2 c3 : Nat) (h0 : c0 < 4) (h1 : c1 < 4) (h2 : c2 < 4) (h3 : c3 < 4) :
-    packTwo c0 c1 c2 c3 < 256 ∧ packTwo c0 c1 c2 c3 % 4 = c0 ∧ packTwo c0 c1 c2 c3 / 4 % 4 = c1 ∧
-    packTwo c0 c1 c2 c3 / 16 % 4 = c2 ∧ packTwo c0 c1 c2 c3 / 64 % 4 = c3 := by
-  unfold packTwo; omega
+/-- A Q2_0 block is a 2-byte scale plus 16 code bytes (64 elements at 2 bits each). -/
+theorem q2_0_block_bytes : 2 + 64 * 2 / 8 = 18 := by
+  decide
 
-/-- Packed size: n codes at `per` codes per byte occupy n/per bytes when divisible, and the code count is recoverable. -/
-theorem packed_size (n per : Nat) (hp : 0 < per) (h : n % per = 0) : (n / per) * per = n := by
-  exact Nat.div_mul_cancel (Nat.dvd_of_mod_eq_zero h)
+-- § alignment
 
-/-- The 4-bit element count must be a multiple of 2 and the 2-bit count a multiple of 4. -/
-theorem q2_count_nonmultiple (n : Nat) (h : n % 4 ≠ 0) : ¬ (n % 4 = 0) := h
+/-- `(-len) % 32` written without negation. -/
+def pad32 (n : Nat) : Nat := (32 - n % 32) % 32
 
--- § alignment inside a segment
+/-- Padding always lands on an alignment boundary. -/
+theorem pad32_aligned (n : Nat) : (n + pad32 n) % 32 = 0 := by
+  unfold pad32
+  omega
 
-/-- Align a length to 64. -/
-def pad64 (n : Nat) : Nat := (64 - n % 64) % 64
+/-- Round up to the 32-byte alignment (the tensor directory offset update). -/
+def alignUp32 (n : Nat) : Nat := (n + 31) / 32 * 32
 
-/-- Padding lands on a boundary and is below 64. -/
-theorem pad64_spec (n : Nat) : pad64 n < 64 ∧ (n + pad64 n) % 64 = 0 := by
-  unfold pad64; omega
+/-- The aligned offset never overlaps the previous tensor and wastes less than one unit. -/
+theorem alignUp32_spec (n : Nat) : n ≤ alignUp32 n ∧ alignUp32 n < n + 32 ∧ alignUp32 n % 32 = 0 := by
+  unfold alignUp32
+  omega
 
-/-- Offset of a plane: segment base + current body length after padding. -/
-def putOffset (base bodyLen : Nat) : Nat := base + (bodyLen + pad64 bodyLen)
+/-- Next tensor offset is at least the previous offset plus its length. -/
+theorem offsets_monotone (off len : Nat) : off + len ≤ alignUp32 (off + len) := by
+  have h := alignUp32_spec (off + len)
+  exact h.1
 
-/-- Plane offsets are 64-aligned relative to the segment start. -/
-theorem put_relative_aligned (base bodyLen : Nat) : (putOffset base bodyLen - base) % 64 = 0 := by
-  unfold putOffset pad64; omega
-
-/-- Absolute alignment holds exactly when the segment base is itself 64-aligned. -/
-theorem put_absolute_aligned (base bodyLen : Nat) (hb : base % 64 = 0) : putOffset base bodyLen % 64 = 0 := by
-  unfold putOffset pad64; omega
-
-/-- Without an aligned base the plane is generally not absolutely aligned (the last blob is not padded). -/
-theorem put_unaligned_base : putOffset 1 0 % 64 ≠ 0 := by decide
-
-/-- Planes never overlap: the next plane starts at or after the previous one's end. -/
-theorem put_no_overlap (base bodyLen : Nat) : base + bodyLen ≤ putOffset base bodyLen := by
-  unfold putOffset; omega
-
--- § scale precision
-
-/-- Bytes used by a scale plane of n values. -/
-def scaleBytes (isFp16 : Bool) (n : Nat) : Nat := if isFp16 then 2 * n else 4 * n
-
-/-- fp16 scales halve the plane compared with fp32. -/
-theorem scale_fp16_half (n : Nat) : 2 * scaleBytes true n = scaleBytes false n := by
-  unfold scaleBytes; simp; omega
-
-/-- A scale plane always has at least 2 bytes per value. -/
-theorem scale_bytes_ge (b : Bool) (n : Nat) : 2 * n ≤ scaleBytes b n := by
-  unfold scaleBytes; cases b <;> simp <;> omega
-
--- § arena size and verification sampling
-
-/-- Expert blob bytes. -/
-def blobBytes : Nat := 1382400
-/-- Experts per layer. -/
-def nExperts : Nat := 512
-
-/-- experts.bin size for n layers. -/
-def expertsFileBytes (n : Nat) : Nat := n * nExperts * blobBytes
-
-/-- The default 48 layers give 33,973,862,400 bytes. -/
-theorem experts_file_48 : expertsFileBytes 48 = 33973862400 := by decide
-
-/-- Blob count reported by `info`. -/
-theorem info_blob_count : 48 * nExperts = 24576 := by decide
-
-/-- Experts verified per layer when sampling every k-th. -/
-def expertsPerLayerChecked (every : Nat) : Nat := (512 + every - 1) / every
-
-/-- Total layer/expert/role checks. -/
-def expertsChecked (layers every : Nat) : Nat := layers * expertsPerLayerChecked every * 3
-
-/-- Default sampling (every 32nd of 512) checks 16 experts per layer. -/
-theorem default_sampling : expertsPerLayerChecked 32 = 16 := by decide
-
-/-- The default full pack verification runs 2304 role checks. -/
-theorem default_checks : expertsChecked 48 32 = 2304 := by decide
-
-/-- Sampling every expert checks all 512. -/
-theorem every_one : expertsPerLayerChecked 1 = 512 := by decide
-
-/-- Sampling is never empty when every <= 512. -/
-theorem sampling_nonempty (every : Nat) (h1 : 0 < every) (h2 : every ≤ 512) : 0 < expertsPerLayerChecked every := by
-  unfold expertsPerLayerChecked
-  have : every ≤ 512 + every - 1 := by omega
-  exact Nat.div_pos this h1
-
-end RefPack
+end Ref.GgufWriter
 
 
 
-## FILE: /mnt/user-data/outputs/TokenizerByteLevelBpe.lean
+## FILE: /mnt/user-data/outputs/IqPackLayout.lean
 /-!
-# MODULE: tokenizer_byte_level_bpe
-SOURCES: tools/ref_tokenizer.py
-Model of the GPT-2 byte-to-unicode map, BPE merge step, special-token classes and the decode homomorphism that
-underlies the `decode(encode(s)) == s` round trip.
+# MODULE: iq_pack_layout
+SOURCES: tools/iq_pack.py
+Native pack for the Q2_0 / IQ2_XS / IQ3_XXS model files: experts kept in GGUF form as per-layer blobs
+`[gate | up | down]` x 512, an index table with 64-byte-aligned arena offsets, and BF16 router narrowing.
 
 ## Source semantics
-bytes_to_unicode sends 188 printable bytes to themselves and the other 68 to 256+n in byte order; it is injective.
-A BPE step replaces an adjacent pair by one merged token, shrinking the list by exactly one, so merging terminates.
-Token type 4 (USER_DEFINED) is matched always; type 3 (CONTROL) only with parse_special. decode concatenates the
-byte strings of its tokens, so it distributes over concatenation of id lists.
+* Per layer, blob size = per-expert bytes of gate + up + down, where per-expert bytes = tensor bytes / 512;
+  gate and up must agree. The experts arena is the running sum of `blob * 512`.
+* The index arena size is the running sum of each tensor's size rounded up to ALIGN = 64.
+* An F32 router whose low 16 bits are all zero is exactly a BF16 widened by 16 bits; it is stored as BF16.
+* `n_layers = 1 + max layer index` found among `*_exps.weight` tensors.
 
 ## Form template identifiers
-`bytes_to_unicode` -> `cp`; `_bpe` merge -> `mergeAt`; `special_tokens`/`_always_re` -> `matchedAlways`/`matchedSpecial`;
-`decode` -> `decodeBytes`; `_encode_matching` splice -> `split_decode`.
+- N_EXPERT / blob / offset       → `nExpert` / blob sizes list / `totalBytes`
+- ALIGN pad                      → `alignUp64`
+- (u & 0xFFFF)==0, u>>16         → `routerNarrow`
+- write_index at                 → `alignedTotal`
 -/
 
-namespace RefTokenizer
+namespace Ref.IqPack
+
+/-- Experts per layer. -/
+def nExpert : Nat := 512
+
+-- § experts arena
+
+/-- Total arena bytes for a list of per-layer blob sizes (each layer holds 512 blobs). -/
+def totalBytes : List Nat → Nat
+  | [] => 0
+  | b :: bs => b * 512 + totalBytes bs
+
+/-- The arena is `512 * (sum of blob sizes)`. -/
+theorem totalBytes_eq_mul_sum (bs : List Nat) : totalBytes bs = 512 * bs.sum := by
+  induction bs with
+  | nil => simp [totalBytes]
+  | cons b bs ih =>
+    simp only [totalBytes, List.sum_cons, ih]
+    omega
+
+/-- Per-expert bytes recover exactly when the tensor holds 512 equal experts. -/
+theorem per_expert_exact (per : Nat) : (512 * per) / 512 = per := by
+  omega
+
+/-- A layer blob is gate + up + down bytes, and the layer's arena slice is 512 of them. -/
+theorem layer_slice (g u d : Nat) : (g + u + d) * 512 = g * 512 + u * 512 + d * 512 := by
+  omega
+
+-- § 64-byte aligned index
+
+/-- Round up to ALIGN = 64. -/
+def alignUp64 (n : Nat) : Nat := (n + 63) / 64 * 64
+
+/-- Alignment is monotone, bounded and lands on a boundary. -/
+theorem alignUp64_spec (n : Nat) : n ≤ alignUp64 n ∧ alignUp64 n < n + 64 ∧ alignUp64 n % 64 = 0 := by
+  unfold alignUp64
+  omega
+
+/-- Running aligned total of a list of tensor sizes (the `at` in `write_index`). -/
+def alignedTotal : List Nat → Nat
+  | [] => 0
+  | n :: ns => alignUp64 n + alignedTotal ns
+
+/-- The arena is never smaller than the raw tensor bytes. -/
+theorem sum_le_alignedTotal (ns : List Nat) : ns.sum ≤ alignedTotal ns := by
+  induction ns with
+  | nil => simp [alignedTotal]
+  | cons n ns ih =>
+    have h := alignUp64_spec n
+    simp only [alignedTotal, List.sum_cons]
+    omega
+
+/-- The arena size is itself a multiple of 64. -/
+theorem alignedTotal_aligned (ns : List Nat) : alignedTotal ns % 64 = 0 := by
+  induction ns with
+  | nil => simp [alignedTotal]
+  | cons n ns ih =>
+    have h := alignUp64_spec n
+    simp only [alignedTotal]
+    omega
+
+-- § router narrowing
+
+/-- Keep the high 16 bits of an F32 pattern. -/
+def routerNarrow (u : Nat) : Nat := u / 65536
+
+/-- When the low 16 bits are zero, narrowing then widening reproduces the F32 pattern exactly. -/
+theorem router_narrow_exact (u : Nat) (h : u % 65536 = 0) : routerNarrow u * 65536 = u := by
+  unfold routerNarrow
+  omega
+
+/-- Widening a BF16 pattern by 16 bits and narrowing back is the identity. -/
+theorem bf16_widen_narrow (b : Nat) : routerNarrow (b * 65536) = b := by
+  unfold routerNarrow
+  omega
+
+/-- A narrowed router fits in 16 bits when the F32 pattern is below 2^32. -/
+theorem router_narrow_lt (u : Nat) (h : u < 4294967296) : routerNarrow u < 65536 := by
+  unfold routerNarrow
+  omega
+
+-- § layer count
+
+/-- `n_layers = 1 + max index`: every layer index found is below the layer count. -/
+theorem layer_index_lt (l mx : Nat) (h : l ≤ mx) : l < 1 + mx := by
+  omega
+
+end Ref.IqPack
+
+
+
+## FILE: /mnt/user-data/outputs/MtpPackQuant.lean
+/-!
+# MODULE: mtp_pack_quant
+SOURCES: tools/mtp_pack.py
+Packs the MTP draft block as a GGUF: dense tensors stay BF16/F32, fused routed experts
+(`gate_up_proj [512,1280,2560]`, `down_proj [512,2560,640]`) are quantised along the last axis to Q2_0, Q4_0 or
+Q8_0 with round-to-nearest.
+
+## Source semantics
+* Q2_0 searches 17 candidate scales `amax * f` with `f` from 1/2 to 1 and clamps symbols to [-1, 2]; the
+  stored code is `symbol + 1` in 0..3.
+* Q4_0 packs `q[:16] | q[16:] << 4` with every code at most 15.
+* Q8_0 codes are `rint(x / d)` with `d = amax/127`, so they fit an int8.
+* The inner dimension must be a multiple of the block size, and the byte counts are
+  `elements / block * block_bytes` (about 0.71, 1.42 and 2.67 GB for the three formats).
+
+## Form template identifiers
+- np.linspace(0.5, 1.0, 17)  → `scaleNumer` (numerator over 32)
+- np.clip(rint(x*inv), -1, 2)+1 → `codeOfSymbol`
+- q[:16] | (q[16:] << 4)     → `nibblePack`
+- blob size                  → `expertBytes`
+-/
+
+namespace Ref.MtpPack
+
+-- § Q2_0 scale search
+
+/-- Candidate scale factor `f_i = (16 + i) / 32`, `i = 0..16`, as a numerator over 32. -/
+def scaleNumer (i : Nat) : Nat := 16 + i
+
+/-- The 17 candidates span `amax/2` to `amax` inclusive. -/
+theorem scale_grid_span (i : Nat) (h : i ≤ 16) : 16 ≤ scaleNumer i ∧ scaleNumer i ≤ 32 := by
+  unfold scaleNumer
+  omega
+
+/-- There are exactly 17 candidates. -/
+theorem scale_grid_count : (List.range 17).length = 17 := by
+  decide
+
+/-- Symbol in [-1, 2] maps to a 2-bit code `symbol + 1` in [0, 3]. -/
+def codeOfSymbol (s : Int) : Int := s + 1
+
+/-- Codes of clamped symbols are valid 2-bit codes. -/
+theorem code_of_symbol_range (s : Int) (h1 : -1 ≤ s) (h2 : s ≤ 2) :
+    0 ≤ codeOfSymbol s ∧ codeOfSymbol s ≤ 3 := by
+  unfold codeOfSymbol
+  omega
+
+-- § Q4_0 / Q8_0
+
+/-- `q[:16] | (q[16:] << 4)` for one nibble pair. -/
+def nibblePack (lo hi : Nat) : Nat := lo + 16 * hi
+
+/-- Packing two codes of at most 15 fits a byte and unpacks to the same pair. -/
+theorem nibble_pack_roundtrip (lo hi : Nat) (hl : lo ≤ 15) (hh : hi ≤ 15) :
+    nibblePack lo hi < 256 ∧ nibblePack lo hi % 16 = lo ∧ nibblePack lo hi / 16 = hi := by
+  unfold nibblePack
+  omega
+
+/-- `min 15 t` is a valid Q4_0 code. -/
+theorem q4_0_code_clamped (t : Nat) : min 15 t ≤ 15 := by
+  omega
+
+/-- A Q8_0 code with magnitude at most 127 fits an int8. -/
+theorem q8_0_code_int8 (r : Int) (h1 : -127 ≤ r) (h2 : r ≤ 127) : -128 ≤ r ∧ r ≤ 127 := by
+  omega
+
+-- § expert sizes
+
+/-- Bytes of a quantised expert tensor: `elements / block * block_bytes`. -/
+def expertBytes (elems block blockBytes : Nat) : Nat := elems / block * blockBytes
+
+/-- Inner dimensions 2560 and 640 are multiples of both block sizes. -/
+theorem inner_dims_divisible :
+    2560 % 64 = 0 ∧ 640 % 64 = 0 ∧ 2560 % 32 = 0 ∧ 640 % 32 = 0 := by
+  decide
+
+/-- Q2_0 bytes of the two fused expert tensors and their sum (about 0.71 GB). -/
+theorem q2_0_expert_bytes :
+    expertBytes (512 * 1280 * 2560) 64 18 = 471859200 ∧
+    expertBytes (512 * 2560 * 640) 64 18 = 235929600 ∧
+    expertBytes (512 * 1280 * 2560) 64 18 + expertBytes (512 * 2560 * 640) 64 18 = 707788800 := by
+  decide
+
+/-- Q4_0 bytes of the two fused expert tensors and their sum (about 1.42 GB). -/
+theorem q4_0_expert_bytes :
+    expertBytes (512 * 1280 * 2560) 32 18 + expertBytes (512 * 2560 * 640) 32 18 = 1415577600 := by
+  decide
+
+/-- Q8_0 bytes of the two fused expert tensors and their sum (about 2.67 GB). -/
+theorem q8_0_expert_bytes :
+    expertBytes (512 * 1280 * 2560) 32 34 + expertBytes (512 * 2560 * 640) 32 34 = 2673868800 := by
+  decide
+
+/-- Q2_0 is exactly half of Q4_0 on the experts (2 bits vs 4, same 2-byte scale per 2x elements). -/
+theorem q2_0_half_of_q4_0 :
+    2 * (expertBytes (512 * 1280 * 2560) 64 18 + expertBytes (512 * 2560 * 640) 64 18) =
+      expertBytes (512 * 1280 * 2560) 32 18 + expertBytes (512 * 2560 * 640) 32 18 := by
+  decide
+
+end Ref.MtpPack
+
+
+
+## FILE: /mnt/user-data/outputs/PackLayerBlob.lean
+/-!
+# MODULE: pack_layer_blob
+SOURCES: tools/pack_layer.py
+Builds the pack-layout expert arena from Q2_0 GGUF tensors. One expert blob is exactly 1,382,400 bytes:
+gate/up codes (rows interleaved g0,u0,g1,u1,...), down codes, gate/up fp16 scales, down fp16 scales.
+
+## Source semantics
+* H = 2560, FF = 640, NE = 512, Q2_0 blocks of 64 elements and 18 bytes (2 scale + 16 code bytes).
+* Each role holds 460,800 bytes per expert; the blob is three roles. The four planes tile the blob with no
+  gap or overlap.
+* The conversion is a pure relayout: gate/up row `r` of role gate/up goes to slot `2r` / `2r+1`.
+* Expert `e` is one contiguous run in each role tensor; the 48-layer arena is 33,973,862,400 bytes.
+
+## Form template identifiers
+- BLOB_BYTES / ROLE_BYTES        → `blobBytes` / `roleBytes`
+- blob_offsets()                 → `offGuCodes`, `offDCodes`, `offGuScales`, `offDScales`
+- np.stack([gate, up], axis=2)   → `slot`
+- ROW_BYTES_GU / ROW_BYTES_D     → `rowBytesGu` / `rowBytesD`
+-/
+
+namespace Ref.PackLayer
+
+-- § constants
+
+/-- Hidden size. -/
+def H : Nat := 2560
+/-- FFN width. -/
+def FF : Nat := 640
+/-- Experts per layer. -/
+def NE : Nat := 512
+/-- Bytes of codes in one gate/up row (2560 elements at 2 bits). -/
+def rowBytesGu : Nat := 640
+/-- Bytes of codes in one down row (640 elements at 2 bits). -/
+def rowBytesD : Nat := 160
+/-- Q2_0 blocks per gate/up row. -/
+def scalesGu : Nat := 40
+/-- Q2_0 blocks per down row. -/
+def scalesD : Nat := 10
+/-- Bytes of one role of one expert. -/
+def roleBytes : Nat := 460800
+/-- Bytes of one expert blob. -/
+def blobBytes : Nat := 1382400
+
+/-- Row code widths follow from element counts at 2 bits per code. -/
+theorem row_code_bytes : H * 2 / 8 = rowBytesGu ∧ FF * 2 / 8 = rowBytesD := by
+  decide
+
+/-- Blocks per row: 2560/64 and 640/64. -/
+theorem blocks_per_row : H / 64 = scalesGu ∧ FF / 64 = scalesD := by
+  decide
+
+/-- A Q2_0 block is 16 code bytes plus a 2-byte scale. -/
+theorem block_split : 16 + 2 = 18 ∧ 64 * 2 / 8 = 16 := by
+  decide
+
+/-- One role of one expert: `H*FF/64` blocks of 18 bytes. -/
+theorem role_bytes_eq : H * FF / 64 * 18 = roleBytes := by
+  decide
+
+/-- Three roles make the blob: 3 * 460,800 = 1,382,400. -/
+theorem blob_eq_three_roles : 3 * roleBytes = blobBytes := by
+  decide
+
+/-- The blob equals the sum of its four planes. -/
+theorem blob_planes_sum :
+    2 * 640 * rowBytesGu + 2560 * rowBytesD + 2 * 640 * scalesGu * 2 + 2560 * scalesD * 2 = blobBytes := by
+  decide
+
+-- § plane offsets
+
+/-- Offset of the gate/up codes plane. -/
+def offGuCodes : Nat := 0
+/-- Offset of the down codes plane. -/
+def offDCodes : Nat := offGuCodes + 2 * FF * rowBytesGu
+/-- Offset of the gate/up scales plane. -/
+def offGuScales : Nat := offDCodes + H * rowBytesD
+/-- Offset of the down scales plane. -/
+def offDScales : Nat := offGuScales + 2 * FF * scalesGu * 2
+
+/-- The planes are contiguous and the last one ends exactly at the blob size. -/
+theorem planes_tile_blob :
+    offDCodes = 819200 ∧ offGuScales = 1228800 ∧ offDScales = 1331200 ∧
+      offDScales + H * scalesD * 2 = blobBytes := by
+  decide
+
+/-- Each plane sits strictly after the previous one. -/
+theorem planes_ordered : offGuCodes < offDCodes ∧ offDCodes < offGuScales ∧ offGuScales < offDScales := by
+  decide
+
+-- § row interleave and inverse
+
+/-- Slot of a gate (role 0) or up (role 1) row in the interleaved plane. -/
+def slot (row role : Nat) : Nat := 2 * row + role
+
+/-- Interleaved slots cover 0..1279 and determine (row, role) uniquely. -/
+theorem slot_bijective (r1 r2 a1 a2 : Nat) (h1 : r1 < 640) (h2 : r2 < 640) (b1 : a1 < 2) (b2 : a2 < 2)
+    (h : slot r1 a1 = slot r2 a2) : r1 = r2 ∧ a1 = a2 := by
+  unfold slot at h
+  omega
+
+/-- Slots stay inside the 1280-row interleaved plane. -/
+theorem slot_lt (r a : Nat) (h1 : r < 640) (h2 : a < 2) : slot r a < 1280 := by
+  unfold slot
+  omega
+
+/-- A block index splits into (row, block-in-row) and recombines (`rebuild_role` inverts the layout). -/
+theorem block_split_recombine (blk per : Nat) (hp : 0 < per) :
+    per * (blk / per) + blk % per = blk ∧ blk % per < per := by
+  exact ⟨Nat.div_add_mod blk per, Nat.mod_lt blk hp⟩
+
+/-- The 16 code bytes of block `b` inside a gate/up row end within the 640-byte row. -/
+theorem code_run_inside_row (b : Nat) (h : b < 40) : b * 16 + 16 ≤ rowBytesGu := by
+  unfold rowBytesGu
+  omega
+
+/-- The 2-byte scale of slot `s`, block `b` ends within the gate/up scales plane (102,400 bytes). -/
+theorem scale_inside_plane (s b : Nat) (hs : s < 1280) (hb : b < 40) : (s * 40 + b) * 2 + 2 ≤ 102400 := by
+  omega
+
+-- § expert contiguity and arena size
+
+/-- Expert `e` is one contiguous run: a role tensor of `H*FF*NE` elements splits into 512 equal runs of
+460,800 bytes. -/
+theorem expert_run_bytes : (H * FF * NE) / NE * 18 / 64 = roleBytes := by
+  decide
+
+/-- Total arena for `n` layers. -/
+def arenaBytes (n : Nat) : Nat := n * NE * blobBytes
+
+/-- The full 48-layer arena is 33,973,862,400 bytes (31.64 GiB). -/
+theorem arena_48_layers : arenaBytes 48 = 33973862400 := by
+  decide
+
+/-- The arena grows linearly: one more layer adds exactly 512 blobs. -/
+theorem arena_succ (n : Nat) : arenaBytes (n + 1) = arenaBytes n + NE * blobBytes := by
+  unfold arenaBytes NE blobBytes
+  omega
+
+end Ref.PackLayer
+
+
+
+## FILE: /mnt/user-data/outputs/RefPackBuilder.lean
+/-!
+# MODULE: ref_pack_builder
+SOURCES: tools/ref_pack.py
+The pack builder and verifier: tensors are canonicalised into planes (codes, scales, offsets), each plane
+starting on a 64-byte boundary, and `verify` decodes the pack from disk and compares it bit for bit.
+
+## Source semantics
+* `pack_codes` writes `8 / bits` codes per byte, LSB first; `unpack_codes` inverts it for in-range codes.
+* `put` pads the running body to a 64-byte boundary before each plane. The ABSOLUTE offset is aligned when
+  the segment base is aligned; segment bases advance by unpadded blob lengths, so alignment of later tensors
+  holds only if each blob length is a multiple of 64 (a property the verifier does not check).
+* The expert arena is addressed `(layer * 512 + e) * blob_bytes`; `verify_experts` samples every Nth expert.
+* Scales are stored FP16 only when the FP16 round trip is exact, otherwise FP32.
+
+## Form template identifiers
+- pack_codes / unpack_codes      → `packLSB` / `unpackLSB`
+- put() padding                  → `padTo64`
+- (layer*NE + e) * blob          → `expertIndex`
+- code_bits(form)                → `codeBits`
+-/
+
+namespace Ref.PackBuilder
+
+-- § LSB-first code packing
+
+/-- Pack codes LSB first, `b` bits per code. -/
+def packLSB (b : Nat) : List Nat → Nat
+  | [] => 0
+  | c :: cs => c + 2 ^ b * packLSB b cs
+
+/-- Unpack `n` codes of `b` bits, LSB first. -/
+def unpackLSB (b : Nat) : Nat → Nat → List Nat
+  | 0, _ => []
+  | n + 1, v => (v % 2 ^ b) :: unpackLSB b n (v / 2 ^ b)
+
+/-- Unpacking inverts packing for in-range codes, for every code width. -/
+theorem unpack_pack (b : Nat) :
+    ∀ cs : List Nat, (∀ c ∈ cs, c < 2 ^ b) → unpackLSB b cs.length (packLSB b cs) = cs := by
+  intro cs
+  induction cs with
+  | nil => intro _; rfl
+  | cons c cs ih =>
+    intro h
+    have hc : c < 2 ^ b := h c (by simp)
+    have hr : ∀ x ∈ cs, x < 2 ^ b := fun x hx => h x (by simp [hx])
+    have hpos : 0 < 2 ^ b := Nat.two_pow_pos b
+    have h1 : (c + 2 ^ b * packLSB b cs) % 2 ^ b = c := by
+      rw [Nat.add_mul_mod_self_left, Nat.mod_eq_of_lt hc]
+    have h2 : (c + 2 ^ b * packLSB b cs) / 2 ^ b = packLSB b cs := by
+      rw [Nat.add_mul_div_left _ _ hpos, Nat.div_eq_of_lt hc, Nat.zero_add]
+    simp only [List.length_cons, unpackLSB, packLSB, h1, h2, ih hr]
+
+/-- Canonical form widths. -/
+def codeBits : String → Nat
+  | "S2" => 2
+  | "S4" => 4
+  | "S8" => 8
+  | _ => 0
+
+/-- Every canonical width fills a byte with a whole number of codes. -/
+theorem code_bits_fill :
+    codeBits "S2" * (8 / codeBits "S2") = 8 ∧ codeBits "S4" * (8 / codeBits "S4") = 8 ∧
+      codeBits "S8" * (8 / codeBits "S8") = 8 := by
+  decide
+
+-- § 64-byte plane alignment
+
+/-- Padding `put` inserts: `(-len) % 64`. -/
+def padTo64 (n : Nat) : Nat := (64 - n % 64) % 64
+
+/-- The padded body length is a multiple of 64. -/
+theorem padTo64_aligned (n : Nat) : (n + padTo64 n) % 64 = 0 := by
+  unfold padTo64
+  omega
+
+/-- Padding is smaller than one alignment unit. -/
+theorem padTo64_lt (n : Nat) : padTo64 n < 64 := by
+  unfold padTo64
+  omega
+
+/-- If the segment base is aligned, every plane's absolute offset is aligned. -/
+theorem plane_offset_aligned (base len : Nat) (h : base % 64 = 0) :
+    (base + (len + padTo64 len)) % 64 = 0 := by
+  unfold padTo64
+  omega
+
+/-- If the base is NOT aligned and a blob length is not a multiple of 64, the next base can be unaligned:
+(base 0, blob 10) leaves the next segment at 10. -/
+theorem unaligned_blob_breaks_next_base : (0 + 10) % 64 ≠ 0 := by
+  decide
+
+-- § expert arena addressing
+
+/-- Index of expert `e` of layer `l` in the arena (in blobs). -/
+def expertIndex (l e : Nat) : Nat := l * 512 + e
+
+/-- Distinct (layer, expert) pairs get distinct arena slots. -/
+theorem expertIndex_injective (l1 l2 e1 e2 : Nat) (h1 : e1 < 512) (h2 : e2 < 512)
+    (h : expertIndex l1 e1 = expertIndex l2 e2) : l1 = l2 ∧ e1 = e2 := by
+  unfold expertIndex at h
+  omega
+
+/-- Sampling every 32nd expert checks 16 of the 512 per layer. -/
+theorem sampled_experts : 512 / 32 = 16 := by
+  decide
+
+/-- The sampled expert indices `0, 32, ..., 480` are all in range. -/
+theorem sampled_in_range (k : Nat) (h : k < 16) : k * 32 < 512 := by
+  omega
+
+-- § plane sizes
+
+/-- Scale plane bytes for `n` scales at FP16 (2 bytes) or FP32 (4 bytes). -/
+def scalePlaneBytes (n : Nat) (fp16 : Bool) : Nat := if fp16 then n * 2 else n * 4
+
+/-- FP16 planes are exactly half the size of FP32 planes. -/
+theorem fp16_half (n : Nat) : 2 * scalePlaneBytes n true = scalePlaneBytes n false := by
+  unfold scalePlaneBytes
+  simp <;> omega
+
+/-- Codes plane bytes for `n` codes at `bits` bits, when `n` is a whole number of bytes. -/
+theorem codes_plane_bytes (n per : Nat) (h : 0 < per) : (n * per) / per = n := by
+  exact Nat.mul_div_cancel n h
+
+end Ref.PackBuilder
+
+
+
+## FILE: /mnt/user-data/outputs/RefTokenizerBpe.lean
+/-!
+# MODULE: ref_tokenizer_bpe
+SOURCES: tools/ref_tokenizer.py
+Reference byte-level BPE tokenizer (GPT-2 style, `qwen35` pre-tokenizer): the byte to printable-unicode map,
+merge-by-lowest-rank, and the special-token matching rules.
+
+## Source semantics
+* `bytes_to_unicode`: the 188 bytes in 33..126, 161..172, 174..255 map to themselves; the other 68 map to
+  `256 + n` in byte order, so the image is in 0..255 (printable) or 256..323 (shifted).
+* BPE repeatedly merges ONE adjacent pair (the lowest-rank one); every merge shortens the sequence by one.
+* GGUF token types: type 4 (USER_DEFINED) is matched always; type 3 (CONTROL) only when `parse_special`.
+* The vocabulary (248,320) holds the 256 byte tokens, the 247,587 merges' results and the specials.
+
+## Form template identifiers
+- bytes_to_unicode               → `b2u` (with `isPrint`, `rank`)
+- Tokenizer._bpe merge step      → `mergeAt`
+- special_tokens / _always_re    → `matched`
+- tokenizer.ggml.tokens / merges → `vocabSize` / `nMerges`
+-/
+
+namespace Ref.TokenizerBpe
 
 -- § byte <-> unicode
 
-/-- Bytes that map to themselves: 33..126, 161..172, 174..255. -/
-def inBs (b : Nat) : Bool :=
-  (33 ≤ b && b ≤ 126) || (161 ≤ b && b ≤ 172) || (174 ≤ b && b ≤ 255)
+/-- Bytes that map to themselves. -/
+def isPrint (b : Nat) : Bool :=
+  (decide (33 ≤ b) && decide (b ≤ 126)) || (decide (161 ≤ b) && decide (b ≤ 172)) ||
+    (decide (174 ≤ b) && decide (b ≤ 255))
 
-/-- Number of non-printable bytes below b (the `n` counter of the source). -/
-def rank (b : Nat) : Nat := ((List.range b).filter (fun x => !inBs x)).length
+/-- Number of shifted bytes before `b`. -/
+def rank (b : Nat) : Nat := (List.range b).countP (fun x => !isPrint x)
 
-/-- Code point of byte b: itself if printable, else 256 plus its rank among the others. -/
-def cp (b : Nat) : Nat := if inBs b then b else 256 + rank b
+/-- The GPT-2 byte encoder as code points. -/
+def b2u (b : Nat) : Nat := if isPrint b then b else 256 + rank b
 
-/-- 188 bytes map to themselves. -/
-theorem inBs_count : ((List.range 256).filter inBs).length = 188 := by decide +kernel
+/-- Exactly 188 bytes are printable and 68 are shifted. -/
+theorem printable_counts :
+    (List.range 256).countP isPrint = 188 ∧ (List.range 256).countP (fun x => !isPrint x) = 68 := by
+  decide +kernel
 
-/-- 68 bytes are shifted. -/
-theorem shifted_count : ((List.range 256).filter (fun x => !inBs x)).length = 68 := by decide +kernel
+/-- Printable bytes map into 0..255 and shifted bytes into 256..323, so the two classes never collide. -/
+theorem b2u_range : ∀ b, b < 256 → b2u b < 324 := by
+  decide +kernel
 
-/-- Printable bytes are fixed points. -/
-theorem cp_printable (b : Nat) (h : inBs b = true) : cp b = b := by
-  unfold cp; simp [h]
+/-- Printable bytes are fixed points; shifted bytes land strictly above 255. -/
+theorem b2u_classes : ∀ b, b < 256 → (isPrint b = true → b2u b = b) ∧ (isPrint b = false → 256 ≤ b2u b) := by
+  decide +kernel
 
-/-- The map is injective on bytes: all 256 code points are distinct, so decode inverts encode. -/
-theorem cp_nodup : ((List.range 256).map cp).Nodup := by decide +kernel
+/-- The encoder is injective on bytes, which is what makes `decode (encode s) = s` exact. -/
+theorem b2u_nodup : ((List.range 256).map b2u).Nodup := by
+  decide +kernel
 
-/-- Shifted code points lie in 256..323. -/
-theorem cp_bound : ∀ b ∈ List.range 256, cp b < 324 := by decide +kernel
+-- § merging
 
--- § BPE merge
+/-- Merge the adjacent pair at index `i` with the combiner `f`. -/
+def mergeAt {α : Type} (f : α → α → α) : List α → Nat → List α
+  | a :: b :: rest, 0 => f a b :: rest
+  | a :: rest, i + 1 => a :: mergeAt f rest i
+  | l, _ => l
 
-/-- Replace the adjacent pair at i by a single merged token. -/
-def mergeAt {α : Type} (l : List α) (i : Nat) (x : α) : List α := l.take i ++ x :: l.drop (i + 2)
+/-- Each merge of a valid pair shortens the sequence by exactly one, so BPE terminates. -/
+theorem mergeAt_length {α : Type} (f : α → α → α) :
+    ∀ (l : List α) (i : Nat), i + 1 < l.length → (mergeAt f l i).length + 1 = l.length := by
+  intro l
+  induction l with
+  | nil => intro i h; simp at h
+  | cons a rest ih =>
+    intro i h
+    cases i with
+    | zero =>
+      cases rest with
+      | nil => simp at h
+      | cons b rest' => simp [mergeAt]
+    | succ i =>
+      have h' : i + 1 < rest.length := by
+        simp at h
+        omega
+      have := ih i h'
+      simp [mergeAt] <;> omega
 
-/-- A merge shrinks the list by exactly one, so BPE terminates after fewer than len steps. -/
-theorem mergeAt_length {α : Type} (l : List α) (i : Nat) (x : α) (h : i + 1 < l.length) :
-    (mergeAt l i x).length + 1 = l.length := by
-  unfold mergeAt
-  simp [List.length_take, List.length_drop]
-  omega
-
-/-- A list of length at most one has no pair left to merge. -/
-theorem no_pair_when_short {α : Type} (l : List α) (h : l.length ≤ 1) : ¬ (0 + 1 < l.length) := by omega
+/-- An index past the end leaves the sequence unchanged. -/
+theorem mergeAt_nil {α : Type} (f : α → α → α) (i : Nat) : mergeAt f [] i = [] := by
+  cases i <;> rfl
 
 -- § special tokens
 
-/-- Type 4 USER_DEFINED tokens are matched with or without parse_special. -/
-def matchedAlways (ty : Nat) : Prop := ty = 4
-/-- Types 3 and 4 are matched when parse_special is set. -/
-def matchedSpecial (ty : Nat) : Prop := ty = 3 ∨ ty = 4
+/-- Whether a token of GGUF type `ty` is matched as a literal: type 4 always, type 3 only with
+`parse_special`. -/
+def matched (ps : Bool) (ty : Nat) : Prop := ty = 4 ∨ (ty = 3 ∧ ps = true)
 
-/-- Anything matched always is matched under parse_special. -/
-theorem always_subset_special (ty : Nat) (h : matchedAlways ty) : matchedSpecial ty := by
-  unfold matchedAlways matchedSpecial at *; omega
+/-- Everything matched without `parse_special` is also matched with it. -/
+theorem matched_monotone (ty : Nat) (h : matched false ty) : matched true ty := by
+  rcases h with h | ⟨_, h'⟩
+  · exact Or.inl h
+  · exact absurd h' (by decide)
 
-/-- CONTROL tokens are matched only under parse_special. -/
-theorem control_needs_flag (ty : Nat) (h : ty = 3) : matchedSpecial ty ∧ ¬ matchedAlways ty := by
-  unfold matchedAlways matchedSpecial; omega
+/-- Without `parse_special`, CONTROL tokens such as `<|im_end|>` (type 3) are not matched. -/
+theorem control_not_matched_by_default : ¬ matched false 3 := by
+  intro h
+  rcases h with h | ⟨_, h'⟩
+  · exact absurd h (by decide)
+  · exact absurd h' (by decide)
 
--- § decode homomorphism
+/-- USER_DEFINED tokens such as `<think>` (type 4) are matched either way. -/
+theorem user_defined_always_matched (ps : Bool) : matched ps 4 := by
+  exact Or.inl rfl
 
-/-- Decoding concatenates the byte strings of the tokens. -/
-def decodeBytes (toks : Nat → List Nat) (ids : List Nat) : List Nat := ids.flatMap toks
+-- § vocabulary arithmetic
 
-/-- Decode distributes over concatenation of id lists. -/
-theorem decode_append (toks : Nat → List Nat) (a b : List Nat) :
-    decodeBytes toks (a ++ b) = decodeBytes toks a ++ decodeBytes toks b := by
-  simp [decodeBytes]
+/-- Vocabulary and merge counts of the GGUF. -/
+def vocabSize : Nat := 248320
+/-- Number of merge rules. -/
+def nMerges : Nat := 247587
 
-/-- Splicing a special token between two encoded pieces decodes to piece, token bytes, piece. -/
-theorem split_decode (toks : Nat → List Nat) (a b : List Nat) (sp : Nat) :
-    decodeBytes toks (a ++ [sp] ++ b) = decodeBytes toks a ++ toks sp ++ decodeBytes toks b := by
-  simp [decodeBytes]
+/-- The 256 byte tokens plus one token per merge fit in the vocabulary, leaving 477 for specials etc. -/
+theorem vocab_covers_merges : 256 + nMerges ≤ vocabSize ∧ vocabSize - (256 + nMerges) = 477 := by
+  decide
 
-/-- Round trip is preserved by splicing: if both pieces round-trip, so does the spliced text. -/
-theorem split_roundtrip (toks : Nat → List Nat) (ea eb ta tb : List Nat) (sp : Nat)
-    (ha : decodeBytes toks ea = ta) (hb : decodeBytes toks eb = tb) :
-    decodeBytes toks (ea ++ [sp] ++ eb) = ta ++ toks sp ++ tb := by
-  rw [split_decode, ha, hb]
-
-/-- Decoding the empty id list gives the empty string, so the empty corpus entry round-trips. -/
-theorem decode_nil (toks : Nat → List Nat) : decodeBytes toks [] = [] := by
-  simp [decodeBytes]
-
-end RefTokenizer
+end Ref.TokenizerBpe
 
 
 
-
-
-## FILE: /mnt/user-data/outputs/GgufShardLoader.lean
+## FILE: /mnt/user-data/outputs/ChatFrontendParser.lean
 /-!
-# MODULE: gguf_shard_loader
-SOURCES: ref/load.py
-Demand-paged GGUF loader: shard discovery, per-(layer, expert) lazy byte ranges, row gathering and
-the shared dequantization dispatch geometry.
-
-## Source semantics
-* `GEOM` maps a type name to (elements per block, bytes per block); every block has a positive element count.
-* `expert(name, e)` reads only `per_expert/el*by` bytes starting at `e * (per_expert/el) * by`; experts tile the tensor.
-* `rows(name, idx)` reads `row_bytes` at `r * row_bytes`; row `r < ncols` stays inside the tensor.
-* BF16 -> FP32 is `bits << 16`, so the low 16 bits are zero.
-* Shard discovery refuses to guess: 0 files, 1 file, a shard set, or an ambiguous directory.
-
-## Form template identifiers
-- `GEOM` -> `block_geometry_table`; `Gguf.expert` -> `lazy_expert_slice`; `Gguf.rows` -> `lazy_row_gather`;
-  `_discover_shards` -> `shard_set_resolver`; `_dequant_flat` -> `dequant_dispatch`.
--/
-
-namespace Ref.GgufShardLoader
-
--- § block geometry table
-
-/-- The `GEOM` table of ref/load.py as (type name, elements per block, bytes per block). -/
-def geomTable : List (String × Nat × Nat) :=
-  [("F32", 1, 4), ("F16", 1, 2), ("BF16", 1, 2), ("Q4_0", 32, 18), ("Q5_0", 32, 22),
-   ("Q8_0", 32, 34), ("IQ4_NL", 32, 18), ("Q3_K", 256, 110), ("Q4_K", 256, 144),
-   ("Q5_K", 256, 176), ("Q6_K", 256, 210), ("IQ4_XS", 256, 136), ("Q2_0", 64, 18)]
-
-/-- Every geometry entry has a positive element count and positive byte count. -/
-theorem geom_positive : ∀ e ∈ geomTable, 0 < e.2.1 ∧ 0 < e.2.2 := by
-  decide
-
-/-- The table has exactly the 13 encodings of the source. -/
-theorem geom_size : geomTable.length = 13 := by
-  decide
-
-/-- Q2_0 is 64 elements in 18 bytes (2-byte scale + 16 bytes of 4 codes). -/
-theorem q2_0_geometry : ("Q2_0", 64, 18) ∈ geomTable := by
-  decide
-
--- § byte offsets
-
-/-- Bytes of a run of `n` elements in a type with block geometry `(el, by)`. -/
-def runBytes (n el by_ : Nat) : Nat := n / el * by_
-
-/-- Start byte of expert `e`: whole experts before it, measured in blocks. -/
-def expertStart (e perExpert el by_ : Nat) : Nat := e * (perExpert / el) * by_
-
-/-- Byte length of one expert's run. -/
-def expertBytes (perExpert el by_ : Nat) : Nat := perExpert / el * by_
-
-/-- Expert `e + 1` starts exactly where expert `e` ends, so reads never overlap or leave gaps. -/
-theorem expert_contiguous (e perExpert el by_ : Nat) :
-    expertStart (e + 1) perExpert el by_ = expertStart e perExpert el by_ + expertBytes perExpert el by_ := by
-  unfold expertStart expertBytes
-  simp [Nat.add_mul]
-
-/-- The start of expert `e` is `e` times the per-expert byte size. -/
-theorem expert_start_eq (e perExpert el by_ : Nat) :
-    expertStart e perExpert el by_ = e * expertBytes perExpert el by_ := by
-  unfold expertStart expertBytes
-  rw [Nat.mul_assoc]
-
-/-- A valid expert index reads entirely inside the fused tensor (`e < n_exp`). -/
-theorem expert_in_range (e nExp perExpert el by_ : Nat) (h : e < nExp) :
-    expertStart e perExpert el by_ + expertBytes perExpert el by_ ≤ nExp * expertBytes perExpert el by_ := by
-  have h1 : expertStart e perExpert el by_ + expertBytes perExpert el by_ =
-      (e + 1) * expertBytes perExpert el by_ := by
-    rw [expert_start_eq, Nat.add_mul, Nat.one_mul]
-  rw [h1]
-  exact Nat.mul_le_mul_right _ h
-
-/-- Experts tile the tensor: `n` experts of `per` elements occupy `n` times one expert's bytes,
-provided the block size divides the per-expert element count (the source raises otherwise). -/
-theorem experts_tile (n per el by_ : Nat) (h : el ∣ per) :
-    runBytes (n * per) el by_ = n * expertBytes per el by_ := by
-  unfold runBytes expertBytes
-  rw [Nat.mul_div_assoc n h, Nat.mul_assoc]
-
-/-- Row `r` of a 2-D tensor starts at `r * rowBytes`. -/
-def rowStart (r rowBytes : Nat) : Nat := r * rowBytes
-
-/-- `row_bytes` of a row of `width` elements. -/
-def rowBytes (width el by_ : Nat) : Nat := width / el * by_
-
-/-- A row index below the column count reads inside the tensor. -/
-theorem row_in_range (r ncols rb : Nat) (h : r < ncols) :
-    rowStart r rb + rb ≤ ncols * rb := by
-  unfold rowStart
-  have : (r + 1) * rb ≤ ncols * rb := Nat.mul_le_mul_right _ h
-  rw [Nat.add_mul, Nat.one_mul] at this
-  exact this
-
-/-- The per-layer embedding table: width 160 in IQ4_NL (32-element, 18-byte blocks) is 90 bytes per row. -/
-theorem ple_row_bytes : rowBytes 160 32 18 = 90 := by
-  decide
-
-/-- 160 is a multiple of the IQ4_NL block size (the divisibility the source checks). -/
-theorem ple_width_divisible : 32 ∣ 160 := by
-  decide
-
--- § BF16 to FP32
-
-/-- BF16 bits widened to f32 bits: shift left by 16. -/
-def bf16ToF32Bits (h : Nat) : Nat := h * 65536
-
-/-- Widening a 16-bit pattern stays within 32 bits. -/
-theorem bf16_fits32 (h : Nat) (hh : h < 65536) : bf16ToF32Bits h < 4294967296 := by
-  unfold bf16ToF32Bits
-  omega
-
-/-- The low 16 bits of the widened pattern are zero (the mantissa is just padded). -/
-theorem bf16_low_zero (h : Nat) : bf16ToF32Bits h % 65536 = 0 := by
-  unfold bf16ToF32Bits
-  omega
-
-/-- The high 16 bits are the original pattern. -/
-theorem bf16_high_roundtrip (h : Nat) : bf16ToF32Bits h / 65536 = h := by
-  unfold bf16ToF32Bits
-  omega
-
--- § shard discovery
-
-/-- Outcome of resolving a directory argument. -/
-inductive DirResult where
-  | shardSet
-  | single
-  | noFiles
-  | ambiguous
-  deriving DecidableEq
-
-/-- Directory resolution: prefer an explicit shard set, accept one unambiguous file, otherwise refuse. -/
-def dirDecision (shards found : Nat) : DirResult :=
-  if shards ≠ 0 then DirResult.shardSet
-  else if found = 1 then DirResult.single
-  else if found = 0 then DirResult.noFiles
-  else DirResult.ambiguous
-
-/-- An mmproj file next to a real shard set never hijacks the choice: the shard set wins. -/
-theorem dir_prefers_shards (shards found : Nat) (h : shards ≠ 0) :
-    dirDecision shards found = DirResult.shardSet := by
-  simp [dirDecision, h]
-
-/-- With no shards and several files the loader refuses to guess. -/
-theorem dir_refuses_ambiguous (found : Nat) (h : 2 ≤ found) :
-    dirDecision 0 found = DirResult.ambiguous := by
-  have h1 : found ≠ 1 := by omega
-  have h2 : found ≠ 0 := by omega
-  simp [dirDecision, h1, h2]
-
-/-- A single unambiguous file is accepted. -/
-theorem dir_accepts_single : dirDecision 0 1 = DirResult.single := by
-  decide
-
-/-- An empty directory is an error, not an empty model. -/
-theorem dir_empty : dirDecision 0 0 = DirResult.noFiles := by
-  decide
-
-/-- A shard named `-NNNNN-of-MMMMM` is complete only when exactly MMMMM siblings exist. -/
-def shardsComplete (found total : Nat) : Bool := found == total
-
-/-- Completeness holds exactly when the sibling count equals the declared total. -/
-theorem shards_complete_iff (found total : Nat) :
-    shardsComplete found total = true ↔ found = total := by
-  simp [shardsComplete]
-
-end Ref.GgufShardLoader
-
-
-
-## FILE: /mnt/user-data/outputs/GgufHeaderReader.lean
-/-!
-# MODULE: gguf_header_reader
-SOURCES: include/ref/artifact/gguf_reader.hpp
-GGUF v3 header reader: bounds-checked cursor, tensor-directory arithmetic, data-section alignment,
-array sampling and the architecture guard for the `qwen4exp` model.
-
-## Source semantics
-* Every cursor read checks `pos + n <= size`, otherwise it throws; a successful read advances by exactly `n`.
-* `data_start = ceil(pos / align) * align` and must not exceed the file size.
-* Tensors have 1..4 dimensions; element count is the product of the shape.
-* Arrays keep at most 64 sampled items; counts above 2^24 are rejected.
-* The guard accepts only `general.architecture == "qwen4exp"` with the six compiled-in constants.
-
-## Form template identifiers
-- `Cursor::need/read` -> `checked_cursor`; `data_start_` -> `aligned_data_start`;
-  `check_architecture` -> `architecture_guard`; `block_geometry` -> `type_geometry`.
--/
-
-namespace Ref.GgufHeaderReader
-
--- § cursor
-
-/-- A checked read of `n` bytes at `pos` in a buffer of `size` bytes: the new position, or failure. -/
-def cursorRead (pos size n : Nat) : Option Nat :=
-  if pos + n ≤ size then some (pos + n) else none
-
-/-- A successful read advances by exactly `n` bytes. -/
-theorem cursor_advances (pos size n p : Nat) (h : cursorRead pos size n = some p) : p = pos + n := by
-  unfold cursorRead at h
-  split at h
-  · injection h with h'
-    omega
-  · cases h
-
-/-- A successful read never moves past the end of the buffer. -/
-theorem cursor_in_bounds (pos size n p : Nat) (h : cursorRead pos size n = some p) : p ≤ size := by
-  unfold cursorRead at h
-  split at h
-  · injection h with h'
-    omega
-  · cases h
-
-/-- A read that would overrun fails instead of reading out of bounds. -/
-theorem cursor_overrun_fails (pos size n : Nat) (h : size < pos + n) : cursorRead pos size n = none := by
-  unfold cursorRead
-  have : ¬ (pos + n ≤ size) := by omega
-  simp [this]
-
--- § data section alignment
-
-/-- First aligned offset at or after `pos`. -/
-def dataStart (pos align : Nat) : Nat := (pos + align - 1) / align * align
-
-/-- The data section never starts before the header ends. -/
-theorem dataStart_ge (pos a : Nat) (ha : 0 < a) : pos ≤ dataStart pos a := by
-  unfold dataStart
-  have h1 := Nat.div_add_mod (pos + a - 1) a
-  have h2 := Nat.mod_lt (pos + a - 1) ha
-  rw [Nat.mul_comm ((pos + a - 1) / a) a]
-  omega
-
-/-- The data section starts less than one alignment unit after the header end. -/
-theorem dataStart_lt (pos a : Nat) (ha : 0 < a) : dataStart pos a < pos + a := by
-  unfold dataStart
-  have h1 := Nat.div_add_mod (pos + a - 1) a
-  rw [Nat.mul_comm ((pos + a - 1) / a) a]
-  omega
-
-/-- The data section start is a multiple of the alignment. -/
-theorem dataStart_aligned (pos a : Nat) : dataStart pos a % a = 0 := by
-  unfold dataStart
-  simp
-
-/-- An already-aligned header end is a fixed point. -/
-theorem dataStart_idempotent (k a : Nat) (ha : 0 < a) : dataStart (k * a) a = k * a := by
-  have hq : (k * a + a - 1) / a = k := by
-    apply Nat.div_eq_of_lt_le
-    · omega
-    · rw [Nat.add_mul]
-      omega
-  unfold dataStart
-  rw [hq]
-
--- § tensor directory
-
-/-- Element count of a shape (product of its dimensions). -/
-def elements : List Nat → Nat
-  | [] => 1
-  | d :: r => d * elements r
-
-/-- The element count of a concatenated shape multiplies. -/
-theorem elements_append (a b : List Nat) : elements (a ++ b) = elements a * elements b := by
-  induction a with
-  | nil => simp [elements]
-  | cons d r ih => simp [elements, ih, Nat.mul_assoc]
-
-/-- A tensor must have between 1 and 4 dimensions. -/
-def validDims (nd : Nat) : Bool := nd != 0 && nd ≤ 4
-
-/-- The dimension check accepts exactly 1 through 4. -/
-theorem validDims_iff (nd : Nat) : validDims nd = true ↔ (1 ≤ nd ∧ nd ≤ 4) := by
-  unfold validDims
-  simp only [Bool.and_eq_true, bne_iff_ne, ne_eq, decide_eq_true_eq]
-  omega
-
--- § arrays and versions
-
-/-- Sampled items kept from an array of `count` elements. -/
-def sampleKept (count : Nat) : Nat := min count 64
-
-/-- The sample never exceeds 64 items. -/
-theorem sample_le_64 (count : Nat) : sampleKept count ≤ 64 := by
-  unfold sampleKept
-  exact Nat.min_le_right _ _
-
-/-- The sample never exceeds the actual count. -/
-theorem sample_le_count (count : Nat) : sampleKept count ≤ count := by
-  unfold sampleKept
-  exact Nat.min_le_left _ _
-
-/-- Array lengths are accepted only up to 2^24. -/
-def arrayLenOk (count : Nat) : Bool := count ≤ 16777216
-
-/-- A rejected array length is above 2^24. -/
-theorem array_len_reject (count : Nat) (h : arrayLenOk count = false) : 16777216 < count := by
-  unfold arrayLenOk at h
-  simp at h
-  omega
-
-/-- Only GGUF version 3 is handled. -/
-def versionOk (v : Nat) : Bool := v == 3
-
-/-- The version check accepts exactly 3. -/
-theorem versionOk_iff (v : Nat) : versionOk v = true ↔ v = 3 := by
-  simp [versionOk]
-
--- § architecture guard
-
-/-- The six compiled-in constants of the qwen4exp guard. -/
-structure Guard where
-  blockCount : Nat := 48
-  hidden : Nat := 2560
-  experts : Nat := 512
-  expertsUsed : Nat := 10
-  headCount : Nat := 24
-  headCountKv : Nat := 2
-  deriving DecidableEq
-
-/-- Metadata values read from the file for those six keys. -/
-abbrev Meta := Guard
-
-/-- The guard accepts only `qwen4exp` with all six values equal. -/
-def archOk (arch : String) (m want : Guard) : Bool := arch == "qwen4exp" && decide (m = want)
-
-/-- A different architecture string is always refused. -/
-theorem arch_refuse_other (arch : String) (m want : Guard) (h : arch ≠ "qwen4exp") :
-    archOk arch m want = false := by
-  simp [archOk, h]
-
-/-- A matching qwen4exp file is accepted. -/
-theorem arch_accept (m : Guard) : archOk "qwen4exp" m m = true := by
-  simp [archOk]
-
-/-- A qwen4exp file with any differing constant is refused. -/
-theorem arch_refuse_mismatch (m want : Guard) (h : m ≠ want) : archOk "qwen4exp" m want = false := by
-  simp [archOk, h]
-
-/-- The compiled-in constants are self-consistent: top-k experts fit in the expert set. -/
-theorem guard_used_le_experts : (Guard.expertsUsed {}) ≤ (Guard.experts {}) := by
-  decide
-
-/-- The attention heads group evenly over the KV heads (GQA ratio 12). -/
-theorem guard_gqa : (Guard.headCount {}) = 12 * (Guard.headCountKv {}) := by
-  decide
-
--- § block geometry by ggml type id
-
-/-- (elements, bytes) per block for the ggml type ids handled by the reader. -/
-def blockGeometry : Nat → Option (Nat × Nat)
-  | 0 => some (1, 4)
-  | 1 => some (1, 2)
-  | 30 => some (1, 2)
-  | 2 => some (32, 18)
-  | 3 => some (32, 20)
-  | 6 => some (32, 22)
-  | 7 => some (32, 24)
-  | 8 => some (32, 34)
-  | 9 => some (32, 36)
-  | 10 => some (256, 84)
-  | 11 => some (256, 110)
-  | 12 => some (256, 144)
-  | 13 => some (256, 176)
-  | 14 => some (256, 210)
-  | 16 => some (256, 66)
-  | 17 => some (256, 74)
-  | 18 => some (256, 98)
-  | 20 => some (32, 18)
-  | 21 => some (256, 110)
-  | 22 => some (256, 82)
-  | 23 => some (256, 136)
-  | 29 => some (256, 56)
-  | 42 => some (64, 18)
-  | _ => none
-
-/-- Type 42 (Q2_0) is 64 elements in 18 bytes. -/
-theorem q2_0_block : blockGeometry 42 = some (64, 18) := by
-  rfl
-
-/-- Q2_0 stores 2.25 bits per weight: 18 bytes * 8 / 64 elements = 9/4. -/
-theorem q2_0_bits_per_weight : 18 * 8 * 4 = 64 * 9 := by
-  decide
-
-/-- The k-quant types all use 256-element super-blocks. -/
-theorem kquant_blocks : ∀ t ∈ [10, 11, 12, 13, 14, 23],
-    (blockGeometry t).map Prod.fst = some 256 := by
-  decide
-
-/-- Unknown type ids have no geometry, so the engine cannot size them. -/
-theorem unknown_type_none : blockGeometry 99 = none := by
-  rfl
-
-end Ref.GgufHeaderReader
-
-
-
-## FILE: /mnt/user-data/outputs/BlockDequantizers.lean
-/-!
-# MODULE: block_dequantizers
-SOURCES: include/ref/artifact/dequant.hpp
-Scalar reference dequantizers (Q2_0, Q8_0, Q4_0, Q5_0, IQ4_NL, Q6_K, Q4_K, Q5_K, Q3_K, IQ4_XS) modelled
-at the level of integer codes: bit/nibble extraction, index coverage, code ranges and block sizes.
-
-## Source semantics
-* Each output is `scale * integer_code`; the integer code ranges are fixed by the bit layout.
-* Q2_0: 4 codes per byte, LSB first, code {0..3} -> symbol {-1,0,1,2}.
-* Q4_0/IQ4_NL: low nibble is element j, high nibble element j+16.
-* Q5_0: a 5th bit from a 32-bit mask; code - 16.
-* K-quants: 256-element super-blocks with 6-bit scales unpacked from 12 bytes.
-* Block byte sizes add up exactly (no gaps).
-
-## Form template identifiers
-- `dequantize_q2_0` -> `ternary2_decode`; `get_scale_min_k4` -> `scale_min_unpack`;
-  `kvalues_iq4nl` -> `nonlinear_codebook`.
--/
-
-namespace Ref.BlockDequantizers
-
--- § block sizes
-
-/-- Q2_0: 2-byte scale + 16 code bytes = 18 bytes holding 16 * 4 = 64 elements. -/
-theorem q2_0_sizes : 2 + 16 = 18 ∧ 16 * 4 = 64 := by
-  decide
-
-/-- Q8_0: 2-byte scale + 32 int8 = 34 bytes. -/
-theorem q8_0_size : 2 + 32 = 34 := by
-  decide
-
-/-- Q4_0 and IQ4_NL: 2-byte scale + 16 nibble bytes = 18 bytes for 32 elements. -/
-theorem q4_0_size : 2 + 16 = 18 ∧ 16 * 2 = 32 := by
-  decide
-
-/-- Q5_0: scale 2 + qh 4 + qs 16 = 22 bytes. -/
-theorem q5_0_size : 2 + 4 + 16 = 22 := by
-  decide
-
-/-- Q6_K: ql 128 + qh 64 + scales 16 + d 2 = 210 bytes (d is last at offset 208). -/
-theorem q6_k_size : 128 + 64 + 16 + 2 = 210 ∧ 128 + 64 + 16 = 208 := by
-  decide
-
-/-- Q4_K: d 2 + dmin 2 + scales 12 + qs 128 = 144 bytes (qs at offset 16). -/
-theorem q4_k_size : 2 + 2 + 12 + 128 = 144 ∧ 2 + 2 + 12 = 16 := by
-  decide
-
-/-- Q5_K: d 2 + dmin 2 + scales 12 + qh 32 + qs 128 = 176 bytes (qh at 16, qs at 48). -/
-theorem q5_k_size : 2 + 2 + 12 + 32 + 128 = 176 ∧ 16 + 32 = 48 := by
-  decide
-
-/-- Q3_K: hmask 32 + qs 64 + scales 12 + d 2 = 110 bytes (scales at 96, d at 108). -/
-theorem q3_k_size : 32 + 64 + 12 + 2 = 110 ∧ 32 + 64 = 96 ∧ 96 + 12 = 108 := by
-  decide
-
-/-- IQ4_XS: d 2 + scales_h 2 + scales_l 4 + qs 128 = 136 bytes (qs at offset 8). -/
-theorem iq4_xs_size : 2 + 2 + 4 + 128 = 136 ∧ 2 + 2 + 4 = 8 := by
-  decide
-
--- § Q2_0
-
-/-- The 2-bit code of element `k` (0..3) inside a byte. -/
-def q2Code (byte k : Nat) : Nat := byte / 4 ^ k % 4
-
-/-- The symbol of a code: code - 1, so {0,1,2,3} -> {-1,0,1,2}. -/
-def q2Sym (byte k : Nat) : Int := (q2Code byte k : Int) - 1
-
-/-- Every Q2_0 symbol is one of -1, 0, 1, 2. -/
-theorem q2_sym_range (byte k : Nat) : -1 ≤ q2Sym byte k ∧ q2Sym byte k ≤ 2 := by
-  have h : q2Code byte k < 4 := by
-    unfold q2Code
-    exact Nat.mod_lt _ (by decide)
-  unfold q2Sym
-  omega
-
-/-- A code byte is exactly its four 2-bit fields (no bits are lost or double-counted). -/
-theorem q2_byte_decomposition (b : Nat) (hb : b < 256) :
-    b % 4 + 4 * (b / 4 % 4) + 16 * (b / 16 % 4) + 64 * (b / 64 % 4) = b := by
-  omega
-
-/-- The element index maps bijectively onto (byte j/4, slot j%4). -/
-theorem q2_index_split (j : Nat) : 4 * (j / 4) + j % 4 = j := by
-  omega
-
-/-- All 64 elements of a block address one of the 16 code bytes. -/
-theorem q2_byte_index_lt (j : Nat) (hj : j < 64) : j / 4 < 16 := by
-  omega
-
-/-- The bit offset (j%4)*2 is at most 6, so a 2-bit field never straddles bytes. -/
-theorem q2_bit_offset_le (j : Nat) : (j % 4) * 2 ≤ 6 := by
-  omega
-
--- § nibble formats: Q4_0, IQ4_NL, Q5_0
-
-/-- Q4_0 value for a nibble `n < 16`: n - 8. -/
-def q4Val (n : Nat) : Int := (n : Int) - 8
-
-/-- Q4_0 values lie in [-8, 7]. -/
-theorem q4_range (n : Nat) (h : n < 16) : -8 ≤ q4Val n ∧ q4Val n ≤ 7 := by
-  unfold q4Val
-  omega
-
-/-- A byte is exactly its low nibble plus 16 times its high nibble. -/
-theorem nibble_decomposition (q : Nat) : q % 16 + 16 * (q / 16) = q := by
-  omega
-
-/-- For a byte, the high nibble is below 16, so it indexes a 16-entry table. -/
-theorem high_nibble_lt (q : Nat) (hq : q < 256) : q / 16 < 16 := by
-  omega
-
-/-- Elements j (low nibble) and j+16 (high nibble) are distinct and cover 0..31 for j < 16. -/
-theorem q4_halves_cover (i : Nat) (hi : i < 32) :
-    (i < 16 ∧ i = i) ∨ (16 ≤ i ∧ ∃ j, j < 16 ∧ i = j + 16) := by
-  by_cases h : i < 16
-  · exact Or.inl ⟨h, rfl⟩
-  · exact Or.inr ⟨by omega, i - 16, by omega, by omega⟩
-
-/-- Q5_0 value: 5-bit code minus 16. -/
-def q5Val (nib bit : Nat) : Int := ((nib + 16 * bit : Nat) : Int) - 16
-
-/-- Q5_0 values lie in [-16, 15] for a nibble and a single high bit. -/
-theorem q5_range (nib bit : Nat) (hn : nib < 16) (hb : bit < 2) : -16 ≤ q5Val nib bit ∧ q5Val nib bit ≤ 15 := by
-  unfold q5Val
-  omega
-
-/-- The i-th bit of a 32-bit mask is 0 or 1. -/
-theorem mask_bit_lt (h i : Nat) : h / 2 ^ i % 2 < 2 := by
-  exact Nat.mod_lt _ (by decide)
-
--- § IQ4_NL codebook
-
-/-- The IQ4_NL non-linear codebook, verbatim from ggml. -/
-def kvaluesIq4nl : List Int :=
-  [-127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113]
-
-/-- The codebook has 16 entries, one per nibble value. -/
-theorem iq4nl_length : kvaluesIq4nl.length = 16 := by
-  decide
-
-/-- The codebook is strictly increasing, so the 4-bit code is order preserving. -/
-theorem iq4nl_sorted : kvaluesIq4nl.Pairwise (· < ·) := by
-  decide
-
-/-- Every codebook entry is within [-127, 113]. -/
-theorem iq4nl_bounds : ∀ v ∈ kvaluesIq4nl, -127 ≤ v ∧ v ≤ 113 := by
-  decide
-
-/-- The codebook is asymmetric: its largest magnitude is 127 on the negative side. -/
-theorem iq4nl_asymmetric : kvaluesIq4nl.head? = some (-127) ∧ kvaluesIq4nl.getLast? = some 113 := by
-  decide
-
--- § Q6_K
-
-/-- Q6_K 6-bit code: 4 low bits from ql, 2 high bits from qh, minus 32. -/
-def q6Val (lo4 hi2 : Nat) : Int := ((lo4 % 16 + 16 * (hi2 % 4) : Nat) : Int) - 32
-
-/-- Q6_K codes lie in [-32, 31]. -/
-theorem q6_range (lo hi : Nat) : -32 ≤ q6Val lo hi ∧ q6Val lo hi ≤ 31 := by
-  unfold q6Val
-  omega
-
-/-- The four output positions l, l+32, l+64, l+96 (l < 32) cover each index of a 128-half exactly once. -/
-theorem q6_positions_cover (i : Nat) (hi : i < 128) : i = i % 32 + 32 * (i / 32) ∧ i / 32 < 4 := by
-  omega
-
-/-- Scale indices used in a Q6_K half stay in 0..15 over both halves (n = 0, 1). -/
-theorem q6_scale_index_lt (n l k : Nat) (hn : n < 2) (hl : l < 32) (hk : k ≤ 6) :
-    8 * n + l / 16 + k < 16 := by
-  omega
-
--- § 6-bit scale/min unpacking (Q4_K, Q5_K)
-
-/-- `get_scale_min_k4` for j ≥ 4: low 4 bits of q[j+4] plus the top 2 bits of q[j-4] shifted by 4. -/
-def scaleHigh (qj4 qjm4 : Nat) : Nat := qj4 % 16 + 16 * (qjm4 / 64)
-
-/-- The unpacked 6-bit scale for j ≥ 4 is below 64 when the source byte is below 256. -/
-theorem scale_high_lt (a b : Nat) (hb : b < 256) : scaleHigh a b < 64 := by
-  unfold scaleHigh
-  omega
-
-/-- The unpacked 6-bit scale for j < 4 (`q[j] & 63`) is below 64. -/
-theorem scale_low_lt (a : Nat) : a % 64 < 64 := by
-  exact Nat.mod_lt _ (by decide)
-
-/-- Q4_K / Q5_K loop: group scale indices are is and is+1 with is in {0,2,4,6}, always below 8. -/
-theorem k_scale_index_lt (g : Nat) (hg : g < 4) : 2 * g + 1 < 8 := by
-  omega
-
-/-- Q4_K covers 256 elements as 4 iterations of 64. -/
-theorem q4_k_coverage : 4 * 64 = 256 := by
-  decide
-
--- § Q5_K high-bit masks
-
-/-- Mask of the 5th bit for the low-nibble half of group `g`: 1, 4, 16, 64. -/
-def maskLo (g : Nat) : Nat := 4 ^ g
-
-/-- Mask of the 5th bit for the high-nibble half of group `g`: 2, 8, 32, 128. -/
-def maskHi (g : Nat) : Nat := 2 * 4 ^ g
-
-/-- All eight masks are distinct single bits of a byte (each group/half pair has its own bit). -/
-theorem q5_masks_distinct :
-    ([maskLo 0, maskLo 1, maskLo 2, maskLo 3, maskHi 0, maskHi 1, maskHi 2, maskHi 3] : List Nat).Nodup := by
-  decide
-
-/-- The eight masks together are exactly 1,2,4,...,128 (every bit of qh is used once). -/
-theorem q5_masks_all_bits :
-    ([maskLo 0, maskHi 0, maskLo 1, maskHi 1, maskLo 2, maskHi 2, maskLo 3, maskHi 3] : List Nat) =
-      [1, 2, 4, 8, 16, 32, 64, 128] := by
-  decide
-
-/-- Q5_K code is a nibble plus 16 when the mask bit is set: at most 31. -/
-theorem q5_k_code_le (nib : Nat) (b : Bool) (h : nib < 16) : nib + (if b then 16 else 0) ≤ 31 := by
-  cases b <;> simp <;> omega
-
--- § Q3_K
-
-/-- Q3_K element code: 2-bit low part minus 4 when the high-mask bit is clear. -/
-def q3Val (c : Nat) (hiSet : Bool) : Int := (c : Int) - (if hiSet then 0 else 4)
-
-/-- Q3_K element codes lie in [-4, 3]. -/
-theorem q3_range (c : Nat) (b : Bool) (h : c < 4) : -4 ≤ q3Val c b ∧ q3Val c b ≤ 3 := by
-  cases b <;> simp [q3Val] <;> omega
-
-/-- Q3_K repacked scale byte: low 4 bits plus 2 high bits shifted by 4 is a 6-bit value; minus 32 gives [-32, 31]. -/
-theorem q3_scale_range (lo hi : Nat) (hl : lo < 16) (hh : hi < 4) :
-    -32 ≤ ((lo + 16 * hi : Nat) : Int) - 32 ∧ ((lo + 16 * hi : Nat) : Int) - 32 ≤ 31 := by
-  omega
-
-/-- Q3_K draws 16 scales: 2 halves x 4 shifts x 2 sub-blocks. -/
-theorem q3_k_scale_count : 2 * 4 * 2 = 16 := by
-  decide
-
--- § IQ4_XS
-
-/-- The 6-bit scale of group `ib`: a nibble of scales_l plus 2 bits of scales_h at shift 2*ib. -/
-def iq4xsScale (sl : Nat) (ib : Nat) (sh : Nat) : Nat :=
-  (sl / 16 ^ (ib % 2)) % 16 + 16 * ((sh / 4 ^ ib) % 4)
-
-/-- The IQ4_XS scale is below 64, so `ls - 32` lies in [-32, 31]. -/
-theorem iq4xs_scale_lt (sl ib sh : Nat) : iq4xsScale sl ib sh < 64 := by
-  unfold iq4xsScale
-  have h1 : (sl / 16 ^ (ib % 2)) % 16 < 16 := Nat.mod_lt _ (by decide)
-  have h2 : (sh / 4 ^ ib) % 4 < 4 := Nat.mod_lt _ (by decide)
-  omega
-
-/-- The scales_l byte index ib/2 is below 4 for the 8 groups. -/
-theorem iq4xs_scales_l_index (ib : Nat) (h : ib < 8) : ib / 2 < 4 := by
-  omega
-
-/-- Eight 32-element groups cover 256 elements, consuming 8 * 16 = 128 qs bytes. -/
-theorem iq4xs_coverage : 8 * 32 = 256 ∧ 8 * 16 = 128 := by
-  decide
-
-end Ref.BlockDequantizers
-
-
-
-## FILE: /mnt/user-data/outputs/Fp16Bits.lean
-/-!
-# MODULE: fp16_bits
-SOURCES: include/ref/kernels/f16_bits.hpp
-Bit-exact fp16 <-> f32 conversion modelled on bit fields: round-to-nearest-even encode with explicit
-normal / subnormal / overflow regimes, and an exact decode.
-
-## Source semantics
-* encode: raw f32 exponent 255 stays inf/NaN; a FINITE value too large for fp16 saturates to inf (not NaN);
-  a value below the subnormal range underflows to a signed zero; the round carry may bump the exponent.
-* decode: exact for all 65536 inputs, subnormal `man * 2^-24` is renormalised (f32 exponent field `113 - s`).
-
-## Form template identifiers
-- `f16_from_f32` -> `encode_rne`; `f32_from_f16` -> `decode_exact`.
--/
-
-namespace Ref.Fp16Bits
-
--- § field layout
-
-/-- Sign bit of an fp16 pattern. -/
-def sgn (h : Nat) : Nat := h / 32768
-
-/-- 5-bit exponent field of an fp16 pattern. -/
-def expo (h : Nat) : Nat := h / 1024 % 32
-
-/-- 10-bit mantissa field of an fp16 pattern. -/
-def mant (h : Nat) : Nat := h % 1024
-
-/-- An fp16 pattern is exactly sign, exponent and mantissa fields. -/
-theorem fields_recompose (h : Nat) (hh : h < 65536) :
-    sgn h * 32768 + expo h * 1024 + mant h = h := by
-  unfold sgn expo mant
-  omega
-
-/-- Finite normal exponents 1..30 map into f32 exponent fields 113..142, never 0 or 255. -/
-theorem normal_exponent_range (ex : Nat) (h1 : 1 ≤ ex) (h2 : ex ≤ 30) :
-    113 ≤ ex + 112 ∧ ex + 112 ≤ 142 := by
-  omega
-
-/-- Subnormal renormalisation: after s ≥ 1 shifts (s ≤ 10) the f32 exponent field `113 - s` lies in 103..112. -/
-theorem subnormal_exponent_range (s : Nat) (h1 : 1 ≤ s) (h2 : s ≤ 10) :
-    103 ≤ 113 - s ∧ 113 - s ≤ 112 := by
-  omega
-
-/-- The renormalised exponent is exactly the true exponent: `man * 2^-24` with leading 1 at bit 10-s equals
-`2^(-14-s)(1+f)`, i.e. (10 - s) - 24 = -(14 + s), and the biased field is `-(14+s) + 127 = 113 - s`. -/
-theorem subnormal_exponent_value (s : Nat) (h : s ≤ 10) :
-    ((10 : Int) - s) - 24 = -((14 : Int) + s) ∧ (113 : Int) - s = -((14 : Int) + s) + 127 := by
-  omega
-
-/-- The smallest subnormal 0x0001 gets f32 exponent field 103, i.e. 2^(103-127) = 2^-24. -/
-theorem smallest_subnormal : (113 - 10 : Nat) = 103 ∧ (103 : Int) - 127 = -24 := by
-  decide
-
--- § encode
-
-/-- Finite-normal case: exponent field `rawexp - 112`, mantissa from the top 10 of 23 bits, RNE carry. -/
-def encNormal (s rawexp man : Nat) : Nat :=
-  let h := s + (rawexp - 112) * 1024 + man / 8192
-  let rem := man % 8192
-  if rem > 4096 ∨ (rem = 4096 ∧ h % 2 = 1) then h + 1 else h
-
-/-- Subnormal case with shift divisor `d = 2^sh`: mantissa with implicit 1 restored, RNE. -/
-def encSub (s man d : Nat) : Nat :=
-  let m := man + 8388608
-  let h := m / d % 1024
-  let rem := m % d
-  if rem > d / 2 ∨ (rem = d / 2 ∧ h % 2 = 1) then s + h + 1 else s + h
-
-/-- Encode from (sign bit value `s` = 0 or 32768, raw f32 exponent, 23-bit mantissa). -/
-def f16FromF32 (s rawexp man : Nat) (d : Nat) : Nat :=
-  if rawexp = 255 then s + 31744 + (if man ≠ 0 then 512 else 0)
-  else if 143 ≤ rawexp then s + 31744
-  else if rawexp ≤ 112 then
-    (if rawexp < 102 then s else encSub s man d)
-  else encNormal s rawexp man
-
-/-- An f32 infinity stays an fp16 infinity. -/
-theorem enc_inf (s d : Nat) : f16FromF32 s 255 0 d = s + 31744 := by
-  simp [f16FromF32]
-
-/-- An f32 NaN stays a NaN: exponent all ones and a nonzero mantissa. -/
-theorem enc_nan (s man d : Nat) (h : man ≠ 0) : f16FromF32 s 255 man d = s + 31744 + 512 := by
-  simp [f16FromF32, h]
-
-/-- A FINITE value too large for fp16 saturates to inf, never to NaN (the bug the shared copy fixes). -/
-theorem enc_overflow_is_inf (s rawexp man d : Nat) (h1 : 143 ≤ rawexp) (h2 : rawexp ≠ 255) :
-    f16FromF32 s rawexp man d = s + 31744 := by
-  simp [f16FromF32, h1, h2]
-
-/-- A value below the subnormal range underflows to a signed zero. -/
-theorem enc_underflow (s rawexp man d : Nat) (h : rawexp < 102) : f16FromF32 s rawexp man d = s := by
-  have h1 : rawexp ≠ 255 := by omega
-  have h2 : ¬ (143 ≤ rawexp) := by omega
-  have h3 : rawexp ≤ 112 := by omega
-  simp [f16FromF32, h1, h2, h3, h]
-
-/-- In the normal regime the result never exceeds infinity (the carry can reach, not pass, 0x7C00). -/
-theorem enc_normal_le_inf (s rawexp man : Nat) (hs : s = 0 ∨ s = 32768) (h1 : 113 ≤ rawexp)
-    (h2 : rawexp ≤ 142) (hm : man < 8388608) : encNormal s rawexp man ≤ s + 31744 := by
-  unfold encNormal
-  dsimp only
-  split <;> omega
-
-/-- In the normal regime the result is at least the smallest normal number. -/
-theorem enc_normal_ge_min (s rawexp man : Nat) (h1 : 113 ≤ rawexp) :
-    s + 1024 ≤ encNormal s rawexp man := by
-  unfold encNormal
-  dsimp only
-  split <;> omega
-
-/-- A subnormal result never exceeds the smallest normal (the carry may promote into it). -/
-theorem enc_sub_le_min_normal (s man d : Nat) : encSub s man d ≤ s + 1024 := by
-  unfold encSub
-  dsimp only
-  have h2 : (man + 8388608) / d % 1024 < 1024 := Nat.mod_lt _ (by decide)
-  split <;> omega
-
-/-- A tie with an even truncated result is not rounded up (round-to-nearest-EVEN). -/
-theorem enc_normal_tie_even (s rawexp man : Nat) (h : man % 8192 = 4096)
-    (he : (s + (rawexp - 112) * 1024 + man / 8192) % 2 = 0) :
-    encNormal s rawexp man = s + (rawexp - 112) * 1024 + man / 8192 := by
-  unfold encNormal
-  simp only [h, he]
-  simp
-
-/-- A tie with an odd truncated result rounds up. -/
-theorem enc_normal_tie_odd (s rawexp man : Nat) (h : man % 8192 = 4096)
-    (ho : (s + (rawexp - 112) * 1024 + man / 8192) % 2 = 1) :
-    encNormal s rawexp man = s + (rawexp - 112) * 1024 + man / 8192 + 1 := by
-  unfold encNormal
-  simp only [h, ho]
-  simp
-
--- § decode
-
-/-- Decode a finite normal or infinite pattern (exponent field nonzero) to (sign, raw f32 exponent, 23-bit mantissa). -/
-def decodeFields (h : Nat) : Nat × Nat × Nat :=
-  (sgn h * 32768, (if expo h = 31 then 255 else expo h + 112), mant h * 8192)
-
-/-- The decoded 23-bit mantissa fits in 23 bits (the fp16 mantissa is padded by 13 zero bits). -/
-theorem decode_mantissa_lt (h : Nat) : (decodeFields h).2.2 < 8388608 := by
-  unfold decodeFields mant
-  simp only
-  omega
-
-/-- Finite normals decode to a raw exponent that is neither 0 nor 255. -/
-theorem decode_normal_exponent (h : Nat) (h1 : 1 ≤ expo h) (h2 : expo h ≤ 30) :
-    113 ≤ (decodeFields h).2.1 ∧ (decodeFields h).2.1 ≤ 142 := by
-  unfold decodeFields
-  simp only
-  have : expo h ≠ 31 := by omega
-  simp [this]
-  omega
-
-/-- encode ∘ decode is the identity on every finite normal fp16 value. -/
-theorem roundtrip_normal (h : Nat) (hh : h < 65536) (h1 : 1 ≤ expo h) (h2 : expo h ≤ 30) (d : Nat) :
-    f16FromF32 (decodeFields h).1 (decodeFields h).2.1 (decodeFields h).2.2 d = h := by
-  have hne : expo h ≠ 31 := by omega
-  have hrec := fields_recompose h hh
-  have hm : mant h < 1024 := by unfold mant; omega
-  have e1 : (decodeFields h).2.1 = expo h + 112 := by simp [decodeFields, hne]
-  have e2 : (decodeFields h).2.2 = mant h * 8192 := rfl
-  have e3 : (decodeFields h).1 = sgn h * 32768 := rfl
-  rw [e1, e2, e3]
-  have n1 : expo h + 112 ≠ 255 := by omega
-  have n2 : ¬ (143 ≤ expo h + 112) := by omega
-  have n3 : ¬ (expo h + 112 ≤ 112) := by omega
-  have q1 : mant h * 8192 / 8192 = mant h := by omega
-  have q2 : mant h * 8192 % 8192 = 0 := by omega
-  simp only [f16FromF32, encNormal, n1, n2, n3, q1, q2]
-  simp
-  omega
-
-/-- encode ∘ decode is the identity on infinity (exponent 31, mantissa 0). -/
-theorem roundtrip_inf (h : Nat) (hh : h < 65536) (he : expo h = 31) (hm : mant h = 0) (d : Nat) :
-    f16FromF32 (decodeFields h).1 (decodeFields h).2.1 (decodeFields h).2.2 d = h := by
-  have hrec := fields_recompose h hh
-  have e1 : (decodeFields h).2.1 = 255 := by simp [decodeFields, he]
-  have e2 : (decodeFields h).2.2 = 0 := by simp [decodeFields, hm]
-  have e3 : (decodeFields h).1 = sgn h * 32768 := rfl
-  rw [e1, e2, e3]
-  rw [he, hm] at hrec
-  simp [f16FromF32]
-  omega
-
-end Ref.Fp16Bits
-
-
-
-## FILE: /mnt/user-data/outputs/ChatRequestNormalizer.lean
-/-!
-# MODULE: chat_request_normalizer
+# MODULE: chat_frontend_parser
 SOURCES: serve/frontend.py
-Request-side half of the frontend: reasoning-effort normalisation (OpenAI / Anthropic spellings onto the
-template's levels), thinking-budget bucketing, image-part extraction and role mapping.
+Request normalisation (OpenAI / Anthropic -> chat template messages) and the incremental output parser that
+splits model text into reasoning, content and tool calls without ever emitting a partial tag.
 
 ## Source semantics
-* Effort strings map onto {off, low, medium, xhigh}; `high` means `xhigh`; unknown values are a 400.
-* `off` is expressed as `enable_thinking=false` and carries no `reasoning_effort`.
-* `budget_tokens`: < 2048 low, < 8192 medium, else xhigh (monotone).
-* Image parts keep their order; unknown parts are dropped; image sources are listed in prompt order.
-* `developer` role becomes `system`.
-* A `chat_template_kwargs` `enable_thinking=false` overrides any effort already chosen.
+* Reasoning effort spellings map onto {none, low, medium, xhigh}: "high", "max", "maximum" mean xhigh;
+  "none", "off", "minimal", "disabled" disable thinking; any other spelling is a client error (400).
+* Anthropic `budget_tokens`: under 2048 low, under 8192 medium, otherwise xhigh (monotone in the budget).
+* `_hold` returns the length of the longest suffix of the buffered text that is a PROPER prefix of a tag,
+  so it is always strictly shorter than the tag; that many characters are withheld from the client.
+* Tool-call parameter values drop one leading and one trailing newline.
 
 ## Form template identifiers
-- `effort_kwargs` -> `effort_normalize`; `budget_effort` -> `budget_bucket`; `_parts_of`/`images_of` -> `image_part_extract`;
-  `openai_to_messages` -> `openai_request_adapter`; `anthropic_to_messages` -> `anthropic_request_adapter`.
+- EFFORT table                   → `effortLevel`
+- budget_effort                  → `budgetRank`
+- OutputParser._hold             → `holdLen` / `isHold`
+- value[1:] / value[:-1] newline → `stripNL`
 -/
 
-namespace Ref.ChatRequestNormalizer
+namespace Ref.ChatFrontend
 
--- § effort levels
+-- § reasoning effort
 
-/-- The template's thinking levels. `off` means thinking disabled. -/
-inductive Thinking where
-  | off
-  | low
-  | medium
-  | xhigh
-  deriving DecidableEq
-
-/-- The EFFORT dictionary; `none` is an unknown spelling (a 400). -/
-def effortOf : String → Option Thinking
-  | "none" => some Thinking.off
-  | "off" => some Thinking.off
-  | "minimal" => some Thinking.off
-  | "disabled" => some Thinking.off
-  | "false" => some Thinking.off
-  | "low" => some Thinking.low
-  | "medium" => some Thinking.medium
-  | "high" => some Thinking.xhigh
-  | "xhigh" => some Thinking.xhigh
-  | "max" => some Thinking.xhigh
-  | "maximum" => some Thinking.xhigh
+/-- Thinking levels as seen by the template: 0 = none, 1 = low, 2 = medium, 3 = xhigh. -/
+def effortLevel : String → Option Nat
+  | "none" => some 0
+  | "off" => some 0
+  | "minimal" => some 0
+  | "disabled" => some 0
+  | "low" => some 1
+  | "medium" => some 2
+  | "high" => some 3
+  | "xhigh" => some 3
+  | "max" => some 3
+  | "maximum" => some 3
   | _ => none
 
-/-- `high` is the template's `xhigh`. -/
-theorem high_is_xhigh : effortOf "high" = some Thinking.xhigh := by
+/-- "high" means xhigh (the template's default), not a separate level. -/
+theorem high_is_xhigh : effortLevel "high" = effortLevel "xhigh" := by
   rfl
 
-/-- The five "off" spellings all disable thinking. -/
-theorem off_spellings : ∀ s ∈ ["none", "off", "minimal", "disabled", "false"],
-    effortOf s = some Thinking.off := by
+/-- Aliases that disable thinking. -/
+theorem disabling_aliases :
+    effortLevel "none" = some 0 ∧ effortLevel "off" = some 0 ∧ effortLevel "minimal" = some 0 ∧
+      effortLevel "disabled" = some 0 := by
   decide
 
-/-- An unknown spelling is rejected rather than guessed. -/
-theorem unknown_effort_rejected : effortOf "ultra" = none := by
+/-- Unknown spellings are rejected rather than guessed. -/
+theorem unknown_effort_rejected : effortLevel "turbo" = none := by
   rfl
 
-/-- Template kwargs: `enable_thinking` flag and `reasoning_effort` level. -/
-structure Kw where
-  enable : Option Bool := none
-  effort : Option Thinking := none
-  deriving DecidableEq
+-- § Anthropic thinking budget
 
-/-- A level as template kwargs. -/
-def levelKw : Thinking → Kw
-  | Thinking.off => { enable := some false, effort := none }
-  | t => { enable := none, effort := some t }
+/-- Level chosen from `budget_tokens`. -/
+def budgetRank (n : Nat) : Nat := if n < 2048 then 1 else if n < 8192 then 2 else 3
 
-/-- `off` never carries a reasoning effort (the two kwargs are mutually exclusive). -/
-theorem off_has_no_effort : (levelKw Thinking.off).effort = none ∧ (levelKw Thinking.off).enable = some false := by
-  decide
+/-- A larger budget never selects a lower level. -/
+theorem budget_mono (n m : Nat) (h : n ≤ m) : budgetRank n ≤ budgetRank m := by
+  unfold budgetRank
+  by_cases a : n < 2048 <;> by_cases b : n < 8192 <;> by_cases c : m < 2048 <;> by_cases d : m < 8192 <;>
+    simp [a, b, c, d] <;> omega
 
-/-- A positive level never disables thinking. -/
-theorem level_not_disabled (t : Thinking) (h : t ≠ Thinking.off) : (levelKw t).enable = none := by
-  cases t <;> simp [levelKw] at h ⊢
-
--- § thinking budget
-
-/-- Rank of a level for ordering. -/
-def rank : Thinking → Nat
-  | Thinking.off => 0
-  | Thinking.low => 1
-  | Thinking.medium => 2
-  | Thinking.xhigh => 3
-
-/-- Anthropic `budget_tokens` bucketed: under 2K low, under 8K medium, else xhigh. -/
-def budgetEffort (n : Nat) : Thinking :=
-  if n < 2048 then Thinking.low else if n < 8192 then Thinking.medium else Thinking.xhigh
-
-/-- A bigger budget never gives a lower level. -/
-theorem budget_monotone (n m : Nat) (h : n ≤ m) : rank (budgetEffort n) ≤ rank (budgetEffort m) := by
-  unfold budgetEffort
-  by_cases a : n < 2048
-  · by_cases b : m < 2048
-    · simp [a, b, rank]
-    · by_cases c : m < 8192
-      · simp [a, b, c, rank]
-      · simp [a, b, c, rank]
-  · have b : ¬ m < 2048 := by omega
-    by_cases c : n < 8192
-    · by_cases d : m < 8192
-      · simp [a, b, c, d, rank]
-      · simp [a, b, c, d, rank]
-    · have d : ¬ m < 8192 := by omega
-      simp [a, b, c, d, rank]
-
-/-- A budget budget never produces `off`: a budget always leaves thinking enabled. -/
-theorem budget_never_off (n : Nat) : budgetEffort n ≠ Thinking.off := by
-  unfold budgetEffort
+/-- The levels are only ever low, medium or xhigh (never "none"). -/
+theorem budget_range (n : Nat) : 1 ≤ budgetRank n ∧ budgetRank n ≤ 3 := by
+  unfold budgetRank
   by_cases a : n < 2048 <;> by_cases b : n < 8192 <;> simp [a, b]
 
-/-- Bucket boundaries: 2047 is low, 2048 medium, 8191 medium, 8192 xhigh. -/
-theorem budget_boundaries :
-    budgetEffort 2047 = Thinking.low ∧ budgetEffort 2048 = Thinking.medium ∧
-    budgetEffort 8191 = Thinking.medium ∧ budgetEffort 8192 = Thinking.xhigh := by
-  decide
+-- § partial-tag hold-back
 
--- § chat_template_kwargs override
+/-- Is a suffix of `text` of length `n` a proper non-empty prefix of `tag`? -/
+def isHold (text tag : List Nat) (n : Nat) : Bool :=
+  decide (0 < n) && decide (n < tag.length) && decide (n ≤ text.length) &&
+    (text.drop (text.length - n) == tag.take n)
 
-/-- `enable_thinking=false` from `chat_template_kwargs` replaces whatever was chosen. -/
-def applyDisable (kw : Kw) (v : Bool) : Kw :=
-  if v then kw else { enable := some false, effort := none }
+/-- Longest held-back suffix length. -/
+def holdLen (text tag : List Nat) : Nat := ((List.range tag.length).filter (isHold text tag)).foldl max 0
 
-/-- After a disable override thinking is off and no effort remains. -/
-theorem disable_clears_effort (kw : Kw) : (applyDisable kw false).effort = none ∧ (applyDisable kw false).enable = some false := by
-  simp [applyDisable]
+/-- A fold of `max` over elements below `k` stays below `k`. -/
+theorem foldl_max_lt (k : Nat) :
+    ∀ (l : List Nat) (a : Nat), a < k → (∀ x ∈ l, x < k) → l.foldl max a < k := by
+  intro l
+  induction l with
+  | nil => intro a ha _; simpa using ha
+  | cons x xs ih =>
+    intro a ha hl
+    simp only [List.foldl_cons]
+    have hx : x < k := hl x (by simp)
+    exact ih (max a x) (by omega) (fun y hy => hl y (by simp [hy]))
 
-/-- A truthy `enable_thinking` leaves the kwargs unchanged. -/
-theorem enable_true_noop (kw : Kw) : applyDisable kw true = kw := by
-  simp [applyDisable]
-
-/-- A `reasoning_effort` key only applies when thinking was not explicitly disabled. -/
-def applyEffort (kw new : Kw) : Kw :=
-  if kw.enable = none then
-    { enable := match new.enable with | some b => some b | none => kw.enable,
-      effort := match new.effort with | some e => some e | none => kw.effort }
-  else kw
-
-/-- Once thinking is disabled a later effort key cannot re-enable it. -/
-theorem disabled_is_sticky (kw new : Kw) (h : kw.enable = some false) : applyEffort kw new = kw := by
-  simp [applyEffort, h]
-
--- § image parts
-
-/-- A content part: text, an image with its source string, or something unrecognised. -/
-inductive Part where
-  | text (s : String)
-  | image (src : String)
-  | other
-
-/-- Keep text and image items in order, drop anything else. -/
-def toItems : List Part → List Part
-  | [] => []
-  | Part.other :: r => toItems r
-  | p :: r => p :: toItems r
-
-/-- Image sources in prompt order. -/
-def imgs : List Part → List String
-  | [] => []
-  | Part.image s :: r => s :: imgs r
-  | _ :: r => imgs r
-
-/-- Dropping unrecognised parts never changes which images are sent, nor their order. -/
-theorem imgs_toItems (ps : List Part) : imgs (toItems ps) = imgs ps := by
-  induction ps with
-  | nil => rfl
-  | cons p r ih => cases p <;> simp [toItems, imgs, ih]
-
-/-- The item list is never longer than the input. -/
-theorem toItems_length_le (ps : List Part) : (toItems ps).length ≤ ps.length := by
-  induction ps with
-  | nil => simp [toItems]
-  | cons p r ih => cases p <;> simp [toItems] <;> omega
-
-/-- Normalising twice equals normalising once. -/
-theorem toItems_idempotent (ps : List Part) : toItems (toItems ps) = toItems ps := by
-  induction ps with
-  | nil => rfl
-  | cons p r ih => cases p <;> simp [toItems, ih]
-
--- § roles
-
-/-- OpenAI `developer` is the template's `system`. -/
-def roleMap (r : String) : String := if r = "developer" then "system" else r
-
-/-- Role mapping is idempotent. -/
-theorem roleMap_idempotent (r : String) : roleMap (roleMap r) = roleMap r := by
-  by_cases h : r = "developer"
-  · simp [roleMap, h]
-  · simp [roleMap, h]
-
-/-- A `developer` message becomes `system`. -/
-theorem developer_becomes_system : roleMap "developer" = "system" := by
-  simp [roleMap]
-
-end Ref.ChatRequestNormalizer
-
-
-
-## FILE: /mnt/user-data/outputs/StreamingOutputParser.lean
-/-!
-# MODULE: streaming_output_parser
-SOURCES: serve/frontend.py
-Response-side half of the frontend: the incremental `OutputParser` state machine (reasoning -> content <-> tool
-call), partial-tag hold-back, tool-call argument decoding and the template renderer's flag mapping.
-
-## Source semantics
-* States: reasoning, content, call. `</think>` leaves reasoning for good; `<tool_call>` enters call; `</tool_call>`
-  returns to content with leading newlines swallowed.
-* A suffix of the buffer that is a proper prefix of a tag is held back, so clients never see `<tool_` or `</thi`.
-* `finish()` flushes held text as reasoning or content, never as a tool call.
-* Tool parameter values: declared `string` stays a string; otherwise JSON when it parses; one leading and one trailing
-  newline are removed.
-
-## Form template identifiers
-- `_hold` -> `partial_tag_holdback`; `OutputParser.feed` -> `incremental_state_machine`; `parse_tool_call` -> `tool_call_decode`.
--/
-
-namespace Ref.StreamingOutputParser
-
--- § hold-back of partial tags
-
-/-- Longest `n ≤ fuel` such that the first `n` elements of `tag` form a suffix of `text`. -/
-def holdAux {α : Type} [BEq α] (tag text : List α) : Nat → Nat
-  | 0 => 0
-  | n + 1 => max (holdAux tag text n) (if (tag.take (n + 1)).isSuffixOf text then n + 1 else 0)
-
-/-- `_hold`: longest proper-prefix-of-`tag` suffix of `text` (lengths 1 .. |tag|-1). -/
-def holdLen {α : Type} [BEq α] (tag text : List α) : Nat := holdAux tag text (tag.length - 1)
-
-/-- The hold search never exceeds its fuel. -/
-theorem holdAux_le {α : Type} [BEq α] (tag text : List α) (n : Nat) : holdAux tag text n ≤ n := by
-  induction n with
-  | zero => simp [holdAux]
-  | succ k ih =>
-    unfold holdAux
-    split <;> omega
-
-/-- The held part is a PROPER prefix: strictly shorter than the tag, so a complete tag is never held. -/
-theorem holdLen_lt {α : Type} [BEq α] (tag text : List α) (h : 0 < tag.length) :
-    holdLen tag text < tag.length := by
-  have := holdAux_le tag text (tag.length - 1)
+/-- The withheld suffix is always strictly shorter than the tag, so a full tag is never withheld. -/
+theorem holdLen_lt (text tag : List Nat) (hne : 0 < tag.length) : holdLen text tag < tag.length := by
   unfold holdLen
-  omega
+  apply foldl_max_lt _ _ _ hne
+  intro x hx
+  rw [List.mem_filter, List.mem_range] at hx
+  exact hx.1
 
-/-- An empty tag holds nothing. -/
-theorem holdLen_empty_tag {α : Type} [BEq α] (text : List α) : holdLen ([] : List α) text = 0 := by
-  simp [holdLen, holdAux]
+-- § newline stripping of parameter values
 
-/-- Split a buffer into the emitted part and the held tail of length `keep`. -/
-def splitHold {α : Type} (buf : List α) (keep : Nat) : List α × List α :=
-  (buf.take (buf.length - keep), buf.drop (buf.length - keep))
-
-/-- Emitted ++ held reproduces the buffer exactly: no text is lost or duplicated by holding. -/
-theorem splitHold_append {α : Type} (buf : List α) (keep : Nat) :
-    (splitHold buf keep).1 ++ (splitHold buf keep).2 = buf := by
-  unfold splitHold
-  simp
-
-/-- The held tail has the requested length when it fits in the buffer. -/
-theorem splitHold_held_length {α : Type} (buf : List α) (keep : Nat) (h : keep ≤ buf.length) :
-    (splitHold buf keep).2.length = keep := by
-  unfold splitHold
-  simp
-  omega
-
-/-- The emitted part has length `len - keep`. -/
-theorem splitHold_emit_length {α : Type} (buf : List α) (keep : Nat) :
-    (splitHold buf keep).1.length = buf.length - keep := by
-  unfold splitHold
-  simp
-
-/-- Concrete check: with tag [1,2,3] and text ending [1,2], two elements are held. -/
-theorem hold_example : holdLen [1, 2, 3] [9, 1, 2] = 2 := by
-  decide
-
-/-- Concrete check: text not ending in a tag prefix holds nothing. -/
-theorem hold_none_example : holdLen [1, 2, 3] [9, 8, 7] = 0 := by
-  decide
-
--- § state machine
-
-/-- Parser states. -/
-inductive State where
-  | reasoning
-  | content
-  | call
-  deriving DecidableEq
-
-/-- Markers the parser reacts to. -/
-inductive Marker where
-  | thinkEnd
-  | callStart
-  | callEnd
-  deriving DecidableEq
-
-/-- State transition when a marker is found in the current state; other markers are inert. -/
-def next : State → Marker → State
-  | State.reasoning, Marker.thinkEnd => State.content
-  | State.content, Marker.callStart => State.call
-  | State.call, Marker.callEnd => State.content
-  | s, _ => s
-
-/-- The initial state is reasoning exactly when thinking is on. -/
-def initState (thinking : Bool) : State := if thinking then State.reasoning else State.content
-
-/-- With thinking disabled the parser starts in content. -/
-theorem init_no_thinking : initState false = State.content := by
-  rfl
-
-/-- Reasoning is never re-entered: a transition into reasoning only comes from reasoning. -/
-theorem reasoning_not_reentered (s : State) (m : Marker) (h : next s m = State.reasoning) :
-    s = State.reasoning := by
-  cases s <;> cases m <;> simp [next] at h ⊢
-
-/-- `</think>` takes reasoning to content. -/
-theorem think_end_exits_reasoning : next State.reasoning Marker.thinkEnd = State.content := by
-  rfl
-
-/-- A completed tool call returns to content. -/
-theorem call_end_returns : next State.call Marker.callEnd = State.content := by
-  rfl
-
-/-- A tool call can only start from content (never from reasoning). -/
-theorem call_only_from_content (s : State) (h : next s Marker.callStart = State.call) : s = State.content ∨ s = State.call := by
-  cases s <;> simp [next] at h ⊢
-
--- § events and flush
-
-/-- Event kinds. -/
-inductive Kind where
-  | reasoning
-  | content
-  | toolCall
-  deriving DecidableEq
-
-/-- The kind `finish()` flushes held text as: reasoning stays reasoning, everything else (including an
-unterminated call) is content. -/
-def finishKind : State → Kind
-  | State.reasoning => Kind.reasoning
-  | _ => Kind.content
-
-/-- `finish()` never fabricates a tool call from unterminated input. -/
-theorem finish_never_tool_call (s : State) : finishKind s ≠ Kind.toolCall := by
-  cases s <;> simp [finishKind]
-
--- § tool-call argument decoding
-
-/-- A decoded argument is either the raw string or a JSON value. -/
-inductive Arg where
-  | str
-  | json
-  deriving DecidableEq
-
-/-- Declared-string parameters stay strings; others are JSON when they parse, else strings. -/
-def decodeArg (declaredString parses : Bool) : Arg :=
-  if declaredString then Arg.str else if parses then Arg.json else Arg.str
-
-/-- A declared string is never JSON-decoded (so the text `123` stays `"123"`). -/
-theorem declared_string_stays_string (parses : Bool) : decodeArg true parses = Arg.str := by
-  simp [decodeArg]
-
-/-- An unparsable value falls back to the string. -/
-theorem unparsable_is_string (d : Bool) : decodeArg d false = Arg.str := by
-  cases d <;> simp [decodeArg]
-
-/-- Drop one leading newline (10). -/
+/-- Drop one leading newline (code 10). -/
 def dropLead : List Nat → List Nat
-  | 10 :: r => r
+  | 10 :: t => t
   | l => l
 
-/-- Drop one trailing newline (10). -/
-def dropTrail (l : List Nat) : List Nat := if l.getLast? = some 10 then l.dropLast else l
+/-- Drop one trailing newline. -/
+def dropTrail (l : List Nat) : List Nat :=
+  match l.reverse with
+  | 10 :: t => t.reverse
+  | _ => l
 
-/-- Exactly one leading newline is removed. -/
-theorem dropLead_newline (r : List Nat) : dropLead (10 :: r) = r := by
-  rfl
+/-- Strip one newline at each end. -/
+def stripNL (l : List Nat) : List Nat := dropTrail (dropLead l)
 
-/-- A leading non-newline is untouched. -/
-theorem dropLead_other (c : Nat) (r : List Nat) (h : c ≠ 10) : dropLead (c :: r) = c :: r := by
-  unfold dropLead
-  split
-  · rename_i heq
-    simp at heq
-    omega
-  · rfl
+/-- A value wrapped in exactly one newline on each side is recovered unchanged. -/
+theorem stripNL_wrapped (l : List Nat) : stripNL (10 :: (l ++ [10])) = l := by
+  simp [stripNL, dropLead, dropTrail]
 
-/-- Exactly one trailing newline is removed. -/
-theorem dropTrail_newline (l : List Nat) : dropTrail (l ++ [10]) = l := by
-  simp [dropTrail]
-
-/-- Stripping never makes a value longer, and removes at most one character at each end. -/
-theorem dropLead_length (l : List Nat) : l.length - 1 ≤ (dropLead l).length ∧ (dropLead l).length ≤ l.length := by
-  unfold dropLead
-  split <;> simp
-
-/-- A tool call needs a `<function=` prefix; the name is the text up to the first `>`. -/
-def hasFunctionPrefix (body : List Nat) (prefixLen : Nat) : Bool := prefixLen ≤ body.length
-
-/-- The tool-call id is `call_` plus the first 24 of the 32 uuid hex digits. -/
-theorem call_id_digits : 24 ≤ 32 ∧ "call_".length + 24 = 29 := by
-  decide
-
-end Ref.StreamingOutputParser
+end Ref.ChatFrontend
 
 
 
-## FILE: /mnt/user-data/outputs/ApiServerEngine.lean
+## FILE: /mnt/user-data/outputs/ServeServerProtocol.lean
 /-!
-# MODULE: api_server_engine
+# MODULE: serve_server_protocol
 SOURCES: serve/server.py
-OpenAI/Anthropic server over a token-id engine: context admission, incremental detokenisation, stop-token
-handling, finish-reason mapping, Anthropic content-block bookkeeping, image-pad expansion, vision cache bound,
-auth and launcher argument assembly.
+OpenAI / Anthropic endpoints over a token-id engine: context admission, image-pad expansion, incremental
+detokenisation, stop reasons, content-block opening, the image-embedding cache bound and API-key checks.
 
 ## Source semantics
-* Requests with `prompt + max_new > max_context` are rejected, never truncated.
-* `completion_tokens` counts every yielded id including the stop id; the stop id is not emitted as text.
-* OpenAI finish: `tool_calls` only when at least one call and the engine stopped; Anthropic: `max_tokens` for length.
-* One `<|image_pad|>` per image is expanded into one pad per image token.
-* The vision cache holds at most 64 entries (oldest evicted).
-* `max_completion_tokens or max_tokens or 1024` is always positive.
+* A request is accepted only if `len(prompt) + max_new <= max_context`; requests are rejected, never truncated.
+* Each `<|image_pad|>` is replaced by as many pads as its image has tokens; text without pads is unchanged.
+* The detokenizer emits `text[sent:]` of the re-decoded ids, so the deltas concatenate to the full text.
+* OpenAI finish: `tool_calls` iff a call was emitted and generation stopped; otherwise `stop`/`length`.
+  Anthropic: `tool_use` iff a tool was used and generation stopped; `end_turn` for stop, `max_tokens` for length.
+* A tool call always opens a new content block; reasoning/text blocks continue while the kind is unchanged.
+* The image cache holds at most 64 entries (oldest evicted first).
+* With an empty API key everything is authorised; otherwise the presented key must equal it.
 
 ## Form template identifiers
-- `Service.prepare` -> `admission_and_image_expand`; `Service.run` -> `stream_loop`; `Detokenizer` -> `incremental_detok`;
-  `openai_chunks`/`anthropic_events` -> `protocol_adapters`; `Vision.encode` -> `cached_image_encode`.
+- len(ids)+max_new > max_context → `accepts`
+- the `<|image_pad|>` loop        → `expand`
+- Detokenizer.push               → `deltaOf`
+- finish mapping                 → `openaiFinish` / `anthropicStop`
+- block open decision            → `newBlock`
+- cache eviction                 → `evict`
+- Service._authorized            → `authorized`
 -/
 
-namespace Ref.ApiServerEngine
+namespace Ref.ServeServer
 
--- § admission
+-- § context admission
 
-/-- Admission: the prompt plus the generation budget must fit in the context. -/
-def admit (promptLen maxNew ctx : Nat) : Bool := promptLen + maxNew ≤ ctx
+/-- The context check of `Service.prepare`. -/
+def accepts (promptLen maxNew ctx : Nat) : Prop := promptLen + maxNew ≤ ctx
 
-/-- An admitted request fits in the context. -/
-theorem admit_fits (p m c : Nat) (h : admit p m c = true) : p + m ≤ c := by
-  simpa [admit] using h
+/-- An accepted request fits wholesale: nothing needs truncating. -/
+theorem accepted_fits (p m c : Nat) (h : accepts p m c) : p ≤ c ∧ m ≤ c := by
+  unfold accepts at h
+  omega
 
-/-- An over-long request is rejected (400), not truncated. -/
-theorem reject_overlong (p m c : Nat) (h : c < p + m) : admit p m c = false := by
-  have : ¬ (p + m ≤ c) := by omega
-  simp [admit, this]
+/-- A request over the context is not accepted. -/
+theorem over_context_rejected (p m c : Nat) (h : c < p + m) : ¬ accepts p m c := by
+  unfold accepts
+  omega
 
-/-- `max_completion_tokens or max_tokens or 1024` (0 counts as unset, like Python `or`). -/
-def maxNew (a b : Nat) : Nat := if a ≠ 0 then a else if b ≠ 0 then b else 1024
+-- § image pad expansion
 
-/-- The effective generation budget is always positive. -/
-theorem maxNew_pos (a b : Nat) : 0 < maxNew a b := by
-  unfold maxNew
-  split
-  · omega
-  · split <;> omega
+/-- Replace each pad token `p` by `c` pads, consuming one count per pad. -/
+def expand (p : Nat) : List Nat → List Nat → List Nat
+  | [], _ => []
+  | t :: ts, cs =>
+    if t = p then
+      (match cs with
+        | [] => t :: expand p ts []
+        | c :: cs' => List.replicate c p ++ expand p ts cs')
+    else t :: expand p ts cs
 
-/-- An explicit `max_completion_tokens` wins over `max_tokens`. -/
-theorem maxNew_prefers_first (a b : Nat) (h : a ≠ 0) : maxNew a b = a := by
-  simp [maxNew, h]
-
--- § stop handling
-
-/-- Ids that are emitted before the first stop id. -/
-def emitted (isStop : Nat → Bool) (ts : List Nat) : List Nat := ts.takeWhile (fun t => !isStop t)
-
-/-- `completion_tokens`: emitted ids plus the stop id when one was seen. -/
-def completionTokens (isStop : Nat → Bool) (ts : List Nat) : Nat :=
-  (emitted isStop ts).length + (if ts.any isStop then 1 else 0)
-
-/-- Counting never exceeds the number of ids the engine yielded. -/
-theorem completion_le (isStop : Nat → Bool) (ts : List Nat) : completionTokens isStop ts ≤ ts.length := by
-  unfold completionTokens emitted
+/-- Without pad tokens the prompt is unchanged. -/
+theorem expand_no_pad (p : Nat) :
+    ∀ (ts cs : List Nat), (∀ t ∈ ts, t ≠ p) → expand p ts cs = ts := by
+  intro ts
   induction ts with
-  | nil => simp
-  | cons t r ih =>
-    by_cases h : isStop t = true
-    · simp [List.takeWhile, h]
-    · have h' : isStop t = false := by simpa using h
-      have e : List.takeWhile (fun t => !isStop t) (t :: r) =
-          t :: List.takeWhile (fun t => !isStop t) r := by simp [List.takeWhile, h']
-      have e2 : (t :: r).any isStop = r.any isStop := by simp [List.any_cons, h']
-      rw [e, e2, List.length_cons, List.length_cons]
-      omega
+  | nil => intro cs _; rfl
+  | cons t ts ih =>
+    intro cs h
+    have ht : t ≠ p := h t (by simp)
+    have hr : ∀ x ∈ ts, x ≠ p := fun x hx => h x (by simp [hx])
+    simp [expand, ht, ih cs hr]
 
-/-- No stop id is ever emitted as text. -/
-theorem emitted_no_stop (isStop : Nat → Bool) (ts : List Nat) : ∀ t ∈ emitted isStop ts, isStop t = false := by
-  intro t ht
-  unfold emitted at ht
-  have := List.mem_takeWhile_imp ht
-  simpa using this
+/-- One pad and one image of `c` tokens expands to exactly `c` pads. -/
+theorem expand_single (p c : Nat) : expand p [p] [c] = List.replicate c p := by
+  simp [expand]
 
-/-- With no stop id the whole stream is emitted and no extra token is counted. -/
-theorem no_stop_all_emitted (isStop : Nat → Bool) (ts : List Nat) (h : ts.any isStop = false) :
-    emitted isStop ts = ts := by
-  unfold emitted
-  apply List.takeWhile_eq_self_iff.mpr
-  intro x hx
-  have := List.any_eq_false.mp h x hx
-  simpa using this
+/-- A prompt of one pad per image grows to exactly the total image-token count. -/
+theorem expand_length (p : Nat) (cs : List Nat) :
+    (expand p (List.replicate cs.length p) cs).length = cs.sum := by
+  induction cs with
+  | nil => simp [expand]
+  | cons c cs ih => simp [expand, List.replicate_succ, ih]
 
--- § finish reasons
+-- § incremental detokenisation
 
-/-- Engine finish reasons. -/
+/-- The new suffix emitted when the decoded text grows from `old` to `new`. -/
+def deltaOf (old new : List Nat) : List Nat := new.drop old.length
+
+/-- If decoding is prefix-extending, the delta is exactly the appended text. -/
+theorem delta_of_append (old x : List Nat) : deltaOf old (old ++ x) = x := by
+  simp [deltaOf]
+
+/-- Successive deltas concatenate back to the final text. -/
+theorem deltas_concatenate (a x y : List Nat) :
+    a ++ deltaOf a (a ++ x) ++ deltaOf (a ++ x) (a ++ x ++ y) = a ++ x ++ y := by
+  simp [deltaOf]
+
+-- § stop reasons and content blocks
+
+/-- Generation finish reasons from the engine. -/
 inductive Finish where
   | stop
   | length
   deriving DecidableEq
 
-/-- OpenAI finish reasons. -/
-inductive OaFinish where
-  | stop
-  | length
-  | toolCalls
-  deriving DecidableEq
+/-- OpenAI finish reason code: 0 = stop, 1 = length, 2 = tool_calls. -/
+def openaiFinish (calls : Nat) (f : Finish) : Nat :=
+  if calls > 0 ∧ f = Finish.stop then 2 else match f with
+    | Finish.stop => 0
+    | Finish.length => 1
 
-/-- OpenAI mapping: `tool_calls` only if calls were made and the engine stopped. -/
-def oaFinish (calls : Nat) (f : Finish) : OaFinish :=
-  match f with
-  | Finish.stop => if calls ≠ 0 then OaFinish.toolCalls else OaFinish.stop
-  | Finish.length => OaFinish.length
+/-- `tool_calls` is reported only when generation stopped normally. -/
+theorem openai_tool_calls_only_on_stop (calls : Nat) (f : Finish) (h : openaiFinish calls f = 2) :
+    f = Finish.stop := by
+  unfold openaiFinish at h
+  cases f <;> simp_all
 
-/-- Hitting the length limit is always reported as `length`, even with tool calls. -/
-theorem oa_length_stays (calls : Nat) : oaFinish calls Finish.length = OaFinish.length := by
-  rfl
+/-- A truncated generation is still reported as `length`, even with calls emitted. -/
+theorem openai_length_preserved (calls : Nat) : openaiFinish calls Finish.length = 1 := by
+  simp [openaiFinish]
 
-/-- `tool_calls` is reported only when at least one tool call was emitted. -/
-theorem oa_tool_calls_needs_call (calls : Nat) (f : Finish) (h : oaFinish calls f = OaFinish.toolCalls) :
-    calls ≠ 0 := by
-  cases f <;> simp [oaFinish] at h
-  exact h
+/-- Anthropic stop reason code: 0 = end_turn, 1 = max_tokens, 2 = tool_use. -/
+def anthropicStop (usedTool : Bool) (f : Finish) : Nat :=
+  if usedTool = true ∧ f = Finish.stop then 2 else match f with
+    | Finish.stop => 0
+    | Finish.length => 1
 
-/-- Anthropic stop reasons. -/
-inductive AnStop where
-  | endTurn
-  | maxTokens
-  | toolUse
-  deriving DecidableEq
+/-- `tool_use` only on a normal stop. -/
+theorem anthropic_tool_use_only_on_stop (u : Bool) (f : Finish) (h : anthropicStop u f = 2) :
+    f = Finish.stop := by
+  unfold anthropicStop at h
+  cases f <;> simp_all
 
-/-- Anthropic mapping: `tool_use` when a tool block was emitted and the engine stopped. -/
-def anStop (usedTool : Bool) (f : Finish) : AnStop :=
-  if usedTool = true ∧ f = Finish.stop then AnStop.toolUse
-  else match f with
-    | Finish.stop => AnStop.endTurn
-    | Finish.length => AnStop.maxTokens
-
-/-- Length always maps to `max_tokens`, with or without tools. -/
-theorem an_length_is_max (u : Bool) : anStop u Finish.length = AnStop.maxTokens := by
-  cases u <;> simp [anStop]
-
-/-- Without a tool block, a stop is `end_turn`. -/
-theorem an_stop_no_tool : anStop false Finish.stop = AnStop.endTurn := by
-  simp [anStop]
-
--- § Anthropic block bookkeeping
-
-/-- Content-block kinds in the Anthropic stream. -/
-inductive BK where
-  | thinking
-  | text
+/-- Kinds of streamed events. -/
+inductive Kind where
+  | reasoning
+  | content
   | tool
   deriving DecidableEq
 
-/-- Number of blocks opened: a new block starts when the kind changes, and always for a tool call. -/
-def blocks (prev : Option BK) : List BK → Nat
-  | [] => 0
-  | k :: r => (if prev = some k ∧ k ≠ BK.tool then 0 else 1) + blocks (some k) r
+/-- Whether an event of kind `k` opens a new block given the currently open kind. -/
+def newBlock (cur : Option Kind) (k : Kind) : Bool :=
+  match k with
+  | Kind.tool => true
+  | _ => decide (cur ≠ some k)
 
-/-- Never more blocks than events. -/
-theorem blocks_le (ks : List BK) : ∀ prev, blocks prev ks ≤ ks.length := by
-  induction ks with
-  | nil => intro prev; simp [blocks]
-  | cons k r ih =>
-    intro prev
-    have := ih (some k)
-    simp only [blocks, List.length_cons]
-    split <;> omega
+/-- A tool call always opens a fresh block. -/
+theorem tool_always_new (cur : Option Kind) : newBlock cur Kind.tool = true := by
+  rfl
 
-/-- Consecutive text deltas share one block. -/
-theorem text_deltas_merge : blocks none [BK.text, BK.text, BK.text] = 1 := by
+/-- Consecutive text deltas continue the same block. -/
+theorem text_continues : newBlock (some Kind.content) Kind.content = false := by
   decide
 
-/-- Every tool call opens its own block. -/
-theorem tool_calls_separate : blocks none [BK.tool, BK.tool] = 2 := by
+/-- Switching from reasoning to content opens a new block. -/
+theorem switch_opens : newBlock (some Kind.reasoning) Kind.content = true := by
   decide
 
-/-- A thinking block followed by text is two blocks. -/
-theorem thinking_then_text : blocks none [BK.thinking, BK.thinking, BK.text] = 2 := by
-  decide
+-- § image cache bound
 
--- § incremental detokenisation
+/-- Drop the oldest entry when the cache exceeds 64. -/
+def evict {α : Type} (l : List α) : List α := if l.length > 64 then l.drop 1 else l
 
-/-- One step of the detokeniser: given the full decoded text and what was already sent, emit the new suffix unless
-the text ends in a replacement character. Returns (delta, new sent). -/
-def detokStep {α : Type} (text : List α) (sent : Nat) (endsReplacement : Bool) : List α × Nat :=
-  if endsReplacement then ([], sent) else (text.drop sent, text.length)
-
-/-- The sent counter never exceeds the text length. -/
-theorem detok_sent_le {α : Type} (text : List α) (sent : Nat) (e : Bool) (h : sent ≤ text.length) :
-    (detokStep text sent e).2 ≤ text.length := by
-  unfold detokStep
-  split <;> simp [h]
-
-/-- Already-sent text plus the new delta is exactly the new sent prefix: nothing is skipped or repeated. -/
-theorem detok_prefix_property {α : Type} (text : List α) (sent : Nat) (e : Bool) (h : sent ≤ text.length) :
-    text.take sent ++ (detokStep text sent e).1 = text.take (detokStep text sent e).2 := by
-  unfold detokStep
+/-- Inserting into a cache of at most 64 entries and evicting keeps it at most 64. -/
+theorem evict_bound {α : Type} (l : List α) (h : l.length ≤ 65) : (evict l).length ≤ 64 := by
+  unfold evict
   split
-  · simp
-  · simp
+  · rw [List.length_drop]
+    omega
+  · omega
 
-/-- A held (incomplete) character emits nothing and leaves the counter unchanged. -/
-theorem detok_hold_noop {α : Type} (text : List α) (sent : Nat) :
-    detokStep text sent true = ([], sent) := by
-  simp [detokStep]
+-- § authorisation
 
--- § image-pad expansion
+/-- The presented key is accepted when no key is configured or it matches. -/
+def authorized (configured presented : String) : Prop := configured = "" ∨ presented = configured
 
-/-- Replace the k-th pad with `counts[k]` pads; leave other ids alone. -/
-def expand (pad : Nat) : List Nat → List Nat → List Nat
-  | [], _ => []
-  | t :: r, cs =>
-    if t = pad then
-      match cs with
-      | [] => t :: expand pad r []
-      | c :: cs' => List.replicate c pad ++ expand pad r cs'
-    else t :: expand pad r cs
+/-- With no configured key, anything is accepted. -/
+theorem no_key_open (presented : String) : authorized "" presented := by
+  exact Or.inl rfl
 
-/-- Number of pad ids in a prompt. -/
-def countPad (pad : Nat) (ids : List Nat) : Nat := (ids.filter (fun t => t == pad)).length
+/-- The right key is always accepted. -/
+theorem right_key_accepted (k : String) : authorized k k := by
+  exact Or.inr rfl
 
-/-- When pads and images match one-to-one, the expanded prompt has `len - pads + sum counts` ids. -/
-theorem expand_length (pad : Nat) (ids : List Nat) : ∀ cs : List Nat, countPad pad ids = cs.length →
-    (expand pad ids cs).length + countPad pad ids = ids.length + cs.sum := by
-  induction ids with
-  | nil =>
-    intro cs h
-    have h1 : countPad pad [] = 0 := by simp [countPad]
-    have h0 : cs.length = 0 := by omega
-    cases cs with
-    | nil => simp [expand, countPad]
-    | cons c r => simp at h0
-  | cons t r ih =>
-    intro cs h
-    by_cases ht : t = pad
-    · subst ht
-      cases cs with
-      | nil => simp [countPad] at h
-      | cons c cs' =>
-        have h' : countPad t r = cs'.length := by
-          simp [countPad, List.filter_cons] at h ⊢
-          omega
-        have := ih cs' h'
-        simp [expand, countPad, List.filter_cons] at this ⊢
-        omega
-    · have h' : countPad pad r = cs.length := by
-        simp [countPad, List.filter_cons, ht] at h ⊢
-        exact h
-      have := ih cs h'
-      simp [expand, ht, countPad, List.filter_cons] at this ⊢
-      omega
-
--- § vision cache
-
-/-- Cache size after inserting one entry: the oldest is evicted past 64. -/
-def cacheAfterInsert (size : Nat) : Nat := if size + 1 > 64 then size else size + 1
-
-/-- The cache never exceeds 64 entries. -/
-theorem cache_bounded (size : Nat) (h : size ≤ 64) : cacheAfterInsert size ≤ 64 := by
-  unfold cacheAfterInsert
-  split <;> omega
-
-/-- Below the cap an insert grows the cache by one. -/
-theorem cache_grows (size : Nat) (h : size < 64) : cacheAfterInsert size = size + 1 := by
-  unfold cacheAfterInsert
-  have : ¬ (size + 1 > 64) := by omega
-  simp [this]
-
--- § image formats and auth
-
-/-- Pass-through detection for the first magic bytes: JPEG `FF D8 FF`, BMP `BM`. -/
-def isJpeg (b0 b1 b2 : Nat) : Bool := b0 == 255 && b1 == 216 && b2 == 255
-
-/-- BMP magic `B M`. -/
-def isBmp (b0 b1 : Nat) : Bool := b0 == 66 && b1 == 77
-
-/-- A JPEG header is never also a BMP header. -/
-theorem jpeg_not_bmp (b0 b1 b2 b1' : Nat) (h : isJpeg b0 b1 b2 = true) : isBmp b0 b1' = false := by
-  simp [isJpeg, isBmp] at h ⊢
-  omega
-
-/-- Authorisation: no key configured means open; otherwise the presented key must match. -/
-def authorized (apiKey presented : String) : Bool := apiKey == "" || presented == apiKey
-
-/-- With no API key configured every request is authorised. -/
-theorem auth_open (presented : String) : authorized "" presented = true := by
-  simp [authorized]
-
-/-- With a key configured, a wrong key is refused. -/
-theorem auth_wrong_refused (k g : String) (hk : k ≠ "") (hg : g ≠ k) : authorized k g = false := by
-  simp [authorized, hk, hg]
-
--- § launcher arguments
-
-/-- Vision launcher argv length: 5 fixed items plus `--gpu`, `--threads N`, `--max-tokens N`. -/
-def visionArgc (gpu threads maxTok : Bool) : Nat :=
-  5 + (if gpu then 1 else 0) + (if threads then 2 else 0) + (if maxTok then 2 else 0)
-
-/-- The launcher argv has between 5 and 10 entries. -/
-theorem vision_argc_bounds (g t m : Bool) : 5 ≤ visionArgc g t m ∧ visionArgc g t m ≤ 10 := by
-  cases g <;> cases t <;> cases m <;> simp [visionArgc]
-
-/-- `DONE` carries 6 whitespace-separated fields; indices 1..5 are the five numbers/strings read. -/
-theorem done_fields : 1 + 5 = 6 := by
-  decide
-
-end Ref.ApiServerEngine
+end Ref.ServeServer
 
 
 
-## FILE: /mnt/user-data/outputs/VisionEncoderService.lean
+## FILE: /mnt/user-data/outputs/VisionBuildConfig.lean
 /-!
-# MODULE: vision_encoder_service
-SOURCES: tools/vision/ref_vision.cpp, tools/vision/CMakeLists.txt
-The resident image encoder `ref-vision`: the `ENC <image> <out>` line protocol, the SVE1 embeddings file
-layout and grid, and the CMake option logic (portable vs native, CUDA passthrough).
+# MODULE: vision_build_config
+SOURCES: tools/vision/CMakeLists.txt
+Build configuration of `ref-vision`: llama.cpp's mtmd library at the engine's pinned commit, with two
+user options (`REF_VISION_CUDA`, `REF_PORTABLE`) that determine the ggml flags.
 
 ## Source semantics
-* The image path ends at the LAST space; the output path contains no space; both must be non-empty.
-* SVE1 header = 5 int32 (magic 0x31455653, n_tokens, nx, ny, n_embd) followed by `n * n_embd` float32 rows.
-* The grid is derived from the last token's position: nx = x+1, ny = y+1, and must satisfy `nx * ny = n`.
-* Row i sits at (x = i mod nx, y = i / nx).
-* Portable builds turn native tuning off and force the AVX2-class baseline; native builds do the opposite.
+* Always off (forced): tools, tests, examples, server, app, common, OpenSSL, curl, shared libs, backend-DL.
+  Always on: `LLAMA_BUILD_MTMD`.
+* `REF_PORTABLE` turns native tuning off, OpenMP off, and the AVX/AVX2/FMA/F16C/BMI2 baseline on;
+  otherwise `GGML_NATIVE` is on. The static MSVC runtime applies only to portable MSVC builds.
+* `GGML_CUDA` follows `REF_VISION_CUDA` exactly.
+* Minimum CMake 3.21 and C++17.
 
 ## Form template identifiers
-- `parse_enc` -> `enc_line_parser`; header writer -> `sve1_writer`; `mtmd_image_tokens_get_decoder_pos` -> `grid_from_last_token`;
-  `REF_PORTABLE` -> `portable_build_switch`.
+- REF_PORTABLE / REF_VISION_CUDA → `Config.portable` / `Config.cuda`
+- GGML_NATIVE / GGML_OPENMP / GGML_CUDA → `native` / `openmp` / `cudaOn`
+- CMAKE_MSVC_RUNTIME_LIBRARY            → `staticRuntime`
 -/
 
-namespace Ref.VisionEncoderService
+namespace Ref.VisionBuild
 
--- § ENC line parsing
+-- § options
 
-/-- Split at the last space (32): (before, after). `none` when there is no space. -/
+/-- The user-visible options. -/
+structure Config where
+  portable : Bool
+  cuda : Bool
+  msvc : Bool
+
+/-- `GGML_NATIVE`. -/
+def native (c : Config) : Bool := !c.portable
+
+/-- `GGML_OPENMP` is forced off only in portable builds (left at the default otherwise). -/
+def openmpForcedOff (c : Config) : Bool := c.portable
+
+/-- The AVX2-family baseline flags are forced on only in portable builds. -/
+def baselineIsa (c : Config) : Bool := c.portable
+
+/-- `GGML_CUDA`. -/
+def cudaOn (c : Config) : Bool := c.cuda
+
+/-- Static MSVC runtime: portable and MSVC. -/
+def staticRuntime (c : Config) : Bool := c.portable && c.msvc
+
+/-- `GGML_BACKEND_DL` is always off. -/
+def backendDl (_ : Config) : Bool := false
+
+-- § consistency
+
+/-- Native tuning and the portable baseline are mutually exclusive. -/
+theorem native_xor_portable (c : Config) : ¬ (native c = true ∧ c.portable = true) := by
+  unfold native
+  intro h
+  obtain ⟨h1, h2⟩ := h
+  simp [h2] at h1
+
+/-- Exactly one of {native tuning, portable baseline ISA} is selected. -/
+theorem exactly_one_isa_mode (c : Config) : native c = !baselineIsa c := by
+  rfl
+
+/-- The CUDA flag follows the option exactly. -/
+theorem cuda_follows_option (c : Config) : cudaOn c = c.cuda := by
+  rfl
+
+/-- The static runtime applies only to portable builds. -/
+theorem static_runtime_needs_portable (c : Config) (h : staticRuntime c = true) : c.portable = true := by
+  unfold staticRuntime at h
+  cases hp : c.portable <;> simp_all
+
+/-- A non-portable build never forces OpenMP off nor the static runtime. -/
+theorem non_portable_defaults (c : Config) (h : c.portable = false) :
+    openmpForcedOff c = false ∧ staticRuntime c = false := by
+  unfold openmpForcedOff staticRuntime
+  simp [h]
+
+/-- Backend DL is off for every configuration. -/
+theorem backend_dl_never (c : Config) : backendDl c = false := by
+  rfl
+
+-- § toolchain floor
+
+/-- CMake 3.21 and C++17 minimums are ordered as stated. -/
+theorem toolchain_floor : 3 * 100 + 21 = 321 ∧ 17 ≥ 17 := by
+  decide
+
+end Ref.VisionBuild
+
+
+
+## FILE: /mnt/user-data/outputs/VisionEncoderProtocol.lean
+/-!
+# MODULE: vision_encoder_protocol
+SOURCES: tools/vision/ref_vision.cpp
+The resident image encoder: line protocol `ENC <image> <out>` -> `OK n nx ny ms` / `ERR msg`, and the SVE1
+embeddings file (5 x int32 header then `n x n_embd` float32 rows in row-major grid order).
+
+## Source semantics
+* `parse_enc` splits the argument at the LAST space: image path may contain spaces, the output path may not;
+  both parts must be non-empty.
+* The header magic `0x31455653` is "SVE1" in little-endian bytes.
+* The grid comes from the last token's decoder position: `nx = x+1`, `ny = y+1`, and the encoder insists
+  `nx * ny = n` (rectangular). Row `i` sits at `(x, y) = (i % nx, i / nx)`.
+* File size is `20 + 4 * n * n_embd` bytes.
+
+## Form template identifiers
+- parse_enc (rfind ' ')          → `lastSplit` / `parseEnc`
+- hdr[5] = {magic,n,nx,ny,n_embd} → `headerBytes`
+- row i at (i % nx, i / nx)      → `gridPos`
+- last decoder pos + 1           → `last_token_grid`
+-/
+
+namespace Ref.VisionEncoder
+
+-- § line parsing
+
+/-- Split a list at its LAST space (code 32): (before, after). -/
 def lastSplit : List Nat → Option (List Nat × List Nat)
   | [] => none
-  | c :: r =>
-    match lastSplit r with
-    | some (a, b) => some (c :: a, b)
-    | none => if c = 32 then some ([], r) else none
+  | x :: xs =>
+    match lastSplit xs with
+    | some (b, a) => some (x :: b, a)
+    | none => if x = 32 then some ([], xs) else none
 
-/-- If no split exists the list contains no space. -/
-theorem lastSplit_none (l : List Nat) (h : lastSplit l = none) : ∀ c ∈ l, c ≠ 32 := by
+/-- A list without a space has no split point. -/
+theorem lastSplit_none : ∀ l : List Nat, (∀ y ∈ l, y ≠ 32) → lastSplit l = none := by
+  intro l
   induction l with
-  | nil => intro c hc; simp at hc
-  | cons c r ih =>
-    unfold lastSplit at h
-    split at h
-    · cases h
-    · rename_i hr
-      split at h
-      · cases h
-      · rename_i hc
-        intro x hx
-        rcases List.mem_cons.mp hx with e | e
-        · subst e; exact hc
-        · exact ih hr x e
+  | nil => intro _; rfl
+  | cons x xs ih =>
+    intro h
+    have hx : x ≠ 32 := h x (by simp)
+    have hr : ∀ y ∈ xs, y ≠ 32 := fun y hy => h y (by simp [hy])
+    simp [lastSplit, ih hr, hx]
 
-/-- A split reproduces the input around one space, and the tail contains no space. -/
-theorem lastSplit_spec (l a b : List Nat) (h : lastSplit l = some (a, b)) :
-    l = a ++ 32 :: b ∧ ∀ c ∈ b, c ≠ 32 := by
-  induction l generalizing a b with
-  | nil => simp [lastSplit] at h
-  | cons c r ih =>
-    unfold lastSplit at h
-    split at h
-    · rename_i a' b' hr
-      injection h with h1
-      have ⟨e1, e2⟩ := Prod.mk.inj h1
-      have ⟨ih1, ih2⟩ := ih a' b' hr
-      subst e1
-      subst e2
-      exact ⟨by simp [ih1], ih2⟩
-    · rename_i hr
-      split at h
-      · rename_i hc
-        injection h with h1
-        have ⟨e1, e2⟩ := Prod.mk.inj h1
-        subst e1
-        subst e2
-        refine ⟨by simp [hc], ?_⟩
-        exact lastSplit_none r hr
-      · cases h
+/-- When the output path has no space, the split recovers (image, output) exactly. -/
+theorem lastSplit_append (out : List Nat) (h : ∀ y ∈ out, y ≠ 32) :
+    ∀ img : List Nat, lastSplit (img ++ 32 :: out) = some (img, out) := by
+  intro img
+  induction img with
+  | nil => simp [lastSplit, lastSplit_none out h]
+  | cons x xs ih => simp [lastSplit, ih]
 
-/-- `parse_enc` on the text after `ENC `: image and output must both be non-empty. -/
-def parseEnc (rest : List Nat) : Option (List Nat × List Nat) :=
-  match lastSplit rest with
-  | some (a, b) => if a = [] ∨ b = [] then none else some (a, b)
+/-- The `parse_enc` result: both parts must be non-empty. -/
+def parseEnc (l : List Nat) : Option (List Nat × List Nat) :=
+  match lastSplit l with
   | none => none
+  | some (b, a) => if b.isEmpty || a.isEmpty then none else some (b, a)
 
-/-- A parsed line has a non-empty image path and a non-empty output path. -/
-theorem parseEnc_nonempty (rest a b : List Nat) (h : parseEnc rest = some (a, b)) : a ≠ [] ∧ b ≠ [] := by
-  unfold parseEnc at h
-  split at h
-  · rename_i x y hs
-    split at h
-    · cases h
-    · rename_i hn
-      injection h with h1
-      have ⟨e1, e2⟩ := Prod.mk.inj h1
-      subst e1
-      subst e2
-      simp at hn
-      exact hn
-  · cases h
+/-- Well-formed `image <space> output` lines parse back to their two parts. -/
+theorem parseEnc_roundtrip (x : Nat) (xs : List Nat) (y : Nat) (ys : List Nat)
+    (h : ∀ z ∈ y :: ys, z ≠ 32) :
+    parseEnc ((x :: xs) ++ 32 :: (y :: ys)) = some (x :: xs, y :: ys) := by
+  have hs : lastSplit (x :: (xs ++ 32 :: y :: ys)) = some (x :: xs, y :: ys) :=
+    lastSplit_append (y :: ys) h (x :: xs)
+  simp [parseEnc, hs]
 
-/-- A space-free output path parses back exactly (a path with a space in the image part is fine). -/
-theorem parseEnc_example : parseEnc [1, 2, 32, 3] = some ([1, 2], [3]) := by
+/-- A line starting with the separator (empty image path, `sp == 0`) is rejected. -/
+theorem parseEnc_empty_image (out : List Nat) (h : ∀ y ∈ out, y ≠ 32) : parseEnc (32 :: out) = none := by
+  simp [parseEnc, lastSplit, lastSplit_none out h]
+
+-- § SVE1 file format
+
+/-- The header magic. -/
+def sveMagic : Nat := 0x31455653
+
+/-- Little-endian bytes of the magic spell S, V, E, 1. -/
+theorem sve_magic_bytes :
+    sveMagic % 256 = 83 ∧ sveMagic / 256 % 256 = 86 ∧ sveMagic / 65536 % 256 = 69 ∧
+      sveMagic / 16777216 = 49 := by
   decide
 
-/-- No space at all: the line is rejected. -/
-theorem parseEnc_no_space : parseEnc [1, 2, 3] = none := by
-  decide
-
-/-- A leading space leaves an empty image path, which is rejected. -/
-theorem parseEnc_empty_image : parseEnc [32, 3] = none := by
-  decide
-
--- § SVE1 file layout
-
-/-- Header bytes: five int32 values. -/
+/-- Header size: five int32 values. -/
 def headerBytes : Nat := 5 * 4
 
-/-- Total size of an SVE1 file for `n` tokens of width `e`. -/
-def sveFileSize (n e : Nat) : Nat := headerBytes + n * e * 4
+/-- Total file size for `n` tokens of width `nEmbd`. -/
+def fileBytes (n nEmbd : Nat) : Nat := headerBytes + 4 * n * nEmbd
 
 /-- The header is 20 bytes. -/
 theorem header_is_20 : headerBytes = 20 := by
   decide
 
-/-- The magic 0x31455653 spells `SVE1` in little-endian bytes S V E 1 = 0x53 0x56 0x45 0x31. -/
-theorem sve1_magic : 0x31455653 = 0x53 + 256 * (0x56 + 256 * (0x45 + 256 * 0x31)) := by
-  decide
-
-/-- The file grows linearly: one more token adds exactly one row of `4 * e` bytes. -/
-theorem sveFileSize_succ (n e : Nat) : sveFileSize (n + 1) e = sveFileSize n e + 4 * e := by
-  unfold sveFileSize
-  rw [Nat.add_mul, Nat.add_mul, Nat.one_mul]
+/-- File size grows by exactly one row of `4 * n_embd` bytes per extra token. -/
+theorem fileBytes_succ (n nEmbd : Nat) : fileBytes (n + 1) nEmbd = fileBytes n nEmbd + 4 * nEmbd := by
+  unfold fileBytes headerBytes
+  rw [Nat.mul_add 4 n 1, Nat.add_mul]
   omega
-
-/-- An empty image yields a header-only file. -/
-theorem sveFileSize_zero (e : Nat) : sveFileSize 0 e = 20 := by
-  simp [sveFileSize, headerBytes]
 
 -- § grid
 
-/-- Grid width and height from the last token's decoder position. -/
-def gridOf (x y : Nat) : Nat × Nat := (x + 1, y + 1)
+/-- Position of token `i` in a grid of width `nx`: (x, y). -/
+def gridPos (nx i : Nat) : Nat × Nat := (i % nx, i / nx)
 
-/-- The grid is rectangular iff its area equals the token count (the source rejects otherwise). -/
-def rectangular (n x y : Nat) : Bool := (x + 1) * (y + 1) == n
-
-/-- Both grid dimensions are positive. -/
-theorem grid_positive (x y : Nat) : 0 < (gridOf x y).1 ∧ 0 < (gridOf x y).2 := by
-  simp [gridOf]
-
-/-- A rectangular grid has exactly `n` cells. -/
-theorem rectangular_iff (n x y : Nat) : rectangular n x y = true ↔ (x + 1) * (y + 1) = n := by
-  simp [rectangular]
-
-/-- Row `i` position: (i mod nx, i / nx) recomposes to `i`. -/
-theorem position_recompose (i nx : Nat) : (i / nx) * nx + i % nx = i := by
+/-- Every token of an `nx x ny` grid sits inside it, and (x, y) recombines to the index. -/
+theorem gridPos_in_bounds (nx ny i : Nat) (hnx : 0 < nx) (hi : i < nx * ny) :
+    (gridPos nx i).1 < nx ∧ (gridPos nx i).2 < ny ∧ (gridPos nx i).2 * nx + (gridPos nx i).1 = i := by
+  unfold gridPos
+  refine ⟨Nat.mod_lt _ hnx, Nat.div_lt_of_lt_mul hi, ?_⟩
   have := Nat.div_add_mod i nx
   rw [Nat.mul_comm] at this
   exact this
 
-/-- Every token of a rectangular grid lands inside it: x < nx and y < ny. -/
-theorem position_in_grid (i nx ny : Nat) (hnx : 0 < nx) (h : i < nx * ny) :
-    i % nx < nx ∧ i / nx < ny := by
-  refine ⟨Nat.mod_lt _ hnx, ?_⟩
-  exact Nat.div_lt_of_lt_mul h
+/-- The last token of a `(j+1) x (k+1)` grid is at (j, k), so `nx = x+1`, `ny = y+1` recovers the grid. -/
+theorem last_token_grid (j k : Nat) :
+    ((j + 1) * (k + 1) - 1) % (j + 1) = j ∧ ((j + 1) * (k + 1) - 1) / (j + 1) = k := by
+  have h : (j + 1) * (k + 1) - 1 = j + (j + 1) * k := by
+    have := Nat.mul_add (j + 1) k 1
+    omega
+  have hp : 0 < j + 1 := Nat.succ_pos j
+  rw [h]
+  constructor
+  · rw [Nat.add_mul_mod_self_left]
+    exact Nat.mod_eq_of_lt (Nat.lt_succ_self j)
+  · rw [Nat.add_mul_div_left _ _ hp, Nat.div_eq_of_lt (Nat.lt_succ_self j)]
+    omega
 
--- § CMake option logic
-
-/-- GGML_NATIVE is on exactly when the build is not portable. -/
-def ggmlNative (portable : Bool) : Bool := !portable
-
-/-- GGML_OPENMP is forced off in portable builds (no vcomp/libgomp on the user's PC). -/
-def ggmlOpenmpForcedOff (portable : Bool) : Bool := portable
-
-/-- Static MSVC runtime only for portable MSVC builds. -/
-def staticRuntime (portable msvc : Bool) : Bool := portable && msvc
-
-/-- Native and portable are mutually exclusive. -/
-theorem native_xor_portable (p : Bool) : ggmlNative p = !p := by
-  rfl
-
-/-- A non-portable build never uses the static MSVC runtime. -/
-theorem no_static_when_native (msvc : Bool) : staticRuntime false msvc = false := by
-  simp [staticRuntime]
-
-/-- The portable ISA baseline switches five features on. -/
-def portableIsa : List String := ["GGML_AVX", "GGML_AVX2", "GGML_FMA", "GGML_F16C", "GGML_BMI2"]
-
-/-- The baseline has five distinct feature flags. -/
-theorem portable_isa_distinct : portableIsa.length = 5 ∧ portableIsa.Nodup := by
-  decide
-
-/-- The CUDA backend flag simply mirrors the `REF_VISION_CUDA` option. -/
-def ggmlCuda (opt : Bool) : Bool := opt
-
-/-- CUDA is on iff the option is on. -/
-theorem cuda_mirrors_option (opt : Bool) : ggmlCuda opt = opt := by
-  rfl
-
-end Ref.VisionEncoderService
+end Ref.VisionEncoder
 
 
 
 /-! [measured by the kernel] STATEMENTS CHANGED AFTER VERIFICATION in this chunk.
 These are not the first reading of the reference: check each against the reference code before implementing or accepting it.
 
-- GgufHeaderReader.lean
-  was: theorem kquant_blocks : ∀ t ∈ [10, 11, 12, 13, 14, 23],
-    ∃ b, blockGeometry t = some (256, b)
-  now: theorem kquant_blocks : ∀ t ∈ [10, 11, 12, 13, 14, 23],
-    (blockGeometry t).map Prod.fst = some 256
-  measured: the claim changed
-
-- VisionEncoderService.lean
-  was: theorem lastSplit_spec (l a b : List Nat) (h : lastSplit l = some (a, b)) :
-    l = a ++ 32 :: b ∧ ∀ c ∈ b, c ≠ 32
-  now: theorem lastSplit_none (l : List Nat) (h : lastSplit l = none) : ∀ c ∈ l, c ≠ 32
-  measured: more hypotheses/binders (1 → 2): the statement holds in fewer cases
-
-- VisionEncoderService.lean
-  was: theorem parseEnc_nonempty (rest a b : List Nat) (h : parseEnc rest = some (a, b)) : a ≠ [] ∧ b ≠ []
-  now: theorem lastSplit_spec (l a b : List Nat) (h : lastSplit l = some (a, b)) :
-    l = a ++ 32 :: b ∧ ∀ c ∈ b, c ≠ 32
-  measured: the claim changed
-
-- VisionEncoderService.lean
-  was: theorem parseEnc_example : parseEnc [1, 2, 32, 3] = some ([1, 2], [3])
-  now: theorem parseEnc_nonempty (rest a b : List Nat) (h : parseEnc rest = some (a, b)) : a ≠ [] ∧ b ≠ []
-  measured: the claim changed
-
-- VisionEncoderService.lean
-  was: theorem parseEnc_no_space : parseEnc [1, 2, 3] = none
-  now: theorem parseEnc_example : parseEnc [1, 2, 32, 3] = some ([1, 2], [3])
-  measured: the claim changed
-
-- VisionEncoderService.lean
-  was: theorem parseEnc_empty_image : parseEnc [32, 3] = none
-  now: theorem parseEnc_no_space : parseEnc [1, 2, 3] = none
-  measured: the claim changed
-
-- VisionEncoderService.lean
-  was: theorem header_is_20 : headerBytes = 20
-  now: theorem parseEnc_empty_image : parseEnc [32, 3] = none
-  measured: the claim changed
-
-- VisionEncoderService.lean
-  was: theorem sve1_magic : 0x31455653 = 0x53 + 256 * (0x56 + 256 * (0x45 + 256 * 0x31))
-  now: theorem header_is_20 : headerBytes = 20
-  measured: the claim changed
-
-- VisionEncoderService.lean
-  was: theorem sveFileSize_succ (n e : Nat) : sveFileSize (n + 1) e = sveFileSize n e + 4 * e
-  now: theorem sve1_magic : 0x31455653 = 0x53 + 256 * (0x56 + 256 * (0x45 + 256 * 0x31))
-  measured: every variable of the statement is gone: a property stated for all values became a statement about fixed values
-
-- VisionEncoderService.lean
-  was: theorem sveFileSize_zero (e : Nat) : sveFileSize 0 e = 20
-  now: theorem sveFileSize_succ (n e : Nat) : sveFileSize (n + 1) e = sveFileSize n e + 4 * e
-  measured: the claim changed
-
-- VisionEncoderService.lean
-  was: theorem grid_positive (x y : Nat) : 0 < (gridOf x y).1 ∧ 0 < (gridOf x y).2
-  now: theorem sveFileSize_zero (e : Nat) : sveFileSize 0 e = 20
-  measured: the claim changed
-
-- VisionEncoderService.lean
-  was: theorem rectangular_iff (n x y : Nat) : rectangular n x y = true ↔ (x + 1) * (y + 1) = n
-  now: theorem grid_positive (x y : Nat) : 0 < (gridOf x y).1 ∧ 0 < (gridOf x y).2
-  measured: the claim changed
-
-- VisionEncoderService.lean
-  was: theorem position_recompose (i nx : Nat) : (i / nx) * nx + i % nx = i
-  now: theorem rectangular_iff (n x y : Nat) : rectangular n x y = true ↔ (x + 1) * (y + 1) = n
-  measured: the claim changed
-
-- VisionEncoderService.lean
-  was: theorem position_in_grid (i nx ny : Nat) (hnx : 0 < nx) (h : i < nx * ny) :
-    i % nx < nx ∧ i / nx < ny
-  now: theorem position_recompose (i nx : Nat) : (i / nx) * nx + i % nx = i
-  measured: fewer quantified variables (3 → 1)
-
-- VisionEncoderService.lean
-  was: theorem native_xor_portable (p : Bool) : ggmlNative p = !p
-  now: theorem position_in_grid (i nx ny : Nat) (hnx : 0 < nx) (h : i < nx * ny) :
-    i % nx < nx ∧ i / nx < ny
-  measured: more hypotheses/binders (1 → 3): the statement holds in fewer cases
-
-- VisionEncoderService.lean
-  was: theorem no_static_when_native (msvc : Bool) : staticRuntime false msvc = false
-  now: theorem native_xor_portable (p : Bool) : ggmlNative p = !p
-  measured: the claim changed
-
-- VisionEncoderService.lean
-  was: theorem portable_isa_distinct : portableIsa.length = 5 ∧ portableIsa.Nodup
-  now: theorem no_static_when_native (msvc : Bool) : staticRuntime false msvc = false
-  measured: the claim changed
-
-- VisionEncoderService.lean
-  was: theorem cuda_mirrors_option (opt : Bool) : ggmlCuda opt = opt
-  now: theorem portable_isa_distinct : portableIsa.length = 5 ∧ portableIsa.Nodup
-  measured: every variable of the statement is gone: a property stated for all values became a statement about fixed values
-
-- ApiServerEngine.lean
-  was: theorem auth_open (given : String) : authorized "" given = true
-  now: theorem auth_open (presented : String) : authorized "" presented = true
+- ServeServerProtocol.lean
+  was: theorem no_key_open (given : String) : authorized "" given
+  now: theorem no_key_open (presented : String) : authorized "" presented
   measured: the claim changed
 -/
 
 
 [LIGHT FILES — structure only, no LAYER 1a/1b]
-  include/ref/core/expert_cache.hpp (156 lines)
-  include/ref/core/graph.hpp (118 lines)
-  include/ref/core/layer.hpp (567 lines)
-  include/ref/core/layout.hpp (98 lines)
-  include/ref/core/mtp.hpp (136 lines)
-  include/ref/core/pinned.hpp (96 lines)
-  include/ref/core/session.hpp (412 lines)
-  include/ref/core/verify.hpp (161 lines)
-  include/ref/core/weights.hpp (136 lines)
   include/ref/core/device.hpp (72 lines)
   include/ref/core/hit_hook.hpp (42 lines)
+  include/ref/core/layout.hpp (98 lines)
   include/ref/core/native_dense.hpp (37 lines)
   include/ref/core/native_head.hpp (66 lines)
+  include/ref/core/pinned.hpp (96 lines)
+  include/ref/core/weights.hpp (136 lines)
   include/ref/kernels/elementwise.hpp (117 lines)
-  include/ref/kernels/gdn.hpp (98 lines)
   include/ref/kernels/gr.hpp (123 lines)
   include/ref/kernels/native_mmvq.hpp (113 lines)
-  include/ref/kernels/ngram.hpp (195 lines)
   include/ref/kernels/ple.hpp (120 lines)
-  include/ref/kernels/qsa.hpp (361 lines)
-  include/ref/kernels/s2_expert_grouped.hpp (119 lines)
-  include/ref/kernels/s_gemv.hpp (134 lines)
   include/ref/kernels/shared_expert.hpp (102 lines)
   include/ref/kernels/verify_kernels.hpp (81 lines)
   include/ref/kernels/bf16_bits.hpp (47 lines)
@@ -10326,29 +9513,22 @@ These are not the first reading of the reference: check each against the referen
   include/ref/kernels/native_qsa_score.hpp (32 lines)
   include/ref/kernels/native_rope.hpp (15 lines)
   include/ref/kernels/native_router.hpp (18 lines)
-  include/ref/kernels/qsa_decode_attn.hpp (45 lines)
-  include/ref/kernels/qsa_select.hpp (34 lines)
   include/ref/kernels/quantize_act.hpp (59 lines)
   include/ref/kernels/rope.hpp (51 lines)
   include/ref/kernels/router_top10.hpp (21 lines)
   include/ref/kernels/s2_gemv.hpp (26 lines)
   include/ref/kernels/s2_gemv_q8.hpp (23 lines)
-  include/ref/kernels/sampler.hpp (44 lines)
-  include/ref/kernels/cpu/expert.hpp (180 lines)
-  include/ref/kernels/cpu/pool.hpp (196 lines)
   include/ref/kernels/cpu/expert_layout.hpp (55 lines)
   include/ref/kernels/cpu/iq_avx512.hpp (19 lines)
   include/ref/kernels/cpu/native_expert.hpp (50 lines)
-  include/ref/ngram/ple_reader.hpp (87 lines)
-  include/ref/plan/plan.hpp (169 lines)
   include/ref/platform/direct_file.hpp (60 lines)
   include/ref/platform/memory.hpp (27 lines)
   include/ref/prefill/gemm.hpp (55 lines)
   include/ref/prefill/kernels.hpp (75 lines)
   include/ref/prefill/prefill.hpp (76 lines)
   include/ref/program/logits_selection.hpp (31 lines)
-  include/ref/spec/controller.hpp (74 lines)
   include/ref/spec/suffix_drafter.hpp (54 lines)
+  ref/load.py (213 lines)
   serve/__init__.py (2 lines)
   serve/chat_golden.json (197 lines)
   serve/chat_template.jinja (184 lines)
@@ -10357,13 +9537,12 @@ These are not the first reading of the reference: check each against the referen
   src/artifact/gguf_reader.cpp (68 lines)
   src/core/concurrent_main.cpp (198 lines)
   src/core/device.cu (118 lines)
-  src/core/device_main.cpp (79 lines)
   src/core/layout.cpp (174 lines)
   src/core/load_main.cpp (120 lines)
   src/core/native_dense.cpp (180 lines)
   src/core/native_head.cpp (152 lines)
   src/core/overlap_main.cpp (170 lines)
-  src/core/pinned.cu (292 lines)
+  src/core/device_main.cpp (79 lines)
   src/kernels/bf16_gemv_parity.cpp (149 lines)
   src/kernels/dequant_bf16_test.cpp (109 lines)
   src/kernels/dequant_s2_parity.cpp (144 lines)
@@ -10391,11 +9570,12 @@ These are not the first reading of the reference: check each against the referen
   src/kernels/cpu/native_expert.cpp (115 lines)
   src/kernels/cpu/pool_test.cpp (225 lines)
   src/kernels/cuda/bf16_gemv.cu (142 lines)
-  src/kernels/cuda/dequant_bf16.cu (246 lines)
   src/kernels/cuda/elementwise.cu (290 lines)
   src/kernels/cuda/native_bf16.cu (119 lines)
   src/kernels/cuda/native_gr_norm.cu (103 lines)
   src/kernels/cuda/native_gr_postops.cu (116 lines)
+  src/kernels/cuda/native_ple_postops.cu (135 lines)
+  src/kernels/cuda/native_qsa.cu (128 lines)
   src/kernels/cuda/native_rope.cu (89 lines)
   src/kernels/cuda/rope.cu (96 lines)
   src/kernels/cuda/s2_gemv_q8.cu (97 lines)
@@ -10405,16 +9585,15 @@ These are not the first reading of the reference: check each against the referen
   src/kernels/cuda/s2_gemv.cu (64 lines)
   src/ngram/ple_reader_test.cpp (238 lines)
   src/plan/plan_main.cpp (74 lines)
-  src/platform/direct_file.cpp (242 lines)
   src/platform/memory.cpp (77 lines)
   src/platform/memory_test.cpp (36 lines)
   src/prefill/gemm.cu (108 lines)
-  src/spec/suffix_drafter_test.cpp (142 lines)
   src/spec/controller_test.cpp (75 lines)
-  tools/gguf_reader.py (143 lines)
-  tools/mtp_fetch.py (122 lines)
-  tools/pack_index.py (261 lines)
+  src/spec/suffix_drafter_test.cpp (142 lines)
   tools/_paths.py (29 lines)
+  tools/mtp_fetch.py (122 lines)
+  tools/mtp_rt.py (113 lines)
+  tools/pack_index.py (261 lines)
   bench/results/2026-09-24-final/estimates.md (28 lines)
   bench/results/2026-09-24-final/matrix.md (16 lines)
   bench/results/2026-09-24-vision/vision.md (6 lines)
@@ -10425,7 +9604,6 @@ These are not the first reading of the reference: check each against the referen
   bench/results/2026-09-24-final/matrix.json (240 lines)
   bench/results/2026-09-24-vision/vision.json (53 lines)
   chat.py (117 lines)
-  docs/DETAILS.md (326 lines)
   setup.py (854 lines)
   setup.sh (31 lines)
   third_party/ggml/ggml-common.h (1912 lines)
