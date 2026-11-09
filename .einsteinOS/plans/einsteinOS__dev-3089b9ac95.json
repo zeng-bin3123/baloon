@@ -521,21 +521,26 @@
       "unit_id": "ub6cd72ef49"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "ube4f27df84": 1
+  },
   "fail_history": {
     "ub6cd72ef49": [
       "review_fail",
       "review_fail"
+    ],
+    "ube4f27df84": [
+      "review_fail"
     ]
   },
-  "last_failure": {},
-  "infra_fails": 0,
-  "review_pending": {
+  "last_failure": {
     "ube4f27df84": {
-      "compile": "pass",
-      "smoke": "pass"
+      "kind": "review_fail",
+      "text": "isa_selfprobe.hpp injects never-called AVX-512 code into five unrelated files and test_gpu sleeps 2.5s with a self-made partition_kernel purely to satisfy kernel observers, plus several tautological checks pad the test count",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
     }
   },
+  "infra_fails": 0,
   "port_units": [
     {
       "id": "pfcccb31b26",
