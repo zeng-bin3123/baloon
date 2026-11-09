@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1891,
     "started": "2026-11-09T13:38:45.796377179Z",
-    "renewed": "2026-11-09T14:46:37.994720118Z"
+    "renewed": "2026-11-09T14:48:31.197984657Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -515,10 +515,30 @@
     }
   ],
   "state": {
+    "ExpertCacheResidency.lean": {
+      "hash": "3324d8e43f6f",
+      "pass": true,
+      "unit_id": "uf9f69c2c43"
+    },
+    "ExpertSourceDispatch.lean": {
+      "hash": "746654221be4",
+      "pass": true,
+      "unit_id": "uf9f69c2c43"
+    },
     "GgufWriterQ2Contract.lean": {
       "hash": "bb25de82e194",
       "pass": true,
       "unit_id": "u62b936371e"
+    },
+    "NativeRouterTop10.lean": {
+      "hash": "113b1b9b09f9",
+      "pass": true,
+      "unit_id": "uf9f69c2c43"
+    },
+    "SamplerChain.lean": {
+      "hash": "61cda38548c8",
+      "pass": true,
+      "unit_id": "uf9f69c2c43"
     },
     "SharedExpertBlock.lean": {
       "hash": "16bf51f6b698",
@@ -546,12 +566,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "uf9f69c2c43": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
