@@ -82,5 +82,9 @@ link "$OUT/ref-device" "$OBJ/device_main.o" $RT
 cuobj $T39/pinned_capture.cu "$OBJ/pinned_capture.o" -DRT_DEVICE_MAIN_DISABLED
 link "$OUT/pinned_capture" "$OBJ/pinned_capture.o" "$OBJ/device_main_lib.o" "$OBJ/core_weights.o" $RT
 
+# ---- real-model backend (loads the HF safetensors checkpoint and runs it on the GPUs) ---------------------------------------
+cuobj src/model/generate_model.cu "$OBJ/generate_model.o"
+link "$OUT/generate_model" "$OBJ/generate_model.o"
+
 rm -rf "$OBJ"
 echo "BUILD OK ($(find "$OUT" -maxdepth 1 -type f -perm -u+x | wc -l) executables in $OUT)"

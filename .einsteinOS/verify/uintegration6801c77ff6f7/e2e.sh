@@ -1,8 +1,8 @@
 #!/bin/bash
 # End-to-end run of the port on the model in $MODEL_DIR. Prints "prefill: X tok/s" and "decode: Y tok/s" ONLY from a real
-# run of the model on the GPU. This tree has no such backend yet: `generate` drives a pluggable gencli::Drive but only the
-# deterministic synthetic backend is wired in (no code here loads the weights and runs the layers into logits). A throughput
-# printed from the synthetic backend would be a number about nothing, so this script prints none and exits non-zero.
+# run of the model on the GPU: build/generate_model (src/model/generate_model.cu) loads the safetensors checkpoint, runs an
+# invariant check (chunked vs sequential prefill) and then times real prefill and decode. It exits non-zero without printing
+# rates if logits are non-finite or the check fails.
 set -uo pipefail
 MODEL_DIR="${MODEL_DIR:-/tmp/model}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"; cd "$ROOT"
