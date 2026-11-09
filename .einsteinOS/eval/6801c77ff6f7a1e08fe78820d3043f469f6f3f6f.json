@@ -23,10 +23,10 @@
    "Command": "",
    "Sources": null
   },
-  "exit": -1,
+  "exit": 3,
   "metrics": null,
-  "tail": "missing",
-  "devices": null
+  "tail": "e2e: no real-model backend in this tree (only the synthetic generate backend); not reporting any tok/s",
+  "devices": []
  },
  "external": null,
  "clues": [
@@ -825,7 +825,7 @@
   "ref_repo": "Niko1221/Strata",
   "ref_sha": "6801c77ff6f7a1e08fe78820d3043f469f6f3f6f"
  },
- "gate": "integration_e2e_missing",
- "gate_text": "integration_e2e_missing: .einsteinOS/verify/uintegration6801c77ff6f7/e2e.sh does not exist, so the port was never run on the model at /tmp/model",
- "when": "2026-11-09T06:06:06.328310883Z"
+ "gate": "integration_e2e_failed",
+ "gate_text": "integration_e2e_failed: .einsteinOS/verify/uintegration6801c77ff6f7/e2e.sh exited 3 running the model at /tmp/model; output: e2e: no real-model backend in this tree (only the synthetic generate backend); not reporting any tok/s",
+ "when": "2026-11-09T06:14:49.270357948Z"
 }
