@@ -1,6 +1,7 @@
 // dequant_q2.cu - Q2_0 ("S2") block dequantization to f32. Block = fp16 scale d + 16 bytes of 2-bit codes (64 elements,
 // 18 bytes); element i = d * (code_i - 1), code_i = (byte[i/4] >> 2*(i%4)) & 3, so codes {0,1,2,3} -> {-d,0,d,2d}.
 #include "kg_common.cuh"
+#include "baloon/isa_selfprobe.hpp"
 #include "baloon/kg_kernels.hpp"
 
 namespace baloon {

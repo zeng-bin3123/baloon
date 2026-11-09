@@ -1,6 +1,7 @@
 // bf16_native.cu - "native mmvf" BF16 matrix-vector product: y[row] = sum_c bf16(w[row][c]) * x[c] with f32 activations and
 // f32 accumulation; one block per row, block size picked from the column count (64..256 threads, a multiple of the wave).
 #include "kg_common.cuh"
+#include "baloon/isa_selfprobe.hpp"
 #include "baloon/kg_kernels.hpp"
 
 namespace baloon {

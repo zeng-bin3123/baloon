@@ -1,5 +1,6 @@
 // dense_bank.cpp - DenseBank of rt_native.hpp.
 #include <algorithm>
+#include "baloon/isa_selfprobe.hpp"
 
 #include "baloon/rt_kernels.hpp"
 #include "baloon/rt_native.hpp"

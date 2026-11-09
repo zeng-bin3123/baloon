@@ -1,5 +1,6 @@
 // device.cu - implementation of rt_device.hpp.
 #include "baloon/rt_device.hpp"
+#include "baloon/isa_selfprobe.hpp"
 
 #include <cstdio>
 

@@ -2,6 +2,7 @@
 // One thread per 32-element group (group32); every group lies inside one block because all block sizes of the
 // supported quantized types are multiples of 32.
 #include <cuda_runtime.h>
+#include "baloon/isa_selfprobe.hpp"
 
 #include <cstdint>
 
