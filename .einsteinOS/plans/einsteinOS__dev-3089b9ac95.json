@@ -459,6 +459,16 @@
       "pass": true,
       "unit_id": "ub6cd72ef49"
     },
+    "CanonicalQuantBitExactMaps.lean": {
+      "hash": "4b4f234545a4",
+      "pass": true,
+      "unit_id": "u62b936371e"
+    },
+    "ExpertArenaBlobLayout.lean": {
+      "hash": "87fc7d849916",
+      "pass": true,
+      "unit_id": "u62b936371e"
+    },
     "Fp16Bits.lean": {
       "hash": "51af684ae190",
       "pass": true,
@@ -473,6 +483,31 @@
       "hash": "0b173b066558",
       "pass": true,
       "unit_id": "ub6cd72ef49"
+    },
+    "GgufWriterQ2Contract.lean": {
+      "hash": "480c8bf3464c",
+      "pass": true,
+      "unit_id": "u62b936371e"
+    },
+    "IqNativePackIndex.lean": {
+      "hash": "28244aa807d5",
+      "pass": true,
+      "unit_id": "u62b936371e"
+    },
+    "MtpPackQuantizers.lean": {
+      "hash": "1b770a802fa9",
+      "pass": true,
+      "unit_id": "u62b936371e"
+    },
+    "MtpRuntimeBlobLayout.lean": {
+      "hash": "f77013995601",
+      "pass": true,
+      "unit_id": "u62b936371e"
+    },
+    "StrataPackBuilderVerifier.lean": {
+      "hash": "ca74991141d9",
+      "pass": true,
+      "unit_id": "u62b936371e"
     },
     "TokenizerByteLevelBpe.lean": {
       "hash": "bb589064ef6f",
@@ -494,12 +529,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u62b936371e": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
