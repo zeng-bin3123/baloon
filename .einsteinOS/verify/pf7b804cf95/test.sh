@@ -43,7 +43,7 @@ mutate() {
   if ! bt "$M" "$M/t" >/dev/null 2>&1; then echo "mutant $name failed to build"; rc=1; return; fi
   if "$M/t" >/dev/null 2>&1; then echo "MUTANT SURVIVED: $name"; rc=1; else echo "mutant $name detected"; fi
 }
-K=src/prefill/kernels.cu
+K=include/baloon/prefill_kernels_api.hpp
 mutate silu_sign     $K 's|out\[i\] = x\[i\] \* sigm(x\[i\]);|out[i] = x[i] * sigm(-x[i]);|'
 mutate gate_attn     $K 's|out\[i\] = attn\[i\] \* sigm(gate\[i\]);|out[i] = attn[i] * gate[i];|'
 mutate route_tie     $K 's|(cv\[l\] == bv \&\& ci\[l\] < bi)|(cv[l] == bv \&\& ci[l] > bi)|'
