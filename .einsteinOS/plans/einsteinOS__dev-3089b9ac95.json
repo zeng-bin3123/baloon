@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1203,
     "started": "2026-11-10T04:44:31.478528076Z",
-    "renewed": "2026-11-10T08:25:31.005420241Z"
+    "renewed": "2026-11-10T08:26:59.840671046Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -912,13 +912,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "p3798e66f3c": {
-      "compile": "pass",
-      "existing_code": "true",
-      "smoke": "pass"
-    }
-  },
   "reopen": {
     "p67ab651d04": {
       "kind": "review_fail",
@@ -935,14 +928,34 @@
       "text": "mapped kg::mrope_table_set/mrope_table/build_rope_table/rope_neox_apply (kg_kernels.hpp) are untested, and kg::mrope_table_set accepts negative sections (and defaults to {-1,0,0}) while the unit's tests only assert rejection and {11,11,10} on the separate refk:: copies. (said by the review of unit pb61a53ee92, whose files these are not)",
       "base_ref": "einsteinOS/dev-3089b9ac95"
     },
+    "u0063babba8": {
+      "kind": "review_fail",
+      "text": "PleReader::issue rejects rows \u003e= n_rows (returns ticket 0) instead of reading them as zeros per ple_direct_reader theory, and the test enforces the rejection (said by the review of unit p3798e66f3c, whose files these are not)",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
+    },
     "u25c78c49e6": {
       "kind": "review_fail",
       "text": "mapped kg::mrope_table_set/mrope_table/build_rope_table/rope_neox_apply (kg_kernels.hpp) are untested, and kg::mrope_table_set accepts negative sections (and defaults to {-1,0,0}) while the unit's tests only assert rejection and {11,11,10} on the separate refk:: copies. (said by the review of unit pb61a53ee92, whose files these are not)",
       "base_ref": "einsteinOS/dev-3089b9ac95"
     },
+    "ua9684a588f": {
+      "kind": "review_fail",
+      "text": "PleReader::issue rejects rows \u003e= n_rows (returns ticket 0) instead of reading them as zeros per ple_direct_reader theory, and the test enforces the rejection (said by the review of unit p3798e66f3c, whose files these are not)",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
+    },
+    "ub6cd72ef49": {
+      "kind": "review_fail",
+      "text": "PleReader::issue rejects rows \u003e= n_rows (returns ticket 0) instead of reading them as zeros per ple_direct_reader theory, and the test enforces the rejection (said by the review of unit p3798e66f3c, whose files these are not)",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
+    },
     "uc81136f4d9": {
       "kind": "review_fail",
       "text": "mapped kg::mrope_table_set/mrope_table/build_rope_table/rope_neox_apply (kg_kernels.hpp) are untested, and kg::mrope_table_set accepts negative sections (and defaults to {-1,0,0}) while the unit's tests only assert rejection and {11,11,10} on the separate refk:: copies. (said by the review of unit pb61a53ee92, whose files these are not)",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
+    },
+    "ud77a0d7726": {
+      "kind": "review_fail",
+      "text": "PleReader::issue rejects rows \u003e= n_rows (returns ticket 0) instead of reading them as zeros per ple_direct_reader theory, and the test enforces the rejection (said by the review of unit p3798e66f3c, whose files these are not)",
       "base_ref": "einsteinOS/dev-3089b9ac95"
     },
     "uf4e6ff5513": {
@@ -960,8 +973,12 @@
     "p67ab651d04": 1,
     "pcd027bc02f": 1,
     "pe1f7ca5c00": 1,
+    "u0063babba8": 1,
     "u25c78c49e6": 1,
+    "ua9684a588f": 1,
+    "ub6cd72ef49": 1,
     "uc81136f4d9": 1,
+    "ud77a0d7726": 1,
     "uf4e6ff5513": 1,
     "uf9f69c2c43": 1
   },
@@ -1314,6 +1331,7 @@
     }
   ],
   "port_pass": {
+    "p3798e66f3c": true,
     "pb03f48e330": true,
     "pb61a53ee92": true,
     "pc4b51f94e7": true,
