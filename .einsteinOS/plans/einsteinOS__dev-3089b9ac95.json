@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1203,
     "started": "2026-11-10T04:44:31.478528076Z",
-    "renewed": "2026-11-10T05:53:02.12374243Z"
+    "renewed": "2026-11-10T05:54:42.812152264Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -521,6 +521,16 @@
     }
   ],
   "state": {
+    "ActivationQuantizer.lean": {
+      "hash": "35cdc632beb0",
+      "pass": true,
+      "unit_id": "uae9dca27a5"
+    },
+    "DequantToHalfBf16.lean": {
+      "hash": "54a95f08e533",
+      "pass": true,
+      "unit_id": "uae9dca27a5"
+    },
     "DirectFileIo.lean": {
       "hash": "d5bfd4f94309",
       "pass": true,
@@ -576,6 +586,16 @@
       "pass": true,
       "unit_id": "u1af344a465"
     },
+    "IqCodebookKernels.lean": {
+      "hash": "9a352a1e7fae",
+      "pass": true,
+      "unit_id": "uae9dca27a5"
+    },
+    "KvCacheQ8.lean": {
+      "hash": "a57c78c285bd",
+      "pass": true,
+      "unit_id": "uae9dca27a5"
+    },
     "LayerComposition.lean": {
       "hash": "addd6b4d9bdb",
       "pass": true,
@@ -611,10 +631,20 @@
       "pass": true,
       "unit_id": "u2726a197a5"
     },
+    "NativeMmvqKernels.lean": {
+      "hash": "89c8eab0dda7",
+      "pass": true,
+      "unit_id": "uae9dca27a5"
+    },
     "NativeQsaIndexerAppend.lean": {
       "hash": "144345a3503c",
       "pass": true,
       "unit_id": "ucc74f228b9"
+    },
+    "NativeQsaScore.lean": {
+      "hash": "afc486c4b67c",
+      "pass": true,
+      "unit_id": "uae9dca27a5"
     },
     "NativeRouterTop10.lean": {
       "hash": "113b1b9b09f9",
@@ -655,6 +685,26 @@
       "hash": "15f5d781c4ff",
       "pass": true,
       "unit_id": "ucc74f228b9"
+    },
+    "QsaDecodeAttention.lean": {
+      "hash": "207f89bfefc0",
+      "pass": true,
+      "unit_id": "uae9dca27a5"
+    },
+    "RouterTop10Select.lean": {
+      "hash": "1e84cbe3cdc1",
+      "pass": true,
+      "unit_id": "uae9dca27a5"
+    },
+    "S2GemvFastExperiment.lean": {
+      "hash": "76c8aeba1930",
+      "pass": true,
+      "unit_id": "uae9dca27a5"
+    },
+    "S2GroupedExperts.lean": {
+      "hash": "c09db7b4e438",
+      "pass": true,
+      "unit_id": "uae9dca27a5"
     },
     "SamplerChain.lean": {
       "hash": "61cda38548c8",
@@ -733,12 +783,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "uae9dca27a5": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
