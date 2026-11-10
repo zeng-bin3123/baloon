@@ -1,9 +1,9 @@
 {
   "holder": {
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
-    "pid": 1673,
-    "started": "2026-11-10T01:22:32.210635459Z",
-    "renewed": "2026-11-10T04:29:22.213952624Z"
+    "pid": 1203,
+    "started": "2026-11-10T04:44:31.478528076Z",
+    "renewed": "2026-11-10T05:53:02.12374243Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -475,7 +475,8 @@
         "S2GemvFastExperiment.lean",
         "S2GroupedExperts.lean"
       ],
-      "reason": "added after theory changed"
+      "reason": "added after theory changed",
+      "conv": "a839678a-54ce-4cf7-9e44-187496d44aa2"
     },
     {
       "id": "u0063babba8",
@@ -732,6 +733,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "uae9dca27a5": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -1085,6 +1092,7 @@
     "u2726a197a5": true,
     "u61716a9a8a": true,
     "ua9684a588f": true,
+    "uae9dca27a5": true,
     "ub6cd72ef49": true,
     "ucc74f228b9": true,
     "uf9f69c2c43": true
