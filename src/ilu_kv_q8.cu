@@ -50,11 +50,14 @@ __global__ void kv_append_q8_kernel(const float* src, int8_t* codes, uint16_t* s
         const float amax = red[0];
         __syncthreads();
         if (ok) {
-            const float inv = amax > 0.f ? 127.f / amax : 0.f;
+            // Quantize with the STORED (fp16-rounded) scale so gather dequantizes consistently (theory: kv_cache_q8).
+            const uint16_t sbits = f16bits::f16_from_f32(amax / 127.f);
+            const float sc = f16bits::f32_from_f16(sbits);
+            const float inv = sc > 0.f ? 1.f / sc : 0.f;
             int q = (int)rintf(x * inv);
             q = q < -127 ? -127 : (q > 127 ? 127 : q);
             codes[row * head_dim + g * GROUP + t] = (int8_t)q;
-            if (t == 0) scales[row * groups + g] = f16bits::f16_from_f32(amax / 127.f);
+            if (t == 0) scales[row * groups + g] = sbits;
         }
     }
 }

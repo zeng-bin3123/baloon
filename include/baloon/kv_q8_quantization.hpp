@@ -31,7 +31,9 @@ inline void quantize_group(const float* x, int8_t* q, uint16_t* scale_bits) {
     }
     const float scale = amax / 127.f;
     *scale_bits = f16::float_to_half(scale);
-    const float inv = amax > 0.f ? 127.f / amax : 0.f;
+    // Quantize with the STORED (fp16-rounded) scale, as the cache dequantizes with it (theory: kv_cache_q8).
+    const float stored = f16::half_to_float(*scale_bits);
+    const float inv = stored > 0.f ? 1.f / stored : 0.f;
     for (int i = 0; i < kGroupSize; ++i) {
         const int64_t c = (int64_t)std::nearbyint(x[i] * inv);
         q[i] = (int8_t)clamp_q(c);

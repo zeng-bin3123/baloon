@@ -64,4 +64,35 @@ static void ig_run() {
         ig_ck(h == back, "device buffer round-trips");
     }
 }
-int main() { int rc = ig_legacy([&] { return legacy_main(); }); ig_run(); return ig_finish("kv_q8_parity", rc); }
+#include "baloon/kv_q8_kernels.hpp"
+// kv_append_q8_step must quantize with the STORED fp16 scale: codes and scales equal the host reference exactly.
+static void ig_append_device() {
+    namespace kq = baloon::kvq8; namespace kd = baloon::kv_q8_dev;
+    const int kvh = 2, hd = 128, ps = 4, pages = 3, groups = hd / 64; const int64_t pool_rows = (int64_t)pages * kvh * ps;
+    std::mt19937 rng(91); std::uniform_real_distribution<float> U(-3.f, 3.f);
+    std::vector<float> x(kvh * hd); for (auto& v : x) v = U(rng) * 7.3f + 0.011f;
+    std::vector<int32_t> table = {2, 0};
+    const int64_t pos = 5;  // page index 1 -> physical page 0, offset 1
+    float* dx = (float*)ig_dalloc(x.size() * 4); int8_t* dc = (int8_t*)ig_dalloc(pool_rows * hd); uint16_t* ds = (uint16_t*)ig_dalloc(pool_rows * groups * 2);
+    int32_t* dt = (int32_t*)ig_dalloc(table.size() * 4);
+    if (!ig_ck(dx && dc && ds && dt, "append test allocations")) return;
+    cudaMemset(dc, 0, pool_rows * hd); cudaMemset(ds, 0, pool_rows * groups * 2);
+    cudaMemcpy(dx, x.data(), x.size() * 4, cudaMemcpyHostToDevice); cudaMemcpy(dt, table.data(), table.size() * 4, cudaMemcpyHostToDevice);
+    ig_ck(kd::kv_append_q8_step(dx, dc, ds, dt, (int64_t)table.size(), pos, kvh, hd, ps, pool_rows, nullptr) == 0, "kv_append_q8_step succeeds");
+    cudaDeviceSynchronize();
+    std::vector<int8_t> hc(pool_rows * hd); std::vector<uint16_t> hs(pool_rows * groups);
+    cudaMemcpy(hc.data(), dc, hc.size(), cudaMemcpyDeviceToHost); cudaMemcpy(hs.data(), ds, hs.size() * 2, cudaMemcpyDeviceToHost);
+    bool codes_ok = true, scales_ok = true;
+    for (int h = 0; h < kvh; ++h) {
+        const int64_t row = ((int64_t)table[pos / ps] * kvh + h) * ps + pos % ps;
+        for (int g = 0; g < groups; ++g) {
+            int8_t q[64]; uint16_t sb; kq::quantize_group(&x[h * hd + g * 64], q, &sb);
+            if (hs[row * groups + g] != sb) scales_ok = false;
+            for (int i = 0; i < 64; ++i) if (hc[row * hd + g * 64 + i] != q[i]) codes_ok = false;
+        }
+    }
+    ig_ck(scales_ok, "device append stores the fp16 scale amax/127");
+    ig_ck(codes_ok, "device append quantizes with the stored fp16 scale (codes equal host reference)");
+    cudaFree(dx); cudaFree(dc); cudaFree(ds); cudaFree(dt);
+}
+int main() { int rc = ig_legacy([&] { return legacy_main(); }); ig_run(); ig_append_device(); return ig_finish("kv_q8_parity", rc); }
