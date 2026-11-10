@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1673,
     "started": "2026-11-10T01:22:32.210635459Z",
-    "renewed": "2026-11-10T03:35:07.27994881Z"
+    "renewed": "2026-11-10T04:27:59.285394824Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -458,7 +458,8 @@
         "GatedResidualReference.lean",
         "GdnReferenceKernels.lean"
       ],
-      "reason": "added after theory changed"
+      "reason": "added after theory changed",
+      "conv": "d4f96f1f-2ec4-4c38-9276-3ab4e3c0fff1"
     },
     {
       "id": "uae9dca27a5",
@@ -681,6 +682,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "ua9684a588f": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -1033,6 +1040,7 @@
     "u1af344a465": true,
     "u2726a197a5": true,
     "u61716a9a8a": true,
+    "ua9684a588f": true,
     "ub6cd72ef49": true,
     "ucc74f228b9": true,
     "uf9f69c2c43": true
