@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1203,
     "started": "2026-11-10T04:44:31.478528076Z",
-    "renewed": "2026-11-10T11:20:29.387372002Z"
+    "renewed": "2026-11-10T11:22:50.6744723Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -875,11 +875,15 @@
     }
   },
   "fix_attempts": {
+    "p17652417b0": 1,
     "p3ff4aef2d0": 1,
     "pb03f48e330": 1,
     "ube4f27df84": 1
   },
   "fail_history": {
+    "p17652417b0": [
+      "review_fail"
+    ],
     "p3ff4aef2d0": [
       "review_fail"
     ],
@@ -904,6 +908,11 @@
     ]
   },
   "last_failure": {
+    "p17652417b0": {
+      "kind": "review_fail",
+      "text": "pytools/layer_pack.py blob_offsets/build put gu_scales (819200) before d_codes (921600), contradicting the pack_layer_blob spec and q2_blob_geometry.hpp (d_codes 819200, gu_scales 1228800); the test pins the wrong order",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
+    },
     "p3ff4aef2d0": {
       "kind": "review_fail",
       "text": "`template_kwargs` (port: `effort_kwargs`) accepts \"false\" as a thinking-disable spelling, but the theory says any spelling outside none/off/minimal/disabled/low/medium/high/xhigh/max/maximum must be rejected with 400; no test or mutant covers it",
@@ -921,13 +930,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "p17652417b0": {
-      "compile": "pass",
-      "existing_code": "true",
-      "smoke": "pass"
-    }
-  },
   "reopen": {
     "p67ab651d04": {
       "kind": "review_fail",
