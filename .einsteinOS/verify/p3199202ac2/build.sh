@@ -162,9 +162,11 @@ for f in src/kernels/gpu/*.cu; do
   echo "[cuda] $f"; "$CLANG" $CUFLAGS -Isrc/kernels/gpu -c "$f" -o "$o"
   KG_OBJS="$KG_OBJS $o"
 done
+echo "[cuda] src/native_flash_attn.cu (flash_short.cu delegates to native_flash_attn_step)"
+"$CLANG" $CUFLAGS -c src/native_flash_attn.cu -o "$OUT/native_flash_attn.o"
 echo "[cuda] tests/k32_gpu_kernels/test_kg.cu"
 "$CLANG" $CUFLAGS -c tests/k32_gpu_kernels/test_kg.cu -o "$OUT/test_kg.o"
-link "$OUT/test_k32_gpu_kernels" "$OUT/test_kg.o" $KG_OBJS
+link "$OUT/test_k32_gpu_kernels" "$OUT/test_kg.o" "$OUT/native_flash_attn.o" $KG_OBJS
 
 # ---- unit 33: plan CLI (src/plan) + invariant test ------------------------------------------------------------------------------
 echo "[build] unit 33 CLI (plan_cli)"
@@ -177,4 +179,32 @@ for f in src/platform/*.cpp; do
 done
 echo "[build] unit 34 test (platform implementation invariants)"
 $HOSTCXX $HFLAGS tests/k34_platform_impl/test_platform_impl.cpp src/platform/direct_file.cpp src/platform/memory.cpp -o "$OUT/test_k34_platform_impl"
+# ---- unit 35: src/prefill/gemm.cu (device Gemm) + invariant test ---------------------------------------------------------------
+echo "[cuda] src/prefill/gemm.cu"
+"$CLANG" $CUFLAGS -c src/prefill/gemm.cu -o "$OUT/src__prefill__gemm.cu.o"
+echo "[cuda] tests/k35_gemm_dev/test_gemm_dev.cu"
+"$CLANG" $CUFLAGS -c tests/k35_gemm_dev/test_gemm_dev.cu -o "$OUT/test_gemm_dev.o"
+link "$OUT/test_k35_gemm_dev" "$OUT/test_gemm_dev.o" "$OUT/src__prefill__gemm.cu.o"
+# ---- unit 37: python tooling (pytools/) -------------------------------------------------------------------------------------
+command -v python3 >/dev/null 2>&1 || { echo "python3 missing"; exit 2; }
+python3 -c "import numpy" || { echo "numpy missing"; exit 2; }
+echo "[python] byte-compile pytools + tests/k37_pytools"
+PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
+import glob, sys
+files = sorted(glob.glob("pytools/*.py") + glob.glob("tests/k37_pytools/*.py"))
+assert len(files) >= 12, files
+for f in files:
+    compile(open(f).read(), f, "exec")
+print("compiled", len(files), "python files")
+PY
+echo "[python] import every module, run the in-module self checks"
+PYTHONDONTWRITEBYTECODE=1 python3 - <<'PY'
+import importlib, pkgutil, pytools
+mods = [m.name for m in pkgutil.iter_modules(pytools.__path__)]
+for m in mods:
+    importlib.import_module("pytools." + m)
+from pytools import gguf_emit
+assert gguf_emit._selfcheck()
+print("imported", len(mods), "modules")
+PY
 echo "BUILD OK"
