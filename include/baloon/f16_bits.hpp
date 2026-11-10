@@ -14,6 +14,10 @@
 #else
 #define BALOON_BITS_HD
 #endif
+// REF_HD: the host+device qualifier of the reference layout (same meaning as BALOON_BITS_HD).
+#ifndef REF_HD
+#define REF_HD BALOON_BITS_HD
+#endif
 
 namespace baloon {
 namespace f16bits {

@@ -1,0 +1,22 @@
+include/ref/artifact/gguf_reader.hpp: Cursor GgufFile MetaType MetaValue Qwen4ExpGuard TensorInfo WIN32_LEAN_AND_MEAN block_geometry check_architecture ggml_type_name read_value
+include/ref/kernels/cpu/expert.hpp: ActQ BB BLOB CpuFeatures ExpertScratch ExpertScratchMulti FF H MAXC MAXT NE O_D_CODES O_D_SCALES O_GU_CODES O_GU_SCALES QK QKA ROW_D ROW_GU SC_D SC_GU act_quant_q8_1 act_quant_q8_1_avx2 cpu_features cpu_require_expert_support expert_oracle_q8_0_enabled expert_set_oracle_q8_0 q2_0_gguf_rows_multi q2_0_gguf_rows_multi_avx2 s2_expert_down_rows s2_expert_down_rows_multi s2_expert_gu_rows s2_expert_gu_rows_multi s2_expert_scalar s2_expert_vnni s2_expert_vnni_multi s2_expert_vnni_q
+include/ref/kernels/cpu/expert_layout.hpp: ExpertLayout act_quant_any cpu_avx512_ok expert_layout expert_layout_load q2_rows_any
+include/ref/kernels/cpu/iq_avx512.hpp: iq512_gu_rows iq512_rows iq512_supported
+include/ref/kernels/cpu/pool.hpp: ExpertJob ExpertJobMulti ExpertPool physical_cores pin_current_thread restore_thread_affinity
+include/ref/kernels/f16_bits.hpp: REF_HD f16_from_f32 f32_from_f16
+include/ref/kernels/gdn.hpp: GdnShapes gdn_beta_gate gdn_conv_step gdn_l2_norm gdn_out_norm gdn_step
+include/ref/kernels/qsa.hpp: QsaIndexerBuffers QsaShapes QsaStep indexer_key_append kTopkMaxCells kv_append kv_append_step kv_gather kv_gather_step qsa_attend qsa_attend_step qsa_freq_base qsa_gate_apply qsa_gate_apply_f32 qsa_index qsa_index_step qsa_real_shapes qsa_rms_eps qsa_selection_width qsa_step_bytes qsa_step_fill topk_512 topk_512_step
+include/ref/kernels/s2_expert_grouped.hpp: moe_group_resident moe_grouped_s2 moe_hit_add moe_hit_grouped_s2 moe_hit_grouped_s2_cpu_order moe_hit_grouped_s2_dev moe_hit_grouped_s2_multi moe_hit_grouped_scratch_bytes moe_hit_select moe_hit_select_multi
+include/ref/kernels/s_gemv.hpp: Codebook SForm s2_gemv_fast s2_gemv_quads s_gemv s_gemv_q8_0_split s_gemv_q8k s_gemv_q8k_split s_gemv_split s_gemv_split_async
+src/artifact/gguf_reader.cpp: main
+src/core/layout.cpp: LayerView::name Want1 Want2 check_all check_layer check_one fail
+src/core/native_dense.cpp: DeviceFree DevicePtr NativeDense::load NativeDense::served_names NativeDense::~NativeDense Pending eligible
+src/kernels/cpu/expert_layout.cpp: act_quant_any cpu_avx512_ok expert_layout expert_layout_load native_down_rows native_experts_available native_fmt native_gu_rows native_quant_act native_quant_h q2_rows_any
+src/kernels/cpu/iq_avx512.cpp: Fmt G3 GGML_COMMON_DECL_CPP GGML_COMMON_IMPL_CPP dot_rows dot_rows_nt gu_rows gu_rows_nt h2f iq512_gu_rows iq512_rows iq512_supported row_dot scales4 u16 u32 u64
+src/kernels/cpu/native_expert.cpp: init_once native_down_rows native_experts_available native_fmt native_gu_rows native_quant_act native_quant_h traits
+src/kernels/cpu/pool.cpp: ExpertPool::ExpertPool ExpertPool::drain ExpertPool::run ExpertPool::run_phase ExpertPool::run_split ExpertPool::run_split_multi ExpertPool::run_split_multi_native ExpertPool::worker ExpertPool::~ExpertPool WIN32_LEAN_AND_MEAN physical_cores pin_current_thread pin_this_thread restore_thread_affinity
+src/kernels/cpu/q2_avx2.cpp: act_quant_q8_1_avx2 h2f q2_0_gguf_rows_multi_avx2 row_multi rows unpack64
+src/kernels/cuda/kv_q8.cu: check kv_append_q8_kernel kv_append_q8_step kv_gather_q8_kernel kv_gather_q8_step validate
+src/kernels/cuda/ple.cu: THREADS add3_kernel bcast_kernel bf16_bits bf16_float bf16_gemv_kernel block_sum ck conv_kernel gate_kernel gnorm_kernel history_advance_kernel native_bf16 native_postops overlap ple_block ple_block_available ple_block_scratch_bytes ple_history_advance ple_native_postops_enabled ple_set_native_bf16 ple_set_native_postops silu_f to_bf16_kernel
+src/kernels/cuda/s_gemv.cu: Q8K_BLOCK_BYTES Q8K_BLOCK_ELEMS Q8_0_BLOCK_BYTES Q8_0_BLOCK_ELEMS decode decode_tbl finish kIq4Nl q8_0_at q8k_at q8k_form_ok s_gemv s_gemv_kernel s_gemv_q8_0_split s_gemv_q8_split_kernel s_gemv_q8k s_gemv_q8k_kernel s_gemv_q8k_split s_gemv_split s_gemv_split_async s_gemv_split_impl s_gemv_split_kernel
+src/kernels/ngram.cpp: NOMINMAX PleTable PleTable::PleTable PleTable::bytes_read PleTable::close PleTable::collect PleTable::gather PleTable::gather_batch PleTable::io_report PleTable::is_open PleTable::issue PleTable::mode PleTable::open PleTable::read_row PleTable::rows PleTable::set_injected_delay_us PleTable::~PleTable WIN32_LEAN_AND_MEAN g_ple_prefetch iq4nl_code iq4nl_dequant_row kIq4Nl ngram_mixed ngram_rows ple_artifact_consts ple_prefetch_enable ple_prefetch_enabled
