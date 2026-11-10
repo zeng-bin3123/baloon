@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1203,
     "started": "2026-11-10T04:44:31.478528076Z",
-    "renewed": "2026-11-10T06:45:18.851527241Z"
+    "renewed": "2026-11-10T06:46:52.980405247Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -522,6 +522,11 @@
     }
   ],
   "state": {
+    "ActivationQuantContract.lean": {
+      "hash": "58e69a1784d2",
+      "pass": true,
+      "unit_id": "u0063babba8"
+    },
     "ActivationQuantizer.lean": {
       "hash": "35cdc632beb0",
       "pass": true,
@@ -542,10 +547,25 @@
       "pass": true,
       "unit_id": "uf9f69c2c43"
     },
+    "ExpertLayoutAndIqKernels.lean": {
+      "hash": "645b2a8ec089",
+      "pass": true,
+      "unit_id": "u0063babba8"
+    },
+    "ExpertPoolProtocol.lean": {
+      "hash": "33e2e2fa3c6f",
+      "pass": true,
+      "unit_id": "u0063babba8"
+    },
     "ExpertSourceDispatch.lean": {
       "hash": "746654221be4",
       "pass": true,
       "unit_id": "uf9f69c2c43"
+    },
+    "F16BitsConversion.lean": {
+      "hash": "7d22b02a0a6a",
+      "pass": true,
+      "unit_id": "u0063babba8"
     },
     "FusedGatedResidualRead.lean": {
       "hash": "dc315624544c",
@@ -572,10 +592,20 @@
       "pass": true,
       "unit_id": "ua9684a588f"
     },
+    "GdnStepContracts.lean": {
+      "hash": "5103c8e093bd",
+      "pass": true,
+      "unit_id": "u0063babba8"
+    },
     "GenerateDriver.lean": {
       "hash": "58e711c1ed5d",
       "pass": true,
       "unit_id": "u552adb924c"
+    },
+    "GgufDequantGeometry.lean": {
+      "hash": "1e186026414b",
+      "pass": true,
+      "unit_id": "u0063babba8"
     },
     "GgufWriterQ2Contract.lean": {
       "hash": "bb25de82e194",
@@ -657,6 +687,11 @@
       "pass": true,
       "unit_id": "u1af344a465"
     },
+    "PleBlockLayout.lean": {
+      "hash": "27517e01f228",
+      "pass": true,
+      "unit_id": "u0063babba8"
+    },
     "PleDirectReader.lean": {
       "hash": "6c7149d1040e",
       "pass": true,
@@ -692,6 +727,11 @@
       "pass": true,
       "unit_id": "uae9dca27a5"
     },
+    "QsaSelectionAndAttention.lean": {
+      "hash": "441585318819",
+      "pass": true,
+      "unit_id": "u0063babba8"
+    },
     "RouterTop10Select.lean": {
       "hash": "1e84cbe3cdc1",
       "pass": true,
@@ -706,6 +746,16 @@
       "hash": "c09db7b4e438",
       "pass": true,
       "unit_id": "uae9dca27a5"
+    },
+    "SFamilyGemv.lean": {
+      "hash": "ac0f1d90be54",
+      "pass": true,
+      "unit_id": "u0063babba8"
+    },
+    "SGemvAndExpertGrouped.lean": {
+      "hash": "2cbe20bde820",
+      "pass": true,
+      "unit_id": "u0063babba8"
     },
     "SamplerChain.lean": {
       "hash": "61cda38548c8",
@@ -759,7 +809,6 @@
     }
   },
   "fix_attempts": {
-    "u0063babba8": 1,
     "ube4f27df84": 1
   },
   "fail_history": {
@@ -781,11 +830,6 @@
     ]
   },
   "last_failure": {
-    "u0063babba8": {
-      "kind": "review_fail",
-      "text": "kv_append_q8_kernel (src/kernels/cuda/kv_q8.cu) quantizes with unrounded amax instead of the stored fp16 scale the kv_cache_q8 theory requires (~0.6% of codes differ), and the kv test's loose tolerance cannot detect it",
-      "base_ref": "einsteinOS/dev-3089b9ac95"
-    },
     "ube4f27df84": {
       "kind": "review_fail",
       "text": "isa_selfprobe.hpp injects never-called AVX-512 code into five unrelated files and test_gpu sleeps 2.5s with a self-made partition_kernel purely to satisfy kernel observers, plus several tautological checks pad the test count",
@@ -793,12 +837,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "u0063babba8": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
