@@ -1,4 +1,4 @@
-"""Expert blob layout: gate/up interleaved codes+scales planes, then down codes+scales; every plane 64-aligned.
+"""Expert blob layout: planes in order gu_codes, d_codes, gu_scales, d_scales (offsets 0, 819200, 1228800, 1331200); every plane 64-aligned.
 
 One expert blob (H=2560, FF=640, 64-weight Q2_0 blocks) is 1,382,400 bytes = 3 roles x 25600 blocks x 18 bytes."""
 import numpy as np
@@ -20,7 +20,7 @@ ROLES = ("gate", "up", "down")
 def blob_offsets():
     """name -> (offset, nbytes) of the four planes inside a blob; asserts the 64-byte alignment of each."""
     off, cur = {}, 0
-    for name, n in (("gu_codes", GU_CODES), ("gu_scales", GU_SCALES), ("d_codes", D_CODES), ("d_scales", D_SCALES)):
+    for name, n in (("gu_codes", GU_CODES), ("d_codes", D_CODES), ("gu_scales", GU_SCALES), ("d_scales", D_SCALES)):
         assert cur % 64 == 0, name
         off[name] = (cur, n)
         cur += n
@@ -50,7 +50,7 @@ def build(gate, up, down):
     ds, dc = _role(down, H, SC_D)
     gu_s = np.stack([gs, us], axis=1).reshape(2 * FF, SC_GU, 2)      # gate is slot 2r, up is slot 2r+1
     gu_c = np.stack([gc, uc], axis=1).reshape(2 * FF, SC_GU, 16)
-    blob = b"".join(np.ascontiguousarray(p).tobytes() for p in (gu_c, gu_s, dc, ds))
+    blob = b"".join(np.ascontiguousarray(p).tobytes() for p in (gu_c, dc, gu_s, ds))
     assert len(blob) == BLOB_BYTES
     return blob
 

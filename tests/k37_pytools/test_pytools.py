@@ -273,7 +273,11 @@ class ExpertBlob(unittest.TestCase):
         self.assertEqual(lp.BLOB_BYTES, 1382400)
         self.assertEqual(3 * lp.ROLE_BYTES, lp.BLOB_BYTES)
         o = lp.blob_offsets()
-        self.assertEqual([v[0] for v in o.values()], [0, 819200, 921600, 1331200])
+        self.assertEqual(list(o), ["gu_codes", "d_codes", "gu_scales", "d_scales"])
+        self.assertEqual({k: v[0] for k, v in o.items()},
+                         {"gu_codes": 0, "d_codes": 819200, "gu_scales": 1228800, "d_scales": 1331200})
+        self.assertEqual({k: v[1] for k, v in o.items()},
+                         {"gu_codes": 819200, "d_codes": 409600, "gu_scales": 102400, "d_scales": 51200})
         self.assertTrue(all(v[0] % 64 == 0 for v in o.values()))
         self.assertEqual(sum(v[1] for v in o.values()), lp.BLOB_BYTES)
         self.assertEqual(lp.FF * lp.SC_GU, lp.H * lp.SC_D)
@@ -296,6 +300,13 @@ class ExpertBlob(unittest.TestCase):
                 idx = slot * lp.SC_GU + b
                 self.assertEqual(bl[so + 2 * idx:so + 2 * idx + 2].tolist(), src[r, b, :2].tolist())
                 self.assertEqual(bl[co + 16 * idx:co + 16 * idx + 16].tolist(), src[r, b, 2:].tolist())
+        # down planes: row-major (H, SC_D) blocks; codes at d_codes, scales at d_scales
+        ds_ = np.frombuffer(d, np.uint8).reshape(lp.H, lp.SC_D, 18)
+        dco, dso = lp.blob_offsets()["d_codes"][0], lp.blob_offsets()["d_scales"][0]
+        for r, b in ((0, 0), (5, 9), (2559, 9)):
+            idx = r * lp.SC_D + b
+            self.assertEqual(bl[dco + 16 * idx:dco + 16 * idx + 16].tolist(), ds_[r, b, 2:].tolist())
+            self.assertEqual(bl[dso + 2 * idx:dso + 2 * idx + 2].tolist(), ds_[r, b, :2].tolist())
         # blob_of wraps build with a verification
         self.assertEqual(mtp_blob.blob_of(g, u, d), blob)
         self.assertEqual(mtp_blob.main([]), 0)
