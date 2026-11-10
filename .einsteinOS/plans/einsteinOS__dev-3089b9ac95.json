@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1203,
     "started": "2026-11-10T04:44:31.478528076Z",
-    "renewed": "2026-11-10T09:19:20.350075524Z"
+    "renewed": "2026-11-10T09:20:40.253403877Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -875,10 +875,14 @@
     }
   },
   "fix_attempts": {
+    "p3ff4aef2d0": 1,
     "pb03f48e330": 1,
     "ube4f27df84": 1
   },
   "fail_history": {
+    "p3ff4aef2d0": [
+      "review_fail"
+    ],
     "pb03f48e330": [
       "review_fail"
     ],
@@ -900,6 +904,11 @@
     ]
   },
   "last_failure": {
+    "p3ff4aef2d0": {
+      "kind": "review_fail",
+      "text": "`template_kwargs` (port: `effort_kwargs`) accepts \"false\" as a thinking-disable spelling, but the theory says any spelling outside none/off/minimal/disabled/low/medium/high/xhigh/max/maximum must be rejected with 400; no test or mutant covers it",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
+    },
     "pb03f48e330": {
       "kind": "review_fail",
       "text": "native_quant_act/native_quant_h (via act_quant_q8_1) round ties to even, but theory module activation_quant_contract requires round-half-away-from-zero, and the unit test asserts the wrong tie behaviour",
@@ -912,13 +921,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "p3ff4aef2d0": {
-      "compile": "pass",
-      "existing_code": "true",
-      "smoke": "pass"
-    }
-  },
   "reopen": {
     "p67ab651d04": {
       "kind": "review_fail",
