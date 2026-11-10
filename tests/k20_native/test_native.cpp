@@ -74,11 +74,11 @@ int main() {
     { std::vector<float> x(64, 1.f); alignas(4) uint8_t buf[512];
       CHECK(!native_quant_act(NativeFmt::Q2_0, x.data(), 40, 1, buf) && !native_quant_act(NativeFmt::None, x.data(), 64, 1, buf) && !native_quant_act(NativeFmt::IQ2_S, x.data(), 64, 1, buf)); }
 
-    // ---- activation quantizer: ties to even, clamp, scale = amax/127, chunk sum
+    // ---- activation quantizer: half away from zero, clamp, scale = amax/127, chunk sum
     { float x[32]; for (int i = 0; i < 32; ++i) x[i] = 0.f;
       x[0] = 127.f; x[1] = 0.5f; x[2] = 1.5f; x[3] = 2.5f; x[4] = -0.5f; x[5] = -2.5f; x[6] = -127.f; x[7] = 3.5f; x[8] = 0.49f; x[9] = 0.51f;
       int8_t q[32]; float d; int32_t hx; act_quant_any(x, 32, q, &d, &hx);
-      CHECK(d == 1.f && q[0] == 127 && q[1] == 0 && q[2] == 2 && q[3] == 2 && q[4] == 0 && q[5] == -2 && q[6] == -127 && q[7] == 4 && q[8] == 0 && q[9] == 1);
+      CHECK(d == 1.f && q[0] == 127 && q[1] == 1 && q[2] == 2 && q[3] == 3 && q[4] == -1 && q[5] == -3 && q[6] == -127 && q[7] == 4 && q[8] == 0 && q[9] == 1);
       int s = 0; for (int i = 0; i < 32; ++i) s += q[i]; CHECK(hx == s);
       int8_t q2[32]; float d2; int32_t h2; kern::act_quant_q8_1(x, 32, q2, &d2, &h2); CHECK(std::memcmp(q, q2, 32) == 0 && d2 == d && h2 == hx); }
     for (int rep = 0; rep < 50; ++rep) {

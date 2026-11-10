@@ -63,7 +63,7 @@ void expert_set_oracle_q8_0(bool on);
 bool expert_oracle_q8_0_enabled();
 
 // ---- activation quantization ----------------------------------------------------------------------------------
-// n % 32 == 0. Rounding is round-half-even; the scalar and AVX2 forms are bit-identical.
+// n % 32 == 0. Rounding is half away from zero (odd-symmetric, clamp [-127,127]); the scalar and AVX2 forms are bit-identical.
 void act_quant_q8_1(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx);
 void act_quant_q8_1_avx2(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx);
 

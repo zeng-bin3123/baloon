@@ -49,6 +49,8 @@ mutate downrange $H 's|r1 > n_embd \|\| nt == 0|r1 > n_embd + 1 \|\| nt == 0|'
 mutate downstr   $H 's|if (out_stride < r1) return false;||'
 mutate guup      $H 's|blob + l.up_off, r0, r1|blob + l.down_off, r0, r1|'
 mutate availmult $H 's|expert_layout(ggml_type, n_embd, n_ff).ok) return false;|expert_layout(ggml_type, n_embd, n_ff).ok \&\& false) return false;|'
+mutate rhaquant  src/cpu/expert_q2.cpp 's|(int)std::round(xc\[i\] \* id)|(int)std::nearbyint(xc[i] * id)|'
+mutate rhasimd   src/cpu/expert_q2.cpp 's|cvt_rha_epi32(_mm256_mul_ps(v\[k\], vid))|_mm256_cvtps_epi32(_mm256_mul_ps(v[k], vid))|'
 mutate portrow   .einsteinOS/port/pb03f48e330.tsv '0,/native_quant_h/{/native_quant_h/d}'
 mutate portname  .einsteinOS/port/pb03f48e330.tsv 's|^\(.*\tnative_gu_rows\t.*\t\)native_gu_rows$|\1native_gu_rows_x|'
 [ $rc -eq 0 ] && echo "ALL UNIT TESTS PASSED" || echo "UNIT TESTS FAILED"

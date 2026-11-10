@@ -82,7 +82,17 @@ void q2_0_gguf_rows_multi_avx2(const uint8_t* w, uint32_t row0, uint32_t row1, u
     }
 }
 
-// Per 32-value chunk: d = amax/127, q = clamp(rint(x/d), -127, 127) (round-to-nearest-even), hx = sum of the codes.
+// Round half away from zero on 8 lanes (exact: the fractional part of t - trunc(t) is exactly representable).
+static inline __m256i cvt_rha_epi32(__m256 t) {
+    const __m256 sign = _mm256_set1_ps(-0.f);
+    const __m256 tr = _mm256_round_ps(t, _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC);
+    const __m256 fr = _mm256_andnot_ps(sign, _mm256_sub_ps(t, tr));
+    const __m256 ge = _mm256_cmp_ps(fr, _mm256_set1_ps(0.5f), _CMP_GE_OQ);
+    const __m256 one = _mm256_or_ps(_mm256_set1_ps(1.f), _mm256_and_ps(t, sign));
+    return _mm256_cvttps_epi32(_mm256_add_ps(tr, _mm256_and_ps(ge, one)));
+}
+
+// Per 32-value chunk: d = amax/127, q = clamp(round(x/d), -127, 127) (round half away from zero), hx = sum of the codes.
 void act_quant_q8_1_avx2(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx) {
     const __m256 absmask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff));
     const __m256i lo = _mm256_set1_epi32(-127), hi = _mm256_set1_epi32(127);
@@ -97,7 +107,7 @@ void act_quant_q8_1_avx2(const float* x, uint32_t n, int8_t* q, float* d, int32_
         const __m256 vid = _mm256_set1_ps(id);
         __m256i qi[4], sum = _mm256_setzero_si256();
         for (int k = 0; k < 4; ++k) {
-            qi[k] = _mm256_min_epi32(_mm256_max_epi32(_mm256_cvtps_epi32(_mm256_mul_ps(v[k], vid)), lo), hi);
+            qi[k] = _mm256_min_epi32(_mm256_max_epi32(cvt_rha_epi32(_mm256_mul_ps(v[k], vid)), lo), hi);
             sum = _mm256_add_epi32(sum, qi[k]);
         }
         __m256i p = _mm256_packs_epi16(_mm256_packs_epi32(qi[0], qi[1]), _mm256_packs_epi32(qi[2], qi[3]));

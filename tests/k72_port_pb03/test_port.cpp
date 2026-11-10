@@ -1,7 +1,7 @@
 // Unit pb03f48e330: the native CPU expert identifier surface (9 reference definitions) and its invariants.
 // (1) Port check: each required row has a port-table entry naming a file in this repo that really defines the identifier.
 // (2) Invariants, against independent scalar models (not the code under test): format table, activation capacities and
-//     packing, activation quantizer (round-half-even, scale = amax/127, chunk sums), gate/up SwiGLU rows, down rows,
+//     packing, activation quantizer (round-half-away-from-zero, scale = amax/127, chunk sums), gate/up SwiGLU rows, down rows,
 //     argument validation, availability, i-quant Q8_K blocks and row paths.
 #include <cmath>
 #include <cstdint>
@@ -97,7 +97,7 @@ static void fill_q2(std::vector<uint8_t>& w, uint64_t blocks) {
     for (auto& v : w) v = (uint8_t)rnd32();
     for (uint64_t b = 0; b < blocks; ++b) { uint16_t h = (uint16_t)(0x2800 + (rnd32() & 0x3FF)); std::memcpy(&w[b * 18], &h, 2); }
 }
-static int ref_round(float v) { return (int)std::nearbyint(v); }   // ties to even (default rounding mode)
+static int ref_round(float v) { return (int)std::round(v); }   // half away from zero (odd-symmetric)
 
 int main(int argc, char** argv) {
     const std::string root = argc > 1 ? argv[1] : ".";
@@ -152,12 +152,12 @@ int main(int argc, char** argv) {
       CHECK(!native_quant_h(NativeFmt::Q2_0, x.data(), 64, 0, buf) && !native_quant_h(NativeFmt::IQ3_S, x.data(), 64, 1, buf));
       CHECK(native_quant_h(NativeFmt::Q2_0, x.data(), 64, 1, buf)); }
 
-    // ---- quantizer semantics against an independent model: ties to even, scale amax/127, chunk sums
+    // ---- quantizer semantics against an independent model: half away from zero, scale amax/127, chunk sums
     { float x[32] = {}; x[0] = 127.f; x[1] = 0.5f; x[2] = 1.5f; x[3] = 2.5f; x[4] = -0.5f; x[5] = -2.5f; x[6] = -127.f; x[7] = 3.5f; x[8] = 0.49f; x[9] = 0.51f;
       alignas(4) uint8_t buf[32 + 8];
       CHECK(native_quant_act(NativeFmt::Q2_0, x, 32, 1, buf));
       const int8_t* q = (const int8_t*)buf; const float d = *(const float*)(buf + 32); const int32_t hx = *(const int32_t*)(buf + 36);
-      CHECK(d == 1.f && q[0] == 127 && q[1] == 0 && q[2] == 2 && q[3] == 2 && q[4] == 0 && q[5] == -2 && q[6] == -127 && q[7] == 4 && q[8] == 0 && q[9] == 1);
+      CHECK(d == 1.f && q[0] == 127 && q[1] == 1 && q[2] == 2 && q[3] == 3 && q[4] == -1 && q[5] == -3 && q[6] == -127 && q[7] == 4 && q[8] == 0 && q[9] == 1);
       int s = 0; for (int i = 0; i < 32; ++i) s += q[i]; CHECK(hx == s); }
     for (int rep = 0; rep < 40; ++rep) {
         const uint32_t n = 32 * (1 + rnd32() % 6), nt = 1 + rnd32() % 4, nc = n / 32; const float sc = 0.01f + (rnd32() % 1000) * 0.05f;
@@ -171,7 +171,7 @@ int main(int argc, char** argv) {
             for (int i = 0; i < 32; ++i) amax = std::fmax(amax, std::fabs(x[(size_t)t * n + c * 32 + i]));
             const float dd = d[(size_t)t * nc + c]; CHECK(near(dd, amax / 127.f, 1e-6f));
             for (int i = 0; i < 32; ++i) { const int v = q[(size_t)t * n + c * 32 + i]; s += v; CHECK(v >= -127 && v <= 127); CHECK(std::fabs(v * dd - x[(size_t)t * n + c * 32 + i]) <= 0.5001f * dd + 1e-6f);
-                if (dd > 0) CHECK(std::abs(v - ref_round(x[(size_t)t * n + c * 32 + i] / dd)) <= 1); }
+                if (dd > 0) CHECK(std::abs(v - ref_round(x[(size_t)t * n + c * 32 + i] * (1.f / dd))) == 0); }
             CHECK(hx[(size_t)t * nc + c] == s);
         }
         // native_quant_h is the same quantizer
@@ -179,6 +179,13 @@ int main(int argc, char** argv) {
         CHECK(native_quant_h(NativeFmt::Q2_0, x.data(), n, nt, b2));
         CHECK(std::memcmp(buf, b2, native_act_bytes(NativeFmt::Q2_0, n, nt)) == 0);
     }
+
+    // scalar and AVX2 forms: half away from zero and bit-identical, including exact ties and near-ties
+    { float x[32] = {}; x[0] = 127.f; x[1] = 0.5f; x[2] = 1.5f; x[3] = 2.5f; x[4] = -0.5f; x[5] = -2.5f; x[6] = -1.5f; x[7] = 0.49999997f; x[8] = -0.49999997f;
+      int8_t qs[32], qa[32]; float ds, da; int32_t hs, ha;
+      kern::act_quant_q8_1(x, 32, qs, &ds, &hs); kern::act_quant_q8_1_avx2(x, 32, qa, &da, &ha);
+      CHECK(ds == 1.f && qs[1] == 1 && qs[2] == 2 && qs[3] == 3 && qs[4] == -1 && qs[5] == -3 && qs[6] == -2 && qs[7] == 0 && qs[8] == 0);
+      CHECK(std::memcmp(qs, qa, 32) == 0 && ds == da && hs == ha); }
 
     // ---- Q2_0 expert stages through the entry points
     if (any) {

@@ -280,6 +280,15 @@ void expert_set_oracle_q8_0(bool on) { oracle_flag.store(on, std::memory_order_r
 bool expert_oracle_q8_0_enabled() { return expert_oracle_q8_0(); }
 
 // ============================================================================================ public: quantization
+// Round half away from zero on 8 lanes (exact: the fractional part of t - trunc(t) is exactly representable).
+static inline __m256i cvt_rha_epi32(__m256 t) {
+    const __m256 sign = _mm256_set1_ps(-0.f);
+    const __m256 tr = _mm256_round_ps(t, _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC);
+    const __m256 fr = _mm256_andnot_ps(sign, _mm256_sub_ps(t, tr));
+    const __m256 ge = _mm256_cmp_ps(fr, _mm256_set1_ps(0.5f), _CMP_GE_OQ);
+    const __m256 one = _mm256_or_ps(_mm256_set1_ps(1.f), _mm256_and_ps(t, sign));
+    return _mm256_cvttps_epi32(_mm256_add_ps(tr, _mm256_and_ps(ge, one)));
+}
 void act_quant_q8_1(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx) {
     if (oracle_on()) { quantize_oracle_q8_0(x, n, q, d, hx); return; }
     for (uint32_t c = 0; c < n / QKA; ++c) {
@@ -289,7 +298,7 @@ void act_quant_q8_1(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx
         const float dd = amax / 127.f, id = dd != 0.f ? 1.f / dd : 0.f;
         int32_t s = 0;
         for (uint32_t i = 0; i < QKA; ++i) {
-            const int v = actq::clamp_cpu((int)std::nearbyint(xc[i] * id));
+            const int v = actq::clamp_cpu((int)std::round(xc[i] * id));
             q[(size_t)c * QKA + i] = (int8_t)v;
             s += v;
         }
@@ -314,7 +323,7 @@ void act_quant_q8_1_avx2(const float* x, uint32_t n, int8_t* q, float* d, int32_
         const __m256i lo = _mm256_set1_epi32(-127), hi = _mm256_set1_epi32(127);
         __m256i qi[4], sum = _mm256_setzero_si256();
         for (int k = 0; k < 4; ++k) {
-            qi[k] = _mm256_min_epi32(_mm256_max_epi32(_mm256_cvtps_epi32(_mm256_mul_ps(v[k], vid)), lo), hi);   // RNE
+            qi[k] = _mm256_min_epi32(_mm256_max_epi32(cvt_rha_epi32(_mm256_mul_ps(v[k], vid)), lo), hi);   // half away from zero
             sum = _mm256_add_epi32(sum, qi[k]);
         }
         __m256i p01 = _mm256_packs_epi32(qi[0], qi[1]), p23 = _mm256_packs_epi32(qi[2], qi[3]);
