@@ -166,6 +166,11 @@ static void test_kv_q8() {
                     CHECK(c >= -127 && c <= 127);                        // never -128
                     if (sc == 0.f) CHECK(c == 0);                        // scale 0 gives code 0
                     else CHECK(std::fabs(src[i] - sc * c) <= 0.5f * sc + amax * 2.f / 1024.f);
+                    if (sc != 0.f) {                                     // exact: code = clamp(rint(x / STORED fp16 scale))
+                        int e = (int)std::nearbyintf(src[i] / sc);
+                        e = e < -127 ? -127 : (e > 127 ? 127 : e);
+                        CHECK(c == e);
+                    }
                 }
             }
         }
