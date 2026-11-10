@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1203,
     "started": "2026-11-10T04:44:31.478528076Z",
-    "renewed": "2026-11-10T06:23:55.104330623Z"
+    "renewed": "2026-11-10T06:26:10.499352405Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -759,9 +759,13 @@
     }
   },
   "fix_attempts": {
+    "u0063babba8": 1,
     "ube4f27df84": 1
   },
   "fail_history": {
+    "u0063babba8": [
+      "review_fail"
+    ],
     "u1af344a465": [
       "review_fail"
     ],
@@ -777,6 +781,11 @@
     ]
   },
   "last_failure": {
+    "u0063babba8": {
+      "kind": "review_fail",
+      "text": "kv_append_q8_kernel (src/kernels/cuda/kv_q8.cu) quantizes with unrounded amax instead of the stored fp16 scale the kv_cache_q8 theory requires (~0.6% of codes differ), and the kv test's loose tolerance cannot detect it",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
+    },
     "ube4f27df84": {
       "kind": "review_fail",
       "text": "isa_selfprobe.hpp injects never-called AVX-512 code into five unrelated files and test_gpu sleeps 2.5s with a self-made partition_kernel purely to satisfy kernel observers, plus several tautological checks pad the test count",
@@ -784,12 +793,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "u0063babba8": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
