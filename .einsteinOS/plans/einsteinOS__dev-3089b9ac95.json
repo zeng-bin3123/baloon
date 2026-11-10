@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1673,
     "started": "2026-11-10T01:22:32.210635459Z",
-    "renewed": "2026-11-10T03:14:58.070642151Z"
+    "renewed": "2026-11-10T03:17:16.625423048Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -606,9 +606,13 @@
     }
   },
   "fix_attempts": {
+    "u1af344a465": 1,
     "ube4f27df84": 1
   },
   "fail_history": {
+    "u1af344a465": [
+      "review_fail"
+    ],
     "ub6cd72ef49": [
       "review_fail",
       "review_fail"
@@ -621,6 +625,11 @@
     ]
   },
   "last_failure": {
+    "u1af344a465": {
+      "kind": "review_fail",
+      "text": "SpeculativeVerifyWindow acceptance test checks a test-local `accepted()` instead of the real accept_len, DirectFileIo test exercises dfio::DirectFile rather than the platform DirectFile counterpart, and many checks are constant arithmetic that cannot fail",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
+    },
     "ube4f27df84": {
       "kind": "review_fail",
       "text": "isa_selfprobe.hpp injects never-called AVX-512 code into five unrelated files and test_gpu sleeps 2.5s with a self-made partition_kernel purely to satisfy kernel observers, plus several tautological checks pad the test count",
@@ -628,12 +637,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "u1af344a465": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
