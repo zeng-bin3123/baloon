@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1673,
     "started": "2026-11-10T01:22:32.210635459Z",
-    "renewed": "2026-11-10T02:20:36.246817913Z"
+    "renewed": "2026-11-10T02:22:30.033858642Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -533,6 +533,11 @@
       "pass": true,
       "unit_id": "u62b936371e"
     },
+    "MtpDrafter.lean": {
+      "hash": "76f23ad3d92e",
+      "pass": true,
+      "unit_id": "u61716a9a8a"
+    },
     "NativeFlashAttnShort.lean": {
       "hash": "8bc24fbdab4b",
       "pass": true,
@@ -577,6 +582,21 @@
       "hash": "16bf51f6b698",
       "pass": true,
       "unit_id": "uf4e6ff5513"
+    },
+    "SuffixDrafter.lean": {
+      "hash": "13ce51305fc5",
+      "pass": true,
+      "unit_id": "u61716a9a8a"
+    },
+    "VerifyWindow.lean": {
+      "hash": "f1e0de0e7a84",
+      "pass": true,
+      "unit_id": "u61716a9a8a"
+    },
+    "VerifyWindowKernels.lean": {
+      "hash": "9b759594e188",
+      "pass": true,
+      "unit_id": "u61716a9a8a"
     }
   },
   "fix_attempts": {
@@ -602,12 +622,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "u61716a9a8a": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
