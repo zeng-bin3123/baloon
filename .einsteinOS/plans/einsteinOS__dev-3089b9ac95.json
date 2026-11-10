@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1203,
     "started": "2026-11-10T04:44:31.478528076Z",
-    "renewed": "2026-11-10T08:20:43.082772133Z"
+    "renewed": "2026-11-10T08:25:31.005420241Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -912,6 +912,13 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "p3798e66f3c": {
+      "compile": "pass",
+      "existing_code": "true",
+      "smoke": "pass"
+    }
+  },
   "reopen": {
     "p67ab651d04": {
       "kind": "review_fail",
