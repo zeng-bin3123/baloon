@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1203,
     "started": "2026-11-10T04:44:31.478528076Z",
-    "renewed": "2026-11-10T07:19:42.337009106Z"
+    "renewed": "2026-11-10T07:21:15.894422739Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -533,6 +533,16 @@
       "pass": true,
       "unit_id": "uae9dca27a5"
     },
+    "CanonicalQuantRoundtrip.lean": {
+      "hash": "e8e37e6f96f3",
+      "pass": true,
+      "unit_id": "ue063fb297c"
+    },
+    "ChatFrontendParser.lean": {
+      "hash": "435b39bf97e0",
+      "pass": true,
+      "unit_id": "ue063fb297c"
+    },
     "DequantToHalfBf16.lean": {
       "hash": "54a95f08e533",
       "pass": true,
@@ -608,6 +618,11 @@
       "pass": true,
       "unit_id": "u0063babba8"
     },
+    "GgufReaderGeometry.lean": {
+      "hash": "937a35c4951c",
+      "pass": true,
+      "unit_id": "ue063fb297c"
+    },
     "GgufWriterQ2Contract.lean": {
       "hash": "bb25de82e194",
       "pass": true,
@@ -622,6 +637,11 @@
       "hash": "9a352a1e7fae",
       "pass": true,
       "unit_id": "uae9dca27a5"
+    },
+    "IqPackLayout.lean": {
+      "hash": "c7789db0cfb2",
+      "pass": true,
+      "unit_id": "ue063fb297c"
     },
     "KvCacheQ8.lean": {
       "hash": "a57c78c285bd",
@@ -647,6 +667,11 @@
       "hash": "76f23ad3d92e",
       "pass": true,
       "unit_id": "u61716a9a8a"
+    },
+    "MtpPackQuant.lean": {
+      "hash": "f662fdaafac4",
+      "pass": true,
+      "unit_id": "ue063fb297c"
     },
     "NativeFlashAttnShort.lean": {
       "hash": "8bc24fbdab4b",
@@ -683,6 +708,11 @@
       "pass": true,
       "unit_id": "uf9f69c2c43"
     },
+    "PackLayerBlob.lean": {
+      "hash": "60f30de911c8",
+      "pass": true,
+      "unit_id": "ue063fb297c"
+    },
     "PinnedArenaLoad.lean": {
       "hash": "1cb868745cd7",
       "pass": true,
@@ -712,6 +742,16 @@
       "hash": "8ebb8b532ac8",
       "pass": true,
       "unit_id": "u1af344a465"
+    },
+    "Q2ExpertBlobGeometry.lean": {
+      "hash": "72feef4a562b",
+      "pass": true,
+      "unit_id": "ue063fb297c"
+    },
+    "Q2RowDotIdentity.lean": {
+      "hash": "5b3cc2168f25",
+      "pass": true,
+      "unit_id": "ue063fb297c"
     },
     "QsaBlockSelect.lean": {
       "hash": "68d9b1073baf",
@@ -763,6 +803,11 @@
       "pass": true,
       "unit_id": "uf9f69c2c43"
     },
+    "ServeServerProtocol.lean": {
+      "hash": "13605d861ba1",
+      "pass": true,
+      "unit_id": "ue063fb297c"
+    },
     "SessionGraphReplay.lean": {
       "hash": "3816e167d46c",
       "pass": true,
@@ -787,6 +832,11 @@
       "hash": "364deb5f04a0",
       "pass": true,
       "unit_id": "u1af344a465"
+    },
+    "StrataPackBuilder.lean": {
+      "hash": "99d2bd60e557",
+      "pass": true,
+      "unit_id": "ue063fb297c"
     },
     "SuffixDrafter.lean": {
       "hash": "13ce51305fc5",
@@ -838,12 +888,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "ue063fb297c": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
