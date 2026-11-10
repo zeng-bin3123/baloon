@@ -28,6 +28,9 @@ std::atomic<bool> oracle_flag{false};
 inline bool expert_oracle_q8_0() { return oracle_flag.load(std::memory_order_relaxed); }
 
 inline float h2f(uint16_t h) { return _cvtsh_ss(h); }
+// acc + a * b with a single rounding (vfmadd); every float accumulation of the Q2_0 row dots goes through it so the scalar
+// reference and the VNNI paths keep one and the same rounding sequence.
+inline float fma_acc(float a, float b, float acc) { return _mm_cvtss_f32(_mm_fmadd_ss(_mm_set_ss(a), _mm_set_ss(b), _mm_set_ss(acc))); }
 inline uint16_t load_u16(const uint8_t* p) { uint16_t v; std::memcpy(&v, p, 2); return v; }
 [[maybe_unused]] inline float hsum_ps(__m512 v) { return _mm512_reduce_add_ps(v); }
 inline float silu_f(float v) { return v / (1.f + std::exp(-v)); }
@@ -70,7 +73,7 @@ inline float row_dot(const uint8_t* codes, const uint8_t* scales, uint32_t nb, c
             const uint32_t ch = 2 * b + h;
             int32_t s = 0;
             for (uint32_t i = 0; i < 32; ++i) s += (int32_t)c[h * 32 + i] * (int32_t)q[(size_t)ch * 32 + i];
-            acc += wd * xd[ch] * (float)(s - hx[ch]);
+            acc = fma_acc(wd * xd[ch], (float)(s - hx[ch]), acc);
         }
     }
     return acc;
@@ -90,8 +93,8 @@ inline float row_dot_z(const uint8_t* codes, const uint8_t* scales, uint32_t nb,
             const uint32_t b = b0 + k;
             int32_t lo, hi;
             block_dot(codes + (size_t)b * 16, q + (size_t)b * kZmm, lo, hi);
-            acc += wd[k] * xd[2 * b] * (float)(lo - hx[2 * b]);
-            acc += wd[k] * xd[2 * b + 1] * (float)(hi - hx[2 * b + 1]);
+            acc = fma_acc(wd[k] * xd[2 * b], (float)(lo - hx[2 * b]), acc);
+            acc = fma_acc(wd[k] * xd[2 * b + 1], (float)(hi - hx[2 * b + 1]), acc);
         }
     }
     return acc;
@@ -111,8 +114,8 @@ inline void row_dot_multi_z(const uint8_t* codes, const uint8_t* scales, uint32_
                 const __m512i s = _mm512_dpbusd_epi32(_mm512_setzero_si512(), c, _mm512_loadu_si512((const void*)(a[t].q + (size_t)b * kZmm)));
                 const int32_t lo = _mm512_reduce_add_epi32(_mm512_inserti64x4(_mm512_setzero_si512(), _mm512_castsi512_si256(s), 0));
                 const int32_t hi = _mm512_reduce_add_epi32(_mm512_inserti64x4(_mm512_setzero_si512(), _mm512_extracti64x4_epi64(s, 1), 0));
-                acc[t] += wd[k] * a[t].d[2 * b] * (float)(lo - a[t].hx[2 * b]);
-                acc[t] += wd[k] * a[t].d[2 * b + 1] * (float)(hi - a[t].hx[2 * b + 1]);
+                acc[t] = fma_acc(wd[k] * a[t].d[2 * b], (float)(lo - a[t].hx[2 * b]), acc[t]);
+                acc[t] = fma_acc(wd[k] * a[t].d[2 * b + 1], (float)(hi - a[t].hx[2 * b + 1]), acc[t]);
             }
         }
     }
