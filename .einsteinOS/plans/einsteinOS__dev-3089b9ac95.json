@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1203,
     "started": "2026-11-10T04:44:31.478528076Z",
-    "renewed": "2026-11-10T07:53:27.24134536Z"
+    "renewed": "2026-11-10T07:55:14.798335536Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -903,11 +903,51 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "pb61a53ee92": {
-      "compile": "pass",
-      "smoke": "pass"
+  "reopen": {
+    "p67ab651d04": {
+      "kind": "review_fail",
+      "text": "mapped kg::mrope_table_set/mrope_table/build_rope_table/rope_neox_apply (kg_kernels.hpp) are untested, and kg::mrope_table_set accepts negative sections (and defaults to {-1,0,0}) while the unit's tests only assert rejection and {11,11,10} on the separate refk:: copies. (said by the review of unit pb61a53ee92, whose files these are not)",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
+    },
+    "pcd027bc02f": {
+      "kind": "review_fail",
+      "text": "mapped kg::mrope_table_set/mrope_table/build_rope_table/rope_neox_apply (kg_kernels.hpp) are untested, and kg::mrope_table_set accepts negative sections (and defaults to {-1,0,0}) while the unit's tests only assert rejection and {11,11,10} on the separate refk:: copies. (said by the review of unit pb61a53ee92, whose files these are not)",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
+    },
+    "pe1f7ca5c00": {
+      "kind": "review_fail",
+      "text": "mapped kg::mrope_table_set/mrope_table/build_rope_table/rope_neox_apply (kg_kernels.hpp) are untested, and kg::mrope_table_set accepts negative sections (and defaults to {-1,0,0}) while the unit's tests only assert rejection and {11,11,10} on the separate refk:: copies. (said by the review of unit pb61a53ee92, whose files these are not)",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
+    },
+    "u25c78c49e6": {
+      "kind": "review_fail",
+      "text": "mapped kg::mrope_table_set/mrope_table/build_rope_table/rope_neox_apply (kg_kernels.hpp) are untested, and kg::mrope_table_set accepts negative sections (and defaults to {-1,0,0}) while the unit's tests only assert rejection and {11,11,10} on the separate refk:: copies. (said by the review of unit pb61a53ee92, whose files these are not)",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
+    },
+    "uc81136f4d9": {
+      "kind": "review_fail",
+      "text": "mapped kg::mrope_table_set/mrope_table/build_rope_table/rope_neox_apply (kg_kernels.hpp) are untested, and kg::mrope_table_set accepts negative sections (and defaults to {-1,0,0}) while the unit's tests only assert rejection and {11,11,10} on the separate refk:: copies. (said by the review of unit pb61a53ee92, whose files these are not)",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
+    },
+    "uf4e6ff5513": {
+      "kind": "review_fail",
+      "text": "mapped kg::mrope_table_set/mrope_table/build_rope_table/rope_neox_apply (kg_kernels.hpp) are untested, and kg::mrope_table_set accepts negative sections (and defaults to {-1,0,0}) while the unit's tests only assert rejection and {11,11,10} on the separate refk:: copies. (said by the review of unit pb61a53ee92, whose files these are not)",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
+    },
+    "uf9f69c2c43": {
+      "kind": "review_fail",
+      "text": "mapped kg::mrope_table_set/mrope_table/build_rope_table/rope_neox_apply (kg_kernels.hpp) are untested, and kg::mrope_table_set accepts negative sections (and defaults to {-1,0,0}) while the unit's tests only assert rejection and {11,11,10} on the separate refk:: copies. (said by the review of unit pb61a53ee92, whose files these are not)",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
     }
+  },
+  "reopen_count": {
+    "p67ab651d04": 1,
+    "pcd027bc02f": 1,
+    "pe1f7ca5c00": 1,
+    "u25c78c49e6": 1,
+    "uc81136f4d9": 1,
+    "uf4e6ff5513": 1,
+    "uf9f69c2c43": 1
   },
   "port_units": [
     {
@@ -1258,6 +1298,7 @@
     }
   ],
   "port_pass": {
+    "pb61a53ee92": true,
     "pc4b51f94e7": true,
     "pfcccb31b26": true
   },
