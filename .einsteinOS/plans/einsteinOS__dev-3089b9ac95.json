@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1203,
     "started": "2026-11-10T04:44:31.478528076Z",
-    "renewed": "2026-11-10T05:54:42.812152264Z"
+    "renewed": "2026-11-10T06:23:55.104330623Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -492,7 +492,8 @@
         "ExpertPoolProtocol.lean",
         "GgufDequantGeometry.lean"
       ],
-      "reason": "added after theory changed"
+      "reason": "added after theory changed",
+      "conv": "4ce7e284-4d75-45d4-aadb-c6115d4607b0"
     },
     {
       "id": "ue063fb297c",
@@ -783,6 +784,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "u0063babba8": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -1132,6 +1139,7 @@
     }
   ],
   "verify_seen": {
+    "u0063babba8": true,
     "u1af344a465": true,
     "u2726a197a5": true,
     "u61716a9a8a": true,
