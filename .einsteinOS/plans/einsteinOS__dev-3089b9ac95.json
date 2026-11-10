@@ -1,9 +1,9 @@
 {
   "holder": {
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
-    "pid": 1891,
-    "started": "2026-11-09T13:38:45.796377179Z",
-    "renewed": "2026-11-09T16:30:04.702496257Z"
+    "pid": 1673,
+    "started": "2026-11-10T01:22:32.210635459Z",
+    "renewed": "2026-11-10T02:20:36.246817913Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -417,7 +417,8 @@
         "VerifyWindowKernels.lean",
         "SuffixDrafter.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "383919aa-ca68-44e4-8719-b18aca646212"
     },
     {
       "id": "u552adb924c",
@@ -601,6 +602,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "u61716a9a8a": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -951,6 +958,7 @@
   ],
   "verify_seen": {
     "u2726a197a5": true,
+    "u61716a9a8a": true,
     "ub6cd72ef49": true,
     "ucc74f228b9": true,
     "uf9f69c2c43": true
