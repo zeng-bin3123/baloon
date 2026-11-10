@@ -1,0 +1,9 @@
+include/ref/kernels/cpu/native_expert.hpp	NativeFmt	type
+include/ref/kernels/cpu/native_expert.hpp	kNativeActBytes	const
+include/ref/kernels/cpu/native_expert.hpp	kNativeHBytes	const
+include/ref/kernels/cpu/native_expert.hpp	native_down_rows	func
+include/ref/kernels/cpu/native_expert.hpp	native_experts_available	func
+include/ref/kernels/cpu/native_expert.hpp	native_fmt	func
+include/ref/kernels/cpu/native_expert.hpp	native_gu_rows	func
+include/ref/kernels/cpu/native_expert.hpp	native_quant_act	func
+include/ref/kernels/cpu/native_expert.hpp	native_quant_h	func
