@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1673,
     "started": "2026-11-10T01:22:32.210635459Z",
-    "renewed": "2026-11-10T02:22:44.545543693Z"
+    "renewed": "2026-11-10T03:14:58.070642151Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -441,7 +441,8 @@
         "PrefillChunkPipeline.lean",
         "PrefillKernelsIndexing.lean"
       ],
-      "reason": "added after theory changed"
+      "reason": "added after theory changed",
+      "conv": "3ff98a1c-4a9b-4679-9378-76a53107a1ae"
     },
     {
       "id": "ua9684a588f",
@@ -627,6 +628,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "u1af344a465": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -976,6 +983,7 @@
     }
   ],
   "verify_seen": {
+    "u1af344a465": true,
     "u2726a197a5": true,
     "u61716a9a8a": true,
     "ub6cd72ef49": true,
