@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1203,
     "started": "2026-11-10T04:44:31.478528076Z",
-    "renewed": "2026-11-10T08:05:51.167770739Z"
+    "renewed": "2026-11-10T08:07:35.382850634Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -875,9 +875,13 @@
     }
   },
   "fix_attempts": {
+    "pb03f48e330": 1,
     "ube4f27df84": 1
   },
   "fail_history": {
+    "pb03f48e330": [
+      "review_fail"
+    ],
     "u0063babba8": [
       "review_fail"
     ],
@@ -896,6 +900,11 @@
     ]
   },
   "last_failure": {
+    "pb03f48e330": {
+      "kind": "review_fail",
+      "text": "native_quant_act/native_quant_h (via act_quant_q8_1) round ties to even, but theory module activation_quant_contract requires round-half-away-from-zero, and the unit test asserts the wrong tie behaviour",
+      "base_ref": "einsteinOS/dev-3089b9ac95"
+    },
     "ube4f27df84": {
       "kind": "review_fail",
       "text": "isa_selfprobe.hpp injects never-called AVX-512 code into five unrelated files and test_gpu sleeps 2.5s with a self-made partition_kernel purely to satisfy kernel observers, plus several tautological checks pad the test count",
@@ -903,12 +912,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "pb03f48e330": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "reopen": {
     "p67ab651d04": {
       "kind": "review_fail",
