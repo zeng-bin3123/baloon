@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1203,
     "started": "2026-11-10T04:44:31.478528076Z",
-    "renewed": "2026-11-10T07:21:15.894422739Z"
+    "renewed": "2026-11-10T07:21:29.840139493Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -838,6 +838,11 @@
       "pass": true,
       "unit_id": "ue063fb297c"
     },
+    "StrataTokenizerBpe.lean": {
+      "hash": "f5f167c0a28b",
+      "pass": true,
+      "unit_id": "u71db141952"
+    },
     "SuffixDrafter.lean": {
       "hash": "13ce51305fc5",
       "pass": true,
@@ -852,6 +857,16 @@
       "hash": "9b759594e188",
       "pass": true,
       "unit_id": "u61716a9a8a"
+    },
+    "VisionBuildConfig.lean": {
+      "hash": "8ad9263904e4",
+      "pass": true,
+      "unit_id": "u71db141952"
+    },
+    "VisionEncoderProtocol.lean": {
+      "hash": "9a6783f4f172",
+      "pass": true,
+      "unit_id": "u71db141952"
     },
     "WeightPackLoader.lean": {
       "hash": "42867e89bcc4",
