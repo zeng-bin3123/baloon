@@ -1,0 +1,854 @@
+{
+ "repo": "Niko1221/Strata",
+ "ref_sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+ "prev_sha": "6801c77ff6f7a1e08fe78820d3043f469f6f3f6f",
+ "reference": {
+  "repo": "Niko1221/Strata",
+  "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+  "build_exit": 0,
+  "build_tail": "…al_3303997548/src/build/_deps/strata_llamacpp-src/ggml/src/ggml-cpu/ops.cpp:5250:18: warning: variable 'rs' set but not used [-Wunused-but-set-variable]\n 5250 |     const size_t rs = ggml_row_size(src0-\u003etype, nc);\n      |                  ^~\n/tmp/einsteinos_eval_3303997548/src/build/_deps/strata_llamacpp-src/ggml/src/ggml-cpu/ops.cpp: In instantiation of 'void ggml_compute_forward_set_rows_impl(const ggml_compute_params*, ggml_tensor*) [with src_t = float; idx_t = int]':\n/tmp/einsteinos_eval_3303997548/src/build/_deps/strata_llamacpp-src/ggml/src/ggml-cpu/ops.cpp:5304:83:   required from here\n/tmp/einsteinos_eval_3303997548/src/build/_deps/strata_llamacpp-src/ggml/src/ggml-cpu/ops.cpp:5250:18: warning: variable 'rs' set but not used [-Wunused-but-set-variable]\n[ 83%] Linking CXX static library libggml-cpu.a\n[ 83%] Built target ggml-cpu\n[ 85%] Building CXX object CMakeFiles/strata_kernels_cpu.dir/src/kernels/cpu/expert.cpp.o\n[ 88%] Building CXX object CMakeFiles/strata_kernels_cpu.dir/src/kernels/cpu/pool.cpp.o\n[ 92%] Building CXX object CMakeFiles/strata_kernels_cpu.dir/src/kernels/cpu/expert_layout.cpp.o\n[ 92%] Building CXX object CMakeFiles/strata_kernels_cpu.dir/src/kernels/cpu/q2_avx2.cpp.o\n[ 95%] Building CXX object CMakeFiles/strata_kernels_cpu.dir/src/kernels/cpu/native_expert.cpp.o\n[ 97%] Building CXX object CMakeFiles/strata_kernels_cpu.dir/src/kernels/cpu/iq_avx512.cpp.o\n[100%] Linking CXX static library libstrata_kernels_cpu.a\n[100%] Built target strata_kernels_cpu",
+  "benches": null
+ },
+ "dev": {
+  "repo": "(port)",
+  "sha": "",
+  "build_exit": 0,
+  "build_tail": "",
+  "benches": null
+ },
+ "e2e": {
+  "bench": {
+   "File": ".einsteinOS/verify/uintegratione5509707730d/e2e.sh",
+   "Kind": "e2e",
+   "Name": "e2e.sh",
+   "Command": "",
+   "Sources": null
+  },
+  "exit": 2,
+  "metrics": null,
+  "tail": "e2e: MODEL_DIR=/tmp/model does not exist",
+  "devices": []
+ },
+ "external": [
+  {
+   "repo": "triton-lang/triton",
+   "sha": "5a65cea23b5ac6bdfaf1e97d619b8d8d1c966ce8",
+   "build_exit": -1,
+   "build_tail": "",
+   "benches": null,
+   "err": "checkout: fatal: unable to access 'https://github.com/triton-lang/triton.git/': GnuTLS recv error (-9): Error decoding the received TLS packet.\ntar: This does not look like a tar archive\ntar: Exiting with failure status due to previous errors"
+  }
+ ],
+ "clues": [
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing q2_0 1k",
+    "value": 389,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing q2_0 4k",
+    "value": 539,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing q2_0 32k",
+    "value": 571,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing q2_0 64k",
+    "value": 561,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing q2_0 128k",
+    "value": 543,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing q2_0 262k",
+    "value": 496,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq2_xs 1k",
+    "value": 332,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq2_xs 4k",
+    "value": 463,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq2_xs 32k",
+    "value": 495,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq2_xs 64k",
+    "value": 486,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq2_xs 128k",
+    "value": 472,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq2_xs 262k",
+    "value": 437,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq3_xxs 1k",
+    "value": 285,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq3_xxs 4k",
+    "value": 410,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq3_xxs 32k",
+    "value": 435,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq3_xxs 64k",
+    "value": 427,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq3_xxs 128k",
+    "value": 414,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output q2_0 1k",
+    "value": 88.7,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output q2_0 4k",
+    "value": 94.6,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output q2_0 32k",
+    "value": 87.5,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output q2_0 64k",
+    "value": 76.4,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output q2_0 128k",
+    "value": 65.1,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output q2_0 262k",
+    "value": 56.3,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq2_xs 1k",
+    "value": 82,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq2_xs 4k",
+    "value": 78,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq2_xs 32k",
+    "value": 65.3,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq2_xs 64k",
+    "value": 63.7,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq2_xs 128k",
+    "value": 52,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq2_xs 262k",
+    "value": 48,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq3_xxs 1k",
+    "value": 64.6,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq3_xxs 4k",
+    "value": 65.6,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq3_xxs 32k",
+    "value": 57.3,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq3_xxs 64k",
+    "value": 54.4,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq3_xxs 128k",
+    "value": 44.8,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **q2_0** 1k",
+    "value": 389,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **q2_0** 4k",
+    "value": 539,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **q2_0** 32k",
+    "value": 571,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **q2_0** 64k",
+    "value": 561,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **q2_0** 128k",
+    "value": 543,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **q2_0** 262k",
+    "value": 496,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **iq2_xs** 1k",
+    "value": 332,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **iq2_xs** 4k",
+    "value": 463,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **iq2_xs** 32k",
+    "value": 495,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **iq2_xs** 64k",
+    "value": 486,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **iq2_xs** 128k",
+    "value": 472,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **iq2_xs** 262k",
+    "value": 437,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **iq3_xxs** 1k",
+    "value": 285,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **iq3_xxs** 4k",
+    "value": 410,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **iq3_xxs** 32k",
+    "value": 435,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **iq3_xxs** 64k",
+    "value": 427,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "prompt processing **iq3_xxs** 128k",
+    "value": 414,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **q2_0** 1k",
+    "value": 88.7,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **q2_0** 4k",
+    "value": 94.6,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **q2_0** 32k",
+    "value": 87.5,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **q2_0** 64k",
+    "value": 76.4,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **q2_0** 128k",
+    "value": 65.1,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **q2_0** 262k",
+    "value": 56.3,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **iq2_xs** 1k",
+    "value": 82,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **iq2_xs** 4k",
+    "value": 78,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **iq2_xs** 32k",
+    "value": 65.3,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **iq2_xs** 64k",
+    "value": 63.7,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **iq2_xs** 128k",
+    "value": 52,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **iq2_xs** 262k",
+    "value": 48,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **iq3_xxs** 1k",
+    "value": 64.6,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **iq3_xxs** 4k",
+    "value": 65.6,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **iq3_xxs** 32k",
+    "value": 57.3,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **iq3_xxs** 64k",
+    "value": 54.4,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+   "file": "docs/DETAILS.md",
+   "metric": {
+    "label": "output **iq3_xxs** 128k",
+    "value": 44.8,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  }
+ ],
+ "compared": null,
+ "conditions": {
+  "model_dir": "/tmp/model",
+  "model_name": "",
+  "model": null,
+  "model_bytes": 0,
+  "model_err": "lstat /tmp/model: no such file or directory",
+  "gpus": [
+   {
+    "index": 0,
+    "name": "Iluvatar BI-V100",
+    "memory_mib": 32768
+   },
+   {
+    "index": 1,
+    "name": "Iluvatar BI-V100",
+    "memory_mib": 32768
+   },
+   {
+    "index": 2,
+    "name": "Iluvatar BI-V100",
+    "memory_mib": 32768
+   },
+   {
+    "index": 3,
+    "name": "Iluvatar BI-V100",
+    "memory_mib": 32768
+   }
+  ],
+  "host_mem_kib": 527921112,
+  "ref_repo": "Niko1221/Strata",
+  "ref_sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54"
+ },
+ "discover": {
+  "asked": 2,
+  "named": [
+   "llvm/llvm-project",
+   "triton-lang/triton",
+   "NVIDIA/cutlass",
+   "Niko1221/Strata",
+   "zeng-bin3123/baloon"
+  ],
+  "taken": [
+   "triton-lang/triton: 4 runnable benchmark(s): script:bench_dense_matmul.py script:bench_matmul_metadata.py script:bench_mlp.py script:bench_reduce.py"
+  ],
+  "not_taken": [
+   "llvm/llvm-project: does not clone (signal: killed: Cloning into bare repository '/tmp/eval_llvm_llvm-project.git'...)",
+   "NVIDIA/cutlass: does not clone (signal: killed: Cloning into bare repository '/tmp/eval_NVIDIA_cutlass.git'...\nfatal: unable to access 'https://github.com/NVIDIA/cutlass.git/': GnuTLS recv error (-9): Error decoding the received TLS packet.)",
+   "Niko1221/Strata: the reference, a dev repository or named before",
+   "zeng-bin3123/baloon: the reference, a dev repository or named before"
+  ]
+ },
+ "compare": {
+  "published": 0,
+  "port_rates": 0,
+  "asked": false,
+  "named": 0,
+  "ignored": null
+ },
+ "gate": "integration_e2e_failed",
+ "gate_text": "integration_e2e_failed: .einsteinOS/verify/uintegratione5509707730d/e2e.sh exited 2 running the model at /tmp/model; output: e2e: MODEL_DIR=/tmp/model does not exist",
+ "when": "2026-11-10T22:39:14.467277484Z"
+}
