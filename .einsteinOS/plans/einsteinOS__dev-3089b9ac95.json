@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 1673,
     "started": "2026-11-10T01:22:32.210635459Z",
-    "renewed": "2026-11-10T03:33:49.875871324Z"
+    "renewed": "2026-11-10T03:35:07.27994881Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -519,6 +519,11 @@
     }
   ],
   "state": {
+    "DirectFileIo.lean": {
+      "hash": "d5bfd4f94309",
+      "pass": true,
+      "unit_id": "u1af344a465"
+    },
     "ExpertCacheResidency.lean": {
       "hash": "3324d8e43f6f",
       "pass": true,
@@ -529,6 +534,11 @@
       "pass": true,
       "unit_id": "uf9f69c2c43"
     },
+    "GdnQsaLayerGeometry.lean": {
+      "hash": "43ce17f17f50",
+      "pass": true,
+      "unit_id": "u1af344a465"
+    },
     "GenerateDriver.lean": {
       "hash": "58e711c1ed5d",
       "pass": true,
@@ -538,6 +548,21 @@
       "hash": "bb25de82e194",
       "pass": true,
       "unit_id": "u62b936371e"
+    },
+    "GraphCaptureRegistry.lean": {
+      "hash": "f6c81533c426",
+      "pass": true,
+      "unit_id": "u1af344a465"
+    },
+    "LayerComposition.lean": {
+      "hash": "addd6b4d9bdb",
+      "pass": true,
+      "unit_id": "u1af344a465"
+    },
+    "MtpDraftChain.lean": {
+      "hash": "cbe1a8d34269",
+      "pass": true,
+      "unit_id": "u1af344a465"
     },
     "MtpDrafter.lean": {
       "hash": "76f23ad3d92e",
@@ -569,6 +594,21 @@
       "pass": true,
       "unit_id": "uf9f69c2c43"
     },
+    "PinnedArenaLoad.lean": {
+      "hash": "1cb868745cd7",
+      "pass": true,
+      "unit_id": "u1af344a465"
+    },
+    "PrefillChunkPipeline.lean": {
+      "hash": "7a2457b0f544",
+      "pass": true,
+      "unit_id": "u1af344a465"
+    },
+    "PrefillKernelsIndexing.lean": {
+      "hash": "8ebb8b532ac8",
+      "pass": true,
+      "unit_id": "u1af344a465"
+    },
     "QsaBlockSelect.lean": {
       "hash": "68d9b1073baf",
       "pass": true,
@@ -584,10 +624,20 @@
       "pass": true,
       "unit_id": "uf9f69c2c43"
     },
+    "SessionTokenLoop.lean": {
+      "hash": "0154a1bba5c8",
+      "pass": true,
+      "unit_id": "u1af344a465"
+    },
     "SharedExpertBlock.lean": {
       "hash": "16bf51f6b698",
       "pass": true,
       "unit_id": "uf4e6ff5513"
+    },
+    "SpeculativeVerifyWindow.lean": {
+      "hash": "364deb5f04a0",
+      "pass": true,
+      "unit_id": "u1af344a465"
     },
     "SuffixDrafter.lean": {
       "hash": "13ce51305fc5",
@@ -606,7 +656,6 @@
     }
   },
   "fix_attempts": {
-    "u1af344a465": 1,
     "ube4f27df84": 1
   },
   "fail_history": {
@@ -625,11 +674,6 @@
     ]
   },
   "last_failure": {
-    "u1af344a465": {
-      "kind": "review_fail",
-      "text": "SpeculativeVerifyWindow acceptance test checks a test-local `accepted()` instead of the real accept_len, DirectFileIo test exercises dfio::DirectFile rather than the platform DirectFile counterpart, and many checks are constant arithmetic that cannot fail",
-      "base_ref": "einsteinOS/dev-3089b9ac95"
-    },
     "ube4f27df84": {
       "kind": "review_fail",
       "text": "isa_selfprobe.hpp injects never-called AVX-512 code into five unrelated files and test_gpu sleeps 2.5s with a self-made partition_kernel purely to satisfy kernel observers, plus several tautological checks pad the test count",
@@ -637,12 +681,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "u1af344a465": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
