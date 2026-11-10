@@ -113,7 +113,7 @@ cudaError_t build_rope_table(float* table, int n_pos, int rot, float theta, cuda
 cudaError_t rope_neox_apply(float* x, const float* table, const int32_t* pos, int n_tok, int n_heads, int head_dim, int rot, cudaStream_t s = 0);
 bool native_rope_enabled();
 void native_rope_set_enabled(bool on);
-void mrope_table_set(const int sections[3]);            // null = default (all frequencies on component 0)
+bool mrope_table_set(const int sections[3]);            // null = default (all frequencies on component 0); negative section -> false, unchanged
 int mrope_table(int i, int half);
 cudaError_t native_rope_apply(float* x, const int32_t* pos3, int n_tok, int n_heads, int head_dim, int rot, float theta, cudaStream_t s = 0);   // synchronizes s
 bool native_qsa_enabled();

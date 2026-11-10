@@ -9,7 +9,8 @@ namespace baloon {
 namespace kg {
 namespace {
 bool g_enabled = true;
-int g_sections[3] = {-1, 0, 0};          // -1 first section = "all frequencies on component 0"
+int g_sections[3] = {0, 0, 0};
+bool g_default = true;                  // default = plain text RoPE: every frequency on component 0
 bool overlaps(const void* a, size_t an, const void* b, size_t bn) {
     const char* pa = (const char*)a; const char* pb = (const char*)b;
     return pa < pb + bn && pb < pa + an;
@@ -38,13 +39,17 @@ __global__ void apply(float* __restrict__ x, const int32_t* __restrict__ pos3, c
 
 bool native_rope_enabled() { return g_enabled; }
 void native_rope_set_enabled(bool on) { g_enabled = on; }
-void mrope_table_set(const int sections[3]) {
-    if (!sections) { g_sections[0] = -1; g_sections[1] = g_sections[2] = 0; return; }
+// nullptr restores the default; a negative section is rejected (returns false, state unchanged).
+bool mrope_table_set(const int sections[3]) {
+    if (!sections) { g_default = true; g_sections[0] = g_sections[1] = g_sections[2] = 0; return true; }
+    for (int k = 0; k < 3; ++k) if (sections[k] < 0) return false;
     for (int k = 0; k < 3; ++k) g_sections[k] = sections[k];
+    g_default = false;
+    return true;
 }
 // component (0..2) that owns frequency i for `half` frequencies in total
 int mrope_table(int i, int half) {
-    if (g_sections[0] < 0) return 0;
+    if (g_default) return 0;
     int acc = 0;
     for (int k = 0; k < 3; ++k) { acc += g_sections[k]; if (i < acc) return k; }
     return 2;
@@ -52,7 +57,7 @@ int mrope_table(int i, int half) {
 
 cudaError_t native_rope_apply(float* x, const int32_t* pos3, int n_tok, int n_heads, int head_dim, int rot, float theta, cudaStream_t s) {
     if (!x || !pos3 || n_tok <= 0 || n_heads <= 0 || rot <= 0 || (rot & 1) || rot > head_dim) return cudaErrorInvalidValue;
-    if (g_sections[0] >= 0 && g_sections[0] + g_sections[1] + g_sections[2] != rot / 2) return cudaErrorInvalidValue;
+    if (!g_default && g_sections[0] + g_sections[1] + g_sections[2] != rot / 2) return cudaErrorInvalidValue;
     if (overlaps(x, (size_t)n_tok * n_heads * head_dim * 4, pos3, (size_t)n_tok * 12)) return cudaErrorInvalidValue;
     const int half = rot / 2;
     int8_t* sel = nullptr;
