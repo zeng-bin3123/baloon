@@ -28,18 +28,18 @@
   "metrics": [
    {
     "label": "prefill",
-    "value": 57.86,
+    "value": 57.87,
     "unit": "tok/s",
     "better": "higher"
    },
    {
     "label": "decode",
-    "value": 11.29,
+    "value": 11.28,
     "unit": "tok/s",
     "better": "higher"
    }
   ],
-  "tail": "e2e: /tmp/model has no weights; using /root/public-storage/models/Qwen/Qwen3.6-35B-A3B/\nloading 1045 tensors from 26 shards onto 4 GPU(s)\n  layer 8/40 loaded\n  layer 16/40 loaded\n  layer 24/40 loaded\n  layer 32/40 loaded\n  layer 40/40 loaded\nload: 12.7 s\nselfcheck: chunked vs sequential prefill rel L2 = 0.000e+00, argmax 44784 vs 44784\ngenerated: 220 248046 198 248045 248068 271 248069 271 1919 7701 310 381 264 47739 466 25766 7658 886 314 1414 11 4222 12571 494 264 795 8427 1412 11 264 59026 303 264 1970 6238 11 466 449 4621 310 1454 49850 344 2144 13 1049 5435 33358 314 15019 15005 318 28514 11 12654 11 351 58730 7622 11 4831 23618 10597 3665\nprefill: 57.86 tok/s\ndecode: 11.29 tok/s",
+  "tail": "e2e: /tmp/model has no weights; using /root/public-storage/models/Qwen/Qwen3.6-35B-A3B/\nloading 1045 tensors from 26 shards onto 4 GPU(s)\n  layer 8/40 loaded\n  layer 16/40 loaded\n  layer 24/40 loaded\n  layer 32/40 loaded\n  layer 40/40 loaded\nload: 11.2 s\nselfcheck: chunked vs sequential prefill rel L2 = 0.000e+00, argmax 44784 vs 44784\ngenerated: 220 248046 198 248045 248068 271 248069 271 1919 7701 310 381 264 47739 466 25766 7658 886 314 1414 11 4222 12571 494 264 795 8427 1412 11 264 59026 303 264 1970 6238 11 466 449 4621 310 1454 49850 344 2144 13 1049 5435 33358 314 15019 15005 318 28514 11 12654 11 351 58730 7622 11 4831 23618 10597 3665\nprefill: 57.87 tok/s\ndecode: 11.28 tok/s",
   "devices": [
    "/dev/iluvatar0",
    "/dev/iluvatar1",
@@ -872,5 +872,5 @@
  },
  "gate": "",
  "gate_text": "",
- "when": "2026-11-10T23:06:02.719883669Z"
+ "when": "2026-11-10T23:07:21.049104469Z"
 }
