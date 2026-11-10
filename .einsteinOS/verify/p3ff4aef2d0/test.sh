@@ -49,6 +49,7 @@ mutate() {
   if "$M/t" >/dev/null 2>&1; then echo "MUTANT SURVIVED: $name"; rc=1; else echo "mutant $name detected"; fi
 }
 C=include/baloon/serve_chat.hpp
+mutate falsespell include/baloon/serve_frontend.hpp 's/s == "disabled")/s == "disabled" || s == "false")/'
 H=include/baloon/serve_http.hpp
 mutate budget     include/baloon/serve_frontend.hpp 's|n < 8192 ? 1u|n < 8000 ? 1u|'
 mutate stripend   $C 's|if (!v.empty() \&\& v.back() == .\\n.) v.pop_back();||'

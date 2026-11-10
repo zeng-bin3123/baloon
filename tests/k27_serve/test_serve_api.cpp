@@ -39,6 +39,12 @@ static void test_budget() {
     CHECK(template_kwargs("low").effort == "low");
     CHECK(!template_kwargs("none").enable_thinking && template_kwargs("none").effort.empty() && template_kwargs("none").ok);
     CHECK(!template_kwargs("turbo").ok);
+    for (const char* bad : {"false", "true", "False", "OFF", "None", "", "0", "1", "on", "enabled", "mid", "Medium", "x-high", " low", "low "})
+        CHECK(!template_kwargs(bad).ok);
+    for (const char* good : {"none", "off", "minimal", "disabled", "low", "medium", "high", "xhigh", "max", "maximum"})
+        CHECK(template_kwargs(good).ok);
+    for (const char* dis : {"none", "off", "minimal", "disabled"})
+        CHECK(!template_kwargs(dis).enable_thinking && template_kwargs(dis).effort.empty());
 }
 
 static void test_tool_call_strip() {

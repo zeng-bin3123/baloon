@@ -21,7 +21,7 @@ struct Effort {
 
 inline Effort effort_of(const std::string& s) {
     Effort e;
-    if (s == "none" || s == "off" || s == "minimal" || s == "disabled" || s == "false") { e.known = true; e.disabled = true; }
+    if (s == "none" || s == "off" || s == "minimal" || s == "disabled") { e.known = true; e.disabled = true; }
     else if (s == "low") { e.known = true; e.level = Level::Low; }
     else if (s == "medium") { e.known = true; e.level = Level::Medium; }
     else if (s == "high" || s == "xhigh" || s == "max" || s == "maximum") { e.known = true; e.level = Level::XHigh; }
