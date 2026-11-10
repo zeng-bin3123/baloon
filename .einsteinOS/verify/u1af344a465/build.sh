@@ -16,7 +16,7 @@ OBJ="$(mktemp -d)"; trap 'rm -rf "$OBJ"' EXIT
 echo "== unit u1af344a465 build =="
 CUF="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Iinclude -Isrc -O2 -ffp-contract=off"
 OBJS=""
-for f in src/core/graph.cpp src/core/layer.cpp src/core/session.cpp src/core/weights.cpp src/core/pinned.cu src/prefill/kernels.cu; do
+for f in src/core/graph.cpp src/core/layer.cpp src/core/session.cpp src/core/weights.cpp src/core/pinned.cu src/prefill/kernels.cu src/platform/direct_file.cpp src/core/verify.cpp; do
   o="$OBJ/$(echo "$f" | tr '/' '_').o"; "$CLANG" $CUF -c "$f" -o "$o"; OBJS="$OBJS $o"
 done
 "$CLANG" $CUF -c tests/u1af/test_u1af.cu -o "$OBJ/test.o"

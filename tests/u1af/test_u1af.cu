@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -17,12 +18,16 @@
 #include <random>
 #include <set>
 #include <string>
+#include <thread>
 #include <vector>
+#include <chrono>
 
 #include "baloon/core_graph.hpp"
 #include "baloon/core_graph_dev.hpp"
 #include "baloon/core_layer.hpp"
 #include "baloon/core_pinned_hw.hpp"
+#include "baloon/core_verify.hpp"
+#include "baloon/platform_io.hpp"
 #include "baloon/core_prefill.hpp"
 #include "baloon/core_session.hpp"
 #include "baloon/direct_file.hpp"
@@ -54,7 +59,7 @@ static void test_layer_geometry() {
     for (int l = 0; l < 48; ++l) (core::is_qsa_layer(l) ? nq : ng)++;
     CHECK(nq == 12 && ng == 36);                                           // qsa_count / gdn_count
     CHECK(core::is_qsa_layer(3) && core::is_qsa_layer(47) && !core::is_qsa_layer(0) && !core::is_qsa_layer(46));
-    CHECK(16 * 128 + 16 * 128 + 48 * 128 == 10240);                        // conv_channels
+    CHECK(pk::HK == 16 && pk::HV == 48 && pk::S == 128 && pk::C == pk::HK * pk::S + pk::HK * pk::S + pk::HV * pk::S);   // conv_channels (q|k|v widths)
     std::set<int> gs, qs;
     for (int l = 0; l < 48; ++l) {
         const int g = core::gdn_point_at(l), q = core::qsa_point_at(l);
@@ -64,26 +69,27 @@ static void test_layer_geometry() {
         if (!core::is_qsa_layer(l)) CHECK((int)session_schedule::gdn_index((uint64_t)l) == g);
     }
     CHECK(gs.size() == 36 && qs.size() == 12);
-    // q|gate halves of q_full: contiguous, in range, never colliding within a head
-    const int hd = 256, nh = 16;
-    for (int h = 0; h < nh; ++h) for (int d = 0; d < hd; ++d) {
-        const int qi = h * 2 * hd + d, gi = h * 2 * hd + hd + d;
-        CHECK(qi < nh * 2 * hd && gi < nh * 2 * hd && qi != gi);
-    }
-    // stage split: halves cover and are disjoint; prefixes grow by exactly one stage
-    auto stages = [](int half) { return half == 1 ? std::vector<int>{0, 1, 2} : half == 2 ? std::vector<int>{3, 4} : std::vector<int>{0, 1, 2, 3, 4}; };
-    std::vector<int> cat = stages(1); for (int s : stages(2)) cat.push_back(s);
-    CHECK(cat == stages(0));
-    { const std::vector<int> s2 = stages(2); for (int s : stages(1)) CHECK(std::count(s2.begin(), s2.end(), s) == 0); }
+    // q|gate halves of q_full: the real split_q kernel puts head h's first 256 lanes into q and the next 256 into gate
+    { const int T = 3, HQ = 24, HD = 256; const int64_t nin = (int64_t)T * HQ * 2 * HD, nout = (int64_t)T * HQ * HD;
+      std::vector<float> in(nin), q(nout, -1.f), g(nout, -1.f); for (int64_t k = 0; k < nin; ++k) in[k] = (float)k;
+      float *di, *dq, *dg; CHECK(cudaMalloc(&di, nin * 4) == cudaSuccess && cudaMalloc(&dq, nout * 4) == cudaSuccess && cudaMalloc(&dg, nout * 4) == cudaSuccess);
+      CHECK(cudaMemcpy(di, in.data(), nin * 4, cudaMemcpyHostToDevice) == cudaSuccess);
+      CHECK(pk::split_q(di, dq, dg, T) == 0); cudaDeviceSynchronize();
+      CHECK(cudaMemcpy(q.data(), dq, nout * 4, cudaMemcpyDeviceToHost) == cudaSuccess && cudaMemcpy(g.data(), dg, nout * 4, cudaMemcpyDeviceToHost) == cudaSuccess);
+      int bad = 0;
+      for (int t = 0; t < T; ++t) for (int h = 0; h < HQ; ++h) for (int d = 0; d < HD; ++d) {
+          const int64_t o = ((int64_t)t * HQ + h) * HD + d, base = ((int64_t)t * HQ + h) * 2 * HD;
+          if (q[o] != in[base + d] || g[o] != in[base + HD + d]) ++bad;
+      }
+      CHECK(bad == 0 && pk::split_q(nullptr, dq, dg, T) == -1 && pk::split_q(di, dq, dg, 0) == -1);
+      cudaFree(di); cudaFree(dq); cudaFree(dg); }
+    // prefix timings: differencing isolates one stage
     { std::vector<int64_t> P = {0, 5, 9, 14, 20, 27};   // prefix timings P[0..5], P[0] = 0
       auto st = session_loop::stage_times(P);                              // differencing isolates one stage
       CHECK(st.size() == 5 && st[0] == 5 && st[1] == 4 && st[2] == 5 && st[3] == 6 && st[4] == 7);
       auto st2 = session_schedule::stage_ms(5, 9, 14, 20, 27); CHECK(st2 == st); }
-    CHECK(16 * 90 == 1440);                                                // ple_row_bytes
-    for (uint64_t m = 0; m < 1000; ++m) CHECK(64 * m + 2 * m <= 2 * (64 * m));  // int8 kv_smaller
 
     // SessionTokenLoop: launches, dump layout, exec index bounds
-    CHECK(2 * 48 == 96 && 48 < 96);
     for (uint64_t stride : {1ull, 7ull, 2560ull, 10240ull}) for (uint64_t n : {1ull, 48ull}) for (uint64_t l = 0; l < n; ++l) {
         CHECK(session_loop::slot_base(stride, l) + stride <= session_loop::dump_total(stride, n));    // dump_slot_in_bounds
         CHECK(session_loop::slot_base(stride, l) + stride == session_loop::slot_base(stride, l + 1));  // slots abut
@@ -91,7 +97,6 @@ static void test_layer_geometry() {
     }
     for (uint64_t T = 1; T <= 8; ++T) CHECK(session_loop::exec_index_ok(8, T));
     CHECK(!session_loop::exec_index_ok(9, 1) && !session_loop::exec_index_ok(8, 9));
-    for (int k = 1; k <= 5; ++k) CHECK(k - 1 < 5);
     // oracle dump layout (LayerComposition dump_last_slot_end): slots tile the stride exactly
     std::mt19937_64 rng(11);
     for (int it = 0; it < 200; ++it) {
@@ -106,11 +111,6 @@ static void test_layer_geometry() {
 
 // ---------------------------------------------------------------------------------------------------------------
 // MtpDraftChain + SpeculativeVerifyWindow
-static uint64_t accepted(const std::vector<int>& d, const std::vector<int>& o) {
-    uint64_t a = 0;
-    for (size_t i = 0; i < d.size() && i < o.size(); ++i) { if (d[i] != o[i]) break; ++a; }
-    return a;
-}
 static void test_mtp_and_verify() {
     // window: 0 or >= max_cells attends everything, otherwise at most `window` cells
     for (uint64_t cells : {1ull, 63ull, 64ull, 65ull, 4096ull}) {
@@ -121,39 +121,49 @@ static void test_mtp_and_verify() {
             CHECK(mtp::cap_of(w, cells) >= eff && mtp::cap_of(w, cells) % 64 == 0 && mtp::cap_of(w, cells) < eff + 64);
         }
     }
-    // draft cells p+a+1 .. : T-1 cells, all after the last accepted cell p+a; graph arrays have 9 entries so T <= 8
-    for (uint64_t T = 1; T <= 8; ++T) {
-        std::vector<uint64_t> cells; for (uint64_t j = 0; j + 1 < T; ++j) cells.push_back(100 + 3 + 1 + j);
-        CHECK(cells.size() == T - 1);
-        for (uint64_t c : cells) CHECK(c > 100 + 3);
-        CHECK(T < 9);
-    }
-    CHECK(512ull * 1382400 < 708000000ull && 707000000ull < 512ull * 1382400);
+    CHECK((uint64_t)pk::kExperts * (uint64_t)pk::kBlobBytes == 707788800ull);          // expert file = 512 blobs
     for (uint64_t mt = 3; mt <= 8; ++mt) for (uint64_t j = 1; j + 2 <= mt; ++j) CHECK(mtp::rows_disjoint(mt, j));
 
-    // acceptance: longest matching prefix; n_keep = 1 + accepted in 1..T; all-match accepts all; first mismatch rejects
+    // acceptance through the REAL core::Verifier: accept_len = longest prefix with window[a+1] == greedy[a]
+    core::Verifier::Config cfg; cfg.max_t = 8; cfg.n_layers = 4; cfg.groups = 1; cfg.row_floats = 4;
+    core::Verifier ver; CHECK(ver.init(cfg) && ver.capture() && ver.capture_commit());
+    { std::vector<int32_t> w(9, 0); CHECK(!ver.record_window(w.data(), 0) && !ver.record_window(w.data(), 9) && !ver.record_window(nullptr, 2)); }
     std::mt19937 rng(5);
+    int hist[9] = {0};
     for (int it = 0; it < 3000; ++it) {
-        const size_t nd = rng() % 8; std::vector<int> d(nd), o(nd + 1);
-        for (auto& x : d) x = (int)(rng() % 3); for (auto& x : o) x = (int)(rng() % 3);
-        const uint64_t a = accepted(d, o);
-        CHECK(a <= d.size() && a <= o.size());
-        const uint64_t T = nd + 1, keep = 1 + a;
-        CHECK(keep >= 1 && keep <= T && verify::accepted_ok(T, a));
-        if (nd > 0 && d[0] != o[0]) CHECK(a == 0);
-        if (a < nd) CHECK(d[a] != o[a]);                                   // stops exactly at the first mismatch
-        CHECK(accepted(d, std::vector<int>(d)) == d.size());
+        const uint64_t T = 1 + rng() % 8, nd = T - 1;
+        std::vector<int32_t> w(T), greedy(T);
+        for (auto& x : w) x = (int32_t)(rng() % 3); for (auto& x : greedy) x = (int32_t)(rng() % 3);
+        if (it % 5 == 0) for (uint64_t k = 0; k < nd; ++k) greedy[k] = w[k + 1];   // force fully-agreeing windows
+        CHECK(ver.record_window(w.data(), T) && ver.T() == T);
+        const uint64_t a = ver.accept_len(greedy);
+        uint64_t want = 0; while (want < nd && w[want + 1] == greedy[want]) ++want;   // independent oracle
+        CHECK(a == want && verify::accepted_ok(T, a));
+        if (a < nd) CHECK(w[a + 1] != greedy[a]);                                    // stops exactly at the first mismatch
+        if (it % 5 == 0) CHECK(a == nd);                                             // all agree -> all drafts accepted
+        ++hist[a];
+        std::vector<int32_t> ent; CHECK(ver.commit(a, 1000, ent));
+        CHECK(ent == verify::commit_vector(1000, (int64_t)a + 1, 8) && ent[0] == (int32_t)a + 1 && ent[1] == (int32_t)a);
+        for (int t = 0; t < 8; ++t) CHECK(ent[2 + t] == (t <= (int)a ? 1000 + t : -1));
+        CHECK(!ver.commit(T, 1000, ent) && ent.empty());                             // a must be <= T-1
+        CHECK(ver.final_R(a) != nullptr && ver.final_R(T) == nullptr);
+        std::vector<int32_t> shortg(greedy.begin(), greedy.begin() + (greedy.size() > 1 ? 1 : 0));   // short greedy list never over-accepts
+        CHECK(ver.accept_len(shortg) <= shortg.size());
     }
-    CHECK(!verify::accepted_ok(3, 3) && verify::accepted_ok(3, 2));
-    for (uint64_t l = 0; l < 64; ++l) for (uint64_t g = 0; g < 2; ++g) CHECK(l * 2 + g < 2 * 64 * 2);   // flag slots
-    for (int T = 1; T <= 8; ++T) {
-        CHECK(2 + T <= 10 && T * 10 <= 128);                               // commit record / plan capacity
-        for (int keep = 1; keep <= T; ++keep) {
-            auto v = verify::commit_vector(1000, keep, T);
-            CHECK(v.size() == (size_t)(2 + T));
-            CHECK(v[0] == keep && v[1] == keep - 1);
-            for (int t = 0; t < T; ++t) CHECK(v[2 + t] == (t < keep ? 1000 + t : -1));
-        }
+    for (int a = 0; a < 8; ++a) CHECK(hist[a] > 0);                                  // every acceptance length actually exercised
+    { core::Verifier un; std::vector<int32_t> w(2, 1), e; CHECK(!un.record_window(w.data(), 2) && !un.commit(0, 0, e) && un.accept_len(w) == 0); }
+    // schedule + flag: one step per (layer, group), flag rises monotonically to the last ring value, never lowers
+    for (uint64_t G : {1ull, 2ull}) {
+        core::Verifier v2; core::Verifier::Config c2; c2.max_t = 8; c2.n_layers = 6; c2.groups = G; CHECK(v2.init(c2) && v2.capture());
+        std::vector<int32_t> w(5, 1); CHECK(v2.record_window(w.data(), 5));
+        uint64_t last = 0, steps = 0; bool mono = true, cover = true; std::vector<uint64_t> seen(5, 0);
+        const uint64_t n = v2.run([&](const core::Verifier::Step& st) {
+            mono = mono && st.ring == last + 1 && v2.flag() == last; last = st.ring; ++steps;
+            for (uint64_t r = st.row_begin; r < st.row_end; ++r) seen[r]++;
+        });
+        CHECK(n == 6 * G && steps == n && mono && v2.flag() == 6 * G);
+        for (uint64_t r = 0; r < 5; ++r) cover = cover && seen[r] == 6; CHECK(cover);   // every row visited once per layer
+        v2.raise_flag(3); CHECK(v2.flag() == 6 * G);
     }
 }
 
@@ -261,6 +271,52 @@ static void test_direct_file() {
     free(buf); f.close(); CHECK(!f.is_open()); unlink(path);
 }
 
+// platform::DirectFile (src/platform/direct_file.cpp): worker-thread implementation
+static void test_platform_direct_file() {
+    using platform::DirectFile; const uint64_t A = dfio::kAlign;
+    char path[] = "/tmp/u1af_pdf_XXXXXX"; int fd = mkstemp(path); CHECK(fd >= 0);
+    std::vector<unsigned char> data(10000); for (size_t i = 0; i < data.size(); ++i) data[i] = (unsigned char)(i * 131 + 7);
+    CHECK(write(fd, data.data(), data.size()) == (ssize_t)data.size()); close(fd);
+    // alloc_aligned: kAlign-aligned, zero length -> nullptr
+    { void* p = DirectFile::alloc_aligned(1); CHECK(p && (uintptr_t)p % A == 0); std::memset(p, 1, A); DirectFile::free_aligned(p);
+      CHECK(DirectFile::alloc_aligned(0) == nullptr); }
+    int64_t t0 = platform::now_us(), t1 = platform::now_us(); CHECK(t1 >= t0);
+    DirectFile f; CHECK(!f.is_open() && !f.open(nullptr) && !f.open("/nonexistent/u1af_missing"));
+    uint8_t* buf = (uint8_t*)DirectFile::alloc_aligned(4 * A); CHECK(buf != nullptr);
+    CHECK(!f.submit(1, 0, buf, A));                                          // closed file rejects
+    CHECK(f.open(path) && f.is_open() && f.size() == 10000);
+    std::memset(buf, 0xAB, 4 * A);
+    CHECK(!f.submit(1, 1, buf, A) && !f.submit(2, 0, buf, 100) && !f.submit(3, 0, buf + 16, A) && !f.submit(4, 0, buf, 0));
+    CHECK(f.in_flight() == 0);                                               // rejected requests are never queued
+    platform::Completion out[8];
+    CHECK(f.wait(out, 8, 20) == 0);                                          // nothing pending: bounded wait returns 0
+    CHECK(f.submit(10, 0, buf, A) && f.submit(11, 2 * A, buf + A, A) && f.submit(12, 3 * A, buf + 2 * A, A));
+    CHECK(f.in_flight() <= 3 && f.in_flight() >= 1);
+    // drain: completions arrive oldest-first, each wait <= max, none dropped or duplicated
+    std::vector<platform::Completion> got; int rounds = 0;
+    while (got.size() < 3 && rounds++ < 200) { const uint64_t n = f.wait(out, 2, 1000); CHECK(n <= 2); for (uint64_t i = 0; i < n; ++i) got.push_back(out[i]); }
+    CHECK(got.size() == 3 && got[0].tag == 10 && got[1].tag == 11 && got[2].tag == 12 && f.in_flight() == 0);
+    CHECK(got[0].ok && got[0].bytes == A && got[1].ok && got[1].bytes == 10000 - 2 * A && got[2].ok && got[2].bytes == 0);   // full / tail / past EOF
+    CHECK(std::memcmp(buf, data.data(), A) == 0 && std::memcmp(buf + A, data.data() + 2 * A, 10000 - 2 * A) == 0);
+    CHECK(f.wait(out, 8, 10) == 0);
+    // wake(): a blocked wait returns promptly with 0 completions; sticky when issued before the wait
+    { const int64_t a0 = platform::now_us(); std::thread th([&] { std::this_thread::sleep_for(std::chrono::milliseconds(50)); f.wake(); });
+      const uint64_t n = f.wait(out, 8, -1); const int64_t dt = platform::now_us() - a0; th.join();
+      CHECK(n == 0 && dt < 5000000);
+      f.wake(); CHECK(f.wait(out, 8, -1) == 0);
+      CHECK(f.wait(out, 8, 10) == 0); }                                      // wake was consumed
+    // many in flight: a wait never exceeds max and every tag is delivered exactly once
+    { const int N = 16; std::vector<uint8_t*> bs; for (int i = 0; i < N; ++i) { bs.push_back((uint8_t*)DirectFile::alloc_aligned(A)); CHECK(f.submit(100 + i, (uint64_t)(i % 2) * A, bs.back(), A)); }
+      std::set<uint64_t> tags; uint64_t prev = 99; bool fifo = true; int r = 0;
+      while (tags.size() < (size_t)N && r++ < 500) { const uint64_t n = f.wait(out, 3, 1000); CHECK(n <= 3); for (uint64_t i = 0; i < n; ++i) { tags.insert(out[i].tag); fifo = fifo && out[i].tag == prev + 1; prev = out[i].tag; CHECK(out[i].ok && out[i].bytes == A); } }
+      CHECK(tags.size() == (size_t)N && fifo && f.in_flight() == 0);
+      CHECK(std::memcmp(bs[1], data.data() + A, A) == 0 && std::memcmp(bs[2], data.data(), A) == 0);
+      for (auto b : bs) DirectFile::free_aligned(b); }
+    f.close(); CHECK(!f.is_open() && !f.submit(1, 0, buf, A) && f.size() == 0);
+    CHECK(f.open(path) && f.size() == 10000); f.close();                     // re-open after close
+    DirectFile::free_aligned(buf); unlink(path);
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // LayerComposition
 static void test_layer_composition() {
@@ -294,7 +350,6 @@ static void test_layer_composition() {
     }
     core::layer_set_native_bf16(false); core::layer_set_fused_gr(false); core::layer_set_fused_gdn(false);
     core::layer_set_fast_attn(false); core::layer_set_native_flash_attn_short(false); core::layer_set_fast_select(false);
-    for (uint64_t m = 0; m < 5000; m += 7) for (uint64_t ps : {1ull, 16ull, 64ull}) CHECK(m <= (m + ps - 1) / ps * ps);   // pages_cover
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -306,22 +361,6 @@ static void test_pinned() {
         auto b = hw::uniform_bounds(total, parts);
         CHECK(b.size() == parts + 1 && b.front() == 0 && b.back() == total);
         for (size_t i = 0; i < parts; ++i) { CHECK(b[i] <= b[i + 1]); CHECK(b[i + 1] - b[i] <= total / parts + 1 && b[i + 1] - b[i] >= total / parts); }
-        // per-layer ranges [L*per, L*per+per) abut, stay inside the file and are pairwise disjoint
-        const uint64_t per = 1 + rng() % 5000, layers = 1 + rng() % 30;
-        for (uint64_t L = 0; L < layers; ++L) {
-            CHECK(L * per + per <= layers * per && (L + 1) * per == L * per + per);
-            for (uint64_t M = L + 1; M < layers; ++M) CHECK(L * per + per <= M * per);
-        }
-        // read loop: each step min(chunk, remaining) makes progress and never over-reads
-        const uint64_t chunk = 1 + rng() % 700, lb = rng() % 5000; uint64_t pos = 0, steps = 0;
-        while (pos < lb) { const uint64_t st = std::min(chunk, lb - pos); CHECK(st > 0 && pos + st <= lb); pos += st; ++steps; }
-        CHECK(pos == lb && steps == (lb + chunk - 1) / chunk);
-        const uint64_t bytes = rng() % 100000; const uint64_t moved = bytes / chunk * chunk;
-        CHECK(moved <= bytes && (bytes % chunk != 0 || moved == bytes));   // bandwidth probe accounting
-        // sliced pinning: k = bytes/slice whole slices, registered prefix + locked suffix = capacity
-        const uint64_t slice = 1 + rng() % 9000, k = bytes / slice;
-        CHECK(k * slice <= bytes);
-        for (uint64_t c = 0; c <= k; ++c) { const uint64_t reg = c * slice; CHECK(reg <= bytes && reg + (bytes - reg) == bytes); }
     }
     CHECK(hw::uniform_bounds(10, 0).empty());
     // fnv1a64 known vectors (offset basis 0xcbf29ce484222325)
@@ -329,6 +368,44 @@ static void test_pinned() {
     CHECK(hw::fnv1a64(nullptr, 0, seed) == seed);
     const uint8_t a = 'a'; CHECK(hw::fnv1a64(&a, 1, seed) == 0xaf63dc4c8601ec8cull);
     const uint8_t foobar[6] = {'f', 'o', 'o', 'b', 'a', 'r'}; CHECK(hw::fnv1a64(foobar, 6, seed) == 0x85944171f73967e8ull);
+    // chunked hashing: the running value as next seed equals the hash of the concatenation
+    { std::vector<uint8_t> z(1000); for (size_t i = 0; i < z.size(); ++i) z[i] = (uint8_t)(i * 7 + 1);
+      uint64_t h = hw::kRefFnvSeed; for (size_t o = 0; o < z.size(); o += 300) h = hw::fnv1a64(z.data() + o, std::min<size_t>(300, z.size() - o), h);
+      CHECK(h == hw::fnv1a64(z.data(), z.size(), hw::kRefFnvSeed)); }
+
+    // real arena + parallel load: layers abut, each is loaded by exactly one worker, per-layer hash == hash of that layer's bytes
+    const uint64_t layers = 6, bpl = 3, blob = 4096 + 8, chunk = 1000, total = layers * bpl * blob;
+    auto src = [](uint64_t off) { return (uint8_t)((off * 2654435761ull >> 7) ^ off); };
+    hw::Reader rd = [&](uint64_t off, uint64_t n, uint8_t* dst) { for (uint64_t i = 0; i < n; ++i) dst[i] = src(off + i); return true; };
+    for (unsigned workers : {1u, 3u, 8u}) {
+        hw::PinnedArena arena; CHECK(arena.reserve(total, 8192) && arena.data() && arena.bytes() == total && arena.backing() != hw::Backing::None);
+        CHECK(arena.registered_bytes() + arena.locked_bytes() == total && arena.registered_bytes() % arena.slice_bytes() == 0);
+        auto r = hw::load_experts(arena, rd, layers, bpl, blob, chunk, workers);
+        CHECK(r.ok && r.bytes == total && r.hashes.size() == layers && r.claimed_by.size() == layers);
+        for (uint64_t L = 0; L < layers; ++L) {
+            const uint64_t b0 = L * bpl * blob, n = bpl * blob; bool same = true; std::vector<uint8_t> ref(n);
+            for (uint64_t i = 0; i < n; ++i) { ref[i] = src(b0 + i); same = same && arena.data()[b0 + i] == ref[i]; }
+            CHECK(same && r.hashes[L] == hw::fnv1a64(ref.data(), n, hw::kRefFnvSeed) && r.claimed_by[L] < workers);
+        }
+        // a failing read latches and the load reports failure
+        std::atomic<int> calls{0}; hw::Reader bad = [&](uint64_t, uint64_t, uint8_t*) { return ++calls < 4; };
+        hw::PinnedArena a2; CHECK(a2.reserve(total) && !hw::load_experts(a2, bad, layers, bpl, blob, chunk, workers).ok);
+        // ranges packed back to back from arena offset 0
+        std::vector<std::pair<uint64_t, uint64_t>> rg = {{100, 500}, {5000, 1}, {7, 2048}};
+        auto rr = hw::load_experts_ranges(arena, rd, rg, 300); uint64_t at = 0; bool ok = rr.ok && rr.hashes.size() == rg.size();
+        for (size_t k = 0; k < rg.size() && ok; ++k) { std::vector<uint8_t> ref(rg[k].second); for (uint64_t i = 0; i < ref.size(); ++i) ref[i] = src(rg[k].first + i);
+            ok = ok && std::memcmp(arena.data() + at, ref.data(), ref.size()) == 0 && rr.hashes[k] == hw::fnv1a64(ref.data(), ref.size(), hw::kRefFnvSeed); at += ref.size(); }
+        CHECK(ok);
+        if (workers == 8) {   // stream to the device, then verify on the GPU against host chunk hashes
+            hw::load_experts(arena, rd, layers, bpl, blob, chunk, 2);
+            void* dev = nullptr; CHECK(cudaMalloc(&dev, total) == cudaSuccess);
+            auto bw = hw::stream_bandwidth(arena, dev, 4096, 2); CHECK(bw.ok && bw.passes == 2 && bw.bytes == 2 * (total / 4096 * 4096) && bw.gbps > 0);
+            std::vector<uint64_t> dh; CHECK(hw::device_chunk_hashes(dev, total, 4096, dh) && dh.size() == total / 4096);
+            bool eq = true; for (size_t c = 0; c < dh.size(); ++c) eq = eq && dh[c] == hw::fnv1a64(arena.data() + c * 4096, 4096, hw::kRefFnvSeed);
+            CHECK(eq); cudaFree(dev);
+        }
+        arena.release(); CHECK(arena.data() == nullptr && arena.bytes() == 0);
+    }
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -387,12 +464,15 @@ static uint16_t bf_host(float f) {
     return (uint16_t)((u + 0x7fffu + ((u >> 16) & 1u)) >> 16);
 }
 static void test_prefill_kernels() {
-    CHECK(1280 * 640 == 819200 && 1280 * 640 + 2560 * 160 == 1228800 && 1280 * 640 + 2560 * 160 + 1280 * 40 * 2 == 1331200);
-    CHECK(1280 * 640 + 2560 * 160 + 1280 * 40 * 2 + 2560 * 10 * 2 == 1382400);          // blob_total
+    CHECK(pk::kDownOff == 819200 && pk::kGuScaleOff == 1228800 && pk::kDownScaleOff == 1331200 && pk::kDownScaleOff + 2560 * 10 * 2 == pk::kBlobBytes);   // blob planes tile the blob
     for (int n = 0; n < 5000; ++n) { const int64_t b = pk::blocks_for(n, 256); CHECK(b * 256 >= n && b * 256 < n + 256); }
-    for (int e = 0; e < 512; ++e) CHECK(e % 32 + 32 * (e / 32) == e && e / 32 < 16);     // expert id <-> (lane, i)
-    for (int i = 0; i < 40000; i += 13) CHECK(i % 2560 == (i % 10240) % 2560);          // broadcast_same_d
-    for (int rg = 0; rg < 4; ++rg) for (int r = 0; r < 32; ++r) CHECK(rg * 32 + r < 128);
+    // gr_broadcast on the device: out[t][c][d] = e[t][d] (same d for every stream c)
+    { const int T = 3; std::vector<float> e(T * pk::N), o((size_t)T * pk::D, -1.f); for (size_t k = 0; k < e.size(); ++k) e[k] = (float)k * 0.5f;
+      float *de, *dout; CHECK(cudaMalloc(&de, e.size() * 4) == cudaSuccess && cudaMalloc(&dout, o.size() * 4) == cudaSuccess);
+      CHECK(cudaMemcpy(de, e.data(), e.size() * 4, cudaMemcpyHostToDevice) == cudaSuccess && pk::gr_broadcast(de, dout, T) == 0); cudaDeviceSynchronize();
+      CHECK(cudaMemcpy(o.data(), dout, o.size() * 4, cudaMemcpyDeviceToHost) == cudaSuccess);
+      int bad = 0; for (int t = 0; t < T; ++t) for (int c = 0; c < pk::HC; ++c) for (int d = 0; d < pk::N; ++d) if (o[((size_t)t * pk::HC + c) * pk::N + d] != e[(size_t)t * pk::N + d]) ++bad;
+      CHECK(bad == 0 && pk::gr_broadcast(nullptr, dout, T) == -1); cudaFree(de); cudaFree(dout); }
     // to_bf16 on the device equals the host round-to-nearest-even formula, ties go to even
     std::mt19937 rng(77);
     std::vector<float> x;
@@ -444,6 +524,7 @@ int main() {
     STAGE("mtp_and_verify"); test_mtp_and_verify();
     STAGE("graph_registry"); test_graph_registry();
     STAGE("direct_file"); test_direct_file();
+    STAGE("platform_direct_file"); test_platform_direct_file();
     STAGE("layer_composition"); test_layer_composition();
     STAGE("pinned"); test_pinned();
     STAGE("prefill_pipeline"); test_prefill_pipeline();
