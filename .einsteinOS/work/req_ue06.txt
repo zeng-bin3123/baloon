@@ -1,0 +1,3 @@
+include/ref/artifact/dequant.hpp: REF_GGUF_MAIN_DISABLED bf16_to_fp32 dequantize_bf16 dequantize_f16 dequantize_f32 dequantize_iq4_nl dequantize_iq4_xs dequantize_q2_0 dequantize_q3_K dequantize_q4_0 dequantize_q4_K dequantize_q5_0 dequantize_q5_K dequantize_q6_K dequantize_q8_0 fp16_to_fp32 get_scale_min_k4 kvalues_iq4nl read_u16
+src/core/native_head.cpp: NativeEmbed::gather_dev NativeEmbed::gather_one NativeEmbed::load NativeEmbed::~NativeEmbed NativeHead::load NativeHead::run NativeHead::~NativeHead g_embed native_embed set_native_embed
+tools/vision/ref_vision.cpp: main parse_enc quiet_log
