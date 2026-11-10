@@ -114,7 +114,15 @@ int main(int argc, char** argv) {
         auto yo = get(dyo, n_out); good = true; for (int r = 0; r < n_out; ++r) good &= std::fabs(yo[r] - yr[r]) <= 1e-3 * (1 + std::fabs(yr[r]));
         ok(good, "s2_gemv_fast == Q2_0 dot with f16-rounded x");
         ok(s2_gemv_fast(dwq, dxs, dyo, 100, n_out) != cudaSuccess, "s2_gemv_fast rejects n_in % 64");
-        ok(s2_gemv_fast(dwq, dxs, dyo, 24576 + 64, n_out) != cudaSuccess, "s2_gemv_fast rejects n_in > MAX_SHARED_HALVES");
+        {   // theory s2_gemv_fast_experiment: maxSharedHalves = 4096; 2560-element staging fits; 4096 accepted, 4096+64 rejected
+            const int nbig = 4096, nbb = nbig / 64;
+            uint8_t* dwb = dup(std::vector<uint8_t>((size_t)n_out * nbb * 18)); float* dxb = dup(std::vector<float>(nbig));
+            ok(s2_gemv_fast(dwb, dxb, dyo, 2560, n_out) == cudaSuccess, "s2_gemv_fast accepts n_in=2560 (stage_fits_2560)");
+            ok(s2_gemv_fast(dwb, dxb, dyo, nbig, n_out) == cudaSuccess, "s2_gemv_fast accepts n_in == MAX_SHARED_HALVES (4096)");
+            cudaDeviceSynchronize();
+            ok(s2_gemv_fast(dwb, dxb, dyo, nbig + 64, n_out) != cudaSuccess, "s2_gemv_fast rejects n_in > MAX_SHARED_HALVES (4096)");
+            ok(s2_gemv_fast(dwb, dxb, dyo, 24576, n_out) != cudaSuccess, "s2_gemv_fast rejects old wrong limit 24576");
+        }
         ok(s2_gemv_fast(nullptr, dxs, dyo, n_in, n_out) != cudaSuccess, "s2_gemv_fast rejects null");
     }
     std::printf("%d checks, %d failed\n", g_checks, g_fail);

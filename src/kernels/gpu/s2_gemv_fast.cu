@@ -8,7 +8,7 @@ namespace baloon {
 namespace kg {
 namespace {
 constexpr int QK_S2 = 64;
-constexpr int MAX_SHARED_HALVES = 24576;          // 48 KiB of f16
+constexpr int MAX_SHARED_HALVES = 4096;           // theory: maxSharedHalves = 4096 (8 KiB of f16; + 4 KiB LUT stays far below 48 KiB)
 bool g_lut_ready = false;                // the byte->values table lives in shared memory and is rebuilt per block
 
 cudaError_t ensure_lut() { g_lut_ready = true; return cudaSuccess; }
