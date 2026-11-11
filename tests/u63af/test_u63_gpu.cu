@@ -1,5 +1,5 @@
 // test_u63_gpu.cu - unit u63af4bc057, device side. Checks the LAYER 1 statements of
-//   GgmlBlockDequant   (src/cu/dequant_bf16.cu: kern::dequant_bf16 / dequant_f16 / dequant_f32, dequant_bf16_supported)
+//   GgmlBlockDequant   (src/kernels/cuda/dequant_bf16.cu: kern::dequant_bf16 / dequant_f16 / dequant_f32, dequant_bf16_supported)
 //   S2CanonicalDequant (src/kernels/gpu/dequant_q2.cu: kg::dequant_s2 (plane), kg::dequant_q2_0)
 // on a real GPU, against the host scalar dequantizers and the theory models. Exits non-zero on any failure, and fails if
 // no GPU device can be opened.
@@ -61,6 +61,29 @@ static void test_ggml_block_dequant() {
     }
     // f2bf model: nearest, ties to even, no NaN guard (theory witnesses)
     CHECK(u63::f2bf(0x7FFFFFFFu) == 0x8000 && u63::f2bf(0x7F800001u) == 0x7F80);
+
+    // the DEVICE f2bf (dequant_bf16 on raw F32 words, type 0) matches the model on every word, NaN/inf included:
+    // f2bf_nan_to_negzero, f2bf_nan_to_inf, the 2^32 wrap, ties to even
+    {
+        std::vector<uint32_t> words = {0x7FFFFFFFu, 0x7F800001u, 0xFFFFFFFFu, 0xFF800001u, 0x7FC00000u, 0x7F800000u,
+                                       0xFF800000u, 0x7F7FFFFFu, 0x3F808000u, 0x3F818000u, 0x00000000u, 0x80000000u};
+        for (uint32_t hi = 0x7F80; hi <= 0x7FFF; ++hi)           // every +NaN/inf high half, with tie/low/high payloads
+            for (uint32_t lo : {0x0000u, 0x0001u, 0x7FFFu, 0x8000u, 0x8001u, 0xFFFFu}) { words.push_back(hi << 16 | lo); words.push_back((hi | 0x8000u) << 16 | lo); }
+        while (words.size() % 256) words.push_back((uint32_t)rng());
+        for (int k = 0; k < (1 << 20); ++k) words.push_back((uint32_t)rng());
+        const int64_t n = (int64_t)words.size();
+        uint32_t* dw = dup(words); uint16_t* db = dalloc<uint16_t>((size_t)n);
+        CHECK(dequant_bf16(0, dw, db, n, 0) == cudaSuccess && sync_ok());
+        const std::vector<uint16_t> got = back(db, (size_t)n);
+        int64_t bad = 0;
+        for (int64_t i = 0; i < n; ++i) if (got[(size_t)i] != u63::f2bf(words[(size_t)i])) {
+            if (bad < 5) std::printf("  device f2bf(0x%08x) = 0x%04x, model 0x%04x\n", words[(size_t)i], got[(size_t)i], u63::f2bf(words[(size_t)i]));
+            ++bad;
+        }
+        CHECK(bad == 0);
+        CHECK(got[0] == 0x8000 && got[1] == 0x7F80 && got[2] == 0x0000);   // NaN not preserved (no guard)
+        cudaFree(dw); cudaFree(db);
+    }
 
     // device dequantization of rows x cols tiles of every supported type
     for (int i = 0; i < ns; ++i) {

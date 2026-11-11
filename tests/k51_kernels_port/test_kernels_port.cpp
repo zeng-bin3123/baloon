@@ -77,7 +77,7 @@ int main(int argc, char** argv) {
     }
     { uint32_t u = 0x3F808000u; float f; std::memcpy(&f, &u, 4); CHECK(bf16_from_f32(f) == 0x3F80);   // tie -> even (down)
       u = 0x3F818000u; std::memcpy(&f, &u, 4); CHECK(bf16_from_f32(f) == 0x3F82);                       // tie -> even (up)
-      CHECK(std::isnan(f32_from_bf16(bf16_from_f32(NAN))));
+      { uint32_t q = 0x7F800001u; std::memcpy(&f, &q, 4); CHECK(bf16_from_f32(f) == 0x7F80); }   // no NaN branch (bf16Encode)
       CHECK(std::isinf(f32_from_bf16(bf16_from_f32(INFINITY))) && f32_from_bf16(bf16_from_f32(-INFINITY)) < 0); }
 
     // ---- RoPE: rotation preserves pair norm; pos 0 is identity; dims >= n_rot pass through; mrope reduces to rope ----

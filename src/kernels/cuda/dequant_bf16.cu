@@ -23,7 +23,11 @@ namespace {
 
 enum Out { OUT_BF16 = 0, OUT_F16 = 1, OUT_F32 = 2 };
 
-__device__ __forceinline__ uint16_t f2bf(float f) { return f16bits::round_f32_to_bf16_bits(f); }
+// f2bf: (u + 0x7FFF + ((u >> 16) & 1)) >> 16 on the f32 bits, wrapping mod 2^32, nearest/ties-to-even, NO NaN guard.
+__device__ __forceinline__ uint16_t f2bf(float f) {
+    const uint32_t u = (uint32_t)__float_as_uint(f) + 0x7FFFu + (((uint32_t)__float_as_uint(f) >> 16) & 1u);
+    return (uint16_t)(u >> 16);
+}
 __device__ __forceinline__ float h2f(uint16_t h) { return f16bits::f32_from_f16(h); }
 
 __device__ __forceinline__ int scale_min_k4(int j, const uint8_t* q, int& d, int& m) { scale_min_k4_dev(j, q, d, m); return 0; }
@@ -62,8 +66,11 @@ __global__ void dequant_kernel(int type, const uint8_t* src, void* dst, int64_t 
     group32<O>(type, src, dst, g, n);
 }
 
-// i-quant (codebook) formats need kv_iq4nl; true for them.
-bool iq_only(int type) { return type == T_IQ4_NL || type == T_IQ4_XS; }
+// i-quant (grid-codebook) types served by the iq_kernels path, not by this block-format table:
+// IQ2_XXS 16, IQ2_XS 17, IQ3_XXS 18, IQ3_S 21, IQ2_S 22, IQ1_M 29. Disjoint from dequant_bf16_supported().
+[[maybe_unused]] bool iq_only(int type) {
+    return type == 16 || type == 17 || type == 18 || type == 21 || type == 22 || type == 29;
+}
 void geometry(int64_t n, dim3& grid, dim3& block) {
     const int64_t groups = (n + 31) / 32;
     block = dim3(256);

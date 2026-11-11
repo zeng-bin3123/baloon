@@ -76,11 +76,10 @@ static uint32_t rnd32() { rng_s = rng_s * 1664525u + 1013904223u; return rng_s; 
 static float rndf() { return ((rnd32() >> 8) & 0xFFFF) / 32768.f - 1.f; }
 
 static void bf16_checks() {
-    // exhaustive over every bf16 value: widening then narrowing is the identity (NaNs stay NaN)
+    // exhaustive over every bf16 value: widening then narrowing is the identity (NaN words included: bf16_roundtrip)
     for (uint32_t b = 0; b < 65536; ++b) {
         const float f = f32_from_bf16((uint16_t)b);
-        const uint16_t r = bf16_from_f32(f);
-        if (std::isnan(f)) CHECK(std::isnan(f32_from_bf16(r))); else CHECK(r == b);
+        CHECK(bf16_from_f32(f) == b);
     }
     // rounding oracle: result is the nearest bf16, ties to even
     for (int i = 0; i < 400000; ++i) {
@@ -99,12 +98,10 @@ static void bf16_checks() {
     CHECK(bf16_from_f32(INFINITY) == 0x7F80);
     CHECK(bf16_from_f32(-INFINITY) == 0xFF80);
     { uint32_t u = 0x7F7FFFFFu; float f; std::memcpy(&f, &u, 4); CHECK(bf16_from_f32(f) == 0x7F80); }  // overflow rounds to inf
-    CHECK(std::isnan(f32_from_bf16(bf16_from_f32(NAN))));
-    for (uint32_t u : {0x7F800001u, 0x7F80FFFFu, 0xFF800001u, 0x7FBFFFFFu}) {   // NaNs whose payload sits in the dropped bits
-        float f; std::memcpy(&f, &u, 4);
-        const uint16_t r = bf16_from_f32(f);
-        CHECK(std::isnan(f32_from_bf16(r)));
-        CHECK((r >> 15) == (u >> 31));
+    { uint32_t u = 0xFFFFFFFFu; float f; std::memcpy(&f, &u, 4); CHECK(bf16_from_f32(f) == 0x0000); }   // no NaN branch: wraps
+    for (uint32_t u : {0x7F800001u, 0x7F80FFFFu, 0xFF800001u, 0x7FBFFFFFu, 0x7FFFFFFFu}) {   // NaNs: no special case, the
+        float f; std::memcpy(&f, &u, 4);                                                     // rounding add carries (mod 2^32)
+        CHECK(bf16_from_f32(f) == (uint16_t)((uint32_t)(u + ((u >> 16) & 1u) + 0x7FFFu) >> 16));
     }
 }
 

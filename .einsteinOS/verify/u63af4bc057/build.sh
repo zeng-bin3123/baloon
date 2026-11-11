@@ -24,7 +24,7 @@ echo "== unit u63af4bc057: host test =="
 
 echo "== unit u63af4bc057: GPU test =="
 CUF="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Iinclude -Isrc -Isrc/cu -Isrc/kernels/gpu -Itests/u63af -O2"
-"$CLANG" $CUF -c src/cu/dequant_bf16.cu -o "$OBJ/dequant_bf16.o"
+"$CLANG" $CUF -c src/kernels/cuda/dequant_bf16.cu -o "$OBJ/dequant_bf16.o"
 "$CLANG" $CUF -c src/kernels/gpu/dequant_q2.cu -o "$OBJ/dequant_q2.o"
 "$CLANG" $CUF -c tests/u63af/test_u63_gpu.cu -o "$OBJ/test_u63_gpu.o"
 "$CLANG" "$OBJ/test_u63_gpu.o" "$OBJ/dequant_bf16.o" "$OBJ/dequant_q2.o" -o "$OUT/test_u63_gpu" \

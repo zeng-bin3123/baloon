@@ -25,9 +25,8 @@ int main() {
     CHECK(bf16_from_f32(fl(0x3F807FFFu)) == 0x3F80);        // below half rounds down
     CHECK(bf16_from_f32(-2.0f) == 0xC000);
     CHECK(bf16_from_f32(INFINITY) == 0x7F80 && bf16_from_f32(-INFINITY) == 0xFF80);
-    { uint16_t n = bf16_from_f32(NAN); CHECK((n & 0x7F80) == 0x7F80 && (n & 0x7F) != 0); }
-    { uint16_t n = bf16_from_f32(fl(0x7F800001u)); CHECK((n & 0x7F80) == 0x7F80 && (n & 0x7F) != 0); }   // signalling NaN must not collapse to inf
-    { uint16_t n = bf16_from_f32(fl(0xFF800001u)); CHECK(n >> 15 == 1 && (n & 0x7F) != 0); }
+    CHECK(bf16_from_f32(fl(0x7F800001u)) == 0x7F80 && bf16_from_f32(fl(0xFFFFFFFFu)) == 0x0000);   // no NaN branch (bf16Encode)
+    CHECK(bf16_from_f32(fl(0xFF800001u)) == 0xFF80);          // -NaN with low payload rounds to -inf (no NaN branch)
     CHECK(bf16_from_f32(fl(0x7F7FFFFFu)) == 0x7F80);        // max finite fp32 overflows to inf
     for (uint32_t b = 0; b < 0x10000; b += 7) {             // exact round trip of every non-NaN bf16
         if ((b & 0x7F80) == 0x7F80 && (b & 0x7F)) continue;

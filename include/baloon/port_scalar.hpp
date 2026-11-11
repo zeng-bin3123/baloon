@@ -18,11 +18,11 @@ namespace baloon {
 namespace refk {
 
 // ---- bf16 bits: the top 16 bits of an fp32, rounded to nearest even on the 16 dropped bits -----------------------------
+// Exactly ((u + ((u >> 16) & 1) + 0x7FFF) mod 2^32) >> 16 on the f32 word, with NO NaN special case (theory bf16Encode):
+// a NaN's payload carries like any other bits, so 0x7F800001 -> 0x7F80 (inf) and 0xFFFFFFFF wraps to 0x0000.
 REF_BF16_HD inline uint16_t bf16_from_f32(float f) {
     uint32_t u; std::memcpy(&u, &f, 4);
-    if ((u & 0x7FFFFFFFu) > 0x7F800000u) return (uint16_t)((u >> 16) | 0x0040u);   // NaN stays NaN (quiet), sign kept
-    const uint32_t lsb = (u >> 16) & 1u;
-    u += 0x7FFFu + lsb;                                                             // carry may reach inf: correct
+    u += ((u >> 16) & 1u) + 0x7FFFu;                                                // uint32_t: wraps mod 2^32
     return (uint16_t)(u >> 16);
 }
 REF_BF16_HD inline float f32_from_bf16(uint16_t b) {

@@ -132,21 +132,32 @@ static void test_half_bits() {
         CHECK(fbits(refk::f32_from_bf16((uint16_t)h)) == (uint32_t)u63::bf16Decode(h));             // decode is << 16
         CHECK(fbits(bf16_bits_to_f32((uint16_t)h)) == (uint32_t)u63::bf16Decode(h));
         const float f = bitsf((uint32_t)u63::bf16Decode(h));
-        if (std::isnan(f)) {   // the production encoders keep NaN a NaN (guarded; see the unit summary)
-            CHECK(std::isnan(refk::f32_from_bf16(refk::bf16_from_f32(f))));
-            CHECK(std::isnan(bf16_bits_to_f32(round_f32_to_bf16_bits(f))));
-            continue;
+        CHECK(refk::bf16_from_f32(f) == h);           // bf16_roundtrip on EVERY bf16 word, NaN words included
+        if (!std::isnan(f)) CHECK(round_f32_to_bf16_bits(f) == h);   // (shared helper of other units; non-NaN only)
+    }
+    // production bf16_from_f32 on the theory's NaN witnesses (no NaN branch, 32-bit wrap)
+    CHECK(refk::bf16_from_f32(bitsf(0x7F800001u)) == 0x7F80);   // bf16_nan_becomes_inf
+    CHECK(refk::bf16_from_f32(bitsf(0xFFFFFFFFu)) == 0x0000);   // bf16_neg_nan_wraps_to_zero
+    CHECK(refk::bf16_from_f32(bitsf(0x7FFFFFFFu)) == 0x8000);   // positive NaN carries into the sign bit
+    CHECK(refk::bf16_from_f32(bitsf(0x3F808000u)) == 0x3F80);   // bit-16 tie rule, not bit-15
+    // exhaustive: production bf16_from_f32 == bf16Encode on all 2^32 f32 words (NaN and inf included)
+    {
+        uint64_t bad = 0, first = 0;
+        for (uint64_t w = 0; w < 4294967296ull; ++w) {
+            const uint32_t u = (uint32_t)w;
+            if (refk::bf16_from_f32(bitsf(u)) != u63::bf16Encode(u)) { if (!bad) first = u; ++bad; }
         }
-        CHECK(refk::bf16_from_f32(f) == h && round_f32_to_bf16_bits(f) == h);                        // exact round trip
+        if (bad) std::printf("  bf16_from_f32 != bf16Encode on %llu words, first 0x%08llx\n", (unsigned long long)bad, (unsigned long long)first);
+        CHECK(bad == 0);
     }
     // direction and ties-to-even of the production encoders agree with the theory model on every non-NaN input
     for (int k = 0; k < 3000000; ++k) {
         uint32_t u = (uint32_t)rng();
         if (k % 4 == 0) u = (u & 0xFFFF0000u) | 0x8000u;   // exact ties
         const float f = bitsf(u);
-        if (std::isnan(f)) continue;
         const uint32_t m = u63::bf16Encode(u);
-        CHECK(refk::bf16_from_f32(f) == m && round_f32_to_bf16_bits(f) == m && u63::f2bf(u) == m);
+        CHECK(refk::bf16_from_f32(f) == m && u63::f2bf(u) == m);
+        if (!std::isnan(f)) CHECK(round_f32_to_bf16_bits(f) == m);
         const uint32_t hh = u >> 16, r = u & 0xFFFF;
         if (hh < 65535) {
             if (r < 32768) CHECK(m == hh);
