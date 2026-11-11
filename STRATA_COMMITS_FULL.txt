@@ -1,3 +1,154 @@
+c1ff07f1a1817594811c960039571c6e268fe89a|2026-11-11|Niko1221|Merge f-ok-gpulist (a typed --gpu list clears a leftover gpu_order; help line) into f-main-1111b
+aed74bb74266cd397d1f72d54de6a43b032fd820|2026-11-11|Niko1221|Merge f-ok-mark (picture-reader file mark keyed on the change time) into f-main-1111b
+8d57e7f5a15c9ef82008a27f6af5dca11b604c94|2026-11-11|Niko1221|Merge f-wizard-80x24 (launch wizard keeps every Save choice at 80x24) into f-main-1111b
+697b3ca3744b2032971cec64d0d620087db699b4|2026-11-11|Niko1221|Merge f-diskfull-line (downloads: plain sentences for a full disk, quota or read-only drive) into f-main-1111b
+042bc2b5a4ce74659550591c06066f0f52a41c0a|2026-11-11|Niko1221|Merge f-evict-report (AMD Linux: driver-pause time in the stall report and per request) into f-main-1111b
+4972c0b4eb6a87db8ebac2ecdb549791cf7c73cf|2026-11-11|Niko1221|Merge f-gh5715 (Qwen3.6 context fitted to the card, #5715) into f-main-1111b
+2b9df3fe71cb24cef3052c332e032ea681729abe|2026-11-11|Niko1221|launch: a typed --gpu list means the same in every home; the help line says who picks Main
+b94c2931fb519430bd5e3df6598e780ce648822f|2026-11-11|Niko1221|setup: the alternative picture-reader mark also keys on the file's change time
+0771e3555de79c34343429a14b6d16cf994adb0b|2026-11-11|Niko1221|Downloads: a plain sentence when the drive is full, over quota or read-only
+03e687ace421f3b07906bd133f8ea001b0c2756b|2026-11-11|Niko1221|AMD Linux: show how long the driver paused the GPU (stall report and request line)
+dffa10490b5620c46c00f035cd84fead84efd34a|2026-11-11|Niko1221|Launch wizard: keep every Save choice on an 80x24 screen for any storage path
+6c642df7530a5a4ba2f6ae52deaa5be436271195|2026-11-11|Niko1221|Merge f-gh1110 (docs: STRATA_RESIDENT_PIN=0 also covers the automatic RAM copy) into f-main-1111
+27108a4f2fe781bfd4e60baca2641e301e1f8995|2026-11-11|Niko1221|docs: STRATA_RESIDENT_PIN=0 also covers the automatic RAM copy
+2f52b86360cca34c20bc3a033203c96b27c4a81b|2026-11-11|Niko1221|Merge f-gh1110 (automatic RAM copy wording of 11-11 morning) into f-main-1111
+c28474dc4f1827acd528c52fa04405cc079c2e1e|2026-11-11|Niko1221|automatic RAM copy: two lines in the owner's wording of 11-11 morning
+ded0053f697e1f5f56c143c8957c9f02c92bdca7|2026-11-11|Niko1221|Merge f-net-waits cadeb1f63 into f-main-1111
+cadeb1f63b09ed8aab8a2e3e76a066071999f686|2026-11-11|Niko1221|net: a download whose .part file cannot be written fails at once again, not after five minutes
+2034cb53b09c8deb5ee812cbced7d486fee13e02|2026-11-11|Niko1221|Merge f-net-waits 465fcbbc9 into f-main-1111
+465fcbbc95338d2dc1b2571066c458d2eeff97ba|2026-11-11|Niko1221|net: a local download source that cannot be opened fails at once again, not after five minutes
+794092c46c159577c40bbfa71a51a321a7fc451d|2026-11-10|Niko1221|strata-q36: say a context the card cannot hold before the allocation fails (#5715)
+1fea75a42524a78261898e8c9b9886287174908c|2026-11-10|Niko1221|App: Qwen3.6's context estimate from the catalog's own figures (#5715)
+2c042262adb0780ef80125ac59ca1a244d37fec8|2026-11-11|Niko1221|Merge f-robust-0215 2f1f915aa into f-main-1111
+2f1f915aac130172558e0f111e0c87cedcda287c|2026-11-11|Niko1221|tests: serve/winjob.py's two process starts are on the spawn-site list
+9e8502b76e2e39bffb7120ba34a290a058786e3b|2026-11-10|Niko1221|Qwen3.6: recommend the context that fits the card, and say it before the start when it does not (#5715)
+ebe1fcc9bb66295ffded570d37887c41104adf9f|2026-11-10|Niko1221|Qwen3.6: one figure for the conversation memory per token and the card's fixed share (#5715)
+8cccead004d434b45052e3d51e2d6e0de7caa779|2026-11-10|Niko1221|Merge f-net-item7 a7f384efe into f-main-1111
+c921c6800e2b8608e8ba1d69bd36412c35770742|2026-11-10|Niko1221|Merge f-net-waits f88ea5bb0 into f-main-1111
+7ae0bc8ade1434f14c2e0cd423d5c6125608d97b|2026-11-10|Niko1221|Merge f-robust-0215 ca9c53c1f into f-main-1111
+db288d89d3727ef970dc8210a3004b3bccf902a2|2026-11-10|Niko1221|Merge f-gh1110 40334701c into f-main-1111
+e0b1010fda6c91bf9d8759f5b309f2ad46e00baf|2026-11-10|Niko1221|Merge f-gpu-plan-main 7545928ff into f-main-1111
+e663916f593f409ad6ddd9165cca85dd34cd51fb|2026-11-10|Niko1221|Merge f-winjob-test 750a72650 into f-main-1111
+22b94afb477614e4ff4edf24da112c519feb5202|2026-11-10|Niko1221|Merge f-dltest-killed 9f56c1f04 into f-main-1111
+40334701c0bb3ebbf90cad43ab5f346fc35c3ec1|2026-11-10|Niko1221|expert cache and RAM copy: the free-memory line and the automatic RAM copy's lines in the approved wording
+ca9c53c1fd865651aafd639e9f74a80e8461f6e8|2026-11-10|Niko1221|robustness: the stall report's prompt lines and the Windows resume error in the approved wording
+feaa928f90b787d45c3ab29348cea8f57658179a|2026-11-10|Niko1221|resident RAM copy: STRATA_RESIDENT_PIN also for the automatic copy; its clamp line names no flag
+5d87c4d8eb9d536c663698fdc38a9fc90537090a|2026-11-10|Niko1221|serve (Windows): a child is in the kill-on-close job before it runs, so what it starts at once is too
+b38d9f89888359603ae7fa2709bc3132e85a6f41|2026-11-10|Niko1221|tests: the running-engine stand-in no longer depends on the system's sleep
+92f7e8198a80dac880231590dd06de488a9094ff|2026-11-10|Niko1221|tests: the CPU parity tests skip only their bit-equality leg in older-CPU builds
+711a7e93786ad0fe32ac81d738062c9e5f9f65c3|2026-11-10|Niko1221|engine: the stall report asks the prompt path's compute stream whether its work is done
+cfe755e7abc940935234d89f10362f76ba4eddcb|2026-11-10|Niko1221|launch: the worker thread's last calls to the screen are guarded like the others
+bbf97633c8de03a7f6258bc7f68d0be4eb40bcfc|2026-11-10|Niko1221|serve: the STOP of a request that ends early never raises, whatever state the engine's pipe is in
+f88ea5bb00f5fc86d07d57445781f9b6ac76e0d2|2026-11-10|Niko1221|tests: the refused-port checks of the network tests allow Windows' own refusal time (lane 15)
+a7f384efe7cc6d3ac6d14624d5ffd03a6b2c9556|2026-11-10|Niko1221|setup and the plan accept an Unsloth mmproj-F16.gguf the person already has as the Flash-Next picture reader (lane 15, item 7)
+70bfa88d6660a37a6da1619ad1d37f2d96030f57|2026-11-10|Niko1221|tests: no test reaches the network (lane 15)
+e77c407b839f7a010ac5807606a6bafa30925ab3|2026-11-10|Niko1221|net: the first-run screen shows the waiting line in the stage text's element (lane 15)
+be9d5f50970880b10ea96a8a9ddb474edab8b334|2026-11-10|Niko1221|net: --model-path no longer fails on a folder Strata cannot write to, and writes nothing beside the person's model files (lane 15, item 5)
+4c0626849821345bd6d9ecda4443e4d3896383fc|2026-11-10|Niko1221|net: updates, components, the draft layer and the other transfers follow the one network rule (lane 15, item 2)
+34ae0dcc03772669184bf861a87563acf5ce3c19|2026-11-10|Niko1221|docs: the Windows install line carries a time limit (lane 15)
+54002e83fa7367f08cc6a6907dc791a61e2cafda|2026-11-10|Niko1221|net: install.ps1 gives up on a silent server and keeps a slow download (lane 15, item 6)
+84069c4fd705c62703a12296ef0c99092a99b4e1|2026-11-10|Niko1221|docs: the Linux and Mac install line carries a connect and a total limit (lane 15, W12)
+c5d4e5172260ca6e8da7572c8e3852e95ba89db1|2026-11-10|Niko1221|net: install.sh's fetch() gives up on a silent server and keeps a slow download (lane 15, item 3)
+0988d0c678e01aae525128dad3e95e1c83136700|2026-11-10|Niko1221|net: the launch plan says what the start will do with --data-dir and with a picture reader that is not the pinned file (lane 15, item 4)
+fd40eb0fd8778167b4bf52bafc5e2d5dd5a01c3b|2026-11-10|Niko1221|net: setup's downloads and launch's model step say what they wait for, and a silent host fails in about 44 s, not 320 s (lane 15, item 1)
+cc4f2dfe3c221c56403ce1806911efcc4e5b08ad|2026-11-10|Niko1221|netpolicy: one rule for network calls on install, update and launch (connect 12 s then 30 s, one retry, host memory per run, 60 s stall, 5 min give-up, waiting line after 5 s)
+7ee50cc8c71c94d504e38dee4ebc7e7fdfee6eee|2026-11-10|Niko1221|split: price each stage's prompt loan on its own card (#5722)
+e008709d779f91b19f6dee30df1cfe60bbdd22ee|2026-11-10|Niko1221|expert cache: a failed free-memory query is said with its error, not passed off as 0 free (#5708, part)
+9f56c1f046924a7ed92a097694e373d916f9fb6f|2026-11-10|Niko1221|test_setup_download: the killed-download test no longer depends on timing, and covers the one-stream path as well
+7545928ff8e1ceca1f2b99f0cbb4581c10b52fe2|2026-11-10|Niko1221|launch --plan names the Main card the start will make: one function for the card order
+8c71c492780f48819434803b58c30647247cdb05|2026-11-10|Niko1221|conversation cache: an evicted parked conversation gives its RAM back to the system (#5697)
+de57c8396dc58bf06e1e4eeb3fb9de10f0053c30|2026-11-10|Niko1221|calibrate: build the engine arguments with the engine program, as the server does (#5720)
+b7713cf42708875ab808f8a3042f88e8be1db888|2026-11-10|Niko1221|setup: a build folder whose CUDA toolkit changed drops the cached CUDA paths (#5717)
+750a7265035255109668686f6df822ca28e72c42|2026-11-10|Niko1221|test_bench_stop: a failure of the child-and-its-child test says which check it is and what survived
+4d76d7278a7d7257bca42e785ccebf21ec9c4428|2026-11-10|Niko1221|test_winjob: the failure message no longer calls an exited process "NOT the process held"
+26c3b644117b1922cfaae5118cdeb12628b0a3f8|2026-11-10|Niko1221|test_winjob: hold the child and grandchild by handle, and say which process is left on a failure
+dbb2d168cffa8cf793d9325358809d5263c7c6b0|2026-11-10|Niko1221|When the GPU reader did not start for any other reason, the summary says pictures are read on the processor
+7e8206b50106286de5aa637717fe0bb4f91c9cdd|2026-11-10|Niko1221|The picture reader's need in the sentences is its whole need at its image limit, not the one allocation that failed
+c53e45a35db3464b3c8fb4447d659a879ce7da72|2026-11-10|Niko1221|The picture reader falls back to the processor in every mode instead of ending the launch
+78eaaf1b01c28733deefdd2421ae30ddef85cb0d|2026-11-10|Niko1221|A picture reader that cannot start for lack of GPU memory is reported as that, with the card, the size and the next step
+4cce1ee4d0057ff718cb0219e0114e5ddf73f296|2026-11-10|Niko1221|The picture reader's READY pipe: one deadline, stray lines kept and logged, a printing reader is never killed
+38ad0bcbd107fd92c77376f4715e5d54c3af8e7a|2026-11-10|Niko1221|The product never starts a debugger: every child it starts gets GGML_NO_BACKTRACE=1
+42d502a066b411effb9cb2405ef3c0ea113cbf9e|2026-11-10|Niko1221|Snapshot driver: a command run in the test process does not change the environment the engine's is compared with
+7726f80cba570e851e1107e435726168b9c1a8f3|2026-11-10|Niko1221|test_cfg_paths, test_component_start: the starts give the stub server 60 s, not 15-20 (a pass still returns as soon as it is ready; on a Windows PC with about 330 processes and a non-elevated account a start took 16 s against a 15 s wait)
+8bbd64e971058f3f3c0db9c99601f2dfdebe6c6f|2026-11-10|Niko1221|parallel-chats test: the scratch folder's removal retries (a chat save that landed while it was being removed failed the teardown with ENOTEMPTY on a macOS runner)
+82ab8ac7628a4aa08c823db879985169610d5a71|2026-11-10|Niko1221|test_recipes: the interrupted run is found by excluding the two known runs, not as the newest by file time (three runs in one tick of a coarse Windows clock came back in any order)
+79d529cc78a2c40a516dbd012636125f0a95b873|2026-11-10|Niko1221|procs.orphans_of on Windows: names first, a command line only where the image name can be the engine's file (reading every command line took 4-9 s per server start on a Windows PC with about 280 processes and a non-elevated account; now 0.1 s warm, 2 s cold)
+3e1fcaaf67e04c096b8172682817f427883515a0|2026-11-10|Niko1221|serve: the HTTP server binds without a host name lookup (http.server's server_bind asks getfqdn, which stalled 35 s per start on GitHub's macOS runner; nothing reads server_name)
+42e97db851bda95f89109e856d6abf1d630fcf39|2026-11-10|Niko1221|test_runtime: the start, restart and verify waits give the stub server 60 s (operations 80 s), not 10-20 (a pass still returns as soon as it is ready; on a Windows PC with about 280 processes and a non-elevated account, the server's leftover-engine scan alone took 4-9 s and the budget ran out)
+35ad5b4716b9f8fa7f7ae488e9f79ab814a35f38|2026-11-10|Niko1221|test stubs: mcp_fake_server and cutserver bind without the getfqdn lookup (they run as fresh child processes)
+c7b446fa8510a9b3a0dc334282a7a40f9d39bab6|2026-11-10|Niko1221|test_setup_feed_models TerminalAndApp: the table's Strata reads a fixed NVIDIA PC, not the card of the PC the tests run on (on a PC with an Intel Arc card, install_plan went down the Intel path)
+50c753f5d5bc33b4899a16ef8326c41f710052d8|2026-11-10|Niko1221|host tests: assert-private reads the DACL through .NET File.GetAccessControl and compares it by SID (Get-Acl's module did not load in Windows PowerShell under a PowerShell 7 parent; SDDL writes the runner's built-in Administrator as the alias LA)
+b250bc78a929b0fa6fd41ef632eab9979966dbe4|2026-11-10|Niko1221|test_drafting_tuned: a same-size rewrite moves the file clock on before the marker check, as test_drafting_selector_q4 does (same tick on Windows kept mtime_ns)
+ea6826cc83c36541913fc5fc47e51989a95db5fa|2026-11-10|Niko1221|test_setup_golden: the config a run wrote is the new or changed file, not the newest time (same clock tick on GitHub's Windows runner picked the config placed before; setup wrote the named size)
+e906e7e979db71b761df35564b4d985096a20a90|2026-11-10|Niko1221|test_strata_mcp: the fake model server binds without http.server's getfqdn lookup (a fresh child on GitHub's macOS runner did not answer within 30 s)
+13e7188cc88e4ecf60d6ae8a0efaafa37e0e0b6b|2026-11-10|Niko1221|images: the answer's background says what the picture is: "transparent" also when a picture kept its alpha because it could not be put on white (the logged fallback), "opaque" for a white or an RGB sd-cli picture (_flatten reports whether the returned PNG has an alpha channel)
+3a0916c5e78ca7a4bcd261827c534a665e754799|2026-11-10|Niko1221|docs/IMAGES.md: the background request field, the answer's background and strata.flatten_s, and the picture on white (the API's PNG is no longer byte for byte sd-cli's unless background is transparent)
+631b28030820bc818df1018f729d417b87419b90|2026-11-10|Niko1221|images: pictures are put on white by default. Qwen-Image-2.1 decodes RGBA and leaves some backgrounds transparent over a flat key colour; the server now composites each picture on white and returns an 8-bit RGB PNG (flatten_png: zlib 6, every chunk other than IHDR / IDAT, sd-cli's "parameters" text above all, copied byte for byte; 0.12 s median, 0.22 s max per 1024-1536 picture with Pillow, 0.62 / 1.09 s on the zlib + numpy fallback). background: "transparent" keeps sd-cli's PNG unchanged; opaque / auto / none give the white one; other values are refused. A PNG that cannot be rewritten goes out unchanged with one log line. The response carries background and strata.flatten_s
+ea16bfd3062a9caa998d2f4d5347770283f72142|2026-11-10|Niko1221|images: the text-encoder time reaches /v1/status and the response again: stable-diffusion.cpp 2988060 (the pinned commit) prints "get_learned_condition completed, taking 0.70s", the pattern only read the "N ms" form some older revisions printed (from b636886, 2024-02); both forms are read now (log_figures), the fake sd-cli prints the pinned form
+49bf891e726d24b75647e776cc074e8a643177f7|2026-11-10|Niko1221|make_model_release --checklist <file>: the internal release checklist by path, filled beside the repo's default notes and model card (no second copy of the public templates in a private folder); a missing file is refused before anything is written
+5ce203f59a5d148ce96aa3bf624bd167041bf38f|2026-11-10|Niko1221|make_model_release: the release templates (the notes and the model card) live in the repo, packaging/templates/model-release, and are the default of --templates (another folder can still be named); the templates test reads them on every box (the internal release checklist stays out of the repo)
+87dfca0e7c3ee24ad36cc3f69a31b859587245f8|2026-11-10|Niko1221|test_strata_mcp MacCatalog: the second temp data folder (f-0214-app's disk-short check) under the real home on macOS too
+0abb4f869e5f018d480a9ab2d34c6a6e182a3352|2026-11-10|Niko1221|Merge f-clean-fix: CI fixes and tests that no longer depend on the box they run on
+663f5a5b835fa8eb1b4eef8f2d1cbe5f71734d00|2026-11-10|Niko1221|Merge branch 'main' into f-0214-app
+c47df69e0119a0e4adba40e9680136ebb04ef5fa|2026-11-10|Niko1221|test: the phaseA-tests templates check gives --min-engine as a real case-A caller must, and first checks that without it the script refuses (078b52563 made it required; the check only runs on the owner PC, so it was not run after that)
+1b30def0ed9984c9813040ee21d7ae74740c326b|2026-11-10|Niko1221|Merge commit '562fa312e' into f-0214-app
+562fa312ec481c290b2ed25a7b042d2b34fbbdf8|2026-11-10|Niko1221|test: hermetic drafter-fetch test and no pytest tmp_path in the 0.2.14 tests (Windows gate of f-0214-app)
+e3a04c013f2a3a0d2a4f258182f6add45631c5b1|2026-11-10|Niko1221|test_strata_mcp MacCatalog: the temp data folder under the account's real home (pwd), not HOME, which the fake root points at a temp folder
+872a7bcb28def262aaa873026a46816888d13a59|2026-11-10|Niko1221|test_strata_mcp: the macOS expectedFailure marks come off (lane 3's zombie fix, f-0214-app, lands first: an unexpected success would fail)
+b6a7915c89af801c2c130f3f8594a020542e266b|2026-11-10|Niko1221|serve/test_server.py: LF line ends again (the hip_ordinal edit had written the whole file with CRLF)
+0645f2edecf0ea35febfcb1c4eb1cce861982dc1|2026-11-10|Niko1221|tests: suites that read the box they run on (Boston, p2006, p1006, macOS)
+804d2032d25371374cc294d8ea5e2c032c24fb9c|2026-11-10|Niko1221|tests: a nvidia-smi that answers nothing comes first on PATH for the Python suites on POSIX, so a box with an NVIDIA card runs them as GitHub's runners do (p1004's P100: 64 stub-engine update tests failed against the stand-in packages' sm_86 code)
+1c50fe076c5dbb77d228bc514cf8784b484f0af4|2026-11-10|Niko1221|make_model_release: the plan prints the exact strata launch lines with the size name a person types (<quant>-<id> when the quant's name is a built-in size, as feed_models.py decides)
+9e5030307812d4227cad6f01b02fc91fda5e9650|2026-11-10|Niko1221|feed_tool: an OPT-IN multi-threaded gzip for tar.gz packages (STRATA_PACK_THREADS >= 2: 4 MiB gzip members compressed in parallel, the same bytes for the same tree); unset, the archive is the single-stream tarfile gzip of before. Published 0.2.12 / 0.2.13 Terminals, install.sh and the 0.2.13 AppImage's Control install from such a feed (not the default until every reader is shown)
+1eac64cd5d27a311951f2e1112f0f9fb83ad8c31|2026-11-10|Niko1221|Merge commit '8cf002e1b' into f-0214-app
+8cf002e1b00116790160df459340bb1deb8032fd|2026-11-10|Niko1221|test: drafting.test.mjs's second source check reads the first-load condition too
+c8d1d73122cd3076ebc277f04efb88e533b05759|2026-11-10|Niko1221|Merge commit '95e9b7341' into f-0214-app
+95e9b7341f95adfdfd95de2dd6499ba1ad61de51|2026-11-10|Niko1221|setup: the first range probe of a parallel download is tried again after a hiccup (proposal, from lane 8)
+7ea172159a678119e18ee29a172be4af7a94c457|2026-11-10|Niko1221|strata_mcp: without /proc (macOS) an ended child that is not reaped yet is not "running"
+e481f3b6b9373ee45324d79143e5f2ff209e235c|2026-11-10|Niko1221|Control: a model whose draft layer is off keeps the server's own "without the draft layer" step; the app's first-load test shape
+7fddfd8292cd9854cb0ddc931f3f4b602904f330|2026-11-10|Niko1221|Merge commit '81f7422c1' into f-0214-app
+8793c8f85c11e47173db6e935c42eaaae777e3ac|2026-11-10|Niko1221|Merge branch 'main' into f-0214-app
+a9d52eae2fa2afe9c274287cd0f00e4adec90ee0|2026-11-10|Niko1221|Merge branch 'f-0214-appwin' into f-0214-app
+81f7422c11e75e86366db536559e48553891cf5f|2026-11-10|Niko1221|Desktop (Linux): the restarter closes inherited files in the new app only, not in itself
+a846190347ef6db13c149c5d1b38c81e6ee0cf1b|2026-11-10|Niko1221|tests: the vision-build tests name an AVX2 CPU (a box without one, or a Mac, rebuilt the engine with an ISA floor); the feed command-line tests run setup.main() as on Linux on a Mac
+e9239a87dc74718622ef3cf89f53c468bcd94a57|2026-11-10|Niko1221|tools tests on macOS: only setup.py and strata_mcp see linux (a module-level sys view), the CPU reads x86_64; the three MCP install-job tests are expected failures on macOS (a zombie child reads as running there: product bug, reported)
+cdbb312bbc8ddcaa38fde4647a7539e95962ff12|2026-11-10|Niko1221|test_setup_download: one stream means one stream without setup's one-byte probes (a server without ranges answers the probe with the whole file, which can still be sending when the stream starts: 2 of 10 runs on p2006)
+99b3dc624327872787056b891132810a41258e2a|2026-11-10|Niko1221|tools/conftest.py: on macOS each tools test runs as on the Linux x86 runner (sys.platform, platform.system/machine, sysinfo.machine), not only setup.py's view; the Apple CPU read as ARM64 and strata_mcp took the Mac path
+737ab4f26213ab9920466ae803372df05e73727b|2026-11-09|Niko1221|test: the Strix app-vs-launch reserve test compares the two engine lines with each scratch world's folder written as <ROOT>
+2e25954e57cc9c4fe2c858f99c1bef4e53923b81|2026-11-09|Niko1221|ci: a diagnostic step on the Windows host job shows what Windows PowerShell 5.1 children return under a PowerShell 7 parent (hardware probe, setup cpu_info)
+f328c2cd2728e03b3d3c719e3610e55178c9b10a|2026-11-09|Niko1221|test_setup_download: a killed download may have taken the one-stream path (one failed range probe); its .part is then read as finished pieces, as setup itself reads it
+78451ea7729cbff42caefc7b7f9b871ddd67e96f|2026-11-09|Niko1221|test: the Strix reserve field test of the hardware report no longer patches sys.platform (it broke shutil.which on Linux)
+3801ec40a7473fd87ca43ced9a84cff0d22bafd6|2026-11-09|Niko1221|SYCL router: an fp32 router for a card without fp64 (Intel Arc A/B-series) - a model of another shape (Qwen4: top-8, 256 experts) routes through the generic router, whose double kernel the Arc runtime refused ('double' is not supported), ending the engine at its first token; a card with fp64 keeps the double kernels; the parity test covers the Qwen4 shapes and compares fp32 with double on the same inputs
+8cfd842c72320374dc0fdb10653413ef8037e849|2026-11-09|Niko1221|tests: pass on GitHub's macOS runners
+46e84e2398204bbb27e4b4953efb10382cc60944|2026-11-09|Niko1221|Intel Arc: a model of the signed feed starts (Qwen4 day) - the Terminal's and the app's Arc run config takes a feed qwen4exp model (Unsloth layout, its one GGUF or its shards, no Flash-Next draft layer, drafter none -> drafting off, the neutral expert profile for another shape) and a model of its own shape on its engine component (component:strata-q4-<shape>; the app's Arc setup fetches that engine first); the built-in families' configs are unchanged
+078b5256361a24c52ca60f8ee3476720f1cce936|2026-11-09|Niko1221|make_model_release: --title (the model's title in the entry and the notes; default the file's general.name, as before), and case A with --write needs --min-engine instead of leaving [FILL: minimum engine version] in the entry
+b2f26840351c6deca2b40f8f30631f6763448ba2|2026-11-09|Niko1221|Shape engine: one that cannot answer strata --geometry is refused at install (owner 11-09: "it does not say which model shape it was built for" inside the approved start_failed line); the Strata engine is never asked
+7937614e34da1531acc1b9aa2e9c8ef004090edf|2026-11-09|Niko1221|Desktop (Linux) + App: after the in-app update the update job reads done, and no old AppImage runtime is kept alive
+8b92e9ace8d8ab1fc6977e332c63ed32d67eb968|2026-11-09|Niko1221|Packaging: SHAPE=<geometry> in the Linux engine build scripts (CUDA x86_64 and aarch64/Spark, HIP, SYCL): the engine of a model shape in one command per platform - configured for that geometry (or the header STRATA_CMAKE_EXTRA names), checked with strata --geometry, packaged with --shape, no DeepSeek engine in it; without SHAPE every command is unchanged
+75a75e1a877b3fe56ee3954480b3c901deda6f75|2026-11-09|Niko1221|Settings > Engine, shape group Use dialog: keep the two reassurance sentences after the new first one
+b130a479dc0c9e0dd56cf6a978f820bd277286df|2026-11-09|Niko1221|Settings > Engine: the Use dialog of a Qwen4 model shape's engine says "{model} runs on engine {version} from its next start."
+77f7835a8b3b0e965c0b1c3612729f5cbdc38494|2026-11-09|Niko1221|SYCL engine: strata --geometry and strata --families, as the CUDA/HIP/Metal program answers them (the Intel program is its own main; without them a SYCL shape engine was installed with no geometry check)
+b5dc27e388645b7efa61767fd95b6b99ece07203|2026-11-09|Niko1221|Desktop (Linux): the app comes back by itself after an in-app update
+519c7e8c08649925f6ce994e4c1bee18f9ca3110|2026-11-09|Niko1221|Control: a feed model whose entry says drafter: none starts with no drafter, and the Terminal plans none for it
+b473875485e7f30f3be61bc00cea302ce760f9e8|2026-11-09|Niko1221|App: the first-run engine card also takes a newer Strata Control from the feed, and the app switches to it
+af9b832fd39e6a5c93c44fb5fe5f98e97817fc29|2026-11-09|Niko1221|App: the setup prepares the drafter Control's Auto picks for this card; the first load after it fetches a missing MTP layer
+06f3beb0cada518033a6eb4c98984c0d2304a51c|2026-11-09|Niko1221|App: an engine version that failed its test start is not "up to date"; Update engine tries it again
+fdfb2db6de05c3f1d42ab6ca1dd701f2b1a3de93|2026-11-09|Niko1221|App + Control: run-config paths into a gone Control folder (AppImage /tmp/.mount_*) are repaired before updates and loads
+9c09f839c35a6962e8453345036e496a07a55bbf|2026-11-09|Niko1221|App: exit 7 from Control's update lock is "an update is already running", and the update waits for the lock
+28d6695774d36f5425e97bde82825bd2169d37a0|2026-11-09|Niko1221|Settings > Engine and strata components engines list the engine of a Qwen4 model shape as its own group, with Use and Delete
+afe6c8bc14659f148335281b0eae6dc0f33a0ef7|2026-11-09|Niko1221|Strix reserve, follow-up: with no setup reserve in the run config the app takes the one setup would write (Control's setup_reserve_mib), else the floor of before
+1f2f737e8c94d40bf19a707856a19c0cff9f188c|2026-11-09|Niko1221|test_setup_pins: the stand-in pip stamp carries this system's marker, so the Requirements tests do not depend on the Python that runs them (pyyaml missing made the stamp unbelieved)
+ecccc359ddb9673c2589f053b5d62d183577668f|2026-11-09|Niko1221|A Models-page Load on a unified-memory chip (Strix Halo) keeps the reserve setup wrote, as strata launch does
+731b40fedc3edc81910b2c04f30e1b6c82e10e67|2026-11-09|Niko1221|The This computer card places a unified-memory chip's model with the label's rule (carve-out only beside the RAM)
+db35f762723de88f6f4b973e04006cc805239ea9|2026-11-09|Niko1221|test: Settings > About still shows an interrupted or failed update with no later finished one (also while a retry runs)
+1eec11bd85050aa966fdb53f52d745fa23215772|2026-11-09|Niko1221|Read pictures unticked holds across a restart on a model set up without the picture files: a choice made with a reader present carries a marker
+fb721c37d89645c8dca8dc7098aa7866f36235cf|2026-11-09|Niko1221|The version list's fit word counts a unified-memory chip (Strix Halo) only for its carve-out, as Control's fit_label does
+87ec2e7734959ae707600916dae252485f1306bc|2026-11-09|Niko1221|Settings > About checks for updates again after an in-app Strata or engine update finished, so the row no longer keeps "Update available"
+8c98f9fdb92c9e8a9194a10ae027a2381040edd5|2026-11-09|Niko1221|Settings > About no longer shows an update failure that a later finished update of the same component made right
+0a6a5ad2542986b74b18a224aa3b321fff1753d1|2026-11-09|Niko1221|Menus stay inside the window on WebView2 before 128 at Interface size 125% and up: the window's size is measured like the rectangles (a fixed box), not taken from innerWidth/innerHeight
+beed8a517413b95519019e0410c906388e9eab86|2026-11-09|Niko1221|tests: pass on GitHub's Windows runners (CRLF, PowerShell 7 module path, classic console, coarse clocks)
+8e69b84dd6e5bfa2c2f3127ea998db28d7c3053b|2026-11-09|Niko1221|gitattributes: chat templates (*.jinja) are LF in every checkout
+80cde871b920a2de526f7ef601ad3fa5efe487ba|2026-11-09|Niko1221|ci: the macOS check jobs keep their logs and upload them on a failure, as Linux and Windows do
 504b143342a9fe1aa8320a7b31e11f5c0ac265c3|2026-11-09|Niko1221|test: the old-launcher test reads the Terminal version from strata_cli instead of hard-coding 0.2.13 (it fails on 0.2.13.1)
 628f74955a56fcba092495b800dd02af75373a0f|2026-11-09|Niko1221|release manifest test: a drifting product version is reported when no terminal_version is given
 b5bff964a0728004895b3e94358a690e0084b3bf|2026-11-09|Niko1221|release manifest: a Control-only hotfix (terminal_version 0.2.13.1, control_version 0.1.59.1, engines 0.1.59) passes the check; UPDATES.md example lines follow
