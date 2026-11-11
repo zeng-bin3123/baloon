@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 2678,
     "started": "2026-11-11T16:06:54.084335641Z",
-    "renewed": "2026-11-11T16:56:47.232488655Z"
+    "renewed": "2026-11-11T17:06:14.985905654Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -388,7 +388,7 @@
         "IQuantRowDecode.lean"
       ],
       "reason": "initial plan",
-      "conv": "3d5ab76d-731c-4e3e-aeff-ba1d423fdd70"
+      "conv": "1e973c8f-1eeb-4467-990a-cb2ef5ef1194"
     },
     {
       "id": "u30ab07cd05",
@@ -542,6 +542,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "u63af4bc057": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
