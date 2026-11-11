@@ -375,12 +375,77 @@ static void test_source() {
     check(3ull * 640 * 2560 * 9 / 32 == 1382400ull && 48ull * 512 * 1382400 == 33973862400ull && 48ull * 10 * 1382400 == 663552000ull && 512ull * 1382400 == 707788800ull, "artifact geometry constants");
 }
 
+// ------------------------------------------------------------------------------------------------ rope (kg::build_rope_table / rope_neox_apply / mrope_table_set / mrope_table)
+static void test_rope() {
+    const int rot = 16, half = rot / 2, n_pos = 12; const float theta = 10000.f;
+    float* dt; cudaMalloc(&dt, (size_t)n_pos * half * 2 * 4);
+    check(kg::build_rope_table(dt, n_pos, rot, theta) == cudaSuccess && cudaDeviceSynchronize() == cudaSuccess, "build_rope_table launches");
+    std::vector<float> tab((size_t)n_pos * half * 2);
+    cudaMemcpy(tab.data(), dt, tab.size() * 4, cudaMemcpyDeviceToHost);
+    bool tab_ok = true, unit_ok = true;
+    for (int p = 0; p < n_pos; ++p) for (int i = 0; i < half; ++i) {
+        const double a = (double)p * std::pow((double)theta, -2.0 * i / rot);
+        const float c = tab[((size_t)p * half + i) * 2], sn = tab[((size_t)p * half + i) * 2 + 1];
+        if (std::fabs(c - std::cos(a)) > 2e-4 || std::fabs(sn - std::sin(a)) > 2e-4) tab_ok = false;
+        if (std::fabs((double)c * c + (double)sn * sn - 1.0) > 1e-4) unit_ok = false;
+    }
+    check(tab_ok, "rope table = cos/sin(pos * theta^(-2i/rot)) in [pos][half][cos,sin] layout");
+    check(unit_ok, "rope table entries lie on the unit circle");
+    check(tab[0] == 1.f && tab[1] == 0.f, "position 0, frequency 0 is the identity rotation");
+    check(kg::build_rope_table(nullptr, n_pos, rot, theta) != cudaSuccess, "table: null pointer rejected");
+    check(kg::build_rope_table(dt, 0, rot, theta) != cudaSuccess, "table: n_pos 0 rejected");
+    check(kg::build_rope_table(dt, n_pos, 7, theta) != cudaSuccess, "table: odd rot rejected");
+
+    const int n_tok = 3, nh = 2, hd = 24;            // rot < head_dim: the tail dims must stay untouched
+    std::mt19937 g(5); std::uniform_real_distribution<float> u(-1.f, 1.f);
+    std::vector<float> x((size_t)n_tok * nh * hd); for (auto& v : x) v = u(g);
+    std::vector<int32_t> pos = {0, 5, 11};
+    float* dx = dup(x); int32_t* dp = dup(pos);
+    check(kg::rope_neox_apply(dx, dt, dp, n_tok, nh, hd, rot) == cudaSuccess && cudaDeviceSynchronize() == cudaSuccess, "rope_neox_apply launches");
+    std::vector<float> y(x.size()); cudaMemcpy(y.data(), dx, y.size() * 4, cudaMemcpyDeviceToHost);
+    bool ref_ok = true, tail_ok = true, id_ok = true, norm_ok = true;
+    for (int t = 0; t < n_tok; ++t) for (int h = 0; h < nh; ++h) {
+        const size_t b = ((size_t)t * nh + h) * hd;
+        for (int i = 0; i < half; ++i) {
+            const double a = (double)pos[t] * std::pow((double)theta, -2.0 * i / rot), c = std::cos(a), sn = std::sin(a);
+            const double x0 = x[b + i], x1 = x[b + i + half];
+            if (std::fabs(y[b + i] - (x0 * c - x1 * sn)) > 5e-4 || std::fabs(y[b + i + half] - (x0 * sn + x1 * c)) > 5e-4) ref_ok = false;
+            if (std::fabs((double)y[b + i] * y[b + i] + (double)y[b + i + half] * y[b + i + half] - x0 * x0 - x1 * x1) > 1e-4) norm_ok = false;
+            if (pos[t] == 0 && (y[b + i] != x[b + i] || y[b + i + half] != x[b + i + half])) id_ok = false;
+        }
+        for (int d = rot; d < hd; ++d) if (y[b + d] != x[b + d]) tail_ok = false;
+    }
+    check(ref_ok, "rope_neox_apply pairs element i with i+half and rotates by the table angle for the token's position");
+    check(norm_ok, "rope rotation preserves every pair's norm");
+    check(id_ok, "token at position 0 is unchanged");
+    check(tail_ok, "dims beyond rot are untouched");
+    check(kg::rope_neox_apply(dx, dt, dp, n_tok, nh, hd, 7) != cudaSuccess, "apply: odd rot rejected");
+    check(kg::rope_neox_apply(dx, dt, dp, n_tok, nh, 8, rot) != cudaSuccess, "apply: rot > head_dim rejected");
+    check(kg::rope_neox_apply(dx, nullptr, dp, n_tok, nh, hd, rot) != cudaSuccess, "apply: null table rejected");
+    cudaFree(dx); cudaFree(dp); cudaFree(dt);
+
+    // mrope sections: default = every frequency on component 0; negative sections rejected with state unchanged
+    check(kg::mrope_table_set(nullptr), "mrope: default restore accepted");
+    bool def_ok = true; for (int i = 0; i < 16; ++i) if (kg::mrope_table(i, 16) != 0) def_ok = false;
+    check(def_ok, "mrope default: all frequencies on component 0 (not a negative section)");
+    const int neg[3][3] = {{-1, 8, 8}, {4, -1, 5}, {8, 9, -1}};
+    for (auto& n : neg) check(!kg::mrope_table_set(n), "mrope: negative section rejected");
+    def_ok = true; for (int i = 0; i < 16; ++i) if (kg::mrope_table(i, 16) != 0) def_ok = false;
+    check(def_ok, "mrope: rejected sections leave the default unchanged");
+    const int sec[3] = {6, 5, 5};
+    check(kg::mrope_table_set(sec), "mrope: valid sections accepted");
+    bool own_ok = true; for (int i = 0; i < 16; ++i) if (kg::mrope_table(i, 16) != (i < 6 ? 0 : (i < 11 ? 1 : 2))) own_ok = false;
+    check(own_ok, "mrope: each frequency owned by the component whose section covers it");
+    check(!kg::mrope_table_set(neg[1]) && kg::mrope_table(7, 16) == 1, "mrope: failed set keeps previous sections");
+    kg::mrope_table_set(nullptr);
+}
+
 int main() {
     int n = 0; cudaError_t e = cudaGetDeviceCount(&n);
     if (e != cudaSuccess || n < 1) { std::printf("no GPU device (%s)\n", cudaGetErrorString(e)); return 2; }
     cudaSetDevice(0);
     void* probe; if (cudaMalloc(&probe, 1 << 20) != cudaSuccess) { std::printf("cannot open GPU\n"); return 2; } cudaFree(probe);
-    test_router(); test_sampler(); test_cache(); test_source();
+    test_router(); test_sampler(); test_cache(); test_source(); test_rope();
     std::printf("uf9f: %ld checks, %ld violated\n", checks, fails);
     return fails ? 1 : 0;
 }
