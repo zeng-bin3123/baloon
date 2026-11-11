@@ -1,14 +1,14 @@
 {
   "holder": {
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
-    "pid": 55617,
-    "started": "2026-11-11T10:28:54.941791568Z",
-    "renewed": "2026-11-11T14:30:23.905596956Z"
+    "pid": 2678,
+    "started": "2026-11-11T16:06:54.084335641Z",
+    "renewed": "2026-11-11T16:12:04.63016011Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
   "ref_sha": "07b4a6263ab957f79d8f20db5e3fc9b98403896c",
-  "theory_hash": "8d36f57c1335",
+  "theory_hash": "f29d49f50bb2",
   "modules": {
     "ActivationQuantize.lean": {
       "name": "ActivationQuantize.lean",
@@ -57,8 +57,8 @@
     },
     "ElementwiseGlueKernels.lean": {
       "name": "ElementwiseGlueKernels.lean",
-      "hash": "f7b05519abfc",
-      "bytes": 19129
+      "hash": "e4e0b5d94142",
+      "bytes": 6109
     },
     "ExpertBlobAddressing.lean": {
       "name": "ExpertBlobAddressing.lean",
@@ -87,8 +87,8 @@
     },
     "ExpertPoolScheduling.lean": {
       "name": "ExpertPoolScheduling.lean",
-      "hash": "32935270490f",
-      "bytes": 13233
+      "hash": "1ac07fb69b21",
+      "bytes": 12237
     },
     "FusedGatedDeltaNet.lean": {
       "name": "FusedGatedDeltaNet.lean",
@@ -167,8 +167,8 @@
     },
     "NativeDenseOverride.lean": {
       "name": "NativeDenseOverride.lean",
-      "hash": "ffb128672fe7",
-      "bytes": 9595
+      "hash": "d9b2407554ae",
+      "bytes": 7856
     },
     "NativeExpertGeometry.lean": {
       "name": "NativeExpertGeometry.lean",
@@ -227,8 +227,8 @@
     },
     "NgramPleHash.lean": {
       "name": "NgramPleHash.lean",
-      "hash": "b114004d40c4",
-      "bytes": 10537
+      "hash": "0d3d1c76a580",
+      "bytes": 9303
     },
     "PagedKvLayout.lean": {
       "name": "PagedKvLayout.lean",
@@ -277,8 +277,8 @@
     },
     "RopeNeoxPairing.lean": {
       "name": "RopeNeoxPairing.lean",
-      "hash": "8ad7dd049e26",
-      "bytes": 6989
+      "hash": "ebc0e3c7a67b",
+      "bytes": 5630
     },
     "RouterTopKSelection.lean": {
       "name": "RouterTopKSelection.lean",
@@ -292,8 +292,8 @@
     },
     "S2GemvLutStaging.lean": {
       "name": "S2GemvLutStaging.lean",
-      "hash": "09fd2dc11d10",
-      "bytes": 13080
+      "hash": "4788cc88c8ca",
+      "bytes": 4926
     },
     "S2GemvNaive.lean": {
       "name": "S2GemvNaive.lean",
@@ -322,8 +322,8 @@
     },
     "SamplerChain.lean": {
       "name": "SamplerChain.lean",
-      "hash": "3c7359bca673",
-      "bytes": 13710
+      "hash": "4092d6c911eb",
+      "bytes": 8225
     },
     "SessionTokenLoop.lean": {
       "name": "SessionTokenLoop.lean",
@@ -337,8 +337,8 @@
     },
     "SpecDecodeController.lean": {
       "name": "SpecDecodeController.lean",
-      "hash": "b15140749cc2",
-      "bytes": 6455
+      "hash": "3790655113cd",
+      "bytes": 6007
     },
     "SpeculativeVerifyWindow.lean": {
       "name": "SpeculativeVerifyWindow.lean",
