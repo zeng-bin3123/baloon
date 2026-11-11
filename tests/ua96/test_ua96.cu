@@ -447,10 +447,21 @@ static void test_ple_reader() {
             CHECK(s2.percentile(1.0) >= s2.percentile(0.0));
             r.reset_stats();
             CHECK(r.stats().rows_requested == 0 && r.stats().cache_hits == 0);
-            // an out-of-range row is refused, nothing is read
-            uint64_t bad = n_rows + 5; uint8_t one[ROW_BYTES];
-            const uint32_t tb = r.issue(&bad, 1, one);
-            CHECK(tb == 0 || !r.collect(tb));
+            // rows >= n_rows read as zeros: a valid ticket, no file read, buffer zero-filled
+            {
+                uint64_t bad[2] = {n_rows + 5, n_rows}; uint8_t two[2 * ROW_BYTES]; std::memset(two, 0xAB, sizeof two);
+                const uint64_t b0 = r.stats().bytes_read, j0 = r.stats().jobs_issued;
+                const uint32_t tb = r.issue(bad, 2, two);
+                CHECK(tb != 0 && r.collect(tb));
+                bool allz = true; for (uint8_t c : two) allz = allz && c == 0;
+                CHECK(allz && r.stats().bytes_read == b0 && r.stats().jobs_issued == j0);
+                // mixed in-range + out-of-range: in-range bytes match the table, out-of-range are zero
+                uint64_t mix[2] = {0, n_rows + 1}; uint8_t mo[2 * ROW_BYTES], ref0[ROW_BYTES];
+                const uint32_t tm = r.issue(mix, 2, mo); CHECK(tm != 0 && r.collect(tm));
+                const uint32_t tr = r.issue(mix, 1, ref0); CHECK(tr != 0 && r.collect(tr));
+                bool z2 = true; for (size_t k = ROW_BYTES; k < 2 * ROW_BYTES; ++k) z2 = z2 && mo[k] == 0;
+                CHECK(z2 && std::memcmp(mo, ref0, ROW_BYTES) == 0);
+            }
             // injected latency is observed in the sample ring
             r.set_injected_delay_us(2000);
             uint64_t cold = 0; for (uint64_t cand = 0; cand < n_rows; ++cand) { uint8_t tmp[ROW_BYTES]; const uint32_t t = r.issue(&cand, 1, tmp); if (t) { CHECK(r.collect(t)); cold = cand; break; } }

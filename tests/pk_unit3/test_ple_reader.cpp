@@ -101,10 +101,10 @@ static void test_reader() {
         CHECK(rd.cache_size() <= rd.cache_capacity());
     }
 
-    // out-of-range row and null output are rejected
+    // out-of-range rows read as zeros; null output is rejected
     uint64_t bad_row = ROWS;
     uint8_t one[ROW_BYTES];
-    CHECK(rd.issue(&bad_row, 1, one) == 0);
+    std::memset(one, 0xAB, ROW_BYTES); { uint32_t tb = rd.issue(&bad_row, 1, one); CHECK(tb != 0 && rd.collect(tb)); bool z = true; for (size_t i = 0; i < ROW_BYTES; ++i) z = z && one[i] == 0; CHECK(z); }  // rows >= n_rows read as zeros
     uint64_t r0 = 0;
     CHECK(rd.issue(&r0, 1, nullptr) == 0);
 

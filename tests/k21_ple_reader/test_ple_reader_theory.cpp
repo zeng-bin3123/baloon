@@ -85,7 +85,7 @@ static void end_to_end() {
     CHECK(s.jobs_done == s.jobs_issued && s.latency_ns.size() == s.jobs_done); CHECK(s.errors == 0);
     CHECK(s.jobs_issued < rows.size() + 1 && s.bytes_read > 0 && s.bytes_read <= s.jobs_issued * 8192);
     uint64_t bad_row = ROWS; uint8_t one[90];
-    CHECK(rd.issue(&bad_row, 1, one) == 0);
+    std::memset(one, 0xAB, 90); { uint32_t tb = rd.issue(&bad_row, 1, one); CHECK(tb != 0 && rd.collect(tb)); bool z = true; for (int i = 0; i < 90; ++i) z = z && one[i] == 0; CHECK(z); }  // rows >= n_rows read as zeros
     uint64_t r0 = 5; CHECK(rd.issue(&r0, 1, nullptr) == 0);
     // ticket wrap: ids across 2^32 are never 0 and collect still works
     rd.debug_set_next_ticket(0xFFFFFFFEu);

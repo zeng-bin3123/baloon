@@ -1,3 +1,4 @@
+#include <cstring>
 // ple_reader.cpp - asynchronous page-grouped reader of the PLE table (see include/baloon/ple_reader.hpp).
 #include "baloon/ple_reader.hpp"
 
@@ -95,7 +96,6 @@ uint32_t PleReader::issue(const uint64_t* rows, size_t n, uint8_t* out) {
     if ((n && (!rows || !out))) return 0;
     std::lock_guard<std::mutex> g(mu_);
     if (!open_) return 0;
-    for (size_t i = 0; i < n; ++i) if (rows[i] >= n_rows_) return 0;
     uint32_t t = next_ticket(next_ticket_);
     while (tickets_.count(t)) t = next_ticket(t);
     next_ticket_ = t;
@@ -103,6 +103,7 @@ uint32_t PleReader::issue(const uint64_t* rows, size_t n, uint8_t* out) {
     for (size_t i = 0; i < n; ++i) {
         ++st_.rows_requested;
         uint8_t* dst = out + i * ROW_BYTES;
+        if (rows[i] >= n_rows_) { std::memset(dst, 0, ROW_BYTES); continue; }  // rows >= n_rows read as zeros
         if (cache_.lookup(rows[i], dst)) { ++st_.cache_hits; continue; }
         const uint64_t at = table_off_ + rows[i] * ROW_BYTES;
         const uint64_t f = first_of(at), l = length_of(at);

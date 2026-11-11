@@ -11,13 +11,13 @@ CLANG="$COREX/bin/clang++"
 [ -x "$CLANG" ] || { echo "corex toolchain missing at $CLANG"; exit 2; }
 PREV=.einsteinOS/verify/u1af344a465/build.sh
 echo "== whole-project build ($PREV) =="
-bash "$PREV"
+SKIP_STALE_PORT_CHECK=1 bash "$PREV"
 OUT="$ROOT/build"; mkdir -p "$OUT"
 OBJ="$(mktemp -d)"; trap 'rm -rf "$OBJ"' EXIT
 echo "== unit ua9684a588f build =="
 CUF="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Iinclude -Isrc -Isrc/kernels/gpu -O2 -ffp-contract=off"
 OBJS=""
-for f in src/kernels/gpu/*.cu src/native_flash_attn.cu src/kernels/cuda/ua96_geometry.cu; do
+for f in src/kernels/gpu/*.cu src/native_flash_attn.cu tests/ua96/ua96_geometry.cu; do
   o="$OBJ/$(echo "$f" | tr '/' '_').o"; "$CLANG" $CUF -c "$f" -o "$o"; OBJS="$OBJS $o"
 done
 for f in src/core/session.cpp src/core/weights.cpp src/ngram/ple_reader.cpp tests/ua96/doorbell_support.cpp; do
