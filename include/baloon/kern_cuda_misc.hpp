@@ -19,6 +19,14 @@ bool dequant_bf16_supported(int type);
 cudaError_t dequant_bf16(int type, const void* src, uint16_t* dst, int64_t n, cudaStream_t stream);
 cudaError_t dequant_f16(int type, const void* src, uint16_t* dst, int64_t n, cudaStream_t stream);
 cudaError_t dequant_f32(int type, const void* src, float* dst, int64_t n, cudaStream_t stream);
+}  // namespace kern
+namespace kg { struct IqGrids; }
+namespace kern {
+// Same, plus the i-quant route: types 16 IQ2_XXS, 17 IQ2_XS, 18 IQ3_XXS, 21 IQ3_S, 22 IQ2_S, 29 IQ1_M go to iq_kernels
+// (kg::iq_dequant_f16/f32) with the device codebooks `iq`; iq == nullptr or iq_kernels not linked -> cudaErrorInvalidValue.
+// dequant_bf16 has no i-quant route.
+cudaError_t dequant_f16(int type, const void* src, uint16_t* dst, int64_t n, cudaStream_t stream, const kg::IqGrids* iq);
+cudaError_t dequant_f32(int type, const void* src, float* dst, int64_t n, cudaStream_t stream, const kg::IqGrids* iq);
 
 // ---------------------------------------------------------------------------------------- s_gemv.cu
 // y[row] = sum_i w[row][i] * x[i], w = decode(code) * group scale. bits = 2 (code-1), 4 (IQ4_NL codebook), 8 (int8).

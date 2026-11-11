@@ -7,7 +7,17 @@
 #include <cstdint>
 
 #include "baloon/kern_cuda_misc.hpp"
+#include "baloon/kg_kernels.hpp"
 #include "kern_cu_blocks.cuh"
+
+namespace baloon {
+namespace kg {
+// The i-quant route of dequant_f16/f32 calls iq_kernels.cu. Weak references: a binary that links dequant_bf16.cu without
+// iq_kernels.cu still links, and the route then reports cudaErrorInvalidValue (the i-quants are not decodable here).
+__attribute__((weak)) cudaError_t iq_dequant_f32(Fmt f, const uint8_t* src, float* dst, long long n, const IqGrids& g, cudaStream_t s);
+__attribute__((weak)) cudaError_t iq_dequant_f16(Fmt f, const uint8_t* src, uint16_t* dst, long long n, const IqGrids& g, cudaStream_t s);
+}  // namespace kg
+}  // namespace baloon
 
 namespace baloon {
 namespace kern {
@@ -68,7 +78,7 @@ __global__ void dequant_kernel(int type, const uint8_t* src, void* dst, int64_t 
 
 // i-quant (grid-codebook) types served by the iq_kernels path, not by this block-format table:
 // IQ2_XXS 16, IQ2_XS 17, IQ3_XXS 18, IQ3_S 21, IQ2_S 22, IQ1_M 29. Disjoint from dequant_bf16_supported().
-[[maybe_unused]] bool iq_only(int type) {
+bool iq_only(int type) {
     return type == 16 || type == 17 || type == 18 || type == 21 || type == 22 || type == 29;
 }
 void geometry(int64_t n, dim3& grid, dim3& block) {
@@ -103,6 +113,21 @@ bool dequant_bf16_supported(int type) {
 cudaError_t dequant_bf16(int type, const void* src, uint16_t* dst, int64_t n, cudaStream_t s) { return launch<OUT_BF16>(type, src, dst, n, s); }
 cudaError_t dequant_f16(int type, const void* src, uint16_t* dst, int64_t n, cudaStream_t s) { return launch<OUT_F16>(type, src, dst, n, s); }
 cudaError_t dequant_f32(int type, const void* src, float* dst, int64_t n, cudaStream_t s) { return launch<OUT_F32>(type, src, dst, n, s); }
+
+// dequant_f16 / dequant_f32 route the i-quant types {16,17,18,21,22,29} to iq_kernels (kg::iq_dequant_*, which needs the
+// device codebooks in `iq`); every other type takes the block-format table above. dequant_bf16 has no such route.
+cudaError_t dequant_f16(int type, const void* src, uint16_t* dst, int64_t n, cudaStream_t s, const kg::IqGrids* iq) {
+    if (!iq_only(type)) return launch<OUT_F16>(type, src, dst, n, s);
+    if (iq == nullptr || !kg::iq_dequant_f16 || src == nullptr || dst == nullptr || n < 0) return cudaErrorInvalidValue;
+    if (n == 0) return cudaSuccess;
+    return kg::iq_dequant_f16((kg::Fmt)type, (const uint8_t*)src, dst, (long long)n, *iq, s);
+}
+cudaError_t dequant_f32(int type, const void* src, float* dst, int64_t n, cudaStream_t s, const kg::IqGrids* iq) {
+    if (!iq_only(type)) return launch<OUT_F32>(type, src, dst, n, s);
+    if (iq == nullptr || !kg::iq_dequant_f32 || src == nullptr || dst == nullptr || n < 0) return cudaErrorInvalidValue;
+    if (n == 0) return cudaSuccess;
+    return kg::iq_dequant_f32((kg::Fmt)type, (const uint8_t*)src, dst, (long long)n, *iq, s);
+}
 
 }  // namespace kern
 }  // namespace baloon
