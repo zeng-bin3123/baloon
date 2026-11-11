@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 55617,
     "started": "2026-11-11T10:28:54.941791568Z",
-    "renewed": "2026-11-11T14:29:30.961930509Z"
+    "renewed": "2026-11-11T14:30:08.16732157Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -526,5 +526,12 @@
   "state": {},
   "fix_attempts": {},
   "last_failure": {},
-  "infra_fails": 0
+  "infra_fails": 0,
+  "gates": "build+test+gpu+isa+port+integration",
+  "integration_unit": {
+    "id": "uintegration07b4a6263ab9",
+    "modules": null,
+    "reason": "integration: the reference's registered tests",
+    "integration": true
+  }
 }
