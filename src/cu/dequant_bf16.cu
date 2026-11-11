@@ -62,8 +62,11 @@ __global__ void dequant_kernel(int type, const uint8_t* src, void* dst, int64_t 
     group32<O>(type, src, dst, g, n);
 }
 
-// i-quant (codebook) formats need kv_iq4nl; true for them.
-bool iq_only(int type) { return type == T_IQ4_NL || type == T_IQ4_XS; }
+// i-quant (grid-codebook) types served by the iq_kernels path, not by this block-format table:
+// IQ2_XXS 16, IQ2_XS 17, IQ3_XXS 18, IQ3_S 21, IQ2_S 22, IQ1_M 29. Disjoint from dequant_bf16_supported().
+[[maybe_unused]] bool iq_only(int type) {
+    return type == 16 || type == 17 || type == 18 || type == 21 || type == 22 || type == 29;
+}
 void geometry(int64_t n, dim3& grid, dim3& block) {
     const int64_t groups = (n + 31) / 32;
     block = dim3(256);

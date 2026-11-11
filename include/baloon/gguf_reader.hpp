@@ -225,6 +225,23 @@ inline bool check_architecture(const GgufFile& f, const std::string& expected) {
 }
 
 // Architecture guard constants of the qwen4exp layout (theory: arch_guard_consistent).
+// Theory form of the qwen4exp guard: "" iff general.architecture is "qwen4exp" and the six required keys are present
+// with exactly the compiled-in values; otherwise the FIRST failure, checked in this fixed order (architecture first,
+// then block_count, embedding_length, expert_count, expert_used_count, attention.head_count, attention.head_count_kv).
+// A failing key is reported by its full metadata name.
+inline std::string check_architecture(const GgufFile& f) {
+    static const struct { const char* key; uint64_t want; } kReqs[] = {
+        {"qwen4exp.block_count", 48}, {"qwen4exp.embedding_length", 2560}, {"qwen4exp.expert_count", 512},
+        {"qwen4exp.expert_used_count", 10}, {"qwen4exp.attention.head_count", 24}, {"qwen4exp.attention.head_count_kv", 2}};
+    const auto arch = f.get_string("general.architecture");
+    if (!arch || *arch != "qwen4exp") return "general.architecture";
+    for (const auto& r : kReqs) {
+        const auto v = f.get_uint(r.key);
+        if (!v || *v != r.want) return r.key;
+    }
+    return "";
+}
+
 constexpr uint64_t kGuardExperts = 512, kGuardTopK = 10, kGuardHeads = 24, kGuardKvHeads = 2, kGuardLayers = 48, kGuardHidden = 2560;
 constexpr const char* kGuardArch = "qwen4exp";
 static_assert(kGuardTopK <= kGuardExperts && kGuardHeads % kGuardKvHeads == 0 && kGuardHeads / kGuardKvHeads == 12 &&

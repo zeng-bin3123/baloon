@@ -21,12 +21,35 @@ __global__ void dequant_s2_kernel(const uint8_t* __restrict__ blocks, float* __r
     const int code = (p[2 + i / CODES_PER_BYTE] >> (2 * (i % CODES_PER_BYTE))) & 3;
     out[e] = d * (float)(code - 1);
 }
+
+// Canonical S2 plane: 2-bit codes four per byte LSB-first (element i at byte i/4, bits (i%4)*2), one f32 scale per
+// 64-element block. Thread b decodes block b: code byte b*16 + j/4, output b*64 + j. The bias -1 is applied to the code
+// in the integer domain, then ONE multiply by the scale.
+__global__ void dequant_s2_plane_kernel(const uint8_t* __restrict__ codes, const float* __restrict__ scales,
+                                        float* __restrict__ out, long long n_blocks) {
+    const long long b = (long long)blockIdx.x * blockDim.x + threadIdx.x;
+    if (b >= n_blocks) return;
+    const float sc = scales[b];
+    const uint8_t* cb = codes + b * (QK / CODES_PER_BYTE);
+    float* o = out + b * QK;
+    for (int j = 0; j < QK; ++j) {
+        const int code = (cb[j / CODES_PER_BYTE] >> ((j % CODES_PER_BYTE) * 2)) & 3;
+        o[j] = (float)(code - 1) * sc;
+    }
+}
 }  // namespace
 
 cudaError_t dequant_s2(const uint8_t* blocks, float* out, long long n_blocks, cudaStream_t s) {
     if (n_blocks < 0 || (n_blocks > 0 && (!blocks || !out))) return cudaErrorInvalidValue;
     if (n_blocks == 0) return cudaSuccess;
     dequant_s2_kernel<<<kgc::grid_for_n(n_blocks * QK, 256), 256, 0, s>>>(blocks, out, n_blocks);
+    return cudaGetLastError();
+}
+cudaError_t dequant_s2_plane(const uint8_t* codes, const float* scales, float* out, long long n_blocks, cudaStream_t s) {
+    if (n_blocks <= 0) return cudaSuccess;                       // nothing to launch
+    if (!codes || !scales || !out) return cudaErrorInvalidValue;
+    const unsigned grid = (unsigned)((n_blocks + 255) / 256);    // ceil(n_blocks / 256) x 256
+    dequant_s2_plane_kernel<<<grid, 256, 0, s>>>(codes, scales, out, n_blocks);
     return cudaGetLastError();
 }
 }  // namespace kg

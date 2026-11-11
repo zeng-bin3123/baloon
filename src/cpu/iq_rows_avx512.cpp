@@ -36,10 +36,17 @@ inline uint8_t ksign(uint32_t i) { return (uint8_t)(i | ((__builtin_popcount(i) 
 #define G3(tbl, idx) ((tbl)[(idx)])
 
 // Scale vector: int16 lane l (0..31) = s[l / 8].
+// Built with one byte permute (AVX-512 VBMI vpermb): the four scales (each <= 31) sit in bytes 0..3 of a zero vector;
+// byte 2l of the result takes byte scale_lane(l) and byte 2l+1 takes the zero byte 4, so int16 lane l = s[l / 8].
+struct ScaleLaneIndex {
+    alignas(64) uint8_t idx[64];
+    ScaleLaneIndex() { for (uint32_t i = 0; i < 64; ++i) idx[i] = (i % 2 == 0) ? (uint8_t)iqgeo::scale_lane(i / 2) : (uint8_t)4; }
+};
 inline __m512i scales4(const uint32_t s[4]) {
-    alignas(64) int16_t v[32];
-    for (uint32_t l = 0; l < 32; ++l) v[l] = (int16_t)s[iqgeo::scale_lane(l)];
-    return _mm512_load_si512((const void*)v);
+    static const ScaleLaneIndex k;
+    const int packed = (int)(s[0] | (s[1] << 8) | (s[2] << 16) | (s[3] << 24));
+    const __m512i src = _mm512_set_epi32(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, packed);
+    return _mm512_permutexvar_epi8(_mm512_load_si512((const void*)k.idx), src);
 }
 
 // One decoded 64-value chunk.

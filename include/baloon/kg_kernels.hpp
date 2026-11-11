@@ -34,6 +34,9 @@ cudaError_t bf16_gemv(const uint16_t* x, const uint16_t* w, float* y, long long 
 cudaError_t bf16_gemv_split(const uint16_t* x, const uint16_t* w, float* y, long long n_in, long long n_out, int tpr, cudaStream_t s = 0);
 cudaError_t bf16_gemv_fp32_mmvf(const uint16_t* w, const float* x, float* y, long long rows, long long cols, cudaStream_t s = 0);
 cudaError_t dequant_s2(const uint8_t* blocks, float* out, long long n_blocks, cudaStream_t s = 0);
+// Canonical S2 plane (codes n_blocks*16 bytes, one f32 scale per 64-element block) -> f32, one thread per block.
+// n_blocks <= 0 launches nothing.
+cudaError_t dequant_s2_plane(const uint8_t* codes, const float* scales, float* out, long long n_blocks, cudaStream_t s = 0);
 cudaError_t add_inplace(float* y, const float* x, long long n, cudaStream_t s = 0);
 cudaError_t scale_inplace(float* y, float a, long long n, cudaStream_t s = 0);
 cudaError_t silu_inplace(float* y, long long n, cudaStream_t s = 0);
