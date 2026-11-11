@@ -1,8 +1,10 @@
 #!/bin/bash
 # Runs every Phase 1 test on the machine that has /usr/local/corex and writes ONE log to paste back.
-# Usage: git pull origin main && ./run_all_tests.sh   (uses GPU 0 only, builds are single-threaded)
+# Usage: ./run_all_tests.sh --pull   (preflight fast-forwards to origin/main first; uses GPU 0 only, builds are single-threaded)
 LOG=phase1_results_$(date +%Y%m%d_%H%M%S).log
 {
+  ./tools/preflight.sh "$@"; pf=$?
+  if [ $pf -eq 1 ]; then echo "preflight failed: checkout is not current baloon main - rerun as ./run_all_tests.sh --pull"; exit 1; fi
   echo "### git: $(git log --oneline -1)"
   echo "### host: $(hostname)  $(date -u)"
   ls -l /usr/local/corex/bin/clang++ 2>&1
