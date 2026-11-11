@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 2678,
     "started": "2026-11-11T16:06:54.084335641Z",
-    "renewed": "2026-11-11T17:06:14.985905654Z"
+    "renewed": "2026-11-11T17:07:42.006359762Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -526,28 +526,22 @@
   ],
   "state": {},
   "fix_attempts": {
-    "u63af4bc057": 1
+    "u63af4bc057": 2
   },
   "fail_history": {
     "u63af4bc057": [
+      "review_fail",
       "review_fail"
     ]
   },
   "last_failure": {
     "u63af4bc057": {
       "kind": "review_fail",
-      "text": "port rows dequant_s2_kernel/dequant_s2 (dequant_s2.cu→src/kernels/gpu/dequant_q2.cu) map to the interleaved fp16-scale per-element Q2_0 kernel, not the S2CanonicalDequant plane kernel (byte b*16+j/4, f32 per-group scale, per-block loop, ⌈n/256⌉ grid)",
-      "base_ref": "einsteinOS/dev-af57b5e66f",
-      "copies": "definitions on einsteinOS/dev-af57b5e66f of names the verdict says, in more than one file (measured by the kernel):\n  dequant_s2: include/baloon/port_kernels_ref.hpp, src/kernels/gpu/dequant_q2.cu\n"
+      "text": "bf16_from_f32 (include/baloon/port_scalar.hpp) adds a NaN guard, contradicting theory's bf16Encode (0x7F800001→0x7F80, 0xFFFFFFFF→0, roundtrip on NaN words); tests check only the spec model and skip NaN on production code",
+      "base_ref": "einsteinOS/dev-af57b5e66f"
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "u63af4bc057": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
