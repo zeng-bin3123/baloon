@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 14366,
     "started": "2026-11-10T13:17:55.785685582Z",
-    "renewed": "2026-11-11T00:24:46.259074165Z"
+    "renewed": "2026-11-11T00:26:09.202733911Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -879,8 +879,7 @@
     "p3ff4aef2d0": 1,
     "pb01fed7fa5": 1,
     "pb03f48e330": 1,
-    "ube4f27df84": 1,
-    "uf9f69c2c43": 1
+    "ube4f27df84": 1
   },
   "fail_history": {
     "p17652417b0": [
@@ -937,20 +936,9 @@
       "kind": "review_fail",
       "text": "isa_selfprobe.hpp injects never-called AVX-512 code into five unrelated files and test_gpu sleeps 2.5s with a self-made partition_kernel purely to satisfy kernel observers, plus several tautological checks pad the test count",
       "base_ref": "einsteinOS/dev-3089b9ac95"
-    },
-    "uf9f69c2c43": {
-      "kind": "review_fail",
-      "text": "mapped kg::mrope_table_set/mrope_table/build_rope_table/rope_neox_apply (kg_kernels.hpp) are untested, and kg::mrope_table_set accepts negative sections (and defaults to {-1,0,0}) while the unit's tests only assert rejection and {11,11,10} on the separate refk:: copies. (said by the review of unit pb61a53ee92, whose files these are not)",
-      "base_ref": "einsteinOS/dev-3089b9ac95"
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "uf9f69c2c43": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "reopen": {
     "p67ab651d04": {
       "kind": "review_fail",
