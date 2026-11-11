@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 30049,
     "started": "2026-11-11T18:24:40.924036841Z",
-    "renewed": "2026-11-11T20:04:53.903375357Z"
+    "renewed": "2026-11-11T20:35:23.462429007Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -556,7 +556,7 @@
         "GgufHeaderParsing.lean"
       ],
       "reason": "3 fix attempts used",
-      "conv": "0aa183ca-0df6-4af1-8b59-7c7fdbdc1596"
+      "conv": "50999c6c-93f5-4880-8014-5dc13aed369f"
     }
   ],
   "state": {
@@ -587,10 +587,11 @@
     }
   },
   "fix_attempts": {
-    "u3e84b3357d": 1
+    "u3e84b3357d": 2
   },
   "fail_history": {
     "u3e84b3357d": [
+      "nothing_written",
       "nothing_written"
     ],
     "u63af4bc057": [
