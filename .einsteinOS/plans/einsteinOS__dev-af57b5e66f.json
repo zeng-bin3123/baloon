@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 2678,
     "started": "2026-11-11T16:06:54.084335641Z",
-    "renewed": "2026-11-11T16:12:04.63016011Z"
+    "renewed": "2026-11-11T16:12:38.480587867Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -730,6 +730,19 @@
       "reason": "port: reference files of tools/vision no theory unit covers",
       "sources": [
         "tools/vision/strata_vision.cpp"
+      ]
+    },
+    {
+      "id": "p5e4dfbbfe9",
+      "modules": null,
+      "reason": "port: reference files of src/core no theory unit covers",
+      "sources": [
+        "src/core/concurrent_main.cpp",
+        "src/core/device.cu",
+        "src/core/graph.cpp",
+        "src/core/load_main.cpp",
+        "src/core/native_head.cpp",
+        "src/core/overlap_main.cpp"
       ]
     }
   ],
