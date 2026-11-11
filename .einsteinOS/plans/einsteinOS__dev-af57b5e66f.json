@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 2678,
     "started": "2026-11-11T16:06:54.084335641Z",
-    "renewed": "2026-11-11T17:45:39.214990971Z"
+    "renewed": "2026-11-11T17:46:05.29955009Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -387,6 +387,11 @@
         "S2CanonicalDequant.lean",
         "IQuantRowDecode.lean"
       ],
+      "children": [
+        "u34082f3355",
+        "ube91486083",
+        "u3e84b3357d"
+      ],
       "reason": "initial plan",
       "conv": "951017f9-ac80-4545-9cf0-9374e1a39ced"
     },
@@ -522,12 +527,37 @@
         "VerifyWindowKernels.lean"
       ],
       "reason": "initial plan"
+    },
+    {
+      "id": "u34082f3355",
+      "parent": "u63af4bc057",
+      "modules": [
+        "HalfPrecisionBitConversion.lean",
+        "BlockDequantization.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "ube91486083",
+      "parent": "u63af4bc057",
+      "modules": [
+        "GgmlBlockDequant.lean",
+        "S2CanonicalDequant.lean",
+        "IQuantRowDecode.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "u3e84b3357d",
+      "parent": "u63af4bc057",
+      "modules": [
+        "GgufHeaderParsing.lean"
+      ],
+      "reason": "3 fix attempts used"
     }
   ],
   "state": {},
-  "fix_attempts": {
-    "u63af4bc057": 3
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u63af4bc057": [
       "review_fail",
@@ -535,13 +565,7 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "u63af4bc057": {
-      "kind": "review_fail",
-      "text": "dequant_f16/dequant_f32/iq_only in src/kernels/cuda/dequant_bf16.cu do not route i-quant types {16,17,18,21,22,29} to iq_kernels as GgmlBlockDequant requires (iq_only is dead code), and no test checks it",
-      "base_ref": "einsteinOS/dev-af57b5e66f"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
   "port_units": [
     {
