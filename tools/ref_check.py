@@ -11,6 +11,9 @@ Usage: python3 tools/ref_check.py [--strata ../Strata] [--json]
 """
 import json, os, re, subprocess, sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import strata_repo  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PATH_RE = re.compile(r"Strata ((?:src|include|sycl)/[\w/.\-]+\.(?:cu|cuh|cpp|hpp|h))")
 SHA_RE = re.compile(r"(?:HEAD |Strata )([0-9a-f]{7,40})\b")
@@ -75,9 +78,7 @@ def check(strata, port):
 
 
 def main():
-    strata = sys.argv[sys.argv.index("--strata") + 1] if "--strata" in sys.argv else os.path.join(ROOT, "..", "Strata")
-    if git(strata, "rev-parse", "HEAD")[0]:
-        sys.exit(f"no Strata clone at {strata} (git clone https://github.com/Niko1221/Strata.git)")
+    strata = strata_repo.ensure()  # finds or clones the full Strata history (exit 3 if impossible)
     ports = sorted(os.path.join(ROOT, "src", f) for f in os.listdir(os.path.join(ROOT, "src")) if f.startswith("ix_"))
     rows = [r for p in ports for r in check(strata, p)]
     if "--json" in sys.argv:

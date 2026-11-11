@@ -19,6 +19,7 @@ import os, re, subprocess, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ref_check  # noqa: E402
+import strata_repo  # noqa: E402
 
 ROOT = ref_check.ROOT
 WARP32 = re.compile(r"__shfl(?:_xor|_down|_up)?_sync|__ballot_sync|__activemask|__any_sync|__all_sync")
@@ -28,10 +29,8 @@ GLOBAL = re.compile(r"__global__")
 
 
 def main():
-    strata = sys.argv[sys.argv.index("--strata") + 1] if "--strata" in sys.argv else os.path.join(ROOT, "..", "Strata")
+    strata = strata_repo.ensure()  # finds or clones the full Strata history (exit 3 if impossible)
     out = sys.argv[sys.argv.index("-o") + 1] if "-o" in sys.argv else os.path.join(ROOT, "STRATA_FEATURE_TABLE_GEN.md")
-    if ref_check.git(strata, "rev-parse", "HEAD")[0]:
-        sys.exit(f"no Strata clone at {strata}")
     _, head = ref_check.git(strata, "log", "-1", "--format=%h %ad", "--date=short")
     _, total = ref_check.git(strata, "rev-list", "--count", "HEAD")
     kdir = os.path.join(strata, "src", "kernels", "cuda")
