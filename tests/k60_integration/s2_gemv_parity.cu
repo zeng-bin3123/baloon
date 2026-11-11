@@ -69,7 +69,7 @@ static void ig_run() {
     for (int r = 0; r < n_out; ++r) {
         std::vector<float> row(n_in); const uint8_t* cr = codes.data() + (size_t)r * rk::s2_row_bytes(n_in);
         std::vector<float> rs(sc.begin() + (size_t)r * ig_kScales, sc.begin() + (size_t)(r + 1) * ig_kScales);
-        rk::dequant_s2(cr, rs.data(), cb, row.data(), n_in);
+        rk::dequant_s2_ref(cr, rs.data(), cb, row.data(), n_in);
         double a = 0; for (int i = 0; i < n_in; ++i) a += (double)row[i] * x[i]; yd[r] = (float)a;
     }
     ig_check(ig_rel_l1(y0.data(), yd.data(), n_out) < 1e-4, "gemv equals dot of the dequantised rows");

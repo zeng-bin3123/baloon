@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
       s2_gemv(codes.data(), sc.data(), cb, x.data(), yr.data(), ni, no);
       s2_gemv_fast(codes.data(), sc.data(), cb, x.data(), yf.data(), ni, no); s2_gemv_quads(codes.data(), sc.data(), cb, x.data(), yq.data(), ni, no);
       for (int r = 0; r < no; ++r) {
-          std::vector<float> row(ni); dequant_s2(codes.data() + r * ni / 4, sc.data() + r * gs, cb, row.data(), ni);
+          std::vector<float> row(ni); dequant_s2_ref(codes.data() + r * ni / 4, sc.data() + r * gs, cb, row.data(), ni);
           // dequant_s2 takes one scale per 64 values for the row passed in
           double d = 0; for (int i = 0; i < ni; ++i) d += (double)row[i] * x[i];
           CHECK(std::fabs(d - yr[r]) < 1e-3); CHECK(yf[r] == yr[r]); CHECK(std::fabs(yq[r] - yr[r]) < 1e-3f); }

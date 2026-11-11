@@ -1,6 +1,6 @@
 // test_u63_gpu.cu - unit u63af4bc057, device side. Checks the LAYER 1 statements of
 //   GgmlBlockDequant   (src/cu/dequant_bf16.cu: kern::dequant_bf16 / dequant_f16 / dequant_f32, dequant_bf16_supported)
-//   S2CanonicalDequant (src/kernels/gpu/dequant_q2.cu: kg::dequant_s2_plane, kg::dequant_s2)
+//   S2CanonicalDequant (src/kernels/gpu/dequant_q2.cu: kg::dequant_s2 (plane), kg::dequant_q2_0)
 // on a real GPU, against the host scalar dequantizers and the theory models. Exits non-zero on any failure, and fails if
 // no GPU device can be opened.
 #include <cuda_runtime.h>
@@ -139,7 +139,7 @@ static void test_s2_canonical() {
         uint8_t* dc = dup(codes); float* ds = dup(sc);
         float* dout = dalloc<float>((size_t)nb * 64 + 64);
         cudaMemset(dout, 0xFF, ((size_t)nb * 64 + 64) * 4);
-        CHECK(dequant_s2_plane(dc, ds, dout, nb, 0) == cudaSuccess && sync_ok());
+        CHECK(dequant_s2(dc, ds, dout, nb, 0) == cudaSuccess && sync_ok());
         const std::vector<float> o = back(dout, (size_t)nb * 64 + 64);
         int bad = 0;
         for (long long b = 0; b < nb; ++b) for (int j = 0; j < 64; ++j) {
@@ -150,12 +150,12 @@ static void test_s2_canonical() {
             if (code == 1 && o[(size_t)i] != 0.f) ++bad;            // code 1 is an exact zero
         }
         for (size_t e = (size_t)nb * 64; e < o.size(); ++e) if (fbits(o[e]) != 0xFFFFFFFFu) ++bad;   // nothing past the plane
-        if (bad && g_fail < 40) std::printf("  dequant_s2_plane n_blocks=%lld: %d mismatches\n", nb, bad);
+        if (bad && g_fail < 40) std::printf("  dequant_s2 n_blocks=%lld: %d mismatches\n", nb, bad);
         CHECK(bad == 0);
         // n_blocks <= 0 launches nothing
         cudaMemset(dout, 0xFF, 64 * 4);
-        CHECK(dequant_s2_plane(dc, ds, dout, 0, 0) == cudaSuccess && sync_ok());
-        CHECK(dequant_s2_plane(dc, ds, dout, -3, 0) == cudaSuccess && sync_ok());
+        CHECK(dequant_s2(dc, ds, dout, 0, 0) == cudaSuccess && sync_ok());
+        CHECK(dequant_s2(dc, ds, dout, -3, 0) == cudaSuccess && sync_ok());
         const std::vector<float> z = back(dout, 64);
         for (float v : z) CHECK(fbits(v) == 0xFFFFFFFFu);
         cudaFree(dc); cudaFree(ds); cudaFree(dout);
@@ -166,7 +166,7 @@ static void test_s2_canonical() {
         std::vector<uint8_t> blk((size_t)nb * 18); for (auto& x : blk) x = (uint8_t)rng();
         for (long long b = 0; b < nb; ++b) put16(&blk[(size_t)b * 18], rand_scale_f16());
         uint8_t* db = dup(blk); float* dout = dalloc<float>((size_t)nb * 64);
-        CHECK(dequant_s2(db, dout, nb, 0) == cudaSuccess && sync_ok());
+        CHECK(dequant_q2_0(db, dout, nb, 0) == cudaSuccess && sync_ok());
         const std::vector<float> o = back(dout, (size_t)nb * 64);
         int bad = 0;
         for (long long b = 0; b < nb; ++b) {

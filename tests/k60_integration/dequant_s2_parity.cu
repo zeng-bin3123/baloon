@@ -61,7 +61,7 @@ static void ig_run() {
     std::vector<uint8_t> codes(rk::s2_row_bytes(n)); for (auto& b : codes) b = (uint8_t)(rng() & 255);
     std::vector<float> sc(ig_kScales); for (auto& s : sc) s = U(rng);
     rk::Codebook cb; std::vector<float> out(n);
-    rk::dequant_s2(codes.data(), sc.data(), cb, out.data(), n);
+    rk::dequant_s2_ref(codes.data(), sc.data(), cb, out.data(), n);
     bool ok = true;
     for (int e = 0; e < n; ++e) {
         const int c = (codes[e >> 2] >> ((e & 3) * 2)) & 3;

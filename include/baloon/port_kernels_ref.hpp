@@ -54,7 +54,7 @@ inline int s2_row_bytes(int n_in) { return n_in / 4; }
 inline int s2_code(const uint8_t* row, int e) { return (row[e >> 2] >> ((e & 3) * 2)) & 3; }
 
 // Expand one S2 row (codes: 2 bits, element e in byte e/4 at shift 2*(e%4); one fp32 scale per 64 values).
-inline void dequant_s2(const uint8_t* codes, const float* scales, const Codebook& cb, float* out, int n_in) {
+inline void dequant_s2_ref(const uint8_t* codes, const float* scales, const Codebook& cb, float* out, int n_in) {
     for (int e = 0; e < n_in; ++e) out[e] = cb.levels[s2_code(codes, e)] * scales[e / kS2Group];
 }
 // Reference: group-wise (sum_codes level*x) * scale.

@@ -110,7 +110,7 @@ int main() {
       for (int r = 0; r < no; ++r) CHECK(near(y[r], yq[r], 1e-3f));
       std::vector<float> row(ni);
       for (int r = 0; r < no; ++r) {
-          dequant_s2(codes.data() + r * ni / 4, sc.data() + r * gs, cb, row.data(), ni);
+          dequant_s2_ref(codes.data() + r * ni / 4, sc.data() + r * gs, cb, row.data(), ni);
           double a = 0; for (int e = 0; e < ni; ++e) a += (double)row[e] * x[e];
           CHECK(near((float)a, y[r], 1e-3f));
           for (int e = 0; e < ni; ++e) CHECK(row[e] == cb.levels[(codes[r * ni / 4 + e / 4] >> ((e % 4) * 2)) & 3] * sc[r * gs + e / 64]);

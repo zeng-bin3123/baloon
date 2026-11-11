@@ -97,8 +97,8 @@ static void test_dense() {
         for (int i = 0; i < 64; ++i) ref[(size_t)b * 64 + i] = fb::f32_from_f16(d) * (float)(((blk[b * 18 + 2 + i / 4] >> (2 * (i % 4))) & 3) - 1);
     }
     Dev<uint8_t> db(blk); Dev<float> dout((size_t)nb * 64);
-    ok(dequant_s2(db, dout, nb) == cudaSuccess && sync_ok(), "dequant_s2 launch");
-    ok(dout.get() == ref, "dequant_s2 equals d*(code-1) exactly");
+    ok(dequant_q2_0(db, dout, nb) == cudaSuccess && sync_ok(), "dequant_q2_0 launch");
+    ok(dout.get() == ref, "dequant_q2_0 equals d*(code-1) exactly");
     { auto o = dout.get(); std::vector<float> one(64); for (int i = 0; i < 64; ++i) one[i] = o[i]; (void)one; }
 
     // rounding laws (literal values, not derived from the library under test)
