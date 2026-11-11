@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 14366,
     "started": "2026-11-10T13:17:55.785685582Z",
-    "renewed": "2026-11-11T01:04:25.294300024Z"
+    "renewed": "2026-11-11T01:05:34.849573846Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -879,7 +879,6 @@
     "p3ff4aef2d0": 1,
     "pb01fed7fa5": 1,
     "pb03f48e330": 1,
-    "ua9684a588f": 1,
     "ube4f27df84": 1
   },
   "fail_history": {
@@ -933,11 +932,6 @@
       "text": "native_quant_act/native_quant_h (via act_quant_q8_1) round ties to even, but theory module activation_quant_contract requires round-half-away-from-zero, and the unit test asserts the wrong tie behaviour",
       "base_ref": "einsteinOS/dev-3089b9ac95"
     },
-    "ua9684a588f": {
-      "kind": "review_fail",
-      "text": "PleReader::issue rejects rows \u003e= n_rows (returns ticket 0) instead of reading them as zeros per ple_direct_reader theory, and the test enforces the rejection (said by the review of unit p3798e66f3c, whose files these are not)",
-      "base_ref": "einsteinOS/dev-3089b9ac95"
-    },
     "ube4f27df84": {
       "kind": "review_fail",
       "text": "isa_selfprobe.hpp injects never-called AVX-512 code into five unrelated files and test_gpu sleeps 2.5s with a self-made partition_kernel purely to satisfy kernel observers, plus several tautological checks pad the test count",
@@ -945,12 +939,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "ua9684a588f": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "reopen": {
     "p67ab651d04": {
       "kind": "review_fail",
