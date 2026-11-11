@@ -16,9 +16,8 @@ OBJ="$(mktemp -d)"; trap 'rm -rf "$OBJ"' EXIT
 echo "== unit uf4e6ff5513 test build =="
 CUF="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Iinclude -Isrc -Isrc/kernels/gpu -O2 -ffp-contract=off"
 "$CLANG" $CUF -c src/kernels/gpu/shared_expert_k.cu -o "$OBJ/se_k.o"
-"$CLANG" $CUF -c src/kernels/gpu/shared_expert_batch.cu -o "$OBJ/se_batch.o"
 "$CLANG" $CUF -c tests/kf4e_u2/test_uf4e.cu -o "$OBJ/test.o"
-"$CLANG" "$OBJ/test.o" "$OBJ/se_k.o" "$OBJ/se_batch.o" -o "$OUT/test_uf4e" -rdynamic -L$COREX/lib64 -lcudart -lpthread
+"$CLANG" "$OBJ/test.o" "$OBJ/se_k.o" -o "$OUT/test_uf4e" -rdynamic -L$COREX/lib64 -lcudart -lpthread
 # port map: every line must name an existing file that mentions the name
 python3 - <<'PY'
 import sys

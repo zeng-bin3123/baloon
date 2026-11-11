@@ -8,12 +8,13 @@
 #include "kg_common.cuh"
 #include "baloon/kg_kernels.hpp"
 #include "baloon/shared_expert_layout.hpp"
+#include "baloon/shared_expert_batch.hpp"
 
 namespace baloon {
 namespace kg {
-namespace {
+// The kernels below have external linkage on purpose: their symbols must be visible by name to launch tracing.
 constexpr int THREADS = 256;
-bool native_bf16 = false;
+static bool native_bf16 = false;
 
 __device__ __forceinline__ float warp_sum_d(float v) { return kgc::wave_sum(v); }
 
@@ -95,7 +96,19 @@ __global__ void moe_combine_kernel(const float* __restrict__ parts, const float*
     if (has_shared) acc += shared[j];
     y[j] = acc;
 }
-}  // namespace
+// token-batched combine: one thread per (token, column); shared output is the starting accumulator (added plain)
+__global__ void moe_combine_rows_kernel(const float* __restrict__ parts, const float* __restrict__ weights,
+                                        const float* __restrict__ shared, float* __restrict__ y,
+                                        int n_embd, int k, int has_shared, long long total) {
+    const long long idx = (long long)blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= total) return;
+    const int t = (int)(idx / n_embd), j = (int)(idx % n_embd);
+    const float* wt = weights + (size_t)t * k;
+    const float* pt = parts + (size_t)t * k * n_embd + j;
+    float acc = has_shared ? shared[idx] : 0.f;
+    for (int e = 0; e < k; ++e) acc += wt[e] * pt[(size_t)e * n_embd];
+    y[idx] = acc;
+}
 
 void shared_expert_set_native_bf16(bool on) { native_bf16 = on; }
 size_t shared_expert_scratch_bytes(int n_tok, int n_embd, int n_ff) {
@@ -124,7 +137,8 @@ cudaError_t shared_expert_multi(const float* x, int n_tok, int n_embd, int n_ff,
     if (native_bf16) native_scalar_sigmoid_kernel<<<n_tok, THREADS, 0, s>>>(x, gate_scalar_w, g, n_embd);
     else scalar_gate_kernel<<<n_tok, THREADS, 0, s>>>(x, gate_scalar_w, g, n_embd);
     const long long total = (long long)n_tok * n_embd;
-    scale_rows_kernel<<<(unsigned)((total + 127) / 128), 128, 0, s>>>(out, g, n_embd, total);
+    if (n_tok == 1) scale_kernel<<<(unsigned)((total + 127) / 128), 128, 0, s>>>(out, g, total);      // single scalar gate
+    else scale_rows_kernel<<<(unsigned)((total + 127) / 128), 128, 0, s>>>(out, g, n_embd, total);
     return cudaGetLastError();
 }
 cudaError_t shared_expert(const float* x, int n_embd, int n_ff, const uint16_t* gate_w, const uint16_t* up_w, const uint16_t* down_w,
@@ -134,6 +148,14 @@ cudaError_t shared_expert(const float* x, int n_embd, int n_ff, const uint16_t* 
 cudaError_t moe_combine(const float* parts, const float* weights, const float* shared, float* y, int n_embd, int k, int has_shared, cudaStream_t s) {
     if (!parts || !weights || !y || n_embd <= 0 || !shared_expert::valid_combine_k((uint64_t)(k > 0 ? k : 0)) || (has_shared && !shared)) return cudaErrorInvalidValue;
     moe_combine_kernel<<<(unsigned)shared_expert::grid_blocks_128((uint64_t)n_embd), 128, 0, s>>>(parts, weights, shared, y, n_embd, k, has_shared);
+    return cudaGetLastError();
+}
+cudaError_t moe_combine_rows(const float* parts, const float* weights, const float* shared, float* y,
+                             int n_tok, int n_embd, int k, int has_shared, cudaStream_t s) {
+    if (!parts || !weights || !y || n_tok < 1 || n_embd <= 0 || (has_shared && !shared)) return cudaErrorInvalidValue;
+    if (!shared_expert::valid_combine_k((uint64_t)(k > 0 ? k : 0))) return cudaErrorInvalidValue;
+    const long long total = (long long)n_tok * n_embd;
+    moe_combine_rows_kernel<<<(unsigned)((total + 127) / 128), 128, 0, s>>>(parts, weights, shared, y, n_embd, k, has_shared, total);
     return cudaGetLastError();
 }
 }  // namespace kg
