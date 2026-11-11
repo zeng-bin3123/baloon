@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 30049,
     "started": "2026-11-11T18:24:40.924036841Z",
-    "renewed": "2026-11-11T19:34:24.160090373Z"
+    "renewed": "2026-11-11T20:04:53.903375357Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -555,7 +555,8 @@
       "modules": [
         "GgufHeaderParsing.lean"
       ],
-      "reason": "3 fix attempts used"
+      "reason": "3 fix attempts used",
+      "conv": "0aa183ca-0df6-4af1-8b59-7c7fdbdc1596"
     }
   ],
   "state": {
@@ -585,15 +586,26 @@
       "unit_id": "ube91486083"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u3e84b3357d": 1
+  },
   "fail_history": {
+    "u3e84b3357d": [
+      "nothing_written"
+    ],
     "u63af4bc057": [
       "review_fail",
       "review_fail",
       "review_fail"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "u3e84b3357d": {
+      "kind": "nothing_written",
+      "text": "the conversation wrote no file. what it said last:\n[exceeded 20 rounds, termination=Or(DoneMarker, Or(ConsecutiveTextRounds(4), MaxRounds(30))) never fired]",
+      "base_ref": "einsteinOS/dev-af57b5e66f"
+    }
+  },
   "infra_fails": 0,
   "port_units": [
     {
