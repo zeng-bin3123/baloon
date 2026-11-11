@@ -1,9 +1,9 @@
 {
   "holder": {
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
-    "pid": 2678,
-    "started": "2026-11-11T16:06:54.084335641Z",
-    "renewed": "2026-11-11T17:46:05.29955009Z"
+    "pid": 30049,
+    "started": "2026-11-11T18:24:40.924036841Z",
+    "renewed": "2026-11-11T18:49:32.822284709Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -535,7 +535,8 @@
         "HalfPrecisionBitConversion.lean",
         "BlockDequantization.lean"
       ],
-      "reason": "3 fix attempts used"
+      "reason": "3 fix attempts used",
+      "conv": "c4da188b-df25-4ce4-95be-bcb5cc94566f"
     },
     {
       "id": "ube91486083",
@@ -567,6 +568,12 @@
   },
   "last_failure": {},
   "infra_fails": 0,
+  "review_pending": {
+    "u34082f3355": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -787,6 +794,7 @@
     }
   ],
   "verify_seen": {
+    "u34082f3355": true,
     "u63af4bc057": true
   },
   "gates": "build+test+gpu+isa+port+integration",
