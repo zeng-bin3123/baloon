@@ -1,0 +1,6 @@
+cpu: avx2=1 avx512 f/bw/vl/vnni/vbmi=11111 -> ok
+[ ok ] act_quant_scalar_eq_avx2 - "act_quant_q8_1 and act_quant_q8_1_avx2 are bit-identical; |q|<=127; hx is the chunk sum"
+[ ok ] unpack64_layout - "unpack64: value i is code byte i/4 at bit 2*(i%4)"
+[ ok ] q2_avx2_rows_vs_reference - "q2_0_gguf_rows_multi_avx2 matches the exact (code-1)*d dot for nt=1..9 (groups of <=4) and a row sub-range"
+[ ok ] q2_avx512_eq_avx2 - "q2_0_gguf_rows_multi (AVX-512) agrees with the AVX2 fallback and the reference (skipped without VNNI/VBMI)"
+UFBD318F91B CPU TESTS PASSED (4 sections)

@@ -36,6 +36,7 @@ template <class T> static std::vector<T> host(const T* d, size_t n) {
 }
 
 namespace kg = baloon::kg;
+namespace NQ = baloon::kern;
 static std::mt19937 grng(0xb16u);
 static uint16_t bf16_of(float f) { uint32_t u; std::memcpy(&u, &f, 4); u += 0x7FFFu + ((u >> 16) & 1u); return (uint16_t)(u >> 16); }
 static float f_of_bf16(uint16_t b) { const uint32_t u = (uint32_t)b << 16; float f; std::memcpy(&f, &u, 4); return f; }
@@ -165,6 +166,52 @@ UF_SECTION(iq_block_layouts, "iq_row_bytes(t, n) = (n / qk) * sizeof(block) with
     const int bytes[] = {110, 66, 74, 98, 18, 110, 82, 136, 56, 18}, elems[] = {256, 256, 256, 256, 32, 256, 256, 256, 256, 64};
     for (int k = 0; k < 10; ++k) { CHECK(kg::iq_block_bytes(kAllIq[k]) == bytes[k] && kg::iq_block_elems(kAllIq[k]) == elems[k]);
         CHECK(kg::iq_row_bytes(kAllIq[k], 2560) == (2560 / elems[k]) * bytes[k] && kg::iq_row_bytes(kAllIq[k], elems[k] + 1) == -1); }
+}
+
+// "every schedule must reproduce the naive row walk bit for bit" on integer-valued bf16 data (f32 is exact there)
+UF_SECTION(gemv_schedules_exact, "bf16_gemv and bf16_gemv_split (tpr 1..1024) equal the exact integer row sums bit for bit") {
+    const long long shapes[][2] = {{1, 1}, {63, 5}, {64, 7}, {65, 3}, {1000, 33}, {4097, 9}};
+    for (const auto& sh : shapes) {
+        const long long n_in = sh[0], n_out = sh[1];
+        std::vector<uint16_t> x((size_t)n_in), w((size_t)(n_in * n_out));
+        for (auto& v : x) v = bf16_of((float)((int)(grng() % 17) - 8));
+        for (auto& v : w) v = bf16_of((float)((int)(grng() % 17) - 8));
+        std::vector<float> ref((size_t)n_out);
+        for (long long o = 0; o < n_out; ++o) { long long s = 0; for (long long i = 0; i < n_in; ++i) s += (long long)f_of_bf16(x[i]) * (long long)f_of_bf16(w[o * n_in + i]); ref[o] = (float)s; }
+        uint16_t* dx = dev(x); uint16_t* dw = dev(w); float* dy = dev(std::vector<float>((size_t)n_out + 4, NAN));
+        CHECK(kg::bf16_gemv(dx, dw, dy, n_in, n_out) == cudaSuccess); CU(cudaDeviceSynchronize());
+        std::vector<float> y = host(dy, (size_t)n_out + 4);
+        for (long long o = 0; o < n_out; ++o) CHECK(y[o] == ref[o]);
+        for (long long o = n_out; o < n_out + 4; ++o) CHECK(std::isnan(y[o]));          // no write past n_out
+        for (int tpr = 1; tpr <= 1024; tpr *= 2) {
+            CU(cudaMemset(dy, 0xFF, (size_t)n_out * 4));
+            CHECK(kg::bf16_gemv_split(dx, dw, dy, n_in, n_out, tpr) == cudaSuccess); CU(cudaDeviceSynchronize());
+            y = host(dy, (size_t)n_out);
+            for (long long o = 0; o < n_out; ++o) if (y[o] != ref[o]) { std::printf("  split tpr %d n_in %lld o %lld: %g != %g\n", tpr, n_in, o, (double)y[o], (double)ref[o]); CHECK(false); break; }
+        }
+        CU(cudaFree(dx)); CU(cudaFree(dw)); CU(cudaFree(dy));
+    }
+}
+
+// Q81Block { d, s, qs[32] }: "d = scale, s = d * sum(q)"; native_q8_1_bytes(ncols, n_in) = ncols * n_in/32 * 36
+UF_SECTION(native_q8_1_block, "native_quantize_q8_1: d = scale (|x - q*d| <= d/2, |q| <= 127), s = d * sum(q); bytes = ncols*(n_in/32)*36") {
+    const int n_in = 32 * 40, ncols = 3; const int64_t n = (int64_t)n_in * ncols;
+    CHECK(NQ::native_q8_1_bytes(ncols, n_in) == (size_t)ncols * (n_in / 32) * 36);
+    std::uniform_real_distribution<float> u(-3.f, 3.f); std::vector<float> x((size_t)n); for (auto& v : x) v = u(grng);
+    for (int i = 0; i < 32; ++i) x[(size_t)5 * 32 + i] = 0.f;                       // an all-zero block
+    float* dx = dev(x); uint8_t* dq = nullptr; CU(cudaMalloc(&dq, NQ::native_q8_1_bytes(ncols, n_in)));
+    CHECK(NQ::native_quantize_q8_1(dx, dq, n, 0) == cudaSuccess); CU(cudaDeviceSynchronize());
+    CHECK(NQ::native_quantize_q8_1(dx, dq, n - 1, 0) == cudaErrorInvalidValue);     // n % 32 != 0 is refused
+    const std::vector<uint8_t> q8 = host(dq, NQ::native_q8_1_bytes(ncols, n_in));
+    for (int64_t b = 0; b < n / 32; ++b) {
+        const uint8_t* p = &q8[(size_t)b * 36];
+        const float d = half_to_float((uint16_t)(p[0] | (p[1] << 8))), s = half_to_float((uint16_t)(p[2] | (p[3] << 8)));
+        int sum = 0;
+        for (int i = 0; i < 32; ++i) { const int q = (int8_t)p[4 + i]; sum += q; CHECK(q >= -127 && q <= 127);
+            CHECK(std::fabs(q * d - x[(size_t)b * 32 + i]) <= 0.5f * d + 2e-3f * std::fabs(x[(size_t)b * 32 + i]) + 1e-6f); }
+        CHECK(std::fabs(s - d * sum) <= 1e-3f * (1.f + std::fabs(d * sum)));          // fp16 rounding of s
+    }
+    CU(cudaFree(dx)); CU(cudaFree(dq));
 }
 
 // ---- end of sections
