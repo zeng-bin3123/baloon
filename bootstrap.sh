@@ -4,7 +4,11 @@
 # tools/preflight.sh --pull could not run there: the fix lived in the files that were missing. This script needs
 # nothing from the checkout, so it can be fetched on its own and run against a directory in ANY state:
 #   missing dir                      -> git clone -b main
-#   git clone of baloon              -> fetch + checkout main + fast-forward (refuses if uncommitted changes)
+#   git clone of baloon on main      -> fetch + fast-forward (refuses if uncommitted changes)
+#   git clone of baloon on another   -> the kernel's build tree ("dev=owner/name, branch=<branch>": the BI-V100
+#     branch (e.g. einsteinOS/dev-*)    machine's /home/claude/baloon is einsteinOS/dev-*, src/ilu_*.cu + tests/k*,
+#                                       no tools/). It is NOT touched: main goes into a linked worktree
+#                                       <dir>-main (git worktree, shares objects), tools run from there.
 #   anything else (plain files, other origin, broken .git)
 #                                    -> moved aside to <dir>.pre-bootstrap-<UTC time>, fresh clone, and every file
 #                                       of the old dir that differs from / is absent in main is listed (nothing deleted)
@@ -32,6 +36,28 @@ is_baloon() {
 
 if [ ! -e "$DIR" ] || { [ -d "$DIR" ] && [ -z "$(ls -A "$DIR")" ]; }; then
   rmdir "$DIR" 2>/dev/null; say "no checkout at $DIR -> cloning"; clone
+elif is_baloon "$DIR" && [ "$(git -C "$DIR" symbolic-ref -q --short HEAD 2>/dev/null || echo DETACHED)" != "$BRANCH" ]; then
+  CUR="$(git -C "$DIR" symbolic-ref -q --short HEAD 2>/dev/null || echo "detached $(git -C "$DIR" rev-parse --short HEAD)")"
+  WT="$DIR-$BRANCH"
+  say "$DIR is a baloon clone on '$CUR' (the build tree) -> left as is; $BRANCH goes to worktree $WT"
+  git -C "$DIR" fetch -q "$URL" "+refs/heads/$BRANCH:refs/remotes/origin/$BRANCH" || { say "FAIL: fetch"; exit 1; }
+  git -C "$DIR" worktree prune
+  if [ -e "$WT/.git" ] && [ "$(cd "$WT" && realpath "$(git rev-parse --git-common-dir 2>/dev/null)")" = "$(cd "$DIR" && realpath "$(git rev-parse --git-common-dir)")" ]; then
+    [ -z "$(git -C "$WT" status --porcelain --untracked-files=no)" ] || { git -C "$WT" status --short --untracked-files=no; say "FAIL: uncommitted changes in $WT"; exit 1; }
+    git -C "$WT" merge -q --ff-only "origin/$BRANCH" || { say "FAIL: $WT $BRANCH diverged from origin/$BRANCH"; exit 1; }
+  elif [ -e "$WT" ]; then
+    say "FAIL: $WT exists and is not a worktree of $DIR; move it away and rerun"; exit 1
+  else
+    if git -C "$DIR" show-ref -q --verify "refs/heads/$BRANCH"; then
+      git -C "$DIR" worktree add -q "$WT" "$BRANCH" || exit 1
+      git -C "$WT" merge -q --ff-only "origin/$BRANCH" || { say "FAIL: local $BRANCH diverged from origin/$BRANCH"; exit 1; }
+    else
+      git -C "$DIR" worktree add -q -b "$BRANCH" "$WT" "origin/$BRANCH" || exit 1
+    fi
+  fi
+  say "build tree $DIR still on '$CUR' ($(git -C "$DIR" log --oneline -1 | cut -c1-60))"
+  say "run tools as: python3 $WT/tools/feature_issues.py --next ; python3 $WT/tools/ref_check.py"
+  DIR="$WT"
 elif is_baloon "$DIR"; then
   say "$DIR is a baloon clone -> updating to origin/$BRANCH"
   if [ -n "$(git -C "$DIR" status --porcelain --untracked-files=no)" ]; then

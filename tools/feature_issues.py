@@ -34,7 +34,7 @@ def _require_checkout(*siblings):
     here = os.path.dirname(os.path.abspath(__file__))
     root = os.path.dirname(here)
     missing = [f"tools/{m}.py" for m in siblings if not os.path.exists(os.path.join(here, m + ".py"))]
-    if not os.path.isdir(os.path.join(root, ".git")):
+    if not os.path.exists(os.path.join(root, ".git")):  # a linked worktree (bootstrap <dir>-main) has a .git FILE
         missing.append(".git (not a git clone)")
     if missing:
         sys.stderr.write(f"{root} is not a zeng-bin3123/baloon main checkout; missing: {', '.join(missing)}\n"
