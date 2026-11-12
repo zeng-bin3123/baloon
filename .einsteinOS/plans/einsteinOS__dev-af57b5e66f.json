@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 42115,
     "started": "2026-11-12T01:44:37.440407536Z",
-    "renewed": "2026-11-12T02:14:17.545731028Z"
+    "renewed": "2026-11-12T03:40:54.500930626Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -419,7 +419,8 @@
         "Q2ExpertDotKernel.lean",
         "Q2Avx2Fallback.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "bcb30a8e-dcd2-421c-a080-534eeccec548"
     },
     {
       "id": "u7f1ccea730",
@@ -627,7 +628,9 @@
       "unit_id": "u30ab07cd05"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "ufbd318f91b": 1
+  },
   "fail_history": {
     "u3e84b3357d": [
       "nothing_written",
@@ -637,9 +640,18 @@
       "review_fail",
       "review_fail",
       "review_fail"
+    ],
+    "ufbd318f91b": [
+      "compile_fail"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "ufbd318f91b": {
+      "kind": "compile_fail",
+      "text": "build.sh exit=1: …le(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, xq.q, xq.d, xq.hx)\n                                                                    ^\nsrc/cpu/expert_q2.cpp:442:100: error: use of undeclared identifier 'gate_slot'\n        const float g = oracle_on() ? row_dot_oracle(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, xq.q, xq.d, xq.hx)\n                                                                                                   ^\nsrc/cpu/expert_q2.cpp:443:62: error: use of undeclared identifier 'gate_slot'\n                                    : row_dot(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, xq.q, xq.d, xq.hx);\n                                                             ^\nsrc/cpu/expert_q2.cpp:443:93: error: use of undeclared identifier 'gate_slot'\n                                    : row_dot(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, xq.q, xq.d, xq.hx);\n                                                                                            ^\nsrc/cpu/expert_q2.cpp:444:69: error: use of undeclared identifier 'up_slot'\n        const float u = oracle_on() ? row_dot_oracle(gu_codes(blob, up_slot(r)), gu_scales(blob, up_slot(r)), SC_GU, xq.q, xq.d, xq.hx)\n                                                                    ^\nsrc/cpu/expert_q2.cpp:444:98: error: use of undeclared identifier 'up_slot'\n        const float u = oracle_on() ? row_dot_oracle(gu_codes(blob, up_slot(r)), gu_scales(blob, up_slot(r)), SC_GU, xq.q, xq.d, xq.hx)\n                                                                                                 ^\nsrc/cpu/expert_q2.cpp:445:62: error: use of undeclared identifier 'up_slot'\n                                    : row_dot(gu_codes(blob, up_slot(r)), gu_scales(blob, up_slot(r)), SC_GU, xq.q, xq.d, xq.hx);\n                                                             ^\nsrc/cpu/expert_q2.cpp:445:91: error: use of undeclared identifier 'up_slot'\n                                    : row_dot(gu_codes(blob, up_slot(r)), gu_scales(blob, up_slot(r)), SC_GU, xq.q, xq.d, xq.hx);\n                                                                                          ^\nsrc/cpu/expert_q2.cpp:456:43: error: use of undeclared identifier 'gate_slot'\n        const float g = rd(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, xq);\n                                          ^\nsrc/cpu/expert_q2.cpp:456:74: error: use of undeclared identifier 'gate_slot'\n        const float g = rd(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, xq);\n                                                                         ^\nsrc/cpu/expert_q2.cpp:457:43: error: use of undeclared identifier 'up_slot'\n        const float u = rd(gu_codes(blob, up_slot(r)), gu_scales(blob, up_slot(r)), SC_GU, xq);\n                                          ^\nfatal error: too many errors emitted, stopping now [-ferror-limit=]\n20 errors generated.",
+      "base_ref": "einsteinOS/dev-af57b5e66f-wip-ufbd318f91b"
+    }
+  },
   "infra_fails": 0,
   "port_units": [
     {
