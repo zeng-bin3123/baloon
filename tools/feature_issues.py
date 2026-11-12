@@ -27,6 +27,24 @@ Exit: 0 ok, 2 GitHub unreachable or token missing for --apply, 3 no Strata clone
 """
 import json, os, re, subprocess, sys, time, urllib.error, urllib.request
 
+def _require_checkout(*siblings):
+    """Task: "项目在 zeng-bin3123/baloon，分支是 main". Run outside a baloon clone (the BI-V100 machine had a bare
+    /home/claude/baloon with copied files, no .git, no sibling tools/*.py) this script used to die on an import
+    traceback; now it names what is missing and the one line that fixes it. Exit 4 = not a baloon checkout."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    root = os.path.dirname(here)
+    missing = [f"tools/{m}.py" for m in siblings if not os.path.exists(os.path.join(here, m + ".py"))]
+    if not os.path.isdir(os.path.join(root, ".git")):
+        missing.append(".git (not a git clone)")
+    if missing:
+        sys.stderr.write(f"{root} is not a zeng-bin3123/baloon main checkout; missing: {', '.join(missing)}\n"
+                         "fix (keeps old files in <dir>.pre-bootstrap-<time>, then runs preflight):\n"
+                         "  curl -fsSL https://raw.githubusercontent.com/zeng-bin3123/baloon/main/bootstrap.sh"
+                         f" | bash -s -- {root}\n")
+        sys.exit(4)
+
+
+_require_checkout('feature_table', 'ref_check', 'strata_repo')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import feature_table  # noqa: E402
 import ref_check  # noqa: E402
