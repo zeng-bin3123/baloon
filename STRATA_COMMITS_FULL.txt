@@ -1,3 +1,6 @@
+697b6d67a7d3cde6c78d0122841c6b241cdc0da3|2026-11-11|Niko1221|prefill: size the DeepSeek MTP draft step's MMQ row-id table with the margin llama.cpp's kernels read past it
+14dd746f6ac1c799e91150a9506dc1e4e37236e8|2026-11-11|Niko1221|prefill: size the dense MMQ row-id table with the margin llama.cpp's kernels read past it (STRATA_DENSE_MMQ=1)
+d7f7d9677b9eb0f2895a1bc2f23fe18651408ad6|2026-11-11|Niko1221|qwen35: give MMQ's row-id table the margin llama.cpp's kernels read past its end
 5f0ae5b55acfd618070709b4237303bbb19b49a7|2026-11-11|Niko1221|tests: the retry tests' fake clock belongs to the test's own thread
 3b3c41e403be96048d2c05ddd8968645a644fe8c|2026-11-11|Niko1221|serve: the NVIDIA picture reader stays loaded by default on Linux on Arm (the DGX Spark class)
 a95046690868a38db3f19c0fa89b517b6c7f68c5|2026-11-11|Niko1221|serve: bound the GPU reader's context retries by time (18 s) as well as by count (12)
