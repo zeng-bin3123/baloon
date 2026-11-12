@@ -37,7 +37,23 @@ inline float silu_f(float v) { return v / (1.f + std::exp(-v)); }
 
 // Theory offset_identity: sum_j (c_j - 1) x_j = sum_j c_j x_j - sum_j x_j. Every row dot takes the code offset off ONCE
 // per 32-value chunk as the integer activation sum hx (= sum xq), never broadcast into the lanes.
-inline int32_t offset_dot(int32_t dot, int32_t chunk_sum) { return dot - chunk_sum; }
+constexpr int32_t offset_dot(int32_t dot, int32_t chunk_sum) { return dot - chunk_sum; }
+// Theory chunk_kernel_exact / chunkDotOracle_exact: the integer VNNI dot sum c*x minus the stored activation sum is exactly
+// sum (c - 1) * x, so nothing is rounded before the scale. Asserted on offset_dot itself for 32-element chunks.
+constexpr bool chunk_oracle_exact_ok() {
+    unsigned long long r = 0xD1B54A32D192ED03ull;
+    for (int k = 0; k < 400; ++k) {
+        int32_t dot = 0, sum = 0, want = 0;
+        for (int i = 0; i < 32; ++i) {
+            r = r * 6364136223846793005ull + 1442695040888963407ull;
+            const int32_t c = (int32_t)((r >> 40) & 3u), x = (int32_t)((r >> 20) % 255u) - 127;
+            dot += c * x; sum += x; want += (c - 1) * x;
+        }
+        if (offset_dot(dot, sum) != want) return false;
+    }
+    return offset_dot(32 * 3 * 127, 32 * 127) == 32 * 2 * 127 && offset_dot(0, -32 * 127) == 32 * 127;
+}
+static_assert(chunk_oracle_exact_ok(), "chunk_kernel_exact / chunkDotOracle_exact");
 // Eight fp16 scales (nb <= 8 valid, others zero) as floats. The load is masked: a tail never reads past the row.
 inline __m256 scales8(const uint8_t* s, uint32_t nb) {
     const __mmask8 m = (__mmask8)(nb >= 8 ? 0xFFu : ((1u << nb) - 1u));
@@ -64,14 +80,41 @@ inline void unpack_q2_0(const uint8_t* p16, uint8_t out[64]) {
     for (uint32_t j = 0; j < 64; ++j) out[j] = (uint8_t)((p16[j / 4] >> (2 * (j % 4))) & 3u);
 }
 
+// The multishift control unpack64_q2_0 uses; ctrl_shifts / multishift_code_order below are asserted on this value.
+constexpr uint64_t kMultishiftCtrl = 0x0E0C0A0806040200ull;
+
 // 64 codes (one byte each) of a 16-byte block: qword Q of the source holds bytes 2Q, 2Q+1, and output byte p of
 // qword Q takes the 8-bit window at bit 8*((p%8)/4) + 2*(p%4); the low two bits of that window are the code.
 inline __m512i unpack64_q2_0(const uint8_t* p16) {
     // control byte of output byte p: 8*((p%8)/4) + 2*(p%4)  ->  0,2,4,6,8,10,12,14 repeated per qword
-    const __m512i ctrl = _mm512_set1_epi64(0x0E0C0A0806040200LL);
+    const __m512i ctrl = _mm512_set1_epi64((long long)kMultishiftCtrl);
     const __m512i src = _mm512_cvtepu16_epi64(_mm_loadu_si128((const __m128i*)p16));
     return _mm512_and_si512(_mm512_multishift_epi64_epi8(ctrl, src), _mm512_set1_epi8(3));
 }
+
+// Theory ctrl_shifts: byte i of the multishift control is 2i (shifts 0, 2, ..., 14).
+constexpr bool ctrl_shifts_ok() {
+    for (uint32_t i = 0; i < 8; ++i) if (((kMultishiftCtrl >> (8 * i)) & 0xFF) != 2 * i) return false;
+    return true;
+}
+static_assert(ctrl_shifts_ok(), "ctrl_shifts");
+// Theory multishift_code_order: on the zero-extended u16 lane b0 + 256 b1, the 8-bit window at control byte i, masked
+// with 3, is code i in LSB-first order (codes 0..3 from b0, 4..7 from b1). Every byte value is checked in each half.
+constexpr bool multishift_lane_ok(uint32_t b0, uint32_t b1) {
+    const uint64_t lane = b0 + 256ull * b1;
+    for (uint32_t i = 0; i < 8; ++i) {
+        const uint32_t got = (uint32_t)((lane >> ((kMultishiftCtrl >> (8 * i)) & 0xFF)) & 0xFF) & 3u;
+        const uint32_t want = i < 4 ? (b0 >> (2 * i)) & 3u : (b1 >> (2 * (i - 4))) & 3u;
+        if (got != want) return false;
+    }
+    return true;
+}
+constexpr bool multishift_code_order_ok() {
+    for (uint32_t v = 0; v < 256; ++v)
+        if (!multishift_lane_ok(v, 0xFF - v) || !multishift_lane_ok(0xFF - v, v) || !multishift_lane_ok(v, v)) return false;
+    return true;
+}
+static_assert(multishift_code_order_ok(), "multishift_code_order");
 
 // Integer dot of one 64-weight block (codes 0..3, no offset) against 64 int8 activations: low and high 32.
 inline void block_dot(const uint8_t* codes16, const int8_t* q64, int32_t& lo, int32_t& hi) {
@@ -268,6 +311,23 @@ static_assert(BLOB == 1382400ull, "blob_size matches q2geo::BLOB");
 // Theory batchSizes_cover / laneMask_spec: b0 += 8 batches of min(8, nb - b0) blocks cover every block exactly once.
 constexpr bool batches_cover(uint32_t nb) { uint32_t s = 0; for (uint32_t b0 = 0; b0 < nb; b0 += 8) s += nb - b0 < 8 ? nb - b0 : 8; return s == nb; }
 static_assert(batches_cover(40) && batches_cover(10) && batches_cover(1) && batches_cover(17), "batchSizes_cover");
+// Theory clampQ_range: the clamp the CPU quantizer applies after rounding (actq::clamp_cpu) lands in [-127, 127] and is
+// idempotent - checked on every value in [-300, 300] and at the int extremes.
+constexpr bool clampq_ok(int v) { const int c = actq::clamp_cpu(v); return -127 <= c && c <= 127 && actq::clamp_cpu(c) == c; }
+constexpr bool clampq_range_ok() {
+    for (int v = -300; v <= 300; ++v) if (!clampq_ok(v)) return false;
+    return clampq_ok(-2147483647 - 1) && clampq_ok(2147483647) && actq::clamp_cpu(-128) == -127 && actq::clamp_cpu(5) == 5;
+}
+static_assert(clampq_range_ok(), "clampQ_range");
+// Theory vnni_lane_bound: one dpbusd lane adds four u8 code (0..3) * s8 act (|x| <= 127) products: |sum| <= 1524.
+static_assert(4 * 3 * 127 == 1524 && 1524 < 2147483647, "vnni_lane_bound");
+// Theory chunk_dot_exact_in_f32: a 32-element chunk's integer dot is at most 32 * 381 = 12192 < 2^24, so the int -> f32
+// conversion before the scale multiply is exact - asserted on every integer the dot can take.
+constexpr bool chunk_dot_f32_exact() {
+    for (int v = -12192; v <= 12192; ++v) if ((int)(float)v != v) return false;
+    return true;
+}
+static_assert(32 * 3 * 127 == 12192 && 12192 < (1 << 24) && chunk_dot_f32_exact(), "chunk_dot_exact_in_f32");
 
 // ============================================================================================ public: features
 const char* CpuFeatures::reason() const {

@@ -43,6 +43,13 @@ unported() {
   done <<<"$UNIT_FILES"
 }
 UNIT_FILES=$(unit_files)
+# The manifest is what the kernel's shallow clone sees, so it must not drift: when the base is in history, every file
+# git diff reports must also be listed in the manifest (an empty or stale manifest fails here, not only on the kernel).
+if git rev-parse -q --verify "$BASE^{commit}" >/dev/null 2>&1; then
+  for f in $(git diff --name-only "$BASE" -- src include); do
+    grep -qxF "$f" "$MANIFEST" 2>/dev/null || { echo "manifest: $f changed since $BASE but is missing from $MANIFEST"; rc=1; }
+  done
+fi
 if [ -z "$UNIT_FILES" ]; then
   echo "kernel_unported: no changed-file list ($MANIFEST missing and $BASE not in history)"; rc=1
 else

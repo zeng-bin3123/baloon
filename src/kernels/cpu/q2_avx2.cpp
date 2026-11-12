@@ -22,6 +22,24 @@ inline int32_t hsum_i32(__m256i v) {
     s = _mm_add_epi32(s, _mm_shuffle_epi32(s, 0xB1));
     return _mm_cvtsi128_si32(s);
 }
+// Theory shuffle_constants: _mm_shuffle_epi32 lane i takes source lane (imm >> 2i) & 3; 0x4E swaps the 64-bit halves,
+// 0xB1 swaps adjacent lanes. Theory hsum4_exact: lane 0 after s += shuf(s,0x4E); s += shuf(s,0xB1) is a+b+c+d.
+constexpr int shuf_lane(int imm, int i) { return (imm >> (2 * i)) & 3; }
+constexpr bool shuffle_constants_ok() {
+    constexpr int swap_halves[4] = {2, 3, 0, 1}, swap_adj[4] = {1, 0, 3, 2};
+    for (int i = 0; i < 4; ++i)
+        if (shuf_lane(0x4E, i) != swap_halves[i] || shuf_lane(0xB1, i) != swap_adj[i]) return false;
+    return true;
+}
+static_assert(shuffle_constants_ok(), "shuffle_constants");
+constexpr long long hsum4_lane0(long long a, long long b, long long c, long long d) {
+    long long s[4] = {a, b, c, d}, t[4] = {};
+    for (int i = 0; i < 4; ++i) t[i] = s[i] + s[shuf_lane(0x4E, i)];
+    for (int i = 0; i < 4; ++i) s[i] = t[i] + t[shuf_lane(0xB1, i)];
+    return s[0];
+}
+static_assert(hsum4_lane0(1, 10, 100, 1000) == 1111 && hsum4_lane0(-127, 127, -4064, 4064) == 0 &&
+              hsum4_lane0(4064, 4064, 4064, 4064) == 4 * 4064, "hsum4_exact");
 // Theory shift16_bytes_independent: shifting the 16-bit lanes right by 2k and masking every byte with 3 yields code k
 // of EACH byte on its own - the bits the shift moves in from the neighbouring byte land above bit 1 and are masked off.
 template <int K> inline __m128i code_plane(__m128i x) {
@@ -65,6 +83,25 @@ void unpack64(const uint8_t* codes16, uint8_t out[64]) {
     _mm256_storeu_si256((__m256i*)out, lo);
     _mm256_storeu_si256((__m256i*)(out + 32), hi);
 }
+
+// Theory blockResult_correction: with hx = activation sum per chunk, subtracting hx inside each chunk (what row_multi
+// does: (wd * xd[c]) * (dot32 - hx[c])) equals the block result d*(s0*S0) + d*(s1*S1) - d*(s0*u0 + s1*u1).
+constexpr long long block_result(long long d, long long s0, long long s1, long long S0, long long S1, long long u0, long long u1) {
+    return d * (s0 * S0) + d * (s1 * S1) - d * (s0 * u0 + s1 * u1);
+}
+constexpr long long block_kernel(long long d, long long s0, long long s1, long long S0, long long S1, long long u0, long long u1) {
+    return (d * s0) * (S0 - u0) + (d * s1) * (S1 - u1);
+}
+constexpr bool block_result_correction_ok() {
+    unsigned long long r = 0x9E3779B97F4A7C15ull;   // fixed LCG: deterministic samples within the kernel's ranges
+    for (int k = 0; k < 2000; ++k) {
+        long long v[7] = {};
+        for (long long& e : v) { r = r * 6364136223846793005ull + 1442695040888963407ull; e = (long long)((r >> 33) % 24385) - 12192; }
+        if (block_result(v[0], v[1], v[2], v[3], v[4], v[5], v[6]) != block_kernel(v[0], v[1], v[2], v[3], v[4], v[5], v[6])) return false;
+    }
+    return block_result(1, 1, 1, 12192, -12192, 4064, -4064) == block_kernel(1, 1, 1, 12192, -12192, 4064, -4064);
+}
+static_assert(block_result_correction_ok(), "blockResult_correction");
 
 void row_multi(const uint8_t* row, uint32_t nb, uint32_t n_tok, const int8_t* q, size_t q_stride, const float* xd,
                const int32_t* hx, size_t ch_stride, float* out) {

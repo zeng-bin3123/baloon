@@ -3,6 +3,7 @@
 #include "kg_common.cuh"
 #include "baloon/isa_selfprobe.hpp"
 #include "baloon/kg_kernels.hpp"
+#include "baloon/mmvf_select.hpp"
 
 namespace baloon {
 namespace kg {
@@ -50,21 +51,10 @@ __global__ void bf16_f32_mmvf_kernel(const uint16_t* __restrict__ w, const float
 
 // Theory blockSize/search: start at (32, ceil(n/64)); for c = 64, 96, ..., 256 adopt c only when ceil(n/(2c)) is STRICTLY
 // smaller than the best so far, so ties keep the smaller block. n is the number of input elements (pairs = n/2).
-long long mmvf_pair_iters(long long n, int c) { return (n + 2LL * c - 1) / (2LL * c); }
-int mmvf_block_size(long long n) {
-    int best = 32;
-    long long best_iters = (n + 63) / 64;
-    for (int c = 64; c <= 256; c += 32) {
-        const long long it = mmvf_pair_iters(n, c);
-        if (it < best_iters) { best = c; best_iters = it; }
-    }
-    return best;
-}
+long long mmvf_pair_iters(long long n, int c) { return mmvf::pair_iters(n, c); }
+int mmvf_block_size(long long n) { return mmvf::block_size(n); }   // the fold of mmvf_select.hpp, statically checked there
 
-bool mmvf_args_ok(long long n_in, long long n_out) {
-    constexpr long long kIntMax = 2147483647LL;
-    return n_in > 0 && n_in % 2 == 0 && n_in <= kIntMax && n_out > 0 && n_out <= kIntMax;
-}
+bool mmvf_args_ok(long long n_in, long long n_out) { return mmvf::args_ok(n_in, n_out); }   // odd_refused: mmvf_select.hpp
 bool mmvf_align_ok(const void* w, const void* x, const void* y) {
     const uintptr_t pw = (uintptr_t)w, px = (uintptr_t)x, py = (uintptr_t)y;
     return pw != 0 && px != 0 && py != 0 && px % 8 == 0 && pw % 4 == 0 && py % 4 == 0;
