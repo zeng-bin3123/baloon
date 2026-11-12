@@ -11,6 +11,7 @@
 #include <random>
 #include <vector>
 
+#include "baloon/artifact_dequant.hpp"
 #include "baloon/kern_native_mmvq.hpp"
 #include "baloon/kg_kernels.hpp"
 #include "harness.hpp"
@@ -212,6 +213,159 @@ UF_SECTION(native_q8_1_block, "native_quantize_q8_1: d = scale (|x - q*d| <= d/2
         CHECK(std::fabs(s - d * sum) <= 1e-3f * (1.f + std::fabs(d * sum)));          // fp16 rounding of s
     }
     CU(cudaFree(dx)); CU(cudaFree(dq));
+}
+
+// ---- NativeQuantizedMatVec on the GPU: every native_<type>_mmvq launch (mmvq_kernel) against a host reference built
+// from the scalar dequantizers of artifact_dequant.hpp dotted with the same Q8_1 activations the kernel reads.
+struct NativeType { const char* name; int type, bytes, elems, scale_off, dmin_off;
+    void (*deq)(const uint8_t*, float*);
+    cudaError_t (*mmvq)(const void*, const void*, float*, int, int, int, cudaStream_t);
+    cudaError_t (*f32)(const void*, const float*, float*, int, int, int, void*, cudaStream_t); };
+static const NativeType kNative[] = {
+    {"q2_0", 42, 18, 64, 0, -1, artifact::dequantize_q2_0, NQ::native_q2_0_mmvq, NQ::native_q2_0_f32},
+    {"q4_0", 2, 18, 32, 0, -1, artifact::dequantize_q4_0, NQ::native_q4_0_mmvq, NQ::native_q4_0_f32},
+    {"q5_0", 6, 22, 32, 0, -1, artifact::dequantize_q5_0, NQ::native_q5_0_mmvq, NQ::native_q5_0_f32},
+    {"q8_0", 8, 34, 32, 0, -1, artifact::dequantize_q8_0, NQ::native_q8_0_mmvq, NQ::native_q8_0_f32},
+    {"iq4_nl", 20, 18, 32, 0, -1, artifact::dequantize_iq4_nl, NQ::native_iq4_nl_mmvq, NQ::native_iq4_nl_f32},
+    {"q3_K", 11, 110, 256, 108, -1, artifact::dequantize_q3_K, NQ::native_q3_k_mmvq, NQ::native_q3_k_f32},
+    {"q4_K", 12, 144, 256, 0, 2, artifact::dequantize_q4_K, NQ::native_q4_k_mmvq, NQ::native_q4_k_f32},
+    {"q5_K", 13, 176, 256, 0, 2, artifact::dequantize_q5_K, NQ::native_q5_k_mmvq, NQ::native_q5_k_f32},
+    {"q6_K", 14, 210, 256, 208, -1, artifact::dequantize_q6_K, NQ::native_q6_k_mmvq, NQ::native_q6_k_f32},
+    {"iq4_xs", 23, 136, 256, 0, -1, artifact::dequantize_iq4_xs, NQ::native_iq4_xs_mmvq, NQ::native_iq4_xs_f32}};
+
+// random blocks, fp16 scale fields forced into 2^-7..2^-6 (no NaN/Inf from random bytes), 0xFF tail past the matrix
+static std::vector<uint8_t> native_blocks(const NativeType& t, long long nblocks) {
+    std::vector<uint8_t> v((size_t)nblocks * t.bytes + 256, 0xFF);
+    for (long long b = 0; b < nblocks; ++b) {
+        uint8_t* p = &v[(size_t)b * t.bytes];
+        for (int i = 0; i < t.bytes; ++i) p[i] = (uint8_t)grng();
+        for (int off : {t.scale_off, t.dmin_off}) if (off >= 0) { const uint16_t d = (uint16_t)(0x2000u | (grng() & 0x3FFu)); p[off] = d & 0xFF; p[off + 1] = d >> 8; }
+    }
+    return v;
+}
+// host y[c*n_out + r] = sum_kb (sum_i deq(w)[r][i] * q8[c][i]) * d8[c][kb] - the per-32 accumulation of range_dot
+static std::vector<double> native_ref(const NativeType& t, const std::vector<uint8_t>& w, const std::vector<uint8_t>& q8,
+                                      int n_in, int n_out, int ncols, std::vector<double>* mag) {
+    std::vector<double> y((size_t)ncols * n_out, 0.0); mag->assign(y.size(), 0.0);
+    std::vector<float> row((size_t)n_in);
+    const int nblk = n_in / t.elems;
+    for (int r = 0; r < n_out; ++r) {
+        for (int kb = 0; kb < nblk; ++kb) t.deq(&w[((size_t)r * nblk + kb) * t.bytes], &row[(size_t)kb * t.elems]);
+        for (int c = 0; c < ncols; ++c)
+            for (int i = 0; i < n_in; ++i) {
+                const uint8_t* qb = &q8[((size_t)c * (n_in / 32) + i / 32) * 36];
+                const double term = (double)row[i] * (int8_t)qb[4 + i % 32] * half_to_float((uint16_t)(qb[0] | (qb[1] << 8)));
+                y[(size_t)c * n_out + r] += term; (*mag)[(size_t)c * n_out + r] += std::fabs(term);
+            }
+    }
+    return y;
+}
+// worst |gpu - ref| / sum|terms|; -1 a launch was refused, -2 a value past ncols*n_out was written, -3 dispatcher or
+// _f32 entry differs from native_<type>_mmvq bit for bit
+static double native_err(const NativeType& t, int n_in, int n_out, int ncols) {
+    const std::vector<uint8_t> w = native_blocks(t, (long long)n_out * (n_in / t.elems));
+    std::uniform_real_distribution<float> u(-2.f, 2.f); std::vector<float> x((size_t)ncols * n_in); for (auto& v : x) v = u(grng);
+    const size_t qb = NQ::native_q8_1_bytes(ncols, n_in), ny = (size_t)ncols * n_out;
+    uint8_t* dw = dev(w); float* dx = dev(x); uint8_t* dq = nullptr; uint8_t* ds = nullptr;
+    CU(cudaMalloc(&dq, qb)); CU(cudaMalloc(&ds, qb));
+    float* dy = dev(std::vector<float>(ny + 8, NAN)); float* dy2 = dev(std::vector<float>(ny + 8, NAN)); float* dy3 = dev(std::vector<float>(ny + 8, NAN));
+    double worst = -1.0;
+    if (NQ::native_quantize_q8_1(dx, dq, (int64_t)ncols * n_in, 0) == cudaSuccess &&
+        t.mmvq(dw, dq, dy, n_in, n_out, ncols, 0) == cudaSuccess &&
+        NQ::native_mmvq(t.type, dw, dq, dy2, n_in, n_out, ncols, 0) == cudaSuccess &&
+        t.f32(dw, dx, dy3, n_in, n_out, ncols, ds, 0) == cudaSuccess) {
+        CU(cudaDeviceSynchronize());
+        const std::vector<float> y = host(dy, ny + 8), y2 = host(dy2, ny + 8), y3 = host(dy3, ny + 8);
+        const std::vector<uint8_t> q8 = host(dq, qb);
+        std::vector<double> mag; const std::vector<double> ref = native_ref(t, w, q8, n_in, n_out, ncols, &mag);
+        worst = 0.0;
+        for (size_t k = 0; k < ny; ++k) worst = std::fmax(worst, std::fabs(y[k] - ref[k]) / (mag[k] + 1e-9));
+        for (size_t k = 0; k < ny; ++k) if (std::memcmp(&y[k], &y2[k], 4) || std::memcmp(&y[k], &y3[k], 4)) { worst = -3.0; break; }
+        for (size_t k = ny; k < ny + 8; ++k) if (!std::isnan(y[k]) || !std::isnan(y2[k]) || !std::isnan(y3[k])) worst = -2.0;
+    }
+    CU(cudaFree(dw)); CU(cudaFree(dx)); CU(cudaFree(dq)); CU(cudaFree(ds)); CU(cudaFree(dy)); CU(cudaFree(dy2)); CU(cudaFree(dy3));
+    return worst;
+}
+static bool native_ok(const NativeType& t, int n_in, int n_out, int ncols) {
+    const double e = native_err(t, n_in, n_out, ncols);
+    const bool ok = e >= 0.0 && e <= 2e-4;
+    if (!ok) std::printf("  %s n_in %d n_out %d ncols %d -> %g\n", t.name, n_in, n_out, ncols, e);
+    return ok;
+}
+
+UF_SECTION(native_mmvq_layout, "native_mmvq_supported for the ten types; weight_bytes = n_out * (n_in / qk) * sizeof(block), 0 otherwise") {
+    for (const NativeType& t : kNative) {
+        CHECK(NQ::native_mmvq_supported(t.type));
+        CHECK(NQ::native_mmvq_weight_bytes(t.type, 2560 / t.elems * t.elems, 7) == (size_t)7 * (2560 / t.elems) * t.bytes);
+    }
+    for (int bad : {0, 1, 10, 15, 16, 99}) CHECK(!NQ::native_mmvq_supported(bad));
+}
+
+UF_SECTION(native_mmvq_dot, "mmvq_kernel: y[c*n_out + r] = sum_i w[r][i] * x8[c][i] for every type, small-K and wide-K rows, 1..8 columns") {
+    NQ::native_mmvq_set_multi_exact(true);
+    for (const NativeType& t : kNative) {
+        const int small_k = t.elems, wide_k = 2560 / t.elems * t.elems;   // nblk < 128/T takes the 4-rows-per-block layout
+        CHECK(native_ok(t, small_k, 37, 1));
+        CHECK(native_ok(t, wide_k, 37, 1));
+        CHECK(native_ok(t, wide_k, 5, 3));
+        CHECK(native_ok(t, 4 * 256, 3, 8));
+    }
+}
+
+UF_SECTION(native_mmvq_multi_exact, "with multi_exact on, column c of an 8-column launch equals the 1-column launch bit for bit; off, 5..8 columns still match within rounding") {
+    for (const NativeType& t : {kNative[1], kNative[3], kNative[6], kNative[9]}) {
+        const int n_in = 1024, n_out = 19, nc = 8;
+        const std::vector<uint8_t> w = native_blocks(t, (long long)n_out * (n_in / t.elems));
+        std::uniform_real_distribution<float> u(-2.f, 2.f); std::vector<float> x((size_t)nc * n_in); for (auto& v : x) v = u(grng);
+        uint8_t* dw = dev(w); float* dx = dev(x); uint8_t* dq = nullptr; CU(cudaMalloc(&dq, NQ::native_q8_1_bytes(nc, n_in)));
+        float* dy = nullptr; float* d1 = nullptr; CU(cudaMalloc(&dy, (size_t)nc * n_out * 4)); CU(cudaMalloc(&d1, (size_t)n_out * 4));
+        CHECK(NQ::native_quantize_q8_1(dx, dq, (int64_t)nc * n_in, 0) == cudaSuccess);
+        for (bool exact : {true, false}) {
+            NQ::native_mmvq_set_multi_exact(exact); CHECK(NQ::native_mmvq_multi_exact() == exact);
+            CHECK(t.mmvq(dw, dq, dy, n_in, n_out, nc, 0) == cudaSuccess); CU(cudaDeviceSynchronize());
+            const std::vector<float> y = host(dy, (size_t)nc * n_out);
+            for (int c = 0; c < nc; ++c) {
+                CHECK(t.mmvq(dw, dq + (size_t)c * (n_in / 32) * 36, d1, n_in, n_out, 1, 0) == cudaSuccess); CU(cudaDeviceSynchronize());
+                const std::vector<float> y1 = host(d1, (size_t)n_out);
+                for (int r = 0; r < n_out; ++r) {
+                    const float a = y[(size_t)c * n_out + r], b = y1[r];
+                    if (exact) { if (std::memcmp(&a, &b, 4)) { std::printf("  %s col %d row %d: %g != %g\n", t.name, c, r, (double)a, (double)b); CHECK(false); } }
+                    else CHECK(std::fabs(a - b) <= 1e-4f * (1.f + std::fabs(b)));
+                }
+            }
+        }
+        NQ::native_mmvq_set_multi_exact(true);
+        CU(cudaFree(dw)); CU(cudaFree(dx)); CU(cudaFree(dq)); CU(cudaFree(dy)); CU(cudaFree(d1));
+    }
+}
+
+UF_SECTION(native_mmvq_refuses, "validate_shape/validate_pointer: ncols outside 1..8, n_in not a whole number of blocks, null pointers -> cudaErrorInvalidValue, nothing written") {
+    const NativeType& t = kNative[6];   // q4_K, 256-value blocks
+    const std::vector<uint8_t> w = native_blocks(t, 4);
+    uint8_t* dw = dev(w); uint8_t* dq = nullptr; CU(cudaMalloc(&dq, NQ::native_q8_1_bytes(8, 1024)));
+    CU(cudaMemset(dq, 0, NQ::native_q8_1_bytes(8, 1024)));
+    float* dy = dev(std::vector<float>(64, NAN));
+    CHECK(t.mmvq(dw, dq, dy, 256, 4, 0, 0) == cudaErrorInvalidValue);
+    CHECK(t.mmvq(dw, dq, dy, 256, 4, 9, 0) == cudaErrorInvalidValue);
+    CHECK(t.mmvq(dw, dq, dy, 128, 4, 1, 0) == cudaErrorInvalidValue);
+    CHECK(t.mmvq(dw, dq, dy, 256, 0, 1, 0) == cudaErrorInvalidValue);
+    CHECK(t.mmvq(nullptr, dq, dy, 256, 4, 1, 0) == cudaErrorInvalidValue);
+    CHECK(t.mmvq(dw, nullptr, dy, 256, 4, 1, 0) == cudaErrorInvalidValue);
+    CHECK(t.mmvq(dw, dq, nullptr, 256, 4, 1, 0) == cudaErrorInvalidValue);
+    CHECK(NQ::native_mmvq(1, dw, dq, dy, 256, 4, 1, 0) != cudaSuccess);          // f16 is not a native mmvq type
+    CU(cudaDeviceSynchronize());
+    const std::vector<float> y = host(dy, 64);
+    for (float v : y) CHECK(std::isnan(v));
+    CU(cudaFree(dw)); CU(cudaFree(dq)); CU(cudaFree(dy));
+}
+
+// ---- IqQuantKernels on the GPU: iq_mmvq of every format against iq_dequant_f32 . Q8_1 on the host (iq_ok)
+UF_SECTION(iq_mmvq_dot, "iq_mmvq: y[r] = sum_i dequant(w)[r][i] * x8[i] for Q3_K, IQ2_XXS, IQ2_XS, IQ3_XXS, IQ4_NL, IQ3_S, IQ2_S, IQ4_XS, IQ1_M, Q2_0; nothing past n_out") {
+    for (kg::Fmt f : kAllIq) {
+        CHECK(iq_ok(f, 1, 256));
+        CHECK(iq_ok(f, 37, 256));
+        CHECK(iq_ok(f, 5, 2560));
+    }
 }
 
 // ---- end of sections

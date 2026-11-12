@@ -1,0 +1,12 @@
+device 0: Iluvatar BI-V100, warpSize 64, 16 SMs
+[ ok ] mmvf_partials_fit - "BLOCK_SIZE/32 <= 8 warp sums fit the 32-entry partials array"
+[ ok ] gemv_rsum_succ - "the naive kernel walks the row: y[o] = sum_i bf16(x[i]) * bf16(w[o*n_in + i])"
+[ ok ] iq_block_layouts - "iq_row_bytes(t, n) = (n / qk) * sizeof(block) with the ggml-common block sizes"
+[ ok ] gemv_schedules_exact - "bf16_gemv and bf16_gemv_split (tpr 1..1024) equal the exact integer row sums bit for bit"
+[ ok ] native_q8_1_block - "native_quantize_q8_1: d = scale (|x - q*d| <= d/2, |q| <= 127), s = d * sum(q); bytes = ncols*(n_in/32)*36"
+[ ok ] native_mmvq_layout - "native_mmvq_supported for the ten types; weight_bytes = n_out * (n_in / qk) * sizeof(block), 0 otherwise"
+[ ok ] native_mmvq_dot - "mmvq_kernel: y[c*n_out + r] = sum_i w[r][i] * x8[c][i] for every type, small-K and wide-K rows, 1..8 columns"
+[ ok ] native_mmvq_multi_exact - "with multi_exact on, column c of an 8-column launch equals the 1-column launch bit for bit; off, 5..8 columns still match within rounding"
+[ ok ] native_mmvq_refuses - "validate_shape/validate_pointer: ncols outside 1..8, n_in not a whole number of blocks, null pointers -> cudaErrorInvalidValue, nothing written"
+[ ok ] iq_mmvq_dot - "iq_mmvq: y[r] = sum_i dequant(w)[r][i] * x8[i] for Q3_K, IQ2_XXS, IQ2_XS, IQ3_XXS, IQ4_NL, IQ3_S, IQ2_S, IQ4_XS, IQ1_M, Q2_0; nothing past n_out"
+UB7EDB4CD1F GPU TESTS PASSED (10 sections)
