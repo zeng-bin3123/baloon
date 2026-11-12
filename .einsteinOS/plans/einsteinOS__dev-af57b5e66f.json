@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 51772,
     "started": "2026-11-12T05:32:24.290038493Z",
-    "renewed": "2026-11-12T05:54:02.77914513Z"
+    "renewed": "2026-11-12T06:15:14.720929074Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -419,6 +419,10 @@
         "Q2ExpertDotKernel.lean",
         "Q2Avx2Fallback.lean"
       ],
+      "children": [
+        "ub7edb4cd1f",
+        "u883f305326"
+      ],
       "reason": "initial plan",
       "conv": "5610ee0e-bf76-4dee-954e-56ccfd74e9fb"
     },
@@ -559,6 +563,26 @@
       ],
       "reason": "3 fix attempts used",
       "conv": "e3a4d138-0b77-4b1b-9421-025ca556f99a"
+    },
+    {
+      "id": "ub7edb4cd1f",
+      "parent": "ufbd318f91b",
+      "modules": [
+        "NativeQuantizedMatVec.lean",
+        "IqQuantKernels.lean",
+        "Bf16GemvDispatch.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "u883f305326",
+      "parent": "ufbd318f91b",
+      "modules": [
+        "Bf16MmvfBlockSelect.lean",
+        "Q2ExpertDotKernel.lean",
+        "Q2Avx2Fallback.lean"
+      ],
+      "reason": "3 fix attempts used"
     }
   ],
   "state": {
@@ -628,9 +652,7 @@
       "unit_id": "u30ab07cd05"
     }
   },
-  "fix_attempts": {
-    "ufbd318f91b": 3
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u3e84b3357d": [
       "nothing_written",
@@ -647,13 +669,7 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "ufbd318f91b": {
-      "kind": "review_fail",
-      "text": "未收到评价正文，本轮无代码修改、无 commit",
-      "base_ref": "einsteinOS/dev-af57b5e66f"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
   "port_units": [
     {
