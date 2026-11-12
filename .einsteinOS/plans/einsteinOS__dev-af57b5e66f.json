@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 601,
     "started": "2026-11-12T15:17:12.363091105Z",
-    "renewed": "2026-11-12T15:50:09.621491859Z"
+    "renewed": "2026-11-12T18:31:30.14802475Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -583,7 +583,8 @@
         "Q2ExpertDotKernel.lean",
         "Q2Avx2Fallback.lean"
       ],
-      "reason": "3 fix attempts used"
+      "reason": "3 fix attempts used",
+      "conv": "65c66711-3a83-401b-bd17-56027343ee65"
     }
   ],
   "state": {
@@ -668,7 +669,9 @@
       "unit_id": "u30ab07cd05"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u883f305326": 1
+  },
   "fail_history": {
     "u3e84b3357d": [
       "nothing_written",
@@ -678,6 +681,9 @@
       "review_fail",
       "review_fail",
       "review_fail"
+    ],
+    "u883f305326": [
+      "kernel_unported"
     ],
     "ub7edb4cd1f": [
       "nothing_written",
@@ -690,7 +696,13 @@
       "review_fail"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "u883f305326": {
+      "kind": "kernel_unported",
+      "text": "kernel_unported: src/kernels/gpu/bf16_native.cu define __global__ kernels (bf16_f32_mmvf_kernel) and are neither test files nor files the unit's port map .einsteinOS/port/u883f305326.tsv writes a counterpart into",
+      "base_ref": "einsteinOS/dev-af57b5e66f-wip-u883f305326"
+    }
+  },
   "infra_fails": 0,
   "port_units": [
     {
