@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 42115,
     "started": "2026-11-12T01:44:37.440407536Z",
-    "renewed": "2026-11-12T03:40:54.500930626Z"
+    "renewed": "2026-11-12T04:21:35.219836036Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -420,7 +420,7 @@
         "Q2Avx2Fallback.lean"
       ],
       "reason": "initial plan",
-      "conv": "bcb30a8e-dcd2-421c-a080-534eeccec548"
+      "conv": "a9ad6979-ed01-42f3-8983-a42bf91cda45"
     },
     {
       "id": "u7f1ccea730",
@@ -629,7 +629,7 @@
     }
   },
   "fix_attempts": {
-    "ufbd318f91b": 1
+    "ufbd318f91b": 2
   },
   "fail_history": {
     "u3e84b3357d": [
@@ -642,13 +642,14 @@
       "review_fail"
     ],
     "ufbd318f91b": [
+      "compile_fail",
       "compile_fail"
     ]
   },
   "last_failure": {
     "ufbd318f91b": {
       "kind": "compile_fail",
-      "text": "build.sh exit=1: …le(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, xq.q, xq.d, xq.hx)\n                                                                    ^\nsrc/cpu/expert_q2.cpp:442:100: error: use of undeclared identifier 'gate_slot'\n        const float g = oracle_on() ? row_dot_oracle(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, xq.q, xq.d, xq.hx)\n                                                                                                   ^\nsrc/cpu/expert_q2.cpp:443:62: error: use of undeclared identifier 'gate_slot'\n                                    : row_dot(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, xq.q, xq.d, xq.hx);\n                                                             ^\nsrc/cpu/expert_q2.cpp:443:93: error: use of undeclared identifier 'gate_slot'\n                                    : row_dot(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, xq.q, xq.d, xq.hx);\n                                                                                            ^\nsrc/cpu/expert_q2.cpp:444:69: error: use of undeclared identifier 'up_slot'\n        const float u = oracle_on() ? row_dot_oracle(gu_codes(blob, up_slot(r)), gu_scales(blob, up_slot(r)), SC_GU, xq.q, xq.d, xq.hx)\n                                                                    ^\nsrc/cpu/expert_q2.cpp:444:98: error: use of undeclared identifier 'up_slot'\n        const float u = oracle_on() ? row_dot_oracle(gu_codes(blob, up_slot(r)), gu_scales(blob, up_slot(r)), SC_GU, xq.q, xq.d, xq.hx)\n                                                                                                 ^\nsrc/cpu/expert_q2.cpp:445:62: error: use of undeclared identifier 'up_slot'\n                                    : row_dot(gu_codes(blob, up_slot(r)), gu_scales(blob, up_slot(r)), SC_GU, xq.q, xq.d, xq.hx);\n                                                             ^\nsrc/cpu/expert_q2.cpp:445:91: error: use of undeclared identifier 'up_slot'\n                                    : row_dot(gu_codes(blob, up_slot(r)), gu_scales(blob, up_slot(r)), SC_GU, xq.q, xq.d, xq.hx);\n                                                                                          ^\nsrc/cpu/expert_q2.cpp:456:43: error: use of undeclared identifier 'gate_slot'\n        const float g = rd(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, xq);\n                                          ^\nsrc/cpu/expert_q2.cpp:456:74: error: use of undeclared identifier 'gate_slot'\n        const float g = rd(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, xq);\n                                                                         ^\nsrc/cpu/expert_q2.cpp:457:43: error: use of undeclared identifier 'up_slot'\n        const float u = rd(gu_codes(blob, up_slot(r)), gu_scales(blob, up_slot(r)), SC_GU, xq);\n                                          ^\nfatal error: too many errors emitted, stopping now [-ferror-limit=]\n20 errors generated.",
+      "text": "build.sh exit=1: == port table syntax ==\n== CPU (host) ==\n== CUDA (ivcore10) ==\n[cuda] src/kernels/gpu/gemv_bf16.cu\nsrc/kernels/gpu/gemv_bf16.cu:22:40: error: redefinition of 'rsum'\ntemplate \u003cclass F\u003e constexpr long long rsum(F f, long long n) { long long s = 0; for (long long i = 0; i \u003c n; ++i) s += f(i); return s; }\n                                       ^\nsrc/kernels/gpu/gemv_bf16.cu:15:40: note: previous definition is here\ntemplate \u003cclass F\u003e constexpr long long rsum(F f, long long n) { long long s = 0; for (long long i = 0; i \u003c n; ++i) s += f(i); return s; }\n                                       ^\nsrc/kernels/gpu/gemv_bf16.cu:23:21: error: redefinition of 'gemv_probe'\nconstexpr long long gemv_probe(long long i) { return i * i - 3 * i + 1; }\n                    ^\nsrc/kernels/gpu/gemv_bf16.cu:16:21: note: previous definition is here\nconstexpr long long gemv_probe(long long i) { return i * i - 3 * i + 1; }\n                    ^\n2 errors generated when compiling for ivcore10.",
       "base_ref": "einsteinOS/dev-af57b5e66f-wip-ufbd318f91b"
     }
   },
