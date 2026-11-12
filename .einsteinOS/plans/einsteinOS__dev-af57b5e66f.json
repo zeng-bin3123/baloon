@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 601,
     "started": "2026-11-12T15:17:12.363091105Z",
-    "renewed": "2026-11-12T18:31:30.14802475Z"
+    "renewed": "2026-11-12T21:19:30.961481279Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -584,7 +584,7 @@
         "Q2Avx2Fallback.lean"
       ],
       "reason": "3 fix attempts used",
-      "conv": "65c66711-3a83-401b-bd17-56027343ee65"
+      "conv": "c7a8c59b-9d8a-43de-8b59-cbe014c87630"
     }
   ],
   "state": {
@@ -670,7 +670,7 @@
     }
   },
   "fix_attempts": {
-    "u883f305326": 1
+    "u883f305326": 2
   },
   "fail_history": {
     "u3e84b3357d": [
@@ -683,7 +683,8 @@
       "review_fail"
     ],
     "u883f305326": [
-      "kernel_unported"
+      "kernel_unported",
+      "smoke_fail"
     ],
     "ub7edb4cd1f": [
       "nothing_written",
@@ -698,8 +699,8 @@
   },
   "last_failure": {
     "u883f305326": {
-      "kind": "kernel_unported",
-      "text": "kernel_unported: src/kernels/gpu/bf16_native.cu define __global__ kernels (bf16_f32_mmvf_kernel) and are neither test files nor files the unit's port map .einsteinOS/port/u883f305326.tsv writes a counterpart into",
+      "kind": "smoke_fail",
+      "text": "test.sh exit=1: == port table ==\n== kernel_unported (local) ==\nkernel_unported: no changed-file list (.einsteinOS/verify/u883f305326/changed_files.txt missing and bff4eba7 not in history)\nnegative control FAILED: kernel_unported check did not flag bf16_native.cu with a q2-only table\n== ISA content (EINSTEINOS_ISA_FLAGS: -mavx2 -mf16c -mfma) ==\nq2_avx2.o: avx2(ymm)=105 f16c=3 fma=6\ntest_cpu: avx2(ymm)=446 f16c=28 fma=26\n== CPU tests ==\ncpu: avx2=1 avx512 f/bw/vl/vnni/vbmi=11111 -\u003e ok\n[ ok ] act_quant_scalar_eq_avx2 - \"act_quant_q8_1 and act_quant_q8_1_avx2 are bit-identical; |q|\u003c=127; hx is the chunk sum\"\n[ ok ] unpack64_layout - \"unpack64: value i is code byte i/4 at bit 2*(i%4)\"\n[ ok ] q2_avx2_rows_vs_reference - \"q2_0_gguf_rows_multi_avx2 matches the exact (code-1)*d dot for nt=1..9 (groups of \u003c=4) and a row sub-range\"\n[ ok ] q2_avx512_eq_avx2 - \"q2_0_gguf_rows_multi (AVX-512) agrees with the AVX2 fallback and the reference (skipped without VNNI/VBMI)\"\n[ ok ] u6_unpack64_every_byte - \"unpack64: every byte value 0..255 in every position keeps its own four codes\"\n[ ok ] u6_maddubs_extremes - \"row dot at the saturation extremes (codes 3, x = +-127) equals the exact (code-1)*d sum\"\n[ ok ] u6_hsum_lanes - \"act_quant_q8_1_avx2: hx equals the integer sum of the chunk's 32 codes for one-hot chunks\"\n[ ok ] u6_groups_cover - \"group_size(nt, t0) steps give groups of 1..4 tokens covering nt = 1..64\"\n[ ok ] u6_cpu_gate_bits - \"avx512_ok accepts exactly EBX 16/30/31 + ECX 11/1; dropping any one bit refuses\"\n[ ok ] u6_blob_geometry - \"q2geo: 40/10 blocks per row, interleaved gate/up rows, BLOB = 1,382,400\"\nU883F305326 CPU TESTS PASSED (10 sections)\n== device tests (CUDA_VISIBLE_DEVICES=0,1,2,3) ==\ndevices visible: 4\n[ ok ] block_size_search - \"mmvf_block_size is optimal among 32..256, keeps the smaller block on ties; 2560-\u003e256, 640-\u003e160, 64-\u003e32\"\n  block  32 \u003c- n_in 2\n  block  64 \u003c- n_in 66\n  block  96 \u003c- n_in 130\n  block 128 \u003c- n_in 194\n  block 160 \u003c- n_in 258\n  block 192 \u003c- n_in 322\n  block 224 \u003c- n_in 386\n  block 256 \u003c- n_in 450\n[ ok ] switch_every_case_launches - \"every one of the 8 switch cases is selected by some n_in and its launch is exact\"\n[ ok ] host_contract - \"odd/zero/huge sizes and misaligned x/w/y are refused with cudaErrorInvalidValue\"\n[ ok ] pair_order - \"element 2p is the low half and 2p+1 the high half of weight word p (one-hot probes)\"\n[ ok ] partials_fit - \"full-size shapes (n_in 2560 / 640 / 4096, 8 warps at 256) reduce exactly across warps\"\nU883F305326 GPU TESTS PASSED (5 sections)",
       "base_ref": "einsteinOS/dev-af57b5e66f-wip-u883f305326"
     }
   },
