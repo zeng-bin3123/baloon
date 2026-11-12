@@ -257,6 +257,18 @@ inline void q2g_row_multi(const uint8_t* row, uint32_t nb, uint32_t nt, const in
 
 }  // namespace
 
+// Theory cpuUsable_witness: exactly F/BW/VL + VNNI/VBMI is accepted; the same part without VBMI is refused.
+static_assert(etable::avx512_ok((1u << 16) | (1u << 30) | (1u << 31), (1u << 11) | 2u), "cpuUsable_witness accept");
+static_assert(!etable::avx512_ok((1u << 16) | (1u << 30) | (1u << 31), 1u << 11), "cpuUsable_witness reject");
+// Theory row_geometry / blob_size: 40 blocks per gate/up row (H/64), 10 per down row (FF/64); gate/up rows interleaved
+// (2 FF rows of 640 code + 80 scale bytes), H down rows of 160 + 20 -> 1,382,400 bytes per expert.
+static_assert(H / 64 == 40 && FF / 64 == 10, "row_geometry");
+static_assert(2ull * FF * (H / 4 + H / 64 * 2) + (uint64_t)H * (FF / 4 + FF / 64 * 2) == 1382400ull, "blob_size");
+static_assert(BLOB == 1382400ull, "blob_size matches q2geo::BLOB");
+// Theory batchSizes_cover / laneMask_spec: b0 += 8 batches of min(8, nb - b0) blocks cover every block exactly once.
+constexpr bool batches_cover(uint32_t nb) { uint32_t s = 0; for (uint32_t b0 = 0; b0 < nb; b0 += 8) s += nb - b0 < 8 ? nb - b0 : 8; return s == nb; }
+static_assert(batches_cover(40) && batches_cover(10) && batches_cover(1) && batches_cover(17), "batchSizes_cover");
+
 // ============================================================================================ public: features
 const char* CpuFeatures::reason() const {
     if (!avx512f) return "AVX-512F is missing";
@@ -289,6 +301,8 @@ CpuFeatures cpu_features() {
     f.avx512vl = zmm_ok && etable::bit_set(b, 31);
     f.avx512_vnni = zmm_ok && etable::bit_set(c, 11);
     f.avx512_vbmi = zmm_ok && etable::bit_set(c, 1);
+    // Theory cpuUsable_iff: usable() is exactly the CPUID.7.0 predicate (EBX 16/30/31, ECX 11/1) under an OS that saves ZMM.
+    if (f.usable() != (zmm_ok && etable::avx512_ok(b, c))) std::abort();
 #endif
     return f;
 }

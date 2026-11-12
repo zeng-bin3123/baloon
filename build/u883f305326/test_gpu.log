@@ -1,0 +1,15 @@
+devices visible: 4
+[ ok ] block_size_search - "mmvf_block_size is optimal among 32..256, keeps the smaller block on ties; 2560->256, 640->160, 64->32"
+  block  32 <- n_in 2
+  block  64 <- n_in 66
+  block  96 <- n_in 130
+  block 128 <- n_in 194
+  block 160 <- n_in 258
+  block 192 <- n_in 322
+  block 224 <- n_in 386
+  block 256 <- n_in 450
+[ ok ] switch_every_case_launches - "every one of the 8 switch cases is selected by some n_in and its launch is exact"
+[ ok ] host_contract - "odd/zero/huge sizes and misaligned x/w/y are refused with cudaErrorInvalidValue"
+[ ok ] pair_order - "element 2p is the low half and 2p+1 the high half of weight word p (one-hot probes)"
+[ ok ] partials_fit - "full-size shapes (n_in 2560 / 640 / 4096, 8 warps at 256) reduce exactly across warps"
+U883F305326 GPU TESTS PASSED (5 sections)

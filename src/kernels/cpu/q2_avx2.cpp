@@ -42,6 +42,21 @@ inline int32_t dot32(__m256i codes, const int8_t* qc) {
     const __m256i p = _mm256_maddubs_epi16(codes, _mm256_loadu_si256((const __m256i*)qc));
     return hsum_i32(_mm256_madd_epi16(p, _mm256_set1_epi16(1)));
 }
+// Theory maddubs_codes_bound / chunk_sum_bound: a maddubs pair c0 x0 + c1 x1 with codes <= 3 and |x| <= 127 is within
+// +-762 (no int16 saturation) and a 32-value chunk sum within +-4064 (exact in int32).
+static_assert(2 * 3 * 127 == 762 && 762 < 32767, "maddubs_codes_bound");
+static_assert(32 * 127 == 4064, "chunk_sum_bound");
+// Theory unpackPos_order / unpack_groups_cover: value 16g + i (g < 4, i < 16) is code slot i % 4 of block byte 4g + i/4,
+// i.e. code byte (16g+i)/4 at bit 2*((16g+i)%4) - the dequantizer's LSB-first order used by code_byte/code_shift.
+constexpr bool unpack_order_ok() {
+    for (uint32_t g = 0; g < 4; ++g)
+        for (uint32_t i = 0; i < 16; ++i)
+            if (code_byte(16 * g + i) != 4 * g + i / 4 || code_shift(16 * g + i) != 2 * (i % 4)) return false;
+    return true;
+}
+static_assert(unpack_order_ok(), "unpackPos_order");
+// Theory gguf_block_stride: block b's scale is at 18b and its 16 code bytes end at 18b + 18 <= 18 nb.
+static_assert(BLOCK_BYTES == 2 + 16, "gguf_block_stride");
 }  // namespace
 
 void unpack64(const uint8_t* codes16, uint8_t out[64]) {
@@ -78,8 +93,9 @@ void q2_0_gguf_rows_multi_avx2(const uint8_t* w, uint32_t row0, uint32_t row1, u
                                size_t q_stride, const float* xd, const int32_t* hx, size_t ch_stride, float* out, size_t out_stride) {
     for (uint32_t r = row0; r < row1; ++r) {
         const uint8_t* row = w + (size_t)r * nb * BLOCK_BYTES;
-        for (uint32_t t0 = 0; t0 < nt; t0 += MAX_GROUP) {
-            const uint32_t n = std::min<uint32_t>(MAX_GROUP, nt - t0);
+        // Theory groupsOf4_cover: groups of group_size(nt, t0) = min(4, nt - t0) tokens, each 1..4 wide, cover all nt.
+        for (uint32_t t0 = 0; t0 < nt; t0 += group_size(nt, t0)) {
+            const uint32_t n = group_size(nt, t0);
             float o[MAX_GROUP];
             row_multi(row, nb, n, q + t0 * q_stride, q_stride, xd + t0 * ch_stride, hx + t0 * ch_stride, ch_stride, o);
             for (uint32_t t = 0; t < n; ++t) out[(size_t)(t0 + t) * out_stride + r] = o[t];

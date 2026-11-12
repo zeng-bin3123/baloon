@@ -32,6 +32,13 @@ struct GrMulti {
 // ---- dense / elementwise -------------------------------------------------------------------------------------------------------
 cudaError_t bf16_gemv(const uint16_t* x, const uint16_t* w, float* y, long long n_in, long long n_out, cudaStream_t s = 0);
 cudaError_t bf16_gemv_split(const uint16_t* x, const uint16_t* w, float* y, long long n_in, long long n_out, int tpr, cudaStream_t s = 0);
+// mmvf block-size search (theory Bf16MmvfBlockSelect.blockSize): one of 32, 64, ..., 256, minimising ceil(n/(2*bs)),
+// ties keep the smaller block. mmvf_pair_iters(n, c) = ceil(n / (2c)) pair iterations per thread.
+int mmvf_block_size(long long n);
+long long mmvf_pair_iters(long long n, int c);
+// mmvf host contract: n_in > 0, even, <= INT_MAX; 0 < n_out <= INT_MAX; x 8-byte aligned, w and y 4-byte aligned.
+bool mmvf_args_ok(long long n_in, long long n_out);
+bool mmvf_align_ok(const void* w, const void* x, const void* y);
 cudaError_t bf16_gemv_fp32_mmvf(const uint16_t* w, const float* x, float* y, long long rows, long long cols, cudaStream_t s = 0);
 // Canonical S2 plane (codes n_blocks*16 bytes, LSB-first; one f32 scale per 64-element block) -> f32.
 // One thread per block, grid ceil(n_blocks/256) x 256; n_blocks <= 0 launches nothing.
