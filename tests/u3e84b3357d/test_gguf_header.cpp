@@ -39,6 +39,20 @@ U3E_SECTION(sec_cursor_bounds, "cursor: need fails iff pos+n>size, reads stay in
         }
         CHECK(c.pos == sum && c.ok == alive);
     }
+    // Cursor::read_all (theory readAll): the code path itself, against the sum of the sizes
+    for (int trial = 0; trial < 20000; ++trial) {
+        const uint64_t size = (rng = rng * 1664525u + 1013904223u) >> 26;   // 0..63
+        std::vector<uint64_t> ks((rng = rng * 1664525u + 1013904223u) >> 29);
+        for (auto& k : ks) k = (rng = rng * 1664525u + 1013904223u) >> 28;
+        uint64_t sum = 0, before_fail = 0; bool fits = true;
+        for (uint64_t k : ks) { if (fits && sum + k <= size) sum += k; else if (fits) { fits = false; before_fail = sum; } }
+        Cursor c(mem, size);
+        const bool r = c.read_all(ks.begin(), ks.end());
+        CHECK(r == fits && c.ok == fits && c.pos <= size);
+        CHECK(c.pos == (fits ? sum : before_fail));                       // advances by the sum, or stops at the failure
+    }
+    { Cursor c(mem, 64); CHECK(c.read_all({8, 16, 0, 40}) && c.pos == 64); CHECK(!c.read_all({0, 1}) && c.pos == 64); }
+    { Cursor c(mem, 64); CHECK(c.read_all({}) && c.pos == 0 && c.ok); }
     // the scalar readers are reads of 1/2/4/8 bytes
     { uint8_t d[15] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}; Cursor c(d, 15);
       CHECK(c.u8() == 1 && c.pos == 1 && c.u16() == 0x0302 && c.pos == 3 && c.u32() == 0x07060504u && c.pos == 7);

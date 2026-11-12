@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <initializer_list>
 #include <map>
 #include <optional>
 #include <string>
@@ -55,6 +56,13 @@ struct Cursor {
     bool need(uint64_t k) { if (!ok || pos > n || n - pos < k) { ok = false; return false; } return true; }
     // Theory Cursor.read: need(k) then advance by exactly k. On success pos <= n still holds.
     bool read(uint64_t k) { if (!need(k)) return false; pos += k; return true; }
+    // Theory readAll: run the reads in order, stopping at the first failure. On success pos has advanced by
+    // exactly the sum of the sizes and is still <= n (readAll_spec); on failure pos stays where the failing read began.
+    template <class It> bool read_all(It first, It last) {
+        for (; first != last; ++first) if (!read((uint64_t)*first)) return false;
+        return true;
+    }
+    bool read_all(std::initializer_list<uint64_t> ks) { return read_all(ks.begin(), ks.end()); }
     uint64_t uint_le(unsigned bytes) {
         if (!need(bytes)) return 0;
         uint64_t v = 0;
@@ -66,9 +74,10 @@ struct Cursor {
     uint32_t u32() { return (uint32_t)uint_le(4); }
     uint64_t u64() { return uint_le(8); }
     std::string str() {
-        const uint64_t l = u64();
-        if (!need(l)) return {};
-        std::string s((const char*)p + pos, (size_t)l); pos += l; return s;
+        // string_read_size: a u64 length then that many bytes, i.e. read_all({8, len}) = 8 + len bytes.
+        const uint64_t at = pos, l = u64();
+        if (!ok || !read(l)) return {};
+        return std::string((const char*)p + at + 8, (size_t)l);
     }
 };
 
