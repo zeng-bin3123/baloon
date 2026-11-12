@@ -28,7 +28,7 @@ constexpr bool kImplCommon = true;
 constexpr int QK_K = 256;
 
 struct Geo { int elems; int bytes; };
-__host__ __device__ inline Geo geo(Fmt f) {
+__host__ __device__ constexpr Geo geo(Fmt f) {
     switch (f) {
         case Fmt::Q2_0: return {64, 18};
         case Fmt::Q3_K: return {256, 110};
@@ -49,6 +49,12 @@ template <class T> __device__ __forceinline__ T cvt(float v);
 template <> __device__ __forceinline__ float cvt<float>(float v) { return v; }
 template <> __device__ __forceinline__ uint16_t cvt<uint16_t>(float v) { return kgc::f_to_f16(v); }
 
+// Theory blockBytes / blockElems / block_layouts: the ggml-common layouts - iq2_xxs 2+64, iq2_xs 2+64+8, iq2_s 2+64+8+8,
+// iq3_xxs 2+96, iq3_s 2+64+8+32+4, iq1_m 32+16+8 - are exactly the block sizes geo() uses.
+static_assert(geo(Fmt::IQ2_XXS).bytes == 2 + 64 && geo(Fmt::IQ2_XS).bytes == 2 + 64 + 8 && geo(Fmt::IQ2_S).bytes == 2 + 64 + 8 + 8 &&
+              geo(Fmt::IQ3_XXS).bytes == 2 + 96 && geo(Fmt::IQ3_S).bytes == 2 + 64 + 8 + 32 + 4 && geo(Fmt::IQ1_M).bytes == 32 + 16 + 8 &&
+              geo(Fmt::IQ4_NL).bytes == 18 && geo(Fmt::IQ4_XS).bytes == 136 && geo(Fmt::Q3_K).bytes == 110 && geo(Fmt::Q2_0).bytes == 18,
+              "block_layouts");
 __device__ __forceinline__ float warp_sum(float v) { return kgc::wave_sum(v); }
 // 16-bit-aligned and 32-bit-aligned little-endian reads
 __device__ __forceinline__ int get_int_b2(const void* x, int i32) {

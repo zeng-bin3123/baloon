@@ -1,0 +1,7 @@
+device 0: Iluvatar BI-V100, warpSize 64, 16 SMs
+[ ok ] mmvf_partials_fit - "BLOCK_SIZE/32 <= 8 warp sums fit the 32-entry partials array"
+[ ok ] gemv_rsum_succ - "the naive kernel walks the row: y[o] = sum_i bf16(x[i]) * bf16(w[o*n_in + i])"
+[ ok ] iq_block_layouts - "iq_row_bytes(t, n) = (n / qk) * sizeof(block) with the ggml-common block sizes"
+[ ok ] gemv_schedules_exact - "bf16_gemv and bf16_gemv_split (tpr 1..1024) equal the exact integer row sums bit for bit"
+[ ok ] native_q8_1_block - "native_quantize_q8_1: d = scale (|x - q*d| <= d/2, |q| <= 127), s = d * sum(q); bytes = ncols*(n_in/32)*36"
+UFBD318F91B GPU TESTS PASSED (5 sections)
