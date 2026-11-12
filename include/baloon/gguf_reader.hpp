@@ -353,6 +353,15 @@ struct Qwen4ExpGuard {
         auto arch = f.get_string("general.architecture");
         if (!arch) return fail("missing general.architecture");
         if (*arch != kGuardArch) return fail("architecture is not qwen4exp");
+        // Keys are checked in kGuardDefaults order, so the first failure reported here is the same key
+        // check_architecture reports (block_count, embedding_length, expert_count, expert_used_count, head_count,
+        // head_count_kv); the range checks run as soon as the values they relate are known.
+        auto nl = f.get_uint(*arch + ".block_count");
+        if (!nl) return fail("missing block_count");
+        if (*nl != expected_layers) return fail("block_count mismatch");
+        auto hid = f.get_uint(*arch + ".embedding_length");
+        if (!hid) return fail("missing embedding_length");
+        if (*hid != expected_hidden) return fail("embedding_length mismatch");
         auto ne = f.get_uint(*arch + ".expert_count");
         if (!ne) return fail("missing expert_count");
         if (*ne != expected_experts) return fail("expert_count mismatch");
@@ -367,12 +376,6 @@ struct Qwen4ExpGuard {
         if (!nkv) return fail("missing head_count_kv");
         if (*nkv != expected_kv_heads) return fail("head_count_kv mismatch");
         if (*nkv == 0 || *nh % *nkv != 0) return fail("heads do not group over kv heads");
-        auto nl = f.get_uint(*arch + ".block_count");
-        if (!nl) return fail("missing block_count");
-        if (*nl != expected_layers) return fail("block_count mismatch");
-        auto hid = f.get_uint(*arch + ".embedding_length");
-        if (!hid) return fail("missing embedding_length");
-        if (*hid != expected_hidden) return fail("embedding_length mismatch");
         return true;
     }
 };

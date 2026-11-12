@@ -375,6 +375,13 @@ U3E_SECTION(sec_guard_defaults, "Qwen4ExpGuard: defaults = guardDefaults, accept
             CHECK(g == check_architecture(*f).empty()); agree += g == check_architecture(*f).empty();
             CHECK(g == (arch_ok && code == 0));
             if (!g) CHECK(!why.empty());
+            // the same FIRST failure: the guard's message names the key check_architecture reports
+            const std::string first = check_architecture(*f);
+            if (!g && first != "general.architecture") {
+                const std::string sfx = first.substr(std::string("qwen4exp.").size());
+                const std::string shortk = sfx.rfind("attention.", 0) == 0 ? sfx.substr(10) : sfx;
+                CHECK(why == "missing " + shortk || why == shortk + " mismatch");
+            }
         }
     }
     CHECK(agree == 2 * 729);
