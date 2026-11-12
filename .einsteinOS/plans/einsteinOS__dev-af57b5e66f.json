@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 42115,
     "started": "2026-11-12T01:44:37.440407536Z",
-    "renewed": "2026-11-12T02:08:32.563097145Z"
+    "renewed": "2026-11-12T02:14:17.545731028Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -561,6 +561,11 @@
     }
   ],
   "state": {
+    "ActivationQuantize.lean": {
+      "hash": "984041fe9547",
+      "pass": true,
+      "unit_id": "u30ab07cd05"
+    },
     "BlockDequantization.lean": {
       "hash": "077c478d9fda",
       "pass": true,
@@ -586,10 +591,40 @@
       "pass": true,
       "unit_id": "ube91486083"
     },
+    "KvQ8Quant.lean": {
+      "hash": "4e3929b19a2c",
+      "pass": true,
+      "unit_id": "u30ab07cd05"
+    },
     "S2CanonicalDequant.lean": {
       "hash": "28c7b39e7f73",
       "pass": true,
       "unit_id": "ube91486083"
+    },
+    "S2GemvLutStaging.lean": {
+      "hash": "4788cc88c8ca",
+      "pass": true,
+      "unit_id": "u30ab07cd05"
+    },
+    "S2GemvNaive.lean": {
+      "hash": "b46845860046",
+      "pass": true,
+      "unit_id": "u30ab07cd05"
+    },
+    "S2GemvQ8Activation.lean": {
+      "hash": "94aa4497e971",
+      "pass": true,
+      "unit_id": "u30ab07cd05"
+    },
+    "S2GemvQuadRows.lean": {
+      "hash": "327d064ae4bb",
+      "pass": true,
+      "unit_id": "u30ab07cd05"
+    },
+    "SFamilyGemv.lean": {
+      "hash": "3a82e6f16e60",
+      "pass": true,
+      "unit_id": "u30ab07cd05"
     }
   },
   "fix_attempts": {},
@@ -606,12 +641,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u30ab07cd05": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
