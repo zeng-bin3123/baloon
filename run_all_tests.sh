@@ -6,6 +6,7 @@ LOG=phase1_results_$(date +%Y%m%d_%H%M%S).log
   ./tools/preflight.sh "$@"; pf=$?
   if [ $pf -eq 1 ]; then echo "preflight failed: checkout is not current baloon main - rerun as ./run_all_tests.sh --pull"; exit 1; fi
   echo "### git: $(git log --oneline -1)"
+  echo "### env_probe: ENV.md claims vs this machine"; python3 tools/env_probe.py; echo "env_probe exit=$?"
   echo "### host: $(hostname)  $(date -u)"
   ls -l /usr/local/corex/bin/clang++ 2>&1
   /usr/local/corex/bin/clang++ --version 2>&1 | head -2
