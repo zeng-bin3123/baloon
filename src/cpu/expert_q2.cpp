@@ -38,27 +38,12 @@ inline float silu_f(float v) { return v / (1.f + std::exp(-v)); }
 // Theory offset_identity: sum_j (c_j - 1) x_j = sum_j c_j x_j - sum_j x_j. Every row dot takes the code offset off ONCE
 // per 32-value chunk as the integer activation sum hx (= sum xq), never broadcast into the lanes.
 inline int32_t offset_dot(int32_t dot, int32_t chunk_sum) { return dot - chunk_sum; }
-// Theory offset_identity: sum_j (c_j - 1) x_j = sum_j c_j x_j - sum_j x_j. Every row dot takes the code offset off ONCE
-// per 32-value chunk as the integer activation sum hx (= sum xq), never broadcast into the lanes.
-inline int32_t offset_dot(int32_t dot, int32_t chunk_sum) { return dot - chunk_sum; }
 // Eight fp16 scales (nb <= 8 valid, others zero) as floats. The load is masked: a tail never reads past the row.
 inline __m256 scales8(const uint8_t* s, uint32_t nb) {
     const __mmask8 m = (__mmask8)(nb >= 8 ? 0xFFu : ((1u << nb) - 1u));
     return _mm256_cvtph_ps(_mm_maskz_loadu_epi16(m, s));
 }
 
-// Theory laneMask / laneMask_spec: the chunk lanes of a batch of nb blocks are enabled by 0xFFFF for a full batch, else
-// (1 << 2nb) - 1 - exactly the 2 nb chunk lanes, so a tail never reads scales or activation scales past the row.
-constexpr uint32_t lane_mask(uint32_t nb) { return nb >= 8 ? 0xFFFFu : (1u << (2 * nb)) - 1u; }
-constexpr bool lane_mask_spec() { for (uint32_t nb = 0; nb <= 8; ++nb) if (lane_mask(nb) != (uint32_t)((1ull << (2 * nb)) - 1)) return false; return true; }
-static_assert(lane_mask_spec(), "laneMask_spec");
-// d_w * d_x of the 16 chunk lanes of a batch (block k -> lanes 2k, 2k+1), masked with lane_mask(nb).
-inline void chunk_scales16(const uint8_t* s, const float* xd, uint32_t nb, float out[16]) {
-    const __mmask16 m = (__mmask16)lane_mask(nb);
-    const __m512i dup = _mm512_setr_epi32(0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7);
-    const __m512 wd = _mm512_permutexvar_ps(dup, _mm512_castps256_ps512(scales8(s, nb)));
-    _mm512_store_ps(out, _mm512_maskz_mul_ps(m, wd, _mm512_maskz_loadu_ps(m, xd)));
-}
 // Theory block_chunk_map: weight block b uses activation chunks 2b and 2b+1 at int8 offsets 64b and 64b + 32.
 constexpr size_t chunk_q_offset(uint32_t b, uint32_t h) { return (size_t)(2 * b + h) * QKA; }
 static_assert(chunk_q_offset(5, 0) == 64 * 5 && chunk_q_offset(5, 1) == 64 * 5 + 32 && chunk_q_offset(1, 0) == kZmm, "block_chunk_map");
@@ -204,6 +189,10 @@ inline void rdm(const uint8_t* codes, const uint8_t* scales, uint32_t nb, uint32
     else row_dot_multi_z(codes, scales, nb, nt, a, out);
 }
 
+// Theory gu_interleave: the fused gate/up matrix stores FF row pairs interleaved - gate row r at slot 2r, up row r at 2r+1.
+constexpr uint32_t gate_slot(uint32_t r) { return 2 * r; }
+constexpr uint32_t up_slot(uint32_t r) { return 2 * r + 1; }
+static_assert(gate_slot(3) == 6 && up_slot(3) == 7, "gu_interleave");
 inline const uint8_t* gu_codes(const uint8_t* blob, uint32_t slot) { return blob + O_GU_CODES + (size_t)slot * ROW_GU; }
 inline const uint8_t* gu_scales(const uint8_t* blob, uint32_t slot) { return blob + O_GU_SCALES + (size_t)slot * SC_GU * 2; }
 inline const uint8_t* dn_codes(const uint8_t* blob, uint32_t r) { return blob + O_D_CODES + (size_t)r * ROW_D; }
