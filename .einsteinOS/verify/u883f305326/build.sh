@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unit u883f305326 (Bf16MmvfBlockSelect, Q2ExpertDotKernel, Q2Avx2Fallback). Builds: (1) port table syntax (6 rows);
+# Unit u883f305326 (Bf16MmvfBlockSelect, Q2ExpertDotKernel, Q2Avx2Fallback). Builds: (1) port table syntax, and every row's name defined in its file (6 q2_avx2 + 5 bf16_native rows);
 # (2) the CPU kernels into build/u883f305326/test_cpu - q2_avx2.cpp with the reference flags -mavx2 -mf16c -mfma
 # (EINSTEINOS_ISA_FLAGS), expert_q2.cpp with those plus AVX-512 F/BW/DQ/VL/VNNI/VBMI; (3) bf16_native.cu (+ the kg
 # sources it links with) and tests/u883f305326/test_gpu.cu with the corex clang++ for ivcore10 into test_gpu.
@@ -15,6 +15,12 @@ X512="$ISA -mavx2 -mf16c -mfma -mavx512bw -mavx512dq -mavx512f -mavx512vbmi -mav
 echo "== port table syntax =="
 TSV=.einsteinOS/port/u883f305326.tsv
 awk -F'\t' 'NF != 4 || $1 == "" || $2 == "" || $3 == "" || $4 == "" { print "bad row " NR ": " $0; bad = 1 } END { exit bad }' "$TSV"
+# Every row: the file in this repo exists and defines the name (whole word), as the kernel checks on each line.
+while IFS="$(printf '\t')" read -r rf rn mf mn; do
+  [ -n "$rf" ] || continue
+  [ -f "$mf" ] && grep -qwF -- "$mn" "$mf" || { echo "port row $rn: $mn not defined in $mf"; exit 1; }
+done < "$TSV"
+echo "port rows: $(grep -c . "$TSV") ok"
 
 [ -x "$CLANG" ] || { echo "corex toolchain missing at $CLANG"; exit 2; }
 
