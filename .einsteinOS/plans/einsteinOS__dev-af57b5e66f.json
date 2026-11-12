@@ -1,9 +1,9 @@
 {
   "holder": {
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
-    "pid": 58204,
-    "started": "2026-11-12T07:03:32.951861076Z",
-    "renewed": "2026-11-12T07:18:25.392856723Z"
+    "pid": 601,
+    "started": "2026-11-12T15:17:12.363091105Z",
+    "renewed": "2026-11-12T15:31:11.330047868Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -573,7 +573,7 @@
         "Bf16GemvDispatch.lean"
       ],
       "reason": "3 fix attempts used",
-      "conv": "b9235908-7829-4c7a-8311-cb9915a6689c"
+      "conv": "90c6470e-aa26-4b85-84a6-d86ba50f3162"
     },
     {
       "id": "u883f305326",
@@ -684,6 +684,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "ub7edb4cd1f": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
