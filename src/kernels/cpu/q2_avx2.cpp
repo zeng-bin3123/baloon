@@ -22,11 +22,16 @@ inline int32_t hsum_i32(__m256i v) {
     s = _mm_add_epi32(s, _mm_shuffle_epi32(s, 0xB1));
     return _mm_cvtsi128_si32(s);
 }
+// Theory shift16_bytes_independent: shifting the 16-bit lanes right by 2k and masking every byte with 3 yields code k
+// of EACH byte on its own - the bits the shift moves in from the neighbouring byte land above bit 1 and are masked off.
+template <int K> inline __m128i code_plane(__m128i x) {
+    static_assert(K >= 0 && K < 4, "a byte holds four 2-bit codes");
+    return _mm_and_si128(_mm_srli_epi16(x, 2 * K), _mm_set1_epi8(3));
+}
 // 16 code bytes -> 64 two-bit codes, one per byte, in value order (lo: values 0..31, hi: 32..63).
 inline void unpack64_v(const uint8_t* c16, __m256i& lo, __m256i& hi) {
-    const __m128i x = _mm_loadu_si128((const __m128i*)c16), m = _mm_set1_epi8(3);
-    const __m128i v0 = _mm_and_si128(x, m), v1 = _mm_and_si128(_mm_srli_epi16(x, 2), m);
-    const __m128i v2 = _mm_and_si128(_mm_srli_epi16(x, 4), m), v3 = _mm_and_si128(_mm_srli_epi16(x, 6), m);
+    const __m128i x = _mm_loadu_si128((const __m128i*)c16);
+    const __m128i v0 = code_plane<0>(x), v1 = code_plane<1>(x), v2 = code_plane<2>(x), v3 = code_plane<3>(x);
     const __m128i ab_lo = _mm_unpacklo_epi8(v0, v1), ab_hi = _mm_unpackhi_epi8(v0, v1);
     const __m128i cd_lo = _mm_unpacklo_epi8(v2, v3), cd_hi = _mm_unpackhi_epi8(v2, v3);
     lo = _mm256_set_m128i(_mm_unpackhi_epi16(ab_lo, cd_lo), _mm_unpacklo_epi16(ab_lo, cd_lo));

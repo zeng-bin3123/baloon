@@ -9,13 +9,34 @@ namespace {
 constexpr int THREADS = 256;                 // 4 waves
 constexpr int WAVES = THREADS / 64;
 
+// Exact model of the sums (theory rsum / ssum / treeReduce over integers). The kernels' work decompositions are checked
+// against it at compile time; the tests feed integer-valued bf16 data, where f32 is exact, so every schedule must
+// reproduce the naive row walk bit for bit (the source compares them with a tolerance only because of reassociation).
+template <class F> constexpr long long rsum(F f, long long n) { long long s = 0; for (long long i = 0; i < n; ++i) s += f(i); return s; }
+constexpr long long gemv_probe(long long i) { return i * i - 3 * i + 1; }
+// Theory rsum_succ: the naive kernel's row walk - one more index adds f(n) to the sum of the first n terms.
+static_assert(rsum(gemv_probe, 11) == rsum(gemv_probe, 10) + gemv_probe(10) && rsum(gemv_probe, 1) == gemv_probe(0), "rsum_succ");
+// Exact model of the sums (theory rsum / ssum / treeReduce over integers). The kernels' work decompositions are checked
+// against it at compile time; the tests feed integer-valued bf16 data, where f32 is exact, so every schedule must
+// reproduce the naive row walk bit for bit (the source compares them with a tolerance only because of reassociation).
+template <class F> constexpr long long rsum(F f, long long n) { long long s = 0; for (long long i = 0; i < n; ++i) s += f(i); return s; }
+constexpr long long gemv_probe(long long i) { return i * i - 3 * i + 1; }
+// Theory rsum_succ: the naive kernel's row walk - one more index adds f(n) to the sum of the first n terms.
+static_assert(rsum(gemv_probe, 11) == rsum(gemv_probe, 10) + gemv_probe(10) && rsum(gemv_probe, 1) == gemv_probe(0), "rsum_succ");
+// Exact model of the sums (theory rsum / ssum / treeReduce over integers). The kernels' work decompositions are checked
+// against it at compile time; the tests feed integer-valued bf16 data, where f32 is exact, so every schedule must
+// reproduce the naive row walk bit for bit (the source compares them with a tolerance only because of reassociation).
+template <class F> constexpr long long rsum(F f, long long n) { long long s = 0; for (long long i = 0; i < n; ++i) s += f(i); return s; }
+constexpr long long gemv_probe(long long i) { return i * i - 3 * i + 1; }
+// Theory rsum_succ: the naive kernel's row walk - one more index adds f(n) to the sum of the first n terms.
+static_assert(rsum(gemv_probe, 11) == rsum(gemv_probe, 10) + gemv_probe(10) && rsum(gemv_probe, 1) == gemv_probe(0), "rsum_succ");
 __global__ void bf16_gemv_naive_kernel(const uint16_t* __restrict__ x, const uint16_t* __restrict__ w, float* __restrict__ y,
                                        long long n_in, long long n_out) {
     const long long o = (long long)blockIdx.x * blockDim.x + threadIdx.x;
     if (o >= n_out) return;
     const uint16_t* row = w + o * n_in;
     float acc = 0.f;
-    for (long long i = 0; i < n_in; ++i) acc += kgc::bf16_to_f(x[i]) * kgc::bf16_to_f(row[i]);
+    for (long long i = 0; i < n_in; ++i) acc += kgc::bf16_to_f(x[i]) * kgc::bf16_to_f(row[i]);   // rsum_succ, i = 0 .. n_in-1
     y[o] = acc;
 }
 

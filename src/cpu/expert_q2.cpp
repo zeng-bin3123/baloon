@@ -35,12 +35,45 @@ inline uint16_t load_u16(const uint8_t* p) { uint16_t v; std::memcpy(&v, p, 2); 
 [[maybe_unused]] inline float hsum_ps(__m512 v) { return _mm512_reduce_add_ps(v); }
 inline float silu_f(float v) { return v / (1.f + std::exp(-v)); }
 
+// Theory offset_identity: sum_j (c_j - 1) x_j = sum_j c_j x_j - sum_j x_j. Every row dot takes the code offset off ONCE
+// per 32-value chunk as the integer activation sum hx (= sum xq), never broadcast into the lanes.
+inline int32_t offset_dot(int32_t dot, int32_t chunk_sum) { return dot - chunk_sum; }
+// Theory offset_identity: sum_j (c_j - 1) x_j = sum_j c_j x_j - sum_j x_j. Every row dot takes the code offset off ONCE
+// per 32-value chunk as the integer activation sum hx (= sum xq), never broadcast into the lanes.
+inline int32_t offset_dot(int32_t dot, int32_t chunk_sum) { return dot - chunk_sum; }
 // Eight fp16 scales (nb <= 8 valid, others zero) as floats. The load is masked: a tail never reads past the row.
 inline __m256 scales8(const uint8_t* s, uint32_t nb) {
     const __mmask8 m = (__mmask8)(nb >= 8 ? 0xFFu : ((1u << nb) - 1u));
     return _mm256_cvtph_ps(_mm_maskz_loadu_epi16(m, s));
 }
 
+// Theory laneMask / laneMask_spec: the chunk lanes of a batch of nb blocks are enabled by 0xFFFF for a full batch, else
+// (1 << 2nb) - 1 - exactly the 2 nb chunk lanes, so a tail never reads scales or activation scales past the row.
+constexpr uint32_t lane_mask(uint32_t nb) { return nb >= 8 ? 0xFFFFu : (1u << (2 * nb)) - 1u; }
+constexpr bool lane_mask_spec() { for (uint32_t nb = 0; nb <= 8; ++nb) if (lane_mask(nb) != (uint32_t)((1ull << (2 * nb)) - 1)) return false; return true; }
+static_assert(lane_mask_spec(), "laneMask_spec");
+// d_w * d_x of the 16 chunk lanes of a batch (block k -> lanes 2k, 2k+1), masked with lane_mask(nb).
+inline void chunk_scales16(const uint8_t* s, const float* xd, uint32_t nb, float out[16]) {
+    const __mmask16 m = (__mmask16)lane_mask(nb);
+    const __m512i dup = _mm512_setr_epi32(0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7);
+    const __m512 wd = _mm512_permutexvar_ps(dup, _mm512_castps256_ps512(scales8(s, nb)));
+    _mm512_store_ps(out, _mm512_maskz_mul_ps(m, wd, _mm512_maskz_loadu_ps(m, xd)));
+}
+// Theory block_chunk_map: weight block b uses activation chunks 2b and 2b+1 at int8 offsets 64b and 64b + 32.
+constexpr size_t chunk_q_offset(uint32_t b, uint32_t h) { return (size_t)(2 * b + h) * QKA; }
+static_assert(chunk_q_offset(5, 0) == 64 * 5 && chunk_q_offset(5, 1) == 64 * 5 + 32 && chunk_q_offset(1, 0) == kZmm, "block_chunk_map");
+// Theory laneMask / laneMask_spec: the chunk lanes of a batch of nb blocks are enabled by 0xFFFF for a full batch, else
+// (1 << 2nb) - 1 - exactly the 2 nb chunk lanes, so a tail never reads scales or activation scales past the row.
+constexpr uint32_t lane_mask(uint32_t nb) { return nb >= 8 ? 0xFFFFu : (1u << (2 * nb)) - 1u; }
+constexpr bool lane_mask_spec() { for (uint32_t nb = 0; nb <= 8; ++nb) if (lane_mask(nb) != (uint32_t)((1ull << (2 * nb)) - 1)) return false; return true; }
+static_assert(lane_mask_spec(), "laneMask_spec");
+// d_w * d_x of the 16 chunk lanes of a batch (block k -> lanes 2k, 2k+1), masked with lane_mask(nb).
+inline void chunk_scales16(const uint8_t* s, const float* xd, uint32_t nb, float out[16]) {
+    const __mmask16 m = (__mmask16)lane_mask(nb);
+    const __m512i dup = _mm512_setr_epi32(0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7);
+    const __m512 wd = _mm512_permutexvar_ps(dup, _mm512_castps256_ps512(scales8(s, nb)));
+    _mm512_store_ps(out, _mm512_maskz_mul_ps(m, wd, _mm512_maskz_loadu_ps(m, xd)));
+}
 // Scalar unpack of one 16-byte block into 64 codes.
 inline void unpack_q2_0(const uint8_t* p16, uint8_t out[64]) {
     for (uint32_t j = 0; j < 64; ++j) out[j] = (uint8_t)((p16[j / 4] >> (2 * (j % 4))) & 3u);
@@ -72,8 +105,8 @@ inline float row_dot(const uint8_t* codes, const uint8_t* scales, uint32_t nb, c
         for (uint32_t h = 0; h < 2; ++h) {
             const uint32_t ch = 2 * b + h;
             int32_t s = 0;
-            for (uint32_t i = 0; i < 32; ++i) s += (int32_t)c[h * 32 + i] * (int32_t)q[(size_t)ch * 32 + i];
-            acc = fma_acc(wd * xd[ch], (float)(s - hx[ch]), acc);
+            for (uint32_t i = 0; i < 32; ++i) s += (int32_t)c[h * 32 + i] * (int32_t)q[chunk_q_offset(b, h) + i];
+            acc = fma_acc(wd * xd[ch], (float)offset_dot(s, hx[ch]), acc);
         }
     }
     return acc;
@@ -180,8 +213,8 @@ inline const uint8_t* dn_scales(const uint8_t* blob, uint32_t r) { return blob +
 void gu_rows_multi(const uint8_t* blob, const ActQ* xq, uint32_t nt, uint32_t r0, uint32_t r1, float (*act)[FF]) {
     for (uint32_t r = r0; r < r1; ++r) {
         float g[MAXT], u[MAXT];
-        rdm(gu_codes(blob, 2 * r), gu_scales(blob, 2 * r), SC_GU, nt, xq, g);
-        rdm(gu_codes(blob, 2 * r + 1), gu_scales(blob, 2 * r + 1), SC_GU, nt, xq, u);
+        rdm(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, nt, xq, g);
+        rdm(gu_codes(blob, up_slot(r)), gu_scales(blob, up_slot(r)), SC_GU, nt, xq, u);
         for (uint32_t t = 0; t < nt; ++t) act[t][r] = silu_f(g[t]) * u[t];
     }
 }
@@ -406,10 +439,10 @@ void s2_expert_scalar(const uint8_t* blob, const float* x, float* out) {
     float act[FF];
     act_quant_q8_1(x, H, xq.q, xq.d, xq.hx);
     for (uint32_t r = 0; r < FF; ++r) {
-        const float g = oracle_on() ? row_dot_oracle(gu_codes(blob, 2 * r), gu_scales(blob, 2 * r), SC_GU, xq.q, xq.d, xq.hx)
-                                    : row_dot(gu_codes(blob, 2 * r), gu_scales(blob, 2 * r), SC_GU, xq.q, xq.d, xq.hx);
-        const float u = oracle_on() ? row_dot_oracle(gu_codes(blob, 2 * r + 1), gu_scales(blob, 2 * r + 1), SC_GU, xq.q, xq.d, xq.hx)
-                                    : row_dot(gu_codes(blob, 2 * r + 1), gu_scales(blob, 2 * r + 1), SC_GU, xq.q, xq.d, xq.hx);
+        const float g = oracle_on() ? row_dot_oracle(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, xq.q, xq.d, xq.hx)
+                                    : row_dot(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, xq.q, xq.d, xq.hx);
+        const float u = oracle_on() ? row_dot_oracle(gu_codes(blob, up_slot(r)), gu_scales(blob, up_slot(r)), SC_GU, xq.q, xq.d, xq.hx)
+                                    : row_dot(gu_codes(blob, up_slot(r)), gu_scales(blob, up_slot(r)), SC_GU, xq.q, xq.d, xq.hx);
         act[r] = silu_f(g) * u;
     }
     act_quant_q8_1(act, FF, aq.q, aq.d, aq.hx);
@@ -420,8 +453,8 @@ void s2_expert_scalar(const uint8_t* blob, const float* x, float* out) {
 
 void s2_expert_gu_rows(const uint8_t* blob, const ActQ& xq, uint32_t r0, uint32_t r1, float* act) {
     for (uint32_t r = r0; r < r1; ++r) {
-        const float g = rd(gu_codes(blob, 2 * r), gu_scales(blob, 2 * r), SC_GU, xq);
-        const float u = rd(gu_codes(blob, 2 * r + 1), gu_scales(blob, 2 * r + 1), SC_GU, xq);
+        const float g = rd(gu_codes(blob, gate_slot(r)), gu_scales(blob, gate_slot(r)), SC_GU, xq);
+        const float u = rd(gu_codes(blob, up_slot(r)), gu_scales(blob, up_slot(r)), SC_GU, xq);
         act[r] = silu_f(g) * u;
     }
 }
