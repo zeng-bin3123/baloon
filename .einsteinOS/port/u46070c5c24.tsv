@@ -1,0 +1,5 @@
+src/kernels/cuda/native_bf16.cu	REF_MMVF_CASE	src/kernels/gpu/bf16_native.cu	REF_MMVF_CASE
+src/kernels/cuda/native_bf16.cu	bf16_f32_mmvf_kernel	src/kernels/gpu/bf16_native.cu	bf16_f32_mmvf_kernel
+src/kernels/cuda/native_bf16.cu	bf16_gemv_fp32_mmvf	src/kernels/gpu/bf16_native.cu	bf16_gemv_fp32_mmvf
+src/kernels/cuda/native_bf16.cu	mmvf_block_size	src/kernels/gpu/bf16_native.cu	mmvf_block_size
+src/kernels/cuda/native_bf16.cu	mmvf_warp_sum	src/kernels/gpu/bf16_native.cu	mmvf_warp_sum

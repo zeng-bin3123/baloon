@@ -57,7 +57,7 @@ mutant posCheck      $FS "a.pos != a.width - 1 ||" "false ||"
 mutant waveMaxLanes  $FS "for (int o = 32; o > 0; o >>= 1) v = fmaxf(v, __shfl_xor(v, o, 64));" "for (int o = 16; o > 0; o >>= 1) v = fmaxf(v, __shfl_xor(v, o, 64));"
 mutant waveSumInit   $FS "float v = mode == 0 ? -INFINITY : 0.f;" "float v = mode == 0 ? -INFINITY : 1.f;"
 mutant flashScale    src/native_flash_attn.cu "* 0.0625f;" "* 0.125f;"
-mutant mmvfStride    src/kernels/gpu/bf16_native.cu "c < cols; c += BS)" "c < cols; c += 64)"
+mutant mmvfStride    src/kernels/gpu/bf16_native.cu "p < n_pairs; p += BS)" "p < n_pairs; p += 64)"
 mutant mmvfReduce    src/kernels/gpu/bf16_native.cu "k < BS / 64; ++k) t += sh[k];" "k < 1; ++k) t += sh[k];"
 
 [ "$rc" = 0 ] && echo "ALL TESTS PASSED" || echo "TESTS FAILED"

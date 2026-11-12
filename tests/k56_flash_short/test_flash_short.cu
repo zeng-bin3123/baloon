@@ -6,6 +6,7 @@
 #include <cstring>
 #include <cstdio>
 #include <random>
+#include <stdexcept>
 #include <vector>
 #include "baloon/decode_attn_kernels.hpp"
 #include "baloon/kg_kernels.hpp"
@@ -115,7 +116,8 @@ int main() {
         ok(worst < 1e-3, "mmvf equals host dot product");
         cudaFree(dw); cudaFree(dx); cudaFree(dy);
     }
-    ok(baloon::kg::bf16_gemv_fp32_mmvf(nullptr, nullptr, nullptr, 1, 1, nullptr) == cudaErrorInvalidValue, "mmvf rejects null");
+    { bool threw = false; try { baloon::kg::bf16_gemv_fp32_mmvf(nullptr, nullptr, nullptr, 1, 2, nullptr); } catch (const std::invalid_argument&) { threw = true; }
+      ok(threw, "mmvf rejects null"); }
     std::printf("%d checks, %d failed\n", g_checks, g_fail);
     if (g_fail) return 1;
     std::printf("UNIT p67ab651d04 TESTS PASSED\n");
