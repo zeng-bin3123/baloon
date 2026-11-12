@@ -98,8 +98,49 @@ def load_state():
     return json.load(open(STATE)) if os.path.exists(STATE) else {"files": {}}
 
 
+def cmd_scan_local():
+    """Step 2, local: take each commit's file list from a git clone instead of one API call per commit.
+
+    GitHub's /commits/{sha} "files" is the diff against the first parent, which is exactly
+    `git log --diff-merges=first-parent --name-only`. One git walk covers every commit in under a
+    second, where the API path costs 1 request each (6315 commits > the 5000/hour limit, which is why
+    the state was stuck at 260). Every commit the API had already scanned is re-derived here and
+    compared; a single mismatch aborts rather than overwriting measured evidence with a guess.
+    """
+    import subprocess
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import strata_repo
+    p = strata_repo.ensure()
+    out = subprocess.run(["git", "log", "--diff-merges=first-parent", "--name-only",
+                          "--format=%x00%H", "--all"], cwd=p,
+                         capture_output=True, text=True, errors="replace").stdout
+    got = {}
+    for blk in out.split("\x00"):
+        if not blk.strip():
+            continue
+        sha, _, rest = blk.partition("\n")
+        got[sha.strip()] = [l for l in rest.split("\n") if l.strip()]
+    st = load_state()
+    ok = bad = 0
+    for sha, files in st["files"].items():          # verify the local walk against API-scanned truth
+        if sha in got:
+            ok, bad = (ok + 1, bad) if sorted(files) == sorted(got[sha]) else (ok, bad + 1)
+            if sorted(files) != sorted(got[sha]):
+                print(f"MISMATCH {sha}: api={len(files)} git={len(got[sha])} files", file=sys.stderr)
+    if bad:
+        raise SystemExit(f"local walk disagrees with {bad} API-scanned commits; state left untouched")
+    print(f"clone {p}: {len(got)} commits walked; agrees with all {ok} API-scanned commits")
+    log = {r[0] for r in read_log()}
+    before = len(st["files"])
+    st["files"].update({sha: f for sha, f in got.items() if sha in log})
+    json.dump(st, open(STATE, "w"), separators=(",", ":"))
+    print(f"scanned {len(st['files'])}/{len(log)} (was {before})")
+
+
 def cmd_scan():
     """Step 2: slowly fetch file lists for commits not yet scanned; safe to stop and rerun."""
+    if "--local" in sys.argv:
+        return cmd_scan_local()
     st, batch = load_state(), int(arg("--batch", "200"))
     todo = [r for r in read_log() if r[0] not in st["files"]]
     print(f"to scan: {len(todo)}, this run: {min(batch, len(todo))}")
