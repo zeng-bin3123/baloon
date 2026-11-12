@@ -1,0 +1,13 @@
+[ ok ] cursor: need fails iff pos+n>size, reads stay in bounds, sequences add up: 327957 checks
+[ ok ] arrays: count > 2^24 refused, count <= 2^24 accepted by the guard: 16 checks
+[ ok ] arrays: min(count, 64) items kept, every element still consumed: 649 checks
+[ ok ] arrays: nesting depth > 2 fails: 27 checks
+[ ok ] signed metadata: sign-extended into uint64, recovered exactly: 48229 checks
+[ ok ] bool metadata: any non-zero byte reads as 1: 771 checks
+[ ok ] data section: data_start = ceil(pos/align)*align, aligned, >= header end, < end+align: 721403 checks
+[ ok ] alignment: general.alignment absent or 0 -> 32, otherwise its value: 1267 checks
+[ ok ] block geometry: the theory table, Q2_0 = (64,18), bytes = header fields + payload: 4313 checks
+[ ok ] check_architecture: "" iff qwen4exp + six exact keys, else the first failure: 2942 checks
+[ ok ] Qwen4ExpGuard: defaults = guardDefaults, accepts exactly what check_architecture accepts: 5839 checks
+u3e84b3357d host: 11 sections, 1113413 checks, 0 failures
+U3E84B3357D HOST TESTS PASSED

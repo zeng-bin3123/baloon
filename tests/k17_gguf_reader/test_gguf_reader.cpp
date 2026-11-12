@@ -75,7 +75,7 @@ int main() {
     { Bytes b; put(b, 0xFF, 1); Cursor c(b.data(), b.size()); auto v = read_value(c, MetaType::I8); CHECK(v.i == -1 && c.ok); }
     { Bytes b; put(b, 0x8000, 2); Cursor c(b.data(), b.size()); auto v = read_value(c, MetaType::I16); CHECK(v.i == -32768); }
     { Bytes b; put(b, 0xFFFFFFFFull, 4); Cursor c(b.data(), b.size()); auto v = read_value(c, MetaType::U32); CHECK(v.u == 0xFFFFFFFFull && v.i == 0xFFFFFFFFll); }
-    { Bytes b; put(b, 2, 1); Cursor c(b.data(), b.size()); (void)read_value(c, MetaType::Bool); CHECK(!c.ok); }
+    { Bytes b; put(b, 2, 1); Cursor c(b.data(), b.size()); auto v = read_value(c, MetaType::Bool); CHECK(c.ok && v.b && v.u == 1); }  // non-zero normalises to 1
     { Bytes b; put(b, 0x3ff8000000000000ull, 8); Cursor c(b.data(), b.size()); auto v = read_value(c, MetaType::F64); CHECK(v.f == 1.5); }
     { Bytes b; put(b, 5, 4); put(b, 1ull << 40, 8); Cursor c(b.data(), b.size()); (void)read_value(c, MetaType::Array); CHECK(!c.ok); }
 

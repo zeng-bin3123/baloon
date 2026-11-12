@@ -293,7 +293,7 @@ static void test_gguf() {
     { Bytes b; put(b, 200, 8); for (int i = 0; i < 200; ++i) put(b, (uint64_t)i, 1);
       Bytes arr; put(arr, 0 /*U8*/, 4); put(arr, 200, 8); for (int i = 0; i < 200; ++i) put(arr, (uint64_t)i, 1);
       Cursor c(arr.data(), arr.size()); MetaValue v = read_value(c, MetaType::Array);
-      CHECK(c.ok && v.arr.size() == 200 && v.sample_count() == 64);
+      CHECK(c.ok && v.count == 200 && v.arr.size() == 64 && v.sample_count() == 64 && c.pos == arr.size());
       Bytes huge; put(huge, 0, 4); put(huge, (1ull << 24) + 1, 8);
       Cursor c3(huge.data(), huge.size()); (void)read_value(c3, MetaType::Array); CHECK(!c3.ok); }
     // magic

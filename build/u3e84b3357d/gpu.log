@@ -1,0 +1,6 @@
+[ ok ] device 0: geometry/rowBytes/alignUp on device, tensor addressing in a device image
+[ ok ] device 1: geometry/rowBytes/alignUp on device, tensor addressing in a device image
+[ ok ] device 2: geometry/rowBytes/alignUp on device, tensor addressing in a device image
+[ ok ] device 3: geometry/rowBytes/alignUp on device, tensor addressing in a device image
+u3e84b3357d gpu: 4 device(s), 13520 checks, 0 failures
+U3E84B3357D GPU TESTS PASSED

@@ -93,8 +93,8 @@ inline std::string render(const MetaValue& v) {
             std::string o = "[";
             const size_t shown = v.arr.size() < 8 ? v.arr.size() : 8;
             for (size_t i = 0; i < shown; ++i) { if (i) o += ", "; o += render(v.arr[i]); }
-            if (v.arr.size() > shown) o += ", ...";
-            std::snprintf(b, sizeof b, "] (%zu elements of %s)", v.arr.size(), meta_type_name(v.elem));
+            if (v.count > shown) o += ", ...";
+            std::snprintf(b, sizeof b, "] (%llu elements of %s)", (unsigned long long)v.count, meta_type_name(v.elem));
             return o + b;
         }
     }

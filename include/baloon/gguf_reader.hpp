@@ -14,8 +14,18 @@
 #include <string>
 #include <vector>
 
+#if defined(__CUDACC__) || defined(__CUDA__)
+#define BALOON_GGUF_HD __host__ __device__
+#else
+#define BALOON_GGUF_HD
+#endif
+
 namespace baloon {
 namespace gguf_reader {
+
+// Theory alignUp: ceil(pos / align) * align. For align > 0 the result is a multiple of align, >= pos and
+// < pos + align (alignUp_spec). Usable on the device so kernels stride the data section the same way.
+BALOON_GGUF_HD inline uint64_t align_up(uint64_t pos, uint64_t align) { return (pos + align - 1) / align * align; }
 
 constexpr uint32_t kMagic = 0x46554747u;  // "GGUF" little-endian
 constexpr uint32_t kDefaultAlignment = 32;
@@ -41,7 +51,10 @@ struct Cursor {
     const uint8_t* p = nullptr; uint64_t n = 0; uint64_t pos = 0; bool ok = true;
     Cursor() = default;
     Cursor(const uint8_t* data, uint64_t size) : p(data), n(size) {}
+    // need(k) fails iff pos + k > n (written overflow-free); a failure is sticky and never moves pos.
     bool need(uint64_t k) { if (!ok || pos > n || n - pos < k) { ok = false; return false; } return true; }
+    // Theory Cursor.read: need(k) then advance by exactly k. On success pos <= n still holds.
+    bool read(uint64_t k) { if (!need(k)) return false; pos += k; return true; }
     uint64_t uint_le(unsigned bytes) {
         if (!need(bytes)) return 0;
         uint64_t v = 0;
@@ -60,6 +73,8 @@ struct Cursor {
 };
 
 constexpr uint64_t kMaxArrayElems = 1ull << 24;   // array length cap (16,777,216)
+// Theory arrayLenOk: an array header is accepted iff its count is at most 2^24.
+inline bool array_len_ok(uint64_t count) { return count <= kMaxArrayElems; }
 constexpr uint64_t kArraySample = 64;             // items a summary of an array shows
 inline uint64_t array_sample_count(uint64_t count) { return count < kArraySample ? count : kArraySample; }
 
@@ -69,8 +84,9 @@ struct MetaValue {
     uint64_t u = 0; int64_t i = 0; double f = 0; bool b = false;
     std::string s;
     MetaType elem = MetaType::U8;          // array element type
-    std::vector<MetaValue> arr;            // array elements (kept for all element types)
-    uint64_t sample_count() const { return array_sample_count(arr.size()); }   // at most 64
+    uint64_t count = 0;                    // array length as stored in the file (every element is consumed)
+    std::vector<MetaValue> arr;            // theory keptItems: only the first min(count, 64) elements are kept
+    uint64_t sample_count() const { return array_sample_count(count); }   // == arr.size(), at most 64
     bool is_integer() const {
         switch (type) { case MetaType::U8: case MetaType::I8: case MetaType::U16: case MetaType::I16:
                         case MetaType::U32: case MetaType::I32: case MetaType::U64: case MetaType::I64: return true;
@@ -78,7 +94,19 @@ struct MetaValue {
     }
 };
 
-constexpr int kMaxNesting = 4;
+// Array nesting: the top-level value is depth 0; an array read at depth > 2 is refused.
+constexpr int kMaxNesting = 2;
+
+// Theory signExtend64: an nb-byte two's-complement field widened to int64. MetaValue stores it in u as
+// (uint64_t)i, i.e. modulo 2^64, and (int64_t)u recovers i exactly (signExtend_roundtrip).
+inline int64_t sign_extend(uint64_t raw, unsigned nb) {
+    if (nb >= 8) return (int64_t)raw;
+    const uint64_t sign = 1ull << (8 * nb - 1);
+    return (int64_t)(((raw & ((sign << 1) - 1)) ^ sign) - sign);
+}
+
+// Theory readBool: booleans are normalised, any non-zero byte reads as true (stored as 1).
+inline bool read_bool(uint8_t byte) { return byte != 0; }
 
 // Decode one value of type `t` from the cursor. On malformed data c.ok becomes false.
 inline MetaValue read_value(Cursor& c, MetaType t, int depth = 0) {
@@ -89,23 +117,26 @@ inline MetaValue read_value(Cursor& c, MetaType t, int depth = 0) {
         case MetaType::I8: case MetaType::I16: case MetaType::I32: case MetaType::I64: {
             const unsigned nb = (unsigned)scalar_size(t);
             const uint64_t raw = c.uint_le(nb);
-            const uint64_t sign = 1ull << (8 * nb - 1);
-            v.i = (nb == 8) ? (int64_t)raw : (int64_t)((raw ^ sign) - sign);  // sign extend
+            v.i = sign_extend(raw, nb);
             v.u = (uint64_t)v.i; v.f = (double)v.i; break;
         }
         case MetaType::F32: { const uint32_t r = c.u32(); float x; std::memcpy(&x, &r, 4); v.f = x; break; }
         case MetaType::F64: { const uint64_t r = c.u64(); double x; std::memcpy(&x, &r, 8); v.f = x; break; }
-        case MetaType::Bool: { const uint8_t r = c.u8(); if (r > 1) c.ok = false; v.b = r == 1; v.u = r; break; }
+        case MetaType::Bool: { const uint8_t r = c.u8(); v.b = read_bool(r); v.u = v.b ? 1 : 0; break; }
         case MetaType::String: v.s = c.str(); break;
         case MetaType::Array: {
-            if (depth >= kMaxNesting) { c.ok = false; break; }
+            if (depth > kMaxNesting) { c.ok = false; break; }
             const uint32_t et = c.u32(); const uint64_t cnt = c.u64();
             if (!c.ok || et > 12) { c.ok = false; break; }
             v.elem = (MetaType)et;
             const uint64_t sz = scalar_size(v.elem);
-            if (cnt > kMaxArrayElems || (sz && cnt > c.n / sz)) { c.ok = false; break; }
-            v.arr.reserve((size_t)cnt);
-            for (uint64_t k = 0; k < cnt && c.ok; ++k) v.arr.push_back(read_value(c, v.elem, depth + 1));
+            if (!array_len_ok(cnt) || (sz && cnt > c.n / sz)) { c.ok = false; break; }
+            v.count = cnt;
+            v.arr.reserve((size_t)array_sample_count(cnt));
+            for (uint64_t k = 0; k < cnt && c.ok; ++k) {
+                MetaValue e = read_value(c, v.elem, depth + 1);   // every element is decoded (and bounds-checked)
+                if (k < kArraySample) v.arr.push_back(std::move(e));
+            }
             break;
         }
         default: c.ok = false; break;
@@ -113,10 +144,16 @@ inline MetaValue read_value(Cursor& c, MetaType t, int depth = 0) {
     return v;
 }
 
+// Theory effectiveAlign: general.alignment if present and non-zero, otherwise the default 32. Never zero, so
+// align_up is always well defined (effectiveAlign_pos).
+inline uint32_t effective_alignment(std::optional<uint64_t> key) {
+    return key && *key != 0 ? (uint32_t)*key : kDefaultAlignment;
+}
+
 // ---- tensor types -------------------------------------------------------------------------------------
 struct BlockGeometry { uint64_t el = 0, by = 0; };  // el == 0 means unknown type
 
-inline BlockGeometry block_geometry(uint32_t type) {
+BALOON_GGUF_HD inline BlockGeometry block_geometry(uint32_t type) {
     switch (type) {
         case 0: return {1, 4};      case 1: return {1, 2};     case 30: return {1, 2};
         case 2: return {32, 18};    case 3: return {32, 20};   case 6: return {32, 22};
@@ -130,6 +167,9 @@ inline BlockGeometry block_geometry(uint32_t type) {
         default: return {0, 0};
     }
 }
+
+// Theory rowBytes: bytes of n elements stored as whole blocks of (el elements, by bytes).
+BALOON_GGUF_HD inline uint64_t row_bytes(uint64_t el, uint64_t by, uint64_t n) { return n / el * by; }
 
 inline const char* ggml_type_name(uint32_t type) {
     switch (type) {
@@ -151,7 +191,7 @@ struct TensorInfo {
     uint32_t type = 0;
     uint64_t offset = 0;          // relative to the data section
     uint64_t elements() const { uint64_t n = 1; for (auto d : shape) n *= d; return n; }
-    uint64_t nbytes() const { auto g = block_geometry(type); return g.el ? elements() / g.el * g.by : 0; }
+    uint64_t nbytes() const { auto g = block_geometry(type); return g.el ? row_bytes(g.el, g.by, elements()) : 0; }
 };
 
 // ---- the file ---------------------------------------------------------------------------------------------
@@ -191,10 +231,12 @@ struct GgufFile {
             f.meta_order.push_back(key);
             f.meta.emplace(std::move(key), std::move(v));
         }
-        if (auto a = f.find_meta("general.alignment")) {
-            if (a->type != MetaType::U32 || a->u == 0 || (a->u & (a->u - 1))) return std::nullopt;  // power of two
-            f.alignment = (uint32_t)a->u;
+        std::optional<uint64_t> align_key;
+        if (f.find_meta("general.alignment")) {
+            align_key = f.get_uint("general.alignment");               // any non-negative integer type
+            if (!align_key || *align_key > 0xFFFFFFFFull) return std::nullopt;   // a non-integer alignment is malformed
         }
+        f.alignment = effective_alignment(align_key);
         for (uint64_t i = 0; i < nt; ++i) {
             TensorInfo ti; ti.name = c.str();
             const uint32_t nd = c.u32();
@@ -205,7 +247,7 @@ struct GgufFile {
             f.tensors.push_back(std::move(ti));
         }
         const uint64_t a = f.alignment;
-        f.data_start = (c.pos + a - 1) / a * a;
+        f.data_start = align_up(c.pos, a);   // data_start = ceil(header_end / align) * align
         if (f.data_start > size) return std::nullopt;
         for (auto& t : f.tensors) {
             const auto g = block_geometry(t.type);
@@ -224,28 +266,31 @@ inline bool check_architecture(const GgufFile& f, const std::string& expected) {
     return a && *a == expected;
 }
 
-// Architecture guard constants of the qwen4exp layout (theory: arch_guard_consistent).
-// Theory form of the qwen4exp guard: "" iff general.architecture is "qwen4exp" and the six required keys are present
-// with exactly the compiled-in values; otherwise the FIRST failure, checked in this fixed order (architecture first,
-// then block_count, embedding_length, expert_count, expert_used_count, attention.head_count, attention.head_count_kv).
-// A failing key is reported by its full metadata name.
+// Architecture guard constants of the qwen4exp layout (theory: guardDefaults).
+constexpr uint64_t kGuardExperts = 512, kGuardTopK = 10, kGuardHeads = 24, kGuardKvHeads = 2, kGuardLayers = 48, kGuardHidden = 2560;
+constexpr const char* kGuardArch = "qwen4exp";
+static_assert(kGuardTopK <= kGuardExperts && kGuardHeads % kGuardKvHeads == 0 && kGuardHeads / kGuardKvHeads == 12 &&
+              kGuardLayers > 0, "guard constants must be mutually consistent");
+
+// Theory guardDefaults: the six required keys, in checking order, with their compiled-in values.
+struct GuardReq { const char* key; uint64_t want; };
+constexpr GuardReq kGuardDefaults[6] = {
+    {"qwen4exp.block_count", kGuardLayers},          {"qwen4exp.embedding_length", kGuardHidden},
+    {"qwen4exp.expert_count", kGuardExperts},        {"qwen4exp.expert_used_count", kGuardTopK},
+    {"qwen4exp.attention.head_count", kGuardHeads},  {"qwen4exp.attention.head_count_kv", kGuardKvHeads}};
+
+// Theory checkReqs + checkArchitecture: "" iff general.architecture is "qwen4exp" and every kGuardDefaults key is
+// present with exactly its value; otherwise the name of the FIRST failure ("general.architecture" or the key).
 inline std::string check_architecture(const GgufFile& f) {
-    static const struct { const char* key; uint64_t want; } kReqs[] = {
-        {"qwen4exp.block_count", 48}, {"qwen4exp.embedding_length", 2560}, {"qwen4exp.expert_count", 512},
-        {"qwen4exp.expert_used_count", 10}, {"qwen4exp.attention.head_count", 24}, {"qwen4exp.attention.head_count_kv", 2}};
     const auto arch = f.get_string("general.architecture");
-    if (!arch || *arch != "qwen4exp") return "general.architecture";
-    for (const auto& r : kReqs) {
+    if (!arch || *arch != kGuardArch) return "general.architecture";
+    for (const GuardReq& r : kGuardDefaults) {
         const auto v = f.get_uint(r.key);
         if (!v || *v != r.want) return r.key;
     }
     return "";
 }
 
-constexpr uint64_t kGuardExperts = 512, kGuardTopK = 10, kGuardHeads = 24, kGuardKvHeads = 2, kGuardLayers = 48, kGuardHidden = 2560;
-constexpr const char* kGuardArch = "qwen4exp";
-static_assert(kGuardTopK <= kGuardExperts && kGuardHeads % kGuardKvHeads == 0 && kGuardHeads / kGuardKvHeads == 12 &&
-              kGuardLayers > 0, "guard constants must be mutually consistent");
 
 // Guard for the qwen4exp layout: general.architecture must be exactly "qwen4exp" (no other "qwen*" string passes)
 // and the "qwen4exp.*" keys must carry exactly the six guard constants: expert_count 512, expert_used_count 10,
@@ -286,6 +331,12 @@ struct Qwen4ExpGuard {
         return true;
     }
 };
+
+// Theory: Qwen4ExpGuard's defaults are exactly guardDefaults, so the default guard and check_architecture agree.
+static_assert(Qwen4ExpGuard{}.expected_layers == kGuardDefaults[0].want && Qwen4ExpGuard{}.expected_hidden == kGuardDefaults[1].want &&
+              Qwen4ExpGuard{}.expected_experts == kGuardDefaults[2].want && Qwen4ExpGuard{}.expected_used == kGuardDefaults[3].want &&
+              Qwen4ExpGuard{}.expected_heads == kGuardDefaults[4].want && Qwen4ExpGuard{}.expected_kv_heads == kGuardDefaults[5].want,
+              "Qwen4ExpGuard defaults must equal kGuardDefaults");
 
 }  // namespace gguf_reader
 }  // namespace baloon
