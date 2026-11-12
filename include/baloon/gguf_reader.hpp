@@ -162,7 +162,7 @@ inline uint32_t effective_alignment(std::optional<uint64_t> key) {
 // ---- tensor types -------------------------------------------------------------------------------------
 struct BlockGeometry { uint64_t el = 0, by = 0; };  // el == 0 means unknown type
 
-BALOON_GGUF_HD inline BlockGeometry block_geometry(uint32_t type) {
+BALOON_GGUF_HD constexpr BlockGeometry block_geometry(uint32_t type) {
     switch (type) {
         case 0: return {1, 4};      case 1: return {1, 2};     case 30: return {1, 2};
         case 2: return {32, 18};    case 3: return {32, 20};   case 6: return {32, 22};
@@ -176,6 +176,42 @@ BALOON_GGUF_HD inline BlockGeometry block_geometry(uint32_t type) {
         default: return {0, 0};
     }
 }
+
+// Theory: every listed quantized type's block bytes = its header fields + its packed payload. The layouts below are
+// the per-block fields the dequantizers read (d/m are fp16 = 2 bytes; QK = elements per block); the table above
+// must match them, checked at compile time.
+constexpr uint64_t block_layout_bytes(uint32_t type) {
+    switch (type) {
+        case 2:  return 2 + 32 / 2;                        // Q4_0:  d, qs[QK/2]
+        case 3:  return 2 + 2 + 32 / 2;                    // Q4_1:  d, m, qs[QK/2]
+        case 6:  return 2 + 4 + 32 / 2;                    // Q5_0:  d, qh[4], qs[QK/2]
+        case 7:  return 2 + 2 + 4 + 32 / 2;                // Q5_1:  d, m, qh[4], qs[QK/2]
+        case 8:  return 2 + 32;                            // Q8_0:  d, qs[QK]
+        case 9:  return 2 + 2 + 32;                        // Q8_1:  d, s, qs[QK]
+        case 10: return 256 / 16 + 256 / 4 + 2 + 2;        // Q2_K:  scales[16], qs[64], d, dmin
+        case 11: return 256 / 8 + 256 / 4 + 12 + 2;        // Q3_K:  hmask[32], qs[64], scales[12], d
+        case 12: return 2 + 2 + 12 + 256 / 2;              // Q4_K:  d, dmin, scales[12], qs[128]
+        case 13: return 2 + 2 + 12 + 256 / 8 + 256 / 2;    // Q5_K:  d, dmin, scales[12], qh[32], qs[128]
+        case 14: return 256 / 2 + 256 / 4 + 256 / 16 + 2;  // Q6_K:  ql[128], qh[64], scales[16], d
+        case 16: return 2 + 256 / 4;                       // IQ2_XXS: d, qs[64]
+        case 17: return 2 + 256 / 4 + 256 / 32;            // IQ2_XS:  d, qs[64], scales[8]
+        case 18: return 2 + 3 * 256 / 8;                   // IQ3_XXS: d, qs[96]
+        case 20: return 2 + 32 / 2;                        // IQ4_NL:  d, qs[QK/2]
+        case 21: return 2 + 256 / 4 + 256 / 32 + 256 / 8 + 256 / 64;   // IQ3_S: d, qs[64], qh[8], signs[32], scales[4]
+        case 22: return 2 + 256 / 4 + 256 / 32 + 256 / 32; // IQ2_S:   d, qs[64], qh[8], scales[8]
+        case 23: return 2 + 2 + 256 / 64 + 256 / 2;        // IQ4_XS:  d, scales_h, scales_l[4], qs[128]
+        case 29: return 256 / 8 + 256 / 16 + 256 / 32;     // IQ1_M:   qs[32], qh[16], scales[8]
+        case 42: return 2 + 64 * 2 / 8;                    // Q2_0:    d, 64 two-bit codes
+        default: return 0;                                 // not a quantized type
+    }
+}
+constexpr bool geometry_matches_layouts() {
+    for (uint32_t t : {2u, 3u, 6u, 7u, 8u, 9u, 10u, 11u, 12u, 13u, 14u, 16u, 17u, 18u, 20u, 21u, 22u, 23u, 29u, 42u})
+        if (block_geometry(t).el == 0 || block_geometry(t).by != block_layout_bytes(t)) return false;
+    return true;
+}
+static_assert(geometry_matches_layouts(), "block_geometry bytes must equal header fields + packed payload");
+static_assert(block_geometry(42).el == 64 && block_geometry(42).by == 18, "Q2_0 = (64, 18)");
 
 // Theory rowBytes: bytes of n elements stored as whole blocks of (el elements, by bytes).
 BALOON_GGUF_HD inline uint64_t row_bytes(uint64_t el, uint64_t by, uint64_t n) { return n / el * by; }

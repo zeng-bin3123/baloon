@@ -276,6 +276,10 @@ U3E_SECTION(sec_block_geometry, "block geometry: the theory table, Q2_0 = (64,18
     CHECK(block_geometry(20).by == 2 + 16 && block_geometry(11).by == 32 + 64 + 12 + 2 && block_geometry(12).by == 2 + 2 + 12 + 128);
     CHECK(block_geometry(13).by == 2 + 2 + 12 + 32 + 128 && block_geometry(14).by == 128 + 64 + 16 + 2);
     CHECK(block_geometry(23).by == 2 + 2 + 4 + 128);
+    // the code's own layout table: every listed quantized type is header fields + packed payload
+    CHECK(geometry_matches_layouts());
+    for (auto& r : tab) if (block_layout_bytes(r.t)) CHECK(block_layout_bytes(r.t) == r.by);
+    for (uint32_t t : {0u, 1u, 30u}) CHECK(block_layout_bytes(t) == 0);  // F32/F16/BF16 are not block-quantized
     // the i-quant strides
     CHECK(block_geometry(16).by == 66 && block_geometry(17).by == 74 && block_geometry(18).by == 98 &&
           block_geometry(21).by == 110 && block_geometry(22).by == 82);
