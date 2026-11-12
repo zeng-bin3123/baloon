@@ -22,6 +22,11 @@ DIR="$(realpath -m "${1:-$PWD/baloon}")"
 PUB="https://github.com/$REPO.git"
 URL="$PUB"; [ -n "${GH_TOKEN:-}" ] && URL="https://x-access-token:$GH_TOKEN@github.com/$REPO.git"
 
+# Every run is also appended to <dir>.bootstrap.log (beside the trees, so neither gets dirty): a mirrored call that
+# comes back "exit=0" with empty output can be read back with tools/status.sh or `tail <dir>.bootstrap.log`.
+LOG="$DIR.bootstrap.log"
+mkdir -p "$(dirname "$DIR")" && exec > >(tee -a "$LOG") 2>&1
+echo "=== bootstrap $(date -u +%Y-%m-%dT%H:%M:%SZ) host=$(hostname) dir=$DIR"
 say() { echo "[bootstrap] $*"; }
 clone() {
   git clone -q -b "$BRANCH" "$URL" "$DIR" || { say "FAIL: clone of $REPO@$BRANCH into $DIR"; exit 1; }
