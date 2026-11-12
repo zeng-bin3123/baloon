@@ -62,9 +62,8 @@ def cost(r):
     return max(0, c - 4 if r["wave64"] else c)
 
 
-def main():
-    strata = strata_repo.ensure()
-    out = sys.argv[sys.argv.index("-o") + 1] if "-o" in sys.argv else os.path.join(ROOT, "STRATA_FEATURE_TABLE_GEN.md")
+def measure(strata):
+    """Every row of the table, measured at the Strata clone's HEAD, in table order; plus (head, total)."""
     _, head = ref_check.git(strata, "log", "-1", "--format=%h %ad", "--date=short")
     _, total = ref_check.git(strata, "rev-list", "--count", "HEAD")
 
@@ -93,6 +92,13 @@ def main():
             r["cost"] = cost(r)
             rows.append(r)
     rows.sort(key=lambda r: (r["port"] == "-", r["kind"] != "kernel", r["cost"], -r["commits"], r["rel"]))
+    return rows, head, total
+
+
+def main():
+    strata = strata_repo.ensure()
+    out = sys.argv[sys.argv.index("-o") + 1] if "-o" in sys.argv else os.path.join(ROOT, "STRATA_FEATURE_TABLE_GEN.md")
+    rows, head, total = measure(strata)
 
     hdr = ("| # | path | group | kind | commits | first | last | loc | `__global__` | wave64 | w32 sync | lane32 | "
            "warpSize | tc | dynsmem | tfs | ipc | fp64 | port cost | baloon port |")
