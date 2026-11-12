@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 601,
     "started": "2026-11-12T15:17:12.363091105Z",
-    "renewed": "2026-11-12T21:38:38.511276126Z"
+    "renewed": "2026-11-12T21:52:18.459774696Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -596,7 +596,8 @@
       "modules": [
         "Bf16MmvfBlockSelect.lean"
       ],
-      "reason": "3 fix attempts used"
+      "reason": "3 fix attempts used",
+      "conv": "774ca0b2-8d5d-4c28-9e09-08b9b492201e"
     },
     {
       "id": "u00b8180aa2",
@@ -719,6 +720,12 @@
   },
   "last_failure": {},
   "infra_fails": 0,
+  "review_pending": {
+    "u46070c5c24": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -941,6 +948,7 @@
   "verify_seen": {
     "u34082f3355": true,
     "u3e84b3357d": true,
+    "u46070c5c24": true,
     "u63af4bc057": true,
     "u883f305326": true,
     "ub7edb4cd1f": true,
