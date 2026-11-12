@@ -7,7 +7,7 @@ Covered: `src/kernels/cuda/` (decode), `src/prefill/` (prompt), `src/split/src/`
 | # | path | group | kind | commits | first | last | loc | `__global__` | wave64 | w32 sync | lane32 | warpSize | tc | dynsmem | tfs | ipc | fp64 | port cost | baloon port |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | `src/kernels/cuda/gdn.cu` | decode | kernel | 1 | 01529aaa 2026-09-24 | 01529aaa 2026-09-24 | 248 | 5 | no | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 11 | 4 | ix_gdn.cu OK |
-| 2 | `src/kernels/cuda/shared_expert.cu` | decode | kernel | 12 | 01529aaa 2026-09-24 | 1f8ca8de 2026-10-31 | 512 | 11 | no | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 14 | 8 | ix_moe_combine.cu STALE; ix_shared_expert.cu STALE |
+| 2 | `src/kernels/cuda/shared_expert.cu` | decode | kernel | 12 | 01529aaa 2026-09-24 | 1f8ca8de 2026-10-31 | 512 | 11 | no | 2 | 6 | 0 | 0 | 0 | 0 | 0 | 14 | 8 | ix_moe_combine.cu OK; ix_shared_expert.cu OK |
 | 3 | `src/kernels/cuda/bf16_gemv.cu` | decode | kernel | 2 | 01529aaa 2026-09-24 | d284809f 2026-10-06 | 189 | 4 | no | 3 | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 12 | ix_bf16_gemv.cu OK |
 | 4 | `src/kernels/cuda/router_top10.cu` | decode | kernel | 4 | 01529aaa 2026-09-24 | 9ff290b4 2026-10-03 | 497 | 3 | yes | 12 | 28 | 0 | 0 | 0 | 0 | 0 | 47 | 36 | ix_router_top10_wave.cu OK |
 | 5 | `src/kernels/cuda/native_mmvq.cu` | decode | kernel | 54 | 01529aaa 2026-09-24 | de856c7b 2026-11-01 | 4005 | 19 | yes | 4 | 37 | 0 | 0 | 0 | 0 | 0 | 2 | 37 | ix_mmvq_wave.cu OK |

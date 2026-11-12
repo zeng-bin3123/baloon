@@ -7,7 +7,11 @@ This checks those references against a local Strata clone:
   STALE   Strata changed the file after the port sha; if the header gives line ranges, only diff hunks that
           touch those lines count (the ported region itself changed)
   OK      unchanged upstream since the port
-Usage: python3 tools/ref_check.py [--strata ../Strata] [--json]
+  --repin  for a STALE port whose header names its kernels ("..._kernel"): extract each named __global__ body
+          at the pinned sha and at Strata HEAD; only if every body is byte-identical (upstream moved lines or
+          changed host code around them) rewrite the header to HEAD's sha + the bodies' exact line ranges.
+          Any changed body -> header untouched, kernel named, exit 1 (a real re-port is needed).
+Usage: python3 tools/ref_check.py [--strata ../Strata] [--json] [--repin]
 """
 import json, os, re, subprocess, sys
 
@@ -95,10 +99,73 @@ def check(strata, port):
     return rows
 
 
+KERNEL_RE = re.compile(r"\b([A-Za-z_]\w*_kernel)\b")
+
+
+def kernel_span(text, name):
+    """(first_line, last_line, source) of `__global__ void name(...) {...}` in text, or None."""
+    m = re.search(r"__global__\s+(?:__launch_bounds__\([^)]*\)\s*)?void\s+" + re.escape(name) + r"\s*\(", text)
+    if not m:
+        return None
+    i, depth = text.index("{", m.end()), 0
+    for k in range(i, len(text)):
+        depth += {"{": 1, "}": -1}.get(text[k], 0)
+        if depth == 0:
+            return text.count("\n", 0, m.start()) + 1, text.count("\n", 0, k) + 1, text[m.start():k + 1]
+    return None
+
+
+def repin(strata, port):
+    """Re-pin one STALE port when its named kernels are byte-identical upstream. Returns (ok, message)."""
+    head_lines = open(port, errors="replace").read().split("\n")
+    rel = os.path.relpath(port, ROOT)
+    _, new = git(strata, "rev-parse", "--short=8", "HEAD")
+    new = new.strip()
+    msgs, ok = [], True
+    for p, sha, _ in refs(port):
+        if not sha:
+            return False, f"{rel}: no sha in header, nothing to compare against"
+        idx = next(i for i, l in enumerate(head_lines[:12]) if p in l)
+        names = list(dict.fromkeys(KERNEL_RE.findall(head_lines[idx])))
+        if not names:
+            return False, f"{rel}: header line names no *_kernel, cannot prove the port unchanged"
+        _, old_src = git(strata, "show", f"{sha}:{p}")
+        _, new_src = git(strata, "show", f"HEAD:{p}")
+        spans, changed = [], []
+        for n in names:
+            a, b = kernel_span(old_src, n), kernel_span(new_src, n)
+            if not a or not b or a[2] != b[2]:
+                changed.append(n if a and b else f"{n} (missing at {'HEAD' if a else sha})")
+            else:
+                spans.append((b[0], b[1]))
+        if changed:
+            ok = False
+            msgs.append(f"{rel}: REFUSED, changed upstream {sha}..{new}: {', '.join(changed)}")
+            continue
+        rng = ",".join(f"L{a}-{b}" for a, b in sorted(spans))
+        line = re.sub(r",\s*L\d+(?:-\d+)?(?:,L\d+(?:-\d+)?)*", "", head_lines[idx])
+        line = line.replace(f"HEAD {sha}", f"HEAD {new}, {rng}", 1)
+        if line == head_lines[idx]:
+            return False, f"{rel}: header has no 'HEAD {sha}' to rewrite"
+        head_lines[idx] = line
+        msgs.append(f"{rel}: {sha} -> {new} {rng} ({len(names)} kernels byte-identical: {', '.join(names)})")
+    if ok:
+        open(port, "w").write("\n".join(head_lines))
+    return ok, "; ".join(msgs)
+
+
 def main():
     strata = strata_repo.ensure()  # finds or clones the full Strata history (exit 3 if impossible)
     ports = sorted(os.path.join(ROOT, "src", f) for f in os.listdir(os.path.join(ROOT, "src")) if f.startswith("ix_"))
     rows = [r for p in ports for r in check(strata, p)]
+    if "--repin" in sys.argv:
+        stale = sorted({os.path.join(ROOT, r["port"]) for r in rows if r["status"] == "STALE"})
+        results = [repin(strata, p) for p in stale]
+        for _, m in results:
+            print(m)
+        if not stale:
+            print("nothing STALE")
+        return 0 if all(ok for ok, _ in results) else 1
     if "--json" in sys.argv:
         print(json.dumps(rows, indent=1)); return 1 if any(r["status"] == "BROKEN" for r in rows) else 0
     _, head = git(strata, "log", "-1", "--format=%h %ad", "--date=short")

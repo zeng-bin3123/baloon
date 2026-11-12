@@ -1,5 +1,5 @@
 // ix_shared_expert.cu - Phase 1 #4: shared-expert helpers for ivcore10 (wave64).
-// Port of Strata src/kernels/cuda/shared_expert.cu (HEAD 46c152a1): swiglu_kernel, scalar_gate_kernel, scale_kernel.
+// Port of Strata src/kernels/cuda/shared_expert.cu (HEAD 697b6d67, L57-63,L113-130,L132-135): swiglu_kernel, scalar_gate_kernel, scale_kernel.
 // ivcore10 changes (v9 Part H): warp_sum_d 32->64 lanes (ix_warp_sum_d), lane&63, warp>>6, scratch[4] for <<<1,256>>>.
 // Semantics kept verbatim: SiLU goes on the GATE tensor; the gate is ONE scalar per token = sigmoid(dot(x, w_shexp)),
 // both operands BF16, double accumulator; the shared output is added plain by ix_moe_combine (not router-weighted).
