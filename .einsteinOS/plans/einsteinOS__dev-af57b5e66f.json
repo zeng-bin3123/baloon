@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 601,
     "started": "2026-11-12T15:17:12.363091105Z",
-    "renewed": "2026-11-12T15:47:38.32542508Z"
+    "renewed": "2026-11-12T15:50:09.621491859Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -592,6 +592,11 @@
       "pass": true,
       "unit_id": "u30ab07cd05"
     },
+    "Bf16GemvDispatch.lean": {
+      "hash": "741fdb9c81af",
+      "pass": true,
+      "unit_id": "ub7edb4cd1f"
+    },
     "BlockDequantization.lean": {
       "hash": "077c478d9fda",
       "pass": true,
@@ -617,10 +622,20 @@
       "pass": true,
       "unit_id": "ube91486083"
     },
+    "IqQuantKernels.lean": {
+      "hash": "6f2ea359836c",
+      "pass": true,
+      "unit_id": "ub7edb4cd1f"
+    },
     "KvQ8Quant.lean": {
       "hash": "4e3929b19a2c",
       "pass": true,
       "unit_id": "u30ab07cd05"
+    },
+    "NativeQuantizedMatVec.lean": {
+      "hash": "6d98f57fd153",
+      "pass": true,
+      "unit_id": "ub7edb4cd1f"
     },
     "S2CanonicalDequant.lean": {
       "hash": "28c7b39e7f73",
@@ -653,9 +668,7 @@
       "unit_id": "u30ab07cd05"
     }
   },
-  "fix_attempts": {
-    "ub7edb4cd1f": 3
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u3e84b3357d": [
       "nothing_written",
@@ -677,21 +690,8 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "ub7edb4cd1f": {
-      "kind": "review_fail",
-      "text": "smoke passes without ever launching native_mmvq's mmvq_kernel (no native_*_mmvq call in test_gpu.cu) and iq_ok() is never invoked, so NativeQuantizedMatVec dot products and IqQuantKernels are untested on the GPU",
-      "base_ref": "einsteinOS/dev-af57b5e66f",
-      "copies": "definitions on einsteinOS/dev-af57b5e66f of names the verdict says, in more than one file (measured by the kernel):\n  iq_ok: tests/ub7edb4cd1f/test_gpu.cu, tests/ufbd318f91b/test_gpu.cu\n  mmvq_kernel: src/cu/native_mmvq.cu, src/kernels/cuda/native_mmvq.cu\n  native_mmvq: src/cu/native_mmvq.cu, src/kernels/cuda/native_mmvq.cu\n  test_gpu: tests/k63_ube4/test_ube4.cu, tests/unit19/test_setup_chat.cpp\n"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "ub7edb4cd1f": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
