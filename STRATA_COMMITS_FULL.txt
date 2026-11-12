@@ -1,3 +1,7 @@
+5f0ae5b55acfd618070709b4237303bbb19b49a7|2026-11-11|Niko1221|tests: the retry tests' fake clock belongs to the test's own thread
+3b3c41e403be96048d2c05ddd8968645a644fe8c|2026-11-11|Niko1221|serve: the NVIDIA picture reader stays loaded by default on Linux on Arm (the DGX Spark class)
+a95046690868a38db3f19c0fa89b517b6c7f68c5|2026-11-11|Niko1221|serve: bound the GPU reader's context retries by time (18 s) as well as by count (12)
+b90d38aa89af28efd00ef54f4e2f7028a362d448|2026-11-11|Niko1221|serve: start the GPU picture reader again after a CUDA context failure on a Linux Arm machine with shared memory
 c1ff07f1a1817594811c960039571c6e268fe89a|2026-11-11|Niko1221|Merge f-ok-gpulist (a typed --gpu list clears a leftover gpu_order; help line) into f-main-1111b
 aed74bb74266cd397d1f72d54de6a43b032fd820|2026-11-11|Niko1221|Merge f-ok-mark (picture-reader file mark keyed on the change time) into f-main-1111b
 8d57e7f5a15c9ef82008a27f6af5dca11b604c94|2026-11-11|Niko1221|Merge f-wizard-80x24 (launch wizard keeps every Save choice at 80x24) into f-main-1111b
