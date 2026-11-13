@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 601,
     "started": "2026-11-12T15:17:12.363091105Z",
-    "renewed": "2026-11-12T21:53:41.998883045Z"
+    "renewed": "2026-11-13T00:56:43.975698503Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -606,7 +606,8 @@
         "Q2ExpertDotKernel.lean",
         "Q2Avx2Fallback.lean"
       ],
-      "reason": "3 fix attempts used"
+      "reason": "3 fix attempts used",
+      "conv": "9ea325ab-dda5-462b-8292-d7d934864715"
     }
   ],
   "state": {
@@ -725,6 +726,12 @@
   },
   "last_failure": {},
   "infra_fails": 0,
+  "review_pending": {
+    "u00b8180aa2": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -945,6 +952,7 @@
     }
   ],
   "verify_seen": {
+    "u00b8180aa2": true,
     "u34082f3355": true,
     "u3e84b3357d": true,
     "u46070c5c24": true,
