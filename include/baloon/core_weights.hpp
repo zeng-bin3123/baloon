@@ -45,6 +45,17 @@ constexpr WConv conv_for(bool raw16, int kind) {
     return raw16 ? WConv::Copy : (kind == 1 ? WConv::Bf16High : (kind == 3 ? WConv::ToF16 : WConv::Copy));
 }
 
+// Bytes a conversion writes for n source bytes: Copy keeps n; Bf16High/ToF16 take 4 B/elem to 2; WidenF16 takes 2 to 4.
+constexpr uint64_t out_bytes(WConv c, uint64_t n) {
+    return c == WConv::Copy ? n : (c == WConv::WidenF16 ? n / 2 * 4 : n / 4 * 2);
+}
+// No conversion grows past 2n, so a staging output of 2 * CHUNK holds any converted chunk.
+constexpr uint64_t kStageOutBytes = 2 * kWeightChunk;
+static_assert(out_bytes(WConv::Copy, kWeightChunk) <= kStageOutBytes && out_bytes(WConv::WidenF16, kWeightChunk) <= kStageOutBytes &&
+              out_bytes(WConv::Bf16High, kWeightChunk) <= kStageOutBytes && out_bytes(WConv::ToF16, kWeightChunk) <= kStageOutBytes,
+              "stage_out = 2 * CHUNK bounds every conversion");
+static_assert(kWeightChunk % 2 == 0, "full chunks never split an fp16 element");
+
 // Segment list of a row; false when the segment totals disagree with src_bytes / dst_bytes.
 bool plan_segments(const WIndexRow& r, std::vector<WSeg>& segs);
 // Stream one segment (chunked) from `src` (read via the reader) into dst. Returns bytes written, UINT64_MAX on error.

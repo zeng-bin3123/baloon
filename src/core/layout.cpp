@@ -69,7 +69,7 @@ bool check_one(const TensorIndex& idx, const Geometry& g, int layer, const Want2
     const std::string n = tensor_name(layer, w.suffix);
     auto it = idx.find(n);
     if (it == idx.end()) return shape_fail(why, "missing " + n);
-    if (it->second.ne0 != g.v(w.ne0) || it->second.ne1 != g.v(w.ne1)) return shape_fail(why, n + " has wrong shape");
+    if (!want2_match(w, g.is_qsa(layer), it->second.ne0, it->second.ne1, g.v(w.ne0), g.v(w.ne1))) return shape_fail(why, n + " has wrong shape");
     return true;
 }
 
