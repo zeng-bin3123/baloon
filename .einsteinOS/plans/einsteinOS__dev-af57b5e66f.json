@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 31133,
     "started": "2026-11-13T14:40:07.352138613Z",
-    "renewed": "2026-11-13T15:15:53.069724877Z"
+    "renewed": "2026-11-13T15:39:18.689434138Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -463,7 +463,8 @@
         "SharedExpertGate.lean",
         "NativeMoeCombine.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "eb9e9064-d2e6-4bb1-bbce-e1fbbee3e51a"
     },
     {
       "id": "ua1c077067b",
@@ -799,6 +800,12 @@
   },
   "last_failure": {},
   "infra_fails": 0,
+  "review_pending": {
+    "u7663fc74b8": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
