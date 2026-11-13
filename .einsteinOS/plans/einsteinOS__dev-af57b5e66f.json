@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 22109,
     "started": "2026-11-13T06:39:39.713870926Z",
-    "renewed": "2026-11-13T07:18:52.22975754Z"
+    "renewed": "2026-11-13T08:31:39.127517913Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -632,6 +632,11 @@
       "pass": true,
       "unit_id": "u34082f3355"
     },
+    "DenseWeightLoader.lean": {
+      "hash": "1eea3de97a48",
+      "pass": true,
+      "unit_id": "u7f1ccea730"
+    },
     "GgmlBlockDequant.lean": {
       "hash": "2ccab9926bb8",
       "pass": true,
@@ -661,6 +666,16 @@
       "hash": "4e3929b19a2c",
       "pass": true,
       "unit_id": "u30ab07cd05"
+    },
+    "LayerShapeCheck.lean": {
+      "hash": "72a3dea364d9",
+      "pass": true,
+      "unit_id": "u7f1ccea730"
+    },
+    "NativeDenseOverride.lean": {
+      "hash": "d9b2407554ae",
+      "pass": true,
+      "unit_id": "u7f1ccea730"
     },
     "NativeQuantizedMatVec.lean": {
       "hash": "6d98f57fd153",
@@ -706,11 +721,14 @@
       "hash": "3a82e6f16e60",
       "pass": true,
       "unit_id": "u30ab07cd05"
+    },
+    "VramMemoryPlan.lean": {
+      "hash": "34a35c59a08a",
+      "pass": true,
+      "unit_id": "u7f1ccea730"
     }
   },
-  "fix_attempts": {
-    "u7f1ccea730": 1
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u3e84b3357d": [
       "nothing_written",
@@ -740,20 +758,8 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "u7f1ccea730": {
-      "kind": "missing",
-      "text": "no build.sh was written; the unit cannot be verified",
-      "base_ref": "einsteinOS/dev-af57b5e66f-wip-u7f1ccea730"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 1,
-  "review_pending": {
-    "u7f1ccea730": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
