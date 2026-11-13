@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 31133,
     "started": "2026-11-13T14:40:07.352138613Z",
-    "renewed": "2026-11-13T17:26:47.29347626Z"
+    "renewed": "2026-11-13T17:30:52.285189419Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -662,6 +662,11 @@
       "pass": true,
       "unit_id": "u6bd5f913be"
     },
+    "ElementwiseGlueKernels.lean": {
+      "hash": "e4e0b5d94142",
+      "pass": true,
+      "unit_id": "u739c93b0c3"
+    },
     "ExpertBlobAddressing.lean": {
       "hash": "b9e21f4711e0",
       "pass": true,
@@ -697,10 +702,20 @@
       "pass": true,
       "unit_id": "ued2beb8a35"
     },
+    "FusedGatedResidual.lean": {
+      "hash": "d901fdb52851",
+      "pass": true,
+      "unit_id": "u739c93b0c3"
+    },
     "GatedDeltaNetStep.lean": {
       "hash": "1ad55465bf23",
       "pass": true,
       "unit_id": "ued2beb8a35"
+    },
+    "GatedResidualKernels.lean": {
+      "hash": "040efe225ac1",
+      "pass": true,
+      "unit_id": "u739c93b0c3"
     },
     "GdnLayerComposition.lean": {
       "hash": "c3aed69ef6dc",
@@ -767,6 +782,11 @@
       "pass": true,
       "unit_id": "ued2beb8a35"
     },
+    "NativeGatedResidualPostops.lean": {
+      "hash": "dbe7260b9543",
+      "pass": true,
+      "unit_id": "u739c93b0c3"
+    },
     "NativeGdnPreprocess.lean": {
       "hash": "bb9e27df5f36",
       "pass": true,
@@ -791,6 +811,11 @@
       "hash": "e38b8cec88e3",
       "pass": true,
       "unit_id": "u7663fc74b8"
+    },
+    "NativeWeightedRmsNorm.lean": {
+      "hash": "e6417367a1a2",
+      "pass": true,
+      "unit_id": "u739c93b0c3"
     },
     "PagedKvLayout.lean": {
       "hash": "de5645756cee",
@@ -821,6 +846,11 @@
       "hash": "3e12e7652cba",
       "pass": true,
       "unit_id": "ua1c077067b"
+    },
+    "RopeNeoxPairing.lean": {
+      "hash": "ebc0e3c7a67b",
+      "pass": true,
+      "unit_id": "u739c93b0c3"
     },
     "RouterTopKSelection.lean": {
       "hash": "8bfe4731cca1",
@@ -913,12 +943,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u739c93b0c3": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
