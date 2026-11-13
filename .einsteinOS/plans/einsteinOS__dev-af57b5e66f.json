@@ -1,9 +1,9 @@
 {
   "holder": {
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
-    "pid": 14961,
-    "started": "2026-11-13T03:51:10.902297593Z",
-    "renewed": "2026-11-13T04:29:57.42671606Z"
+    "pid": 22109,
+    "started": "2026-11-13T06:39:39.713870926Z",
+    "renewed": "2026-11-13T07:18:52.22975754Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -435,7 +435,7 @@
         "LayerShapeCheck.lean"
       ],
       "reason": "initial plan",
-      "conv": "154fcd28-7e07-4312-a98b-797c93086de3"
+      "conv": "5e333bf0-a89b-4063-af0b-ea03f899c9b9"
     },
     {
       "id": "u6bd5f913be",
@@ -748,6 +748,12 @@
     }
   },
   "infra_fails": 1,
+  "review_pending": {
+    "u7f1ccea730": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
