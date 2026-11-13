@@ -4,6 +4,7 @@
 // reference, so results are bit-identical.
 #include "baloon/kern_cpu_expert.hpp"
 #include "baloon/expert_table.hpp"
+#include "baloon/q2_expert_vnni_kernel.hpp"
 
 #include <immintrin.h>
 
@@ -37,7 +38,7 @@ inline float silu_f(float v) { return v / (1.f + std::exp(-v)); }
 
 // Theory offset_identity: sum_j (c_j - 1) x_j = sum_j c_j x_j - sum_j x_j. Every row dot takes the code offset off ONCE
 // per 32-value chunk as the integer activation sum hx (= sum xq), never broadcast into the lanes.
-inline int32_t offset_dot(int32_t dot, int32_t chunk_sum) { return dot - chunk_sum; }
+inline int32_t offset_dot(int32_t dot, int32_t chunk_sum) { return q2_expert::offset_dot(dot, chunk_sum); }  // offset_identity
 // Eight fp16 scales (nb <= 8 valid, others zero) as floats. The load is masked: a tail never reads past the row.
 inline __m256 scales8(const uint8_t* s, uint32_t nb) {
     const __mmask8 m = (__mmask8)(nb >= 8 ? 0xFFu : ((1u << nb) - 1u));
@@ -45,13 +46,17 @@ inline __m256 scales8(const uint8_t* s, uint32_t nb) {
 }
 
 // Theory block_chunk_map: weight block b uses activation chunks 2b and 2b+1 at int8 offsets 64b and 64b + 32.
-constexpr size_t chunk_q_offset(uint32_t b, uint32_t h) { return (size_t)(2 * b + h) * QKA; }
+constexpr size_t chunk_q_offset(uint32_t b, uint32_t h) { return q2_expert::chunk_q_offset(b, h); }  // block_chunk_map
 static_assert(chunk_q_offset(5, 0) == 64 * 5 && chunk_q_offset(5, 1) == 64 * 5 + 32 && chunk_q_offset(1, 0) == kZmm, "block_chunk_map");
 // Theory laneMask / laneMask_spec: the chunk lanes of a batch of nb blocks are enabled by 0xFFFF for a full batch, else
 // (1 << 2nb) - 1 - exactly the 2 nb chunk lanes, so a tail never reads scales or activation scales past the row.
-constexpr uint32_t lane_mask(uint32_t nb) { return nb >= 8 ? 0xFFFFu : (1u << (2 * nb)) - 1u; }
+constexpr uint32_t lane_mask(uint32_t nb) { return q2_expert::lane_mask(nb); }  // laneMask_spec
 constexpr bool lane_mask_spec() { for (uint32_t nb = 0; nb <= 8; ++nb) if (lane_mask(nb) != (uint32_t)((1ull << (2 * nb)) - 1)) return false; return true; }
 static_assert(lane_mask_spec(), "laneMask_spec");
+static_assert(SC_GU == q2_expert::SC_GU && SC_D == q2_expert::SC_D && ROW_GU == q2_expert::ROW_GU && ROW_D == q2_expert::ROW_D,
+              "row_geometry: 40 / 10 blocks, 640 / 160 code bytes per row");
+static_assert(BLOB == q2_expert::BLOB && ROW_GU + SC_GU * 2 == q2_expert::kGuRowBytes && ROW_D + SC_D * 2 == q2_expert::kDownRowBytes,
+              "blob_size: 2*FF rows of 720 bytes + H rows of 180 bytes = 1,382,400");
 // d_w * d_x of the 16 chunk lanes of a batch (block k -> lanes 2k, 2k+1), masked with lane_mask(nb).
 inline void chunk_scales16(const uint8_t* s, const float* xd, uint32_t nb, float out[16]) {
     const __mmask16 m = (__mmask16)lane_mask(nb);
@@ -68,13 +73,16 @@ inline void unpack_q2_0(const uint8_t* p16, uint8_t out[64]) {
 // qword Q takes the 8-bit window at bit 8*((p%8)/4) + 2*(p%4); the low two bits of that window are the code.
 inline __m512i unpack64_q2_0(const uint8_t* p16) {
     // control byte of output byte p: 8*((p%8)/4) + 2*(p%4)  ->  0,2,4,6,8,10,12,14 repeated per qword
-    const __m512i ctrl = _mm512_set1_epi64(0x0E0C0A0806040200LL);
+    static_assert(q2_expert::ctrl_shifts(), "ctrl_shifts");
+    const __m512i ctrl = _mm512_set1_epi64((long long)q2_expert::kMultishiftCtrl);
     const __m512i src = _mm512_cvtepu16_epi64(_mm_loadu_si128((const __m128i*)p16));
     return _mm512_and_si512(_mm512_multishift_epi64_epi8(ctrl, src), _mm512_set1_epi8(3));
 }
 
 // Integer dot of one 64-weight block (codes 0..3, no offset) against 64 int8 activations: low and high 32.
+// Each dpbusd lane adds four code * activation products, |lane| <= q2_expert::kVnniLaneMax = 1524 (vnni_lane_bound).
 inline void block_dot(const uint8_t* codes16, const int8_t* q64, int32_t& lo, int32_t& hi) {
+    static_assert(q2_expert::kVnniLaneMax == 1524, "vnni_lane_bound");
     const __m512i s = _mm512_dpbusd_epi32(_mm512_setzero_si512(), unpack64_q2_0(codes16), _mm512_loadu_si512((const void*)q64));
     lo = _mm512_reduce_add_epi32(_mm512_inserti64x4(_mm512_setzero_si512(), _mm512_castsi512_si256(s), 0));
     hi = _mm512_reduce_add_epi32(_mm512_inserti64x4(_mm512_setzero_si512(), _mm512_extracti64x4_epi64(s, 1), 0));
@@ -104,7 +112,7 @@ inline void row_dot_multi(const uint8_t* codes, const uint8_t* scales, uint32_t 
 inline float row_dot_z(const uint8_t* codes, const uint8_t* scales, uint32_t nb, const int8_t* q, const float* xd, const int32_t* hx) {
     float acc = 0.f;
     for (uint32_t b0 = 0; b0 < nb; b0 += 8) {
-        const uint32_t n = nb - b0 < 8 ? nb - b0 : 8;
+        const uint32_t n = q2_expert::batch_size(nb, b0);  // batchSizes_cover: min(8, nb - b0)
         alignas(32) float wd[8];
         _mm256_store_ps(wd, scales8(scales + 2 * (size_t)b0, n));
         for (uint32_t k = 0; k < n; ++k) {
@@ -122,7 +130,7 @@ inline float row_dot_z(const uint8_t* codes, const uint8_t* scales, uint32_t nb,
 inline void row_dot_multi_z(const uint8_t* codes, const uint8_t* scales, uint32_t nb, uint32_t nt, const ActQ* a, float* out) {
     float acc[MAXT] = {0, 0, 0, 0, 0, 0, 0, 0};
     for (uint32_t b0 = 0; b0 < nb; b0 += 8) {
-        const uint32_t n = nb - b0 < 8 ? nb - b0 : 8;
+        const uint32_t n = q2_expert::batch_size(nb, b0);  // batchSizes_cover: min(8, nb - b0)
         alignas(32) float wd[8];
         _mm256_store_ps(wd, scales8(scales + 2 * (size_t)b0, n));
         for (uint32_t k = 0; k < n; ++k) {
@@ -190,8 +198,8 @@ inline void rdm(const uint8_t* codes, const uint8_t* scales, uint32_t nb, uint32
 }
 
 // Theory gu_interleave: the fused gate/up matrix stores FF row pairs interleaved - gate row r at slot 2r, up row r at 2r+1.
-constexpr uint32_t gate_slot(uint32_t r) { return 2 * r; }
-constexpr uint32_t up_slot(uint32_t r) { return 2 * r + 1; }
+constexpr uint32_t gate_slot(uint32_t r) { return q2_expert::gate_slot(r); }  // gate_up_interleave: gate 2r
+constexpr uint32_t up_slot(uint32_t r) { return q2_expert::up_slot(r); }      //                     up 2r + 1
 static_assert(gate_slot(3) == 6 && up_slot(3) == 7, "gu_interleave");
 inline const uint8_t* gu_codes(const uint8_t* blob, uint32_t slot) { return blob + O_GU_CODES + (size_t)slot * ROW_GU; }
 inline const uint8_t* gu_scales(const uint8_t* blob, uint32_t slot) { return blob + O_GU_SCALES + (size_t)slot * SC_GU * 2; }
@@ -258,16 +266,16 @@ inline void q2g_row_multi(const uint8_t* row, uint32_t nb, uint32_t nt, const in
 }  // namespace
 
 // ============================================================================================ public: features
+// The first missing feature of the gate (F, BW, VL, VNNI, VBMI), "ok" when usable: one definition, q2_expert's.
 const char* CpuFeatures::reason() const {
-    if (!avx512f) return "AVX-512F is missing";
-    if (!avx512bw) return "AVX-512BW is missing";
-    if (!avx512vl) return "AVX-512VL is missing";
-    if (!avx512_vnni) return "AVX-512 VNNI is missing";
-    if (!avx512_vbmi) return "AVX-512 VBMI is missing";
-    return "ok";
+    q2_expert::CpuFeatures g;
+    g.avx512f = avx512f; g.avx512bw = avx512bw; g.avx512vl = avx512vl; g.avx512_vnni = avx512_vnni; g.avx512_vbmi = avx512_vbmi;
+    return g.reason();
 }
 
+// Gate words: kern::cpu_features reads exactly q2_expert::kGateEbx / kGateEcx (cpuUsable_witness), plus OS support.
 CpuFeatures cpu_features() {
+    static_assert(q2_expert::kGateEbx == ((1u << 16) | (1u << 30) | (1u << 31)) && q2_expert::kGateEcx == ((1u << 11) | 2u), "cpuUsable_witness");
     CpuFeatures f{};
 #if defined(__x86_64__) || defined(__i386__)
     const unsigned max_leaf = __get_cpuid_max(0, nullptr);

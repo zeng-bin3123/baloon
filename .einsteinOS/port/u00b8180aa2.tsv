@@ -1,0 +1,6 @@
+src/kernels/cpu/q2_avx2.cpp	act_quant_q8_1_avx2	src/kernels/cpu/q2_avx2.cpp	act_quant_q8_1_avx2
+src/kernels/cpu/q2_avx2.cpp	h2f	src/kernels/cpu/q2_avx2.cpp	h2f
+src/kernels/cpu/q2_avx2.cpp	q2_0_gguf_rows_multi_avx2	src/kernels/cpu/q2_avx2.cpp	q2_0_gguf_rows_multi_avx2
+src/kernels/cpu/q2_avx2.cpp	row_multi	src/kernels/cpu/q2_avx2.cpp	row_multi
+src/kernels/cpu/q2_avx2.cpp	rows	src/kernels/cpu/q2_avx2.cpp	rows
+src/kernels/cpu/q2_avx2.cpp	unpack64	src/kernels/cpu/q2_avx2.cpp	unpack64

@@ -43,6 +43,8 @@ bool native_down_rows(NativeFmt f, const uint8_t* blob, uint32_t n_embd, uint32_
 namespace q2avx2 {   // src/kernels/cpu/q2_avx2.cpp  (built with -mavx2 -mf16c -mfma)
 void act_quant_q8_1_avx2(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx);
 void unpack64(const uint8_t* codes16, uint8_t out[64]);
+void block_sums(const uint8_t* blk, const int8_t* qb, int32_t S[2]);
+int32_t hsum8(const int32_t v[8]);
 void row_multi(const uint8_t* row, uint32_t nb, uint32_t n_tok, const int8_t* q, size_t q_stride, const float* xd,
                const int32_t* hx, size_t ch_stride, float* out);
 void rows(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, const int8_t* q, const float* xd, const int32_t* hx, float* out);
