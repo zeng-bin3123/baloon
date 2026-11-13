@@ -1,9 +1,9 @@
 {
   "holder": {
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
-    "pid": 601,
-    "started": "2026-11-12T15:17:12.363091105Z",
-    "renewed": "2026-11-13T01:03:28.964654473Z"
+    "pid": 14961,
+    "started": "2026-11-13T03:51:10.902297593Z",
+    "renewed": "2026-11-13T04:29:57.42671606Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -435,7 +435,7 @@
         "LayerShapeCheck.lean"
       ],
       "reason": "initial plan",
-      "conv": "cb02f94d-25f4-45ea-8259-dc2c2b67ff02"
+      "conv": "154fcd28-7e07-4312-a98b-797c93086de3"
     },
     {
       "id": "u6bd5f913be",
@@ -747,7 +747,7 @@
       "base_ref": "einsteinOS/dev-af57b5e66f-wip-u7f1ccea730"
     }
   },
-  "infra_fails": 0,
+  "infra_fails": 1,
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -973,6 +973,7 @@
     "u3e84b3357d": true,
     "u46070c5c24": true,
     "u63af4bc057": true,
+    "u7f1ccea730": true,
     "u883f305326": true,
     "ub7edb4cd1f": true,
     "ube91486083": true,
