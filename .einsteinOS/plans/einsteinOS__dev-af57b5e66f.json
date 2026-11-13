@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 601,
     "started": "2026-11-12T15:17:12.363091105Z",
-    "renewed": "2026-11-13T00:58:02.604950925Z"
+    "renewed": "2026-11-13T01:03:28.964654473Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -434,7 +434,8 @@
         "NativeDenseOverride.lean",
         "LayerShapeCheck.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "cb02f94d-25f4-45ea-8259-dc2c2b67ff02"
     },
     {
       "id": "u6bd5f913be",
@@ -707,7 +708,9 @@
       "unit_id": "u30ab07cd05"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u7f1ccea730": 1
+  },
   "fail_history": {
     "u3e84b3357d": [
       "nothing_written",
@@ -717,6 +720,9 @@
       "review_fail",
       "review_fail",
       "review_fail"
+    ],
+    "u7f1ccea730": [
+      "missing"
     ],
     "u883f305326": [
       "kernel_unported",
@@ -734,7 +740,13 @@
       "review_fail"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "u7f1ccea730": {
+      "kind": "missing",
+      "text": "no build.sh was written; the unit cannot be verified",
+      "base_ref": "einsteinOS/dev-af57b5e66f-wip-u7f1ccea730"
+    }
+  },
   "infra_fails": 0,
   "port_units": [
     {
