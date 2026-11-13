@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 31133,
     "started": "2026-11-13T14:40:07.352138613Z",
-    "renewed": "2026-11-13T15:10:30.333947862Z"
+    "renewed": "2026-11-13T15:15:53.069724877Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -618,6 +618,11 @@
       "pass": true,
       "unit_id": "u30ab07cd05"
     },
+    "AdaptiveExpertResidency.lean": {
+      "hash": "8ba69d35b0f3",
+      "pass": true,
+      "unit_id": "u6bd5f913be"
+    },
     "Bf16GemvDispatch.lean": {
       "hash": "741fdb9c81af",
       "pass": true,
@@ -637,6 +642,26 @@
       "hash": "1eea3de97a48",
       "pass": true,
       "unit_id": "u7f1ccea730"
+    },
+    "DirectRowReader.lean": {
+      "hash": "7fb9f6946718",
+      "pass": true,
+      "unit_id": "u6bd5f913be"
+    },
+    "ExpertBlobAddressing.lean": {
+      "hash": "b9e21f4711e0",
+      "pass": true,
+      "unit_id": "u6bd5f913be"
+    },
+    "ExpertCacheResidency.lean": {
+      "hash": "5ceaa6b0f36a",
+      "pass": true,
+      "unit_id": "u6bd5f913be"
+    },
+    "ExpertLayoutTable.lean": {
+      "hash": "c995ab204329",
+      "pass": true,
+      "unit_id": "u6bd5f913be"
     },
     "GgmlBlockDequant.lean": {
       "hash": "2ccab9926bb8",
@@ -678,10 +703,20 @@
       "pass": true,
       "unit_id": "u7f1ccea730"
     },
+    "NativeExpertGeometry.lean": {
+      "hash": "72e87235af54",
+      "pass": true,
+      "unit_id": "u6bd5f913be"
+    },
     "NativeQuantizedMatVec.lean": {
       "hash": "6d98f57fd153",
       "pass": true,
       "unit_id": "ub7edb4cd1f"
+    },
+    "PinnedArenaResidency.lean": {
+      "hash": "95c31513c6d4",
+      "pass": true,
+      "unit_id": "u6bd5f913be"
     },
     "Q2Avx2Fallback.lean": {
       "hash": "c6f5336e67f4",
@@ -729,9 +764,7 @@
       "unit_id": "u7f1ccea730"
     }
   },
-  "fix_attempts": {
-    "u6bd5f913be": 1
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u3e84b3357d": [
       "nothing_written",
@@ -764,21 +797,8 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "u6bd5f913be": {
-      "kind": "gpu_not_compiled",
-      "text": "gpu_not_compiled: build.sh ran no CUDA compile of src/core/pinned.cu (CUDA compiles seen: u6bd_fnv_check.cu src/kernels/cuda/u6bd_fnv_check.cu u6bd_fnv_check.cu src/kernels/cuda/u6bd_fnv_check.cu)\ngpu_launch_unmeasured: whether the unit's kernels ran on the device could not be measured: a GPU device was opened but no probed executable imports a launch function the probe watches (cuLaunchKernel cudaLaunch cudaLaunchCooperativeKernel cudaLaunchKernel cudaLaunchKernelExC cudaLaunchKernel_ptsz); the CUDA functions they import: none seen",
-      "base_ref": "einsteinOS/dev-af57b5e66f-wip-u6bd5f913be",
-      "base_sha": "6ac56f580ba08d360456faf52c3db1f31db7ff40"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u6bd5f913be": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
