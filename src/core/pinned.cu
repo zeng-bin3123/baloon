@@ -1,4 +1,6 @@
 // pinned.cu - implementation of core_pinned_hw.hpp (real page-locked arena + parallel checksummed expert load).
+// Unit u6bd5f913be: PinnedArenaResidency.lean formalises uniform_bounds, fnv1a64,
+// registerPrefix, pinnedBlob, chunks and layerOff theorems for this file.
 #include "baloon/core_pinned_hw.hpp"
 
 #include <sys/mman.h>
