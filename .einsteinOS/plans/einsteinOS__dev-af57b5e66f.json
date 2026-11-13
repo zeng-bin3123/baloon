@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 31133,
     "started": "2026-11-13T14:40:07.352138613Z",
-    "renewed": "2026-11-13T16:08:41.72777533Z"
+    "renewed": "2026-11-13T16:10:58.417373636Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -640,6 +640,16 @@
       "pass": true,
       "unit_id": "u34082f3355"
     },
+    "BlockWeightedSelect.lean": {
+      "hash": "0833c34d5cf4",
+      "pass": true,
+      "unit_id": "ua1c077067b"
+    },
+    "ChunkedAttnMerge.lean": {
+      "hash": "803bb4944386",
+      "pass": true,
+      "unit_id": "ua1c077067b"
+    },
     "DenseWeightLoader.lean": {
       "hash": "1eea3de97a48",
       "pass": true,
@@ -700,6 +710,11 @@
       "pass": true,
       "unit_id": "ube91486083"
     },
+    "IndexerPooling.lean": {
+      "hash": "9e9996dd6ebf",
+      "pass": true,
+      "unit_id": "ua1c077067b"
+    },
     "IqQuantKernels.lean": {
       "hash": "6f2ea359836c",
       "pass": true,
@@ -725,10 +740,20 @@
       "pass": true,
       "unit_id": "u6bd5f913be"
     },
+    "NativeFlashAttnContract.lean": {
+      "hash": "817a121bf8fd",
+      "pass": true,
+      "unit_id": "ua1c077067b"
+    },
     "NativeMoeCombine.lean": {
       "hash": "67cf8de975dc",
       "pass": true,
       "unit_id": "u7663fc74b8"
+    },
+    "NativeQsaBufferContracts.lean": {
+      "hash": "39165278de92",
+      "pass": true,
+      "unit_id": "ua1c077067b"
     },
     "NativeQuantizedMatVec.lean": {
       "hash": "6d98f57fd153",
@@ -739,6 +764,11 @@
       "hash": "e38b8cec88e3",
       "pass": true,
       "unit_id": "u7663fc74b8"
+    },
+    "PagedKvLayout.lean": {
+      "hash": "de5645756cee",
+      "pass": true,
+      "unit_id": "ua1c077067b"
     },
     "PinnedArenaResidency.lean": {
       "hash": "95c31513c6d4",
@@ -754,6 +784,16 @@
       "hash": "9d4c92cbfd4a",
       "pass": true,
       "unit_id": "u00b8180aa2"
+    },
+    "QsaIndexCellMap.lean": {
+      "hash": "7560667efd6f",
+      "pass": true,
+      "unit_id": "ua1c077067b"
+    },
+    "QsaStepState.lean": {
+      "hash": "3e12e7652cba",
+      "pass": true,
+      "unit_id": "ua1c077067b"
     },
     "RouterTopKSelection.lean": {
       "hash": "8bfe4731cca1",
@@ -800,6 +840,11 @@
       "pass": true,
       "unit_id": "u7663fc74b8"
     },
+    "TopkThresholdSelect.lean": {
+      "hash": "f7bab54ee59e",
+      "pass": true,
+      "unit_id": "ua1c077067b"
+    },
     "VramMemoryPlan.lean": {
       "hash": "34a35c59a08a",
       "pass": true,
@@ -841,12 +886,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "ua1c077067b": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
