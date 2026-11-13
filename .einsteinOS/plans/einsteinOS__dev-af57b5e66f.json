@@ -1,9 +1,9 @@
 {
   "holder": {
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
-    "pid": 22109,
-    "started": "2026-11-13T06:39:39.713870926Z",
-    "renewed": "2026-11-13T09:32:27.415712551Z"
+    "pid": 31133,
+    "started": "2026-11-13T14:40:07.352138613Z",
+    "renewed": "2026-11-13T15:10:30.333947862Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -449,7 +449,7 @@
         "AdaptiveExpertResidency.lean"
       ],
       "reason": "initial plan",
-      "conv": "68d0f577-7884-4c41-a5c4-24b43278a55f"
+      "conv": "113e6e23-c0bf-4a8a-b8aa-2dab8281f54b"
     },
     {
       "id": "u7663fc74b8",
@@ -773,6 +773,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "u6bd5f913be": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
