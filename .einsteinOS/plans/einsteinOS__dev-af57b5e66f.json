@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 31133,
     "started": "2026-11-13T14:40:07.352138613Z",
-    "renewed": "2026-11-13T16:48:57.690511063Z"
+    "renewed": "2026-11-13T16:51:15.814588907Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -691,6 +691,21 @@
       "pass": true,
       "unit_id": "u7663fc74b8"
     },
+    "FusedGatedDeltaNet.lean": {
+      "hash": "36c63fc25650",
+      "pass": true,
+      "unit_id": "ued2beb8a35"
+    },
+    "GatedDeltaNetStep.lean": {
+      "hash": "1ad55465bf23",
+      "pass": true,
+      "unit_id": "ued2beb8a35"
+    },
+    "GdnLayerComposition.lean": {
+      "hash": "c3aed69ef6dc",
+      "pass": true,
+      "unit_id": "ued2beb8a35"
+    },
     "GgmlBlockDequant.lean": {
       "hash": "2ccab9926bb8",
       "pass": true,
@@ -745,6 +760,16 @@
       "hash": "817a121bf8fd",
       "pass": true,
       "unit_id": "ua1c077067b"
+    },
+    "NativeGatedDeltaNet.lean": {
+      "hash": "4134da45ffb7",
+      "pass": true,
+      "unit_id": "ued2beb8a35"
+    },
+    "NativeGdnPreprocess.lean": {
+      "hash": "bb9e27df5f36",
+      "pass": true,
+      "unit_id": "ued2beb8a35"
     },
     "NativeMoeCombine.lean": {
       "hash": "67cf8de975dc",
@@ -887,12 +912,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "ued2beb8a35": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
