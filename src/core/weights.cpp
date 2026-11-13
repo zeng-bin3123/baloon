@@ -69,9 +69,8 @@ bool plan_segments(const WIndexRow& r, std::vector<WSeg>& segs) {
     const bool quantized = r.codes != 0 || r.scales != 0 || r.offset != 0;
     if (quantized) {
         if (r.scales_fp16 && r.scales % 2 != 0) return false;           // an fp16 plane has whole elements
-        const uint64_t src_scales = r.scales_fp16 ? r.scales / 2 : r.scales;   // half as large in the pack
-        const uint64_t src_total = r.codes + src_scales + r.offset, dst_total = r.codes + r.scales + r.offset;
-        if (src_total != r.src_bytes || dst_total != r.dst_bytes) return false;   // checked before any byte moves
+        const uint64_t src_scales = src_scale_bytes(r.scales, r.scales_fp16);     // half as large in the pack
+        if (!quant_totals_ok(r.codes, r.scales, r.offset, r.scales_fp16, r.src_bytes, r.dst_bytes)) return false;   // before any byte moves
         uint64_t so = r.src_off, d = 0;
         segs.push_back({so, d, r.codes, r.codes, WConv::Copy});
         so += r.codes; d += r.codes;

@@ -62,6 +62,10 @@ struct Geometry {
 };
 
 struct Want2 { const char* suffix; bool qsa_only, gdn_only; Dim ne0, ne1; };
+// A 2-D requirement is skipped on the wrong family; otherwise ne0 AND ne1 must match exactly (no wildcard dimension).
+constexpr bool want2_match(const Want2& w, bool is_qsa, uint64_t have0, uint64_t have1, uint64_t want0, uint64_t want1) {
+    return !applies(w.qsa_only, w.gdn_only, is_qsa) || (have0 == want0 && have1 == want1);
+}
 struct Want1 { const char* suffix; bool qsa_only, gdn_only; Dim ne0; Form form; };
 
 // 22 two-D requirements: 10 common, 6 GDN-only, 6 QSA-only.

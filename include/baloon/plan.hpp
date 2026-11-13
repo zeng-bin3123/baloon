@@ -49,6 +49,12 @@ inline planner::Costs lower(const Costs& c) {
 
 // Fixed, non-evictable GDN recurrence + conv state.
 inline uint64_t state_bytes(const Geometry& g) { return planner::state_bytes(detail::lower(g)); }
+// VramMemoryPlan: 36 GDN layers x (128*48*128*4 recurrence + 3*10240*4 conv history) = 117,669,888 B = 85 whole slots.
+constexpr uint64_t kStateBytesDefault = 36ull * (128ull * 48 * 128 * 4 + 3ull * 10240 * 4);
+static_assert(kStateBytesDefault == 117669888ull, "GDN recurrent state of the default geometry");
+static_assert(kStateBytesDefault / planner::kExpertBlobBytes == 85, "the state is 85 expert slots, not a rounding error");
+// Whole expert slots the fixed state displaces.
+inline uint64_t state_slots(const Geometry& g, uint64_t blob = planner::kExpertBlobBytes) { return blob ? state_bytes(g) / blob : 0; }
 // Per-token KV cost over the QSA layers (int8 K+V, fp16 group scales, indexer key per block).
 inline uint64_t kv_bytes_per_token(const Geometry& g) { return planner::kv_bytes_per_token(detail::lower(g)); }
 
