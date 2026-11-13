@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 22109,
     "started": "2026-11-13T06:39:39.713870926Z",
-    "renewed": "2026-11-13T08:31:39.127517913Z"
+    "renewed": "2026-11-13T09:32:27.415712551Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -448,7 +448,8 @@
         "ExpertCacheResidency.lean",
         "AdaptiveExpertResidency.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "68d0f577-7884-4c41-a5c4-24b43278a55f"
     },
     {
       "id": "u7663fc74b8",
@@ -728,7 +729,9 @@
       "unit_id": "u7f1ccea730"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "u6bd5f913be": 1
+  },
   "fail_history": {
     "u3e84b3357d": [
       "nothing_written",
@@ -738,6 +741,9 @@
       "review_fail",
       "review_fail",
       "review_fail"
+    ],
+    "u6bd5f913be": [
+      "gpu_not_compiled"
     ],
     "u7f1ccea730": [
       "missing"
@@ -758,8 +764,15 @@
       "review_fail"
     ]
   },
-  "last_failure": {},
-  "infra_fails": 1,
+  "last_failure": {
+    "u6bd5f913be": {
+      "kind": "gpu_not_compiled",
+      "text": "gpu_not_compiled: build.sh ran no CUDA compile of src/core/pinned.cu (CUDA compiles seen: u6bd_fnv_check.cu src/kernels/cuda/u6bd_fnv_check.cu u6bd_fnv_check.cu src/kernels/cuda/u6bd_fnv_check.cu)\ngpu_launch_unmeasured: whether the unit's kernels ran on the device could not be measured: a GPU device was opened but no probed executable imports a launch function the probe watches (cuLaunchKernel cudaLaunch cudaLaunchCooperativeKernel cudaLaunchKernel cudaLaunchKernelExC cudaLaunchKernel_ptsz); the CUDA functions they import: none seen",
+      "base_ref": "einsteinOS/dev-af57b5e66f-wip-u6bd5f913be",
+      "base_sha": "6ac56f580ba08d360456faf52c3db1f31db7ff40"
+    }
+  },
+  "infra_fails": 0,
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -985,6 +998,7 @@
     "u3e84b3357d": true,
     "u46070c5c24": true,
     "u63af4bc057": true,
+    "u6bd5f913be": true,
     "u7f1ccea730": true,
     "u883f305326": true,
     "ub7edb4cd1f": true,
