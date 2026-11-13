@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 31133,
     "started": "2026-11-13T14:40:07.352138613Z",
-    "renewed": "2026-11-13T15:39:18.689434138Z"
+    "renewed": "2026-11-13T15:41:20.267806905Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -659,10 +659,25 @@
       "pass": true,
       "unit_id": "u6bd5f913be"
     },
+    "ExpertHitCombine.lean": {
+      "hash": "f7aa4650ad2a",
+      "pass": true,
+      "unit_id": "u7663fc74b8"
+    },
     "ExpertLayoutTable.lean": {
       "hash": "c995ab204329",
       "pass": true,
       "unit_id": "u6bd5f913be"
+    },
+    "ExpertPoolDispatch.lean": {
+      "hash": "e5f83ae96f81",
+      "pass": true,
+      "unit_id": "u7663fc74b8"
+    },
+    "ExpertPoolScheduling.lean": {
+      "hash": "1ac07fb69b21",
+      "pass": true,
+      "unit_id": "u7663fc74b8"
     },
     "GgmlBlockDequant.lean": {
       "hash": "2ccab9926bb8",
@@ -709,10 +724,20 @@
       "pass": true,
       "unit_id": "u6bd5f913be"
     },
+    "NativeMoeCombine.lean": {
+      "hash": "67cf8de975dc",
+      "pass": true,
+      "unit_id": "u7663fc74b8"
+    },
     "NativeQuantizedMatVec.lean": {
       "hash": "6d98f57fd153",
       "pass": true,
       "unit_id": "ub7edb4cd1f"
+    },
+    "NativeRouterWarpTopK.lean": {
+      "hash": "e38b8cec88e3",
+      "pass": true,
+      "unit_id": "u7663fc74b8"
     },
     "PinnedArenaResidency.lean": {
       "hash": "95c31513c6d4",
@@ -728,6 +753,11 @@
       "hash": "9d4c92cbfd4a",
       "pass": true,
       "unit_id": "u00b8180aa2"
+    },
+    "RouterTopKSelection.lean": {
+      "hash": "8bfe4731cca1",
+      "pass": true,
+      "unit_id": "u7663fc74b8"
     },
     "S2CanonicalDequant.lean": {
       "hash": "28c7b39e7f73",
@@ -754,10 +784,20 @@
       "pass": true,
       "unit_id": "u30ab07cd05"
     },
+    "S2GroupedExpert.lean": {
+      "hash": "b8279b44c439",
+      "pass": true,
+      "unit_id": "u7663fc74b8"
+    },
     "SFamilyGemv.lean": {
       "hash": "3a82e6f16e60",
       "pass": true,
       "unit_id": "u30ab07cd05"
+    },
+    "SharedExpertGate.lean": {
+      "hash": "9baa545d14ce",
+      "pass": true,
+      "unit_id": "u7663fc74b8"
     },
     "VramMemoryPlan.lean": {
       "hash": "34a35c59a08a",
@@ -800,12 +840,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "u7663fc74b8": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
