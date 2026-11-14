@@ -20,6 +20,8 @@ inline int64_t blocks_for(int64_t n, int64_t t) { return (n + t - 1) / t; }
 #include "baloon/prefill_kernels_api.hpp"
 
 // Device code (helpers and the kernel bodies) lives in baloon/prefill_kernels_api.hpp behind BALOON_PK_DEFINE_KERNELS.
+// Helpers injected: block_sum (block halving-tree reduction), warp_sum, warp_max (lane reductions),
+// sigm (sigmoid), bf (float->bf16 bits), hf (fp16 bits->float); kernels use __launch_bounds__.
 namespace baloon {
 namespace pk {
 
