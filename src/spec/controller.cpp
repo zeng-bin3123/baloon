@@ -13,6 +13,13 @@
 namespace baloon {
 namespace spec {
 
+// Controller::Controller: initialise MTP priors to 0.86, lookup priors to [0.35, 0.60, 0.80, 0.92].
+Controller::Controller() {
+    for (uint64_t i = 0; i < K_MAX; ++i) mtp_p[i] = 0.86;
+    const double q[4] = {0.35, 0.6, 0.8, 0.92};
+    for (int i = 0; i < 4; ++i) lookup_q[i] = q[i];
+}
+
 // CostModel::CostModel: initialise every table entry to 1.0 (1 ms per verify step).
 CostModel::CostModel() {
     for (uint64_t i = 0; i <= K_MAX; ++i) table[i] = 1.0;

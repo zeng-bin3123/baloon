@@ -88,11 +88,7 @@ public:
     double mtp_p[K_MAX];
     double lookup_q[4];
 
-    Controller() {
-        for (uint64_t i = 0; i < K_MAX; ++i) mtp_p[i] = 0.86;   // prior per MTP position
-        const double q[4] = {0.35, 0.6, 0.8, 0.92};   // lookup prior by match-length bucket
-        for (int i = 0; i < 4; ++i) lookup_q[i] = q[i];
-    }
+    Controller();
 
     // Expected committed tokens of a k-token draft from `src`: 1 + sum of running acceptance products. MTP uses the
     // per-position table; lookup uses one bucket entry (chosen by match length) for every position. k is clipped to
@@ -114,6 +110,11 @@ public:
 };
 
 #ifndef BALOON_SPEC_CONTROLLER_NODEFINE
+inline Controller::Controller() {
+    for (uint64_t i = 0; i < K_MAX; ++i) mtp_p[i] = 0.86;   // prior per MTP position
+    const double q[4] = {0.35, 0.6, 0.8, 0.92};   // lookup prior by match-length bucket
+    for (int i = 0; i < 4; ++i) lookup_q[i] = q[i];
+}
 inline Choice Controller::choose(uint64_t mtp_k_max, uint64_t lookup_avail, uint64_t lookup_match) const {
     const double base = 1.0 / cost.step_ms(0);
     Choice best; best.rate = base;

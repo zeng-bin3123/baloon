@@ -35,7 +35,7 @@ src/core/session.cpp	session_token	src/core/session.cpp	session_token
 src/core/session.cpp	session_zero	src/core/session.cpp	session_zero
 src/core/session.cpp	stage_token	src/core/session.cpp	stage_token
 src/core/session.cpp	token_graph_free	src/core/session.cpp	token_graph_free
-src/spec/controller.cpp	Controller::Constructor	include/baloon/spec_controller.hpp	Controller::Controller
+src/spec/controller.cpp	Controller::Controller	include/baloon/spec_controller.hpp	Controller::Controller
 src/spec/controller.cpp	Controller::choose	src/spec/controller.cpp	Controller::choose
 src/spec/controller.cpp	Controller::expected	include/baloon/spec_controller.hpp	Controller::expected
 src/spec/controller.cpp	Controller::observe	src/spec/controller.cpp	Controller::observe

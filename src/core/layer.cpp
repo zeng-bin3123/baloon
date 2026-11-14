@@ -402,8 +402,6 @@ void doorbell_raise(Doorbell* d, uint64_t v) {
     uint64_t cur = d->word->load(std::memory_order_relaxed);
     while (cur < v && !d->word->compare_exchange_weak(cur, v, std::memory_order_acq_rel)) {}
 }
-uint64_t doorbell_value(const Doorbell* d) { return (d && d->word) ? d->word->load(std::memory_order_acquire) : 0; }
-
 // ---- stage timing ---------------------------------------------------------------------------------------------------------------------
 static StageTimer g_timer;
 static double (*g_clock_ms)() = nullptr;
