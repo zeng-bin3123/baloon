@@ -18,6 +18,7 @@ inline int64_t blocks_for(int64_t n, int64_t t) { return (n + t - 1) / t; }
 #define BALOON_PK_GEOMETRY_IN_TU 1
 #define BALOON_PK_DEFINE_KERNELS 1
 #include "baloon/prefill_kernels_api.hpp"
+#include "kernels_api.cuh"
 
 // Device code (helpers and the kernel bodies) lives in baloon/prefill_kernels_api.hpp behind BALOON_PK_DEFINE_KERNELS.
 // Helpers injected: block_sum (block halving-tree reduction), warp_sum, warp_max (lane reductions),
@@ -163,3 +164,28 @@ int route_ids_bad(const int32_t* ids, int64_t n, int* bad_count) {
 
 }  // namespace pk
 }  // namespace baloon
+
+// R is [T][HC=4][N=2560]; flat index i decomposes as t=i/10240, c=(i%10240)/2560, d=i%2560.
+// grIndex(t,c,d) = t*10240 + c*2560 + d; grIndex_injective proves distinct coords → distinct cells.
+
+// Blob: gate/up codes [1280][640 B], down codes [2560][160 B], gate/up scales [1280][40] f16,
+// down scales [2560][10] f16 — total 1,382,400 bytes. Each code byte holds four 2-bit codes.
+// Weight value = ((c >> 2k) & 3) - 1 ∈ {-1,0,1,2} times block scale of its 64-wide group.
+
+// KV append: row = (page*2 + kvh)*page_size + pos%page_size; int8 codes clamped to [-127,127].
+// kvRow_injective: distinct (page,kvh,pos%ps) → distinct rows. clampQ_range: -128 never written.
+
+// GDN conv: each channel keeps last three inputs (v0,v1,v2); after a chunk of any length,
+// history is exactly its last three values. (convStep_last_three: xs++[a,b,c] → (a,b,c))
+
+// Router: ten rounds of warp arg-max; pairwise step prefers larger probability; ties go to
+// smaller expert id. pick is commutative (pick_comm) → order-independent, all lanes agree.
+
+// Interleaved SwiGLU: gate at column 2k, up at 2k+1 (gateIdx/upIdx). QSA Qf: 256 query values
+// then 256 gate values per head. RoPE rotates pair (p, p+32) of a 64-wide rotary span.
+
+// blob_dequant_kernel: weight code = ((byte >> 2k) & 3); dequantized weight = (code-1) * scale.
+// code2_lt: code ∈ {0,1,2,3}; weightMult_range: code-1 ∈ {-1,0,1,2}. code 1 → zero.
+
+// kv_append_kernel: int8 KV cache codes clamped to [-127,127] (symmetric); -128 is never
+// written. One fp16 scale per 64 values: a 256-wide head row has 4 scale groups.
