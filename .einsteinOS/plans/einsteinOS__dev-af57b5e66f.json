@@ -1,9 +1,9 @@
 {
   "holder": {
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
-    "pid": 31133,
-    "started": "2026-11-13T14:40:07.352138613Z",
-    "renewed": "2026-11-13T17:30:52.285189419Z"
+    "pid": 42442,
+    "started": "2026-11-14T02:32:40.644624353Z",
+    "renewed": "2026-11-14T08:15:27.999599114Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -514,7 +514,8 @@
         "PerLayerEmbeddingBlock.lean",
         "NativePlePostops.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "a991e117-9d73-48a1-af83-9d2561265c90"
     },
     {
       "id": "uaa158d17c5",
@@ -943,6 +944,12 @@
   },
   "last_failure": {},
   "infra_fails": 0,
+  "review_pending": {
+    "u41a85163f4": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -1166,6 +1173,7 @@
     "u00b8180aa2": true,
     "u34082f3355": true,
     "u3e84b3357d": true,
+    "u41a85163f4": true,
     "u46070c5c24": true,
     "u63af4bc057": true,
     "u6bd5f913be": true,
