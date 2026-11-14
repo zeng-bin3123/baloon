@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 42442,
     "started": "2026-11-14T02:32:40.644624353Z",
-    "renewed": "2026-11-14T12:00:44.410760215Z"
+    "renewed": "2026-11-14T16:07:57.654809218Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -540,7 +540,8 @@
         "SpeculativeVerifyWindow.lean",
         "VerifyWindowKernels.lean"
       ],
-      "reason": "initial plan"
+      "reason": "initial plan",
+      "conv": "d0dedfde-e4a1-4d4d-9d90-82acc971f716"
     },
     {
       "id": "u34082f3355",
@@ -940,7 +941,9 @@
       "unit_id": "u7f1ccea730"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "ub848524604": 1
+  },
   "fail_history": {
     "u3e84b3357d": [
       "nothing_written",
@@ -967,13 +970,23 @@
       "nothing_written",
       "review_fail"
     ],
+    "ub848524604": [
+      "compile_fail"
+    ],
     "ufbd318f91b": [
       "compile_fail",
       "compile_fail",
       "review_fail"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "ub848524604": {
+      "kind": "compile_fail",
+      "text": "build.sh exit=1: …_writer.hpp\n[header] include/baloon/q2_row_dot_identity.hpp\n[header] include/baloon/qsa_block_select.hpp\n[header] include/baloon/qsa_cache_indexer.hpp\n[header] include/baloon/qsa_cache_step.hpp\n[header] include/baloon/qsa_decode_attention.hpp\n[header] include/baloon/qsa_geometry_dev.hpp\n[header] include/baloon/qsa_native_kernels.hpp\n[header] include/baloon/qsa_step_kernels.hpp\n[header] include/baloon/quantize_act_kernels.hpp\n[header] include/baloon/ref_pack_builder.hpp\n[header] include/baloon/resident_memory.hpp\n[header] include/baloon/router_top_k_selection.hpp\n[header] include/baloon/rt_device.hpp\n[header] include/baloon/rt_graph.hpp\n[header] include/baloon/rt_kernels.hpp\n[header] include/baloon/rt_layout.hpp\n[header] include/baloon/rt_native.hpp\n[header] include/baloon/rt_pinned.hpp\n[header] include/baloon/rt_testdata.hpp\n[header] include/baloon/s2_expert_grouped_blob.hpp\n[header] include/baloon/s2_gemv_tree.hpp\n[header] include/baloon/s_family_gemv_indexing.hpp\n[header] include/baloon/s_gemv_block_row.hpp\n[header] include/baloon/sampler_chain_contracts.hpp\n[header] include/baloon/scalar_dequantizers.hpp\n[header] include/baloon/serve_chat.hpp\n[header] include/baloon/serve_engine.hpp\n[header] include/baloon/serve_frontend.hpp\n[header] include/baloon/serve_http.hpp\n[header] include/baloon/serve_server.hpp\n[header] include/baloon/session_driver.hpp\n[header] include/baloon/session_loop_contract.hpp\n[header] include/baloon/session_schedule.hpp\n[header] include/baloon/session_state_layout.hpp\n[header] include/baloon/setup_tool.hpp\n[header] include/baloon/shared_expert_batch.hpp\n[header] include/baloon/shared_expert_layout.hpp\n[header] include/baloon/spec_controller.hpp\n[header] include/baloon/suffix_drafter.hpp\n[header] include/baloon/u11_expert.hpp\n[header] include/baloon/u11_native_dense.hpp\n[header] include/baloon/u11_ngram.hpp\n[header] include/baloon/ua96_geometry.hpp\n[header] include/baloon/ucc7_geometry.hpp\n[header] include/baloon/verify_commit_dev.hpp\n[header] include/baloon/verify_kernels.hpp\n[header] include/baloon/verify_window_commit.hpp\n[header] include/baloon/verify_window_indexing.hpp\n[header] include/baloon/verify_window_kernels.hpp\n[header] include/baloon/verify_window_protocol.hpp\n[header] include/baloon/vision_build_config.hpp\n[header] include/baloon/vision_encoder_protocol.hpp\n[header] include/baloon/vision_tool_config.hpp\n[header] include/baloon/weight_loader.hpp\n[header] include/baloon/weight_loader_segments.hpp\n[header] include/baloon/window_verifier.hpp\n[object] src/core/expert_cache.cpp\n[object] src/core/expert_source.cpp\n[object] src/core/graph.cpp\n[object] src/core/layer.cpp\nsrc/core/layer.cpp:405:10: error: redefinition of 'doorbell_value'\nuint64_t doorbell_value(const Doorbell* d) { return (d \u0026\u0026 d-\u003eword) ? d-\u003eword-\u003eload(std::memory_order_acquire) : 0; }\n         ^\ninclude/baloon/core_layer.hpp:189:17: note: previous definition is here\ninline uint64_t doorbell_value(const Doorbell* d) {\n                ^\n1 error generated.",
+      "base_ref": "einsteinOS/dev-af57b5e66f-wip-ub848524604",
+      "base_sha": "0a81dfa3f58d4e8733a0ad3d645135fe559a1729"
+    }
+  },
   "infra_fails": 0,
   "port_units": [
     {
@@ -1207,6 +1220,7 @@
     "u883f305326": true,
     "ua1c077067b": true,
     "ub7edb4cd1f": true,
+    "ub848524604": true,
     "ube91486083": true,
     "ued2beb8a35": true,
     "ufbd318f91b": true
