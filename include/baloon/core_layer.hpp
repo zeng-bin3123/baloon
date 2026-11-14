@@ -186,7 +186,9 @@ void doorbell_init(Doorbell* d);
 void doorbell_reset(Doorbell* d);
 void doorbell_free(Doorbell* d);
 void doorbell_raise(Doorbell* d, uint64_t v);      // monotone: never lowers the ring
-uint64_t doorbell_value(const Doorbell* d);
+inline uint64_t doorbell_value(const Doorbell* d) {
+    return (d && d->word) ? d->word->load(std::memory_order_acquire) : 0;
+}
 
 // ---- stage timing -------------------------------------------------------------------------------------------------------
 struct StageTimer {

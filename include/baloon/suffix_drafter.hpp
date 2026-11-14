@@ -15,7 +15,9 @@ constexpr uint32_t WAYS = 4;
 
 inline uint64_t key_of(uint64_t x) { return x | 1ull; }                       // never 0 (0 marks an empty slot)
 // One hashing round: fold token `tok` into running state `x` (xor, FNV prime multiply, xorshift fold).
+#ifndef BALOON_SUFFIX_DRAFTER_NODEFINE
 inline uint64_t mix(uint64_t x, uint32_t tok) { x ^= tok; x *= 0x100000001b3ull; x ^= x >> 29; return x; }
+#endif  // BALOON_SUFFIX_DRAFTER_NODEFINE
 inline uint64_t probe_next(uint64_t i, uint64_t cap) { return (i + 1) % cap; }  // wraps
 
 // Newest-first way list with at most W entries.
@@ -108,6 +110,7 @@ private:
     uint64_t mask_ = 0, min_match_, max_match_;
 };
 
+#ifndef BALOON_SUFFIX_DRAFTER_NODEFINE
 inline void SuffixDrafter::reset() {
     hist_.clear();
     for (Slot& s : slots_) s = Slot{};
@@ -164,6 +167,7 @@ inline std::vector<uint32_t> SuffixDrafter::propose(uint64_t max_k) const {
     for (uint64_t j = 0; j < k; ++j) out.push_back(hist_[best_end + 1 + j]);
     return out;
 }
+#endif  // BALOON_SUFFIX_DRAFTER_NODEFINE
 
 }  // namespace suffix
 }  // namespace baloon
