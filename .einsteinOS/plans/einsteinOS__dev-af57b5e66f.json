@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 42442,
     "started": "2026-11-14T02:32:40.644624353Z",
-    "renewed": "2026-11-14T11:56:08.089634383Z"
+    "renewed": "2026-11-14T12:00:44.410760215Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -844,6 +844,16 @@
       "pass": true,
       "unit_id": "u6bd5f913be"
     },
+    "PrefillChunkPlanner.lean": {
+      "hash": "dec64d8d29bf",
+      "pass": true,
+      "unit_id": "uaa158d17c5"
+    },
+    "PrefillKernelIndexing.lean": {
+      "hash": "ac20a3755c55",
+      "pass": true,
+      "unit_id": "uaa158d17c5"
+    },
     "Q2Avx2Fallback.lean": {
       "hash": "c6f5336e67f4",
       "pass": true,
@@ -909,6 +919,11 @@
       "pass": true,
       "unit_id": "u30ab07cd05"
     },
+    "SamplerChain.lean": {
+      "hash": "4092d6c911eb",
+      "pass": true,
+      "unit_id": "uaa158d17c5"
+    },
     "SharedExpertGate.lean": {
       "hash": "9baa545d14ce",
       "pass": true,
@@ -960,12 +975,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "uaa158d17c5": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
