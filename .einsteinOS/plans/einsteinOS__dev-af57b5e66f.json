@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 42442,
     "started": "2026-11-14T02:32:40.644624353Z",
-    "renewed": "2026-11-14T19:25:26.637100268Z"
+    "renewed": "2026-11-14T19:59:53.684831496Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -725,6 +725,11 @@
       "pass": true,
       "unit_id": "ued2beb8a35"
     },
+    "GenerateRunContract.lean": {
+      "hash": "65c915ec2e3b",
+      "pass": true,
+      "unit_id": "ub848524604"
+    },
     "GgmlBlockDequant.lean": {
       "hash": "2ccab9926bb8",
       "pass": true,
@@ -764,6 +769,11 @@
       "hash": "72a3dea364d9",
       "pass": true,
       "unit_id": "u7f1ccea730"
+    },
+    "MtpDraftChain.lean": {
+      "hash": "8358c6ee4f90",
+      "pass": true,
+      "unit_id": "ub848524604"
     },
     "NativeDenseOverride.lean": {
       "hash": "d9b2407554ae",
@@ -925,15 +935,50 @@
       "pass": true,
       "unit_id": "uaa158d17c5"
     },
+    "SessionTokenLoop.lean": {
+      "hash": "03a39aac6e4c",
+      "pass": true,
+      "unit_id": "ub848524604"
+    },
     "SharedExpertGate.lean": {
       "hash": "9baa545d14ce",
       "pass": true,
       "unit_id": "u7663fc74b8"
     },
+    "SpecDecodeController.lean": {
+      "hash": "3790655113cd",
+      "pass": true,
+      "unit_id": "ub848524604"
+    },
+    "SpeculativeVerifyWindow.lean": {
+      "hash": "a969f51e554b",
+      "pass": true,
+      "unit_id": "ub848524604"
+    },
+    "SuffixLookupDrafter.lean": {
+      "hash": "4ab4e96caddd",
+      "pass": true,
+      "unit_id": "ub848524604"
+    },
+    "TeacherForcedDecodeLoop.lean": {
+      "hash": "a3ac0ed21d58",
+      "pass": true,
+      "unit_id": "ub848524604"
+    },
     "TopkThresholdSelect.lean": {
       "hash": "f7bab54ee59e",
       "pass": true,
       "unit_id": "ua1c077067b"
+    },
+    "VerifyWindowKernels.lean": {
+      "hash": "db0dbbaeccfe",
+      "pass": true,
+      "unit_id": "ub848524604"
+    },
+    "VerifyWindowSchedule.lean": {
+      "hash": "54342884a981",
+      "pass": true,
+      "unit_id": "ub848524604"
     },
     "VramMemoryPlan.lean": {
       "hash": "34a35c59a08a",
@@ -941,9 +986,7 @@
       "unit_id": "u7f1ccea730"
     }
   },
-  "fix_attempts": {
-    "ub848524604": 1
-  },
+  "fix_attempts": {},
   "fail_history": {
     "u3e84b3357d": [
       "nothing_written",
@@ -979,21 +1022,8 @@
       "review_fail"
     ]
   },
-  "last_failure": {
-    "ub848524604": {
-      "kind": "compile_fail",
-      "text": "build.sh exit=1: …_writer.hpp\n[header] include/baloon/q2_row_dot_identity.hpp\n[header] include/baloon/qsa_block_select.hpp\n[header] include/baloon/qsa_cache_indexer.hpp\n[header] include/baloon/qsa_cache_step.hpp\n[header] include/baloon/qsa_decode_attention.hpp\n[header] include/baloon/qsa_geometry_dev.hpp\n[header] include/baloon/qsa_native_kernels.hpp\n[header] include/baloon/qsa_step_kernels.hpp\n[header] include/baloon/quantize_act_kernels.hpp\n[header] include/baloon/ref_pack_builder.hpp\n[header] include/baloon/resident_memory.hpp\n[header] include/baloon/router_top_k_selection.hpp\n[header] include/baloon/rt_device.hpp\n[header] include/baloon/rt_graph.hpp\n[header] include/baloon/rt_kernels.hpp\n[header] include/baloon/rt_layout.hpp\n[header] include/baloon/rt_native.hpp\n[header] include/baloon/rt_pinned.hpp\n[header] include/baloon/rt_testdata.hpp\n[header] include/baloon/s2_expert_grouped_blob.hpp\n[header] include/baloon/s2_gemv_tree.hpp\n[header] include/baloon/s_family_gemv_indexing.hpp\n[header] include/baloon/s_gemv_block_row.hpp\n[header] include/baloon/sampler_chain_contracts.hpp\n[header] include/baloon/scalar_dequantizers.hpp\n[header] include/baloon/serve_chat.hpp\n[header] include/baloon/serve_engine.hpp\n[header] include/baloon/serve_frontend.hpp\n[header] include/baloon/serve_http.hpp\n[header] include/baloon/serve_server.hpp\n[header] include/baloon/session_driver.hpp\n[header] include/baloon/session_loop_contract.hpp\n[header] include/baloon/session_schedule.hpp\n[header] include/baloon/session_state_layout.hpp\n[header] include/baloon/setup_tool.hpp\n[header] include/baloon/shared_expert_batch.hpp\n[header] include/baloon/shared_expert_layout.hpp\n[header] include/baloon/spec_controller.hpp\n[header] include/baloon/suffix_drafter.hpp\n[header] include/baloon/u11_expert.hpp\n[header] include/baloon/u11_native_dense.hpp\n[header] include/baloon/u11_ngram.hpp\n[header] include/baloon/ua96_geometry.hpp\n[header] include/baloon/ucc7_geometry.hpp\n[header] include/baloon/verify_commit_dev.hpp\n[header] include/baloon/verify_kernels.hpp\n[header] include/baloon/verify_window_commit.hpp\n[header] include/baloon/verify_window_indexing.hpp\n[header] include/baloon/verify_window_kernels.hpp\n[header] include/baloon/verify_window_protocol.hpp\n[header] include/baloon/vision_build_config.hpp\n[header] include/baloon/vision_encoder_protocol.hpp\n[header] include/baloon/vision_tool_config.hpp\n[header] include/baloon/weight_loader.hpp\n[header] include/baloon/weight_loader_segments.hpp\n[header] include/baloon/window_verifier.hpp\n[object] src/core/expert_cache.cpp\n[object] src/core/expert_source.cpp\n[object] src/core/graph.cpp\n[object] src/core/layer.cpp\nsrc/core/layer.cpp:405:10: error: redefinition of 'doorbell_value'\nuint64_t doorbell_value(const Doorbell* d) { return (d \u0026\u0026 d-\u003eword) ? d-\u003eword-\u003eload(std::memory_order_acquire) : 0; }\n         ^\ninclude/baloon/core_layer.hpp:189:17: note: previous definition is here\ninline uint64_t doorbell_value(const Doorbell* d) {\n                ^\n1 error generated.",
-      "base_ref": "einsteinOS/dev-af57b5e66f-wip-ub848524604",
-      "base_sha": "0a81dfa3f58d4e8733a0ad3d645135fe559a1729"
-    }
-  },
+  "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "ub848524604": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
