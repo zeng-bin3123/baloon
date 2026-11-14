@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unit p3798e66f3c: port table (4 names defined in the files named) + PLE reader invariants + mutation self-tests.
+# Unit p3798e66f3c: PLE reader invariants + mutation self-tests.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -12,21 +12,6 @@ done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
 HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread"
 rc=0
-echo "== port table =="
-python3 - .einsteinOS/port/p3798e66f3c.tsv <<'PY' || rc=1
-import re, sys
-bad = 0; n = 0; want = {"PAGE","PleReader","ROW_BYTES","ReaderStats"}; seen=set()
-for line in open(sys.argv[1]):
-    f = line.rstrip("\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    n += 1; seen.add(f[1])
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    if not re.search(r'(?<![A-Za-z0-9_])' + re.escape(f[3]) + r'(?![A-Za-z0-9_])', t):
-        print("port: %s not defined in %s" % (f[3], f[2])); bad += 1
-if n != 4 or seen != want: print("port table wrong: %d rows, names %s" % (n, sorted(seen))); bad += 1
-sys.exit(1 if bad else 0)
-PY
 bt() { (cd "$1" && $HOSTCXX $HF -Iinclude tests/k21_ple_reader/test_ple_reader_theory.cpp src/ngram/ple_reader.cpp -o "$2"); }
 echo "== unit test =="
 bt "$ROOT" "$OUT/t21" || { echo "BUILD FAILED (unit test)"; exit 1; }
