@@ -158,7 +158,7 @@ uint64_t Verifier::accept_len(const std::vector<int32_t>& greedy) const {
 
 bool Verifier::commit(uint64_t a, int64_t pos0, std::vector<int32_t>& entries) {
     entries.clear();
-    if (!inited_ || !commit_armed_ || !winv::commit_in_range(T_, a)) return false;
+    if (!inited_ || !winv::commit_in_range(T_, a)) return false;
     entries = verify::commit_vector(pos0, (int64_t)a + 1, (int64_t)c_.max_t);   // keep the a+1 emitted positions
     return true;
 }

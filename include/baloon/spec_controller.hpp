@@ -73,8 +73,10 @@ struct CostModel {
     double step_ms(uint64_t k) const;   // verify-pass time of a k-token draft (n = k+1, clamped)
     double step(uint64_t k) const { return step_ms(k); }
 };
+#ifndef BALOON_SPEC_CONTROLLER_NODEFINE
 inline CostModel::CostModel() { for (uint64_t i = 0; i <= K_MAX; ++i) table[i] = 1.0; }
 inline double CostModel::step_ms(uint64_t k) const { return table[step_idx(k)]; }
+#endif  // BALOON_SPEC_CONTROLLER_NODEFINE
 
 struct Choice { Drafter drafter = Drafter::None; uint64_t k = 0; double rate = 0.0; };
 
@@ -86,11 +88,7 @@ public:
     double mtp_p[K_MAX];
     double lookup_q[4];
 
-    Controller() {
-        for (uint64_t i = 0; i < K_MAX; ++i) mtp_p[i] = 0.86;   // prior per MTP position
-        const double q[4] = {0.35, 0.6, 0.8, 0.92};   // lookup prior by match-length bucket
-        for (int i = 0; i < 4; ++i) lookup_q[i] = q[i];
-    }
+    Controller();
 
     // Expected committed tokens of a k-token draft from `src`: 1 + sum of running acceptance products. MTP uses the
     // per-position table; lookup uses one bucket entry (chosen by match length) for every position. k is clipped to
@@ -111,6 +109,12 @@ public:
     void observe(Drafter d, uint64_t k, uint64_t accepted, uint64_t lookup_match = 0);
 };
 
+#ifndef BALOON_SPEC_CONTROLLER_NODEFINE
+inline Controller::Controller() {
+    for (uint64_t i = 0; i < K_MAX; ++i) mtp_p[i] = 0.86;   // prior per MTP position
+    const double q[4] = {0.35, 0.6, 0.8, 0.92};   // lookup prior by match-length bucket
+    for (int i = 0; i < 4; ++i) lookup_q[i] = q[i];
+}
 inline Choice Controller::choose(uint64_t mtp_k_max, uint64_t lookup_avail, uint64_t lookup_match) const {
     const double base = 1.0 / cost.step_ms(0);
     Choice best; best.rate = base;
@@ -137,6 +141,7 @@ inline void Controller::observe(Drafter d, uint64_t k, uint64_t accepted, uint64
         else { double& q = lookup_q[bucket(lookup_match)]; q += ema * (hit - q); }
     }
 }
+#endif  // BALOON_SPEC_CONTROLLER_NODEFINE
 
 // ---- fixed-point (per mille, 1000 = 1.0) forms of the theory -------------------------------------------------------------
 // Clamped table position n = max(1, min(k+1, K_MAX+1)); the table index is n-1.
