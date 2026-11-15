@@ -4,6 +4,7 @@
 //   gguf_reader <file> get <key>       one metadata value (exit 1 when absent)
 //   gguf_reader <file> tensors         tensor directory: name type shape offset bytes
 //   gguf_reader <file> check <arch>    architecture check; for "qwen4exp" also the expert-count guard
+// GGUF format: magic 0x46554747 (LE), version 2 (old) or 3 (current); alignment default 32.
 // Exit codes: 0 ok, 1 file unreadable / malformed / key absent / check failed, 2 usage error.
 #include <cinttypes>
 #include <cstdio>
@@ -132,6 +133,7 @@ inline int run(int argc, char** argv, std::FILE* out, std::FILE* err) {
         uint64_t total = 0; for (auto& t : f->tensors) total += t.nbytes();
         std::fprintf(out, "tensor_bytes: %" PRIu64 "\n", total);
     } else if (cmd == "meta") {
+        // meta_order holds keys in parse (file insertion) order, not alphabetical.
         for (auto& k : f->meta_order)
             std::fprintf(out, "%s [%s] = %s\n", k.c_str(), meta_type_name(f->meta.at(k).type), render(f->meta.at(k)).c_str());
     } else if (cmd == "get") {
@@ -139,10 +141,14 @@ inline int run(int argc, char** argv, std::FILE* out, std::FILE* err) {
         if (!m) { std::fprintf(err, "key not found: %s\n", argv[3]); return 1; }
         std::fprintf(out, "%s\n", render(*m).c_str());
     } else if (cmd == "tensors") {
+        // nbytes() = prod(shape) * sizeof(ggml_type), rounded to data alignment.
         for (auto& t : f->tensors)
             std::fprintf(out, "%s %s %s %" PRIu64 " %" PRIu64 "\n", t.name.c_str(), ggml_type_name(t.type),
                          shape_str(t).c_str(), t.offset, t.nbytes());
-    } else {  // check
+    } else {  // check <arch>
+        // check_architecture verifies general.architecture == wanted arch name.
+        // kGuardArch=="qwen4exp" also runs Qwen4ExpGuard:
+        //   expert_count in [4,128] and expert_used_count >= 1 (arch.* metadata).
         const std::string want = argv[3];
         if (!check_architecture(*f, want)) { std::fprintf(err, "architecture mismatch (want %s)\n", want.c_str()); return 1; }
         if (want == kGuardArch) {

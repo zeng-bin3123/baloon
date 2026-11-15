@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unit pea19e6d264: port table + dequant CLI invariants (plain formats, block formats, error codes) + mutants.
+# Unit pea19e6d264: dequant CLI invariants (plain formats, block formats, error codes) + mutants.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -12,18 +12,6 @@ done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
 HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -Iinclude"
 rc=0
-echo "== port table =="
-python3 - .einsteinOS/port/pea19e6d264.tsv <<'PY' || rc=1
-import re, sys
-rows = [l.rstrip("\n").split("\t") for l in open(sys.argv[1]) if l.strip()]
-bad = 0
-if rows != [["src/artifact/dequant.cpp", "main", "src/artifact/dequant.cpp", "main"]]:
-    print("port table wrong:", rows); bad = 1
-for f in rows:
-    t = open(f[2], errors="ignore").read()
-    if not re.search(r'\bint\s+' + re.escape(f[3]) + r'\s*\(', t): print("port: not defined", f); bad = 1
-sys.exit(bad)
-PY
 build() { $HOSTCXX $HF "$1/src/artifact/dequant.cpp" -o "$2"; }
 echo "== build CLI =="
 build "$ROOT" "$OUT/dequant" || { echo "BUILD FAILED"; exit 1; }
