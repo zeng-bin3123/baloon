@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 7297,
     "started": "2026-11-15T08:53:46.338756462Z",
-    "renewed": "2026-11-15T16:02:12.770600777Z"
+    "renewed": "2026-11-15T19:58:24.677725821Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -986,8 +986,13 @@
       "unit_id": "u7f1ccea730"
     }
   },
-  "fix_attempts": {},
+  "fix_attempts": {
+    "p17652417b0": 1
+  },
   "fail_history": {
+    "p17652417b0": [
+      "smoke_fail"
+    ],
     "u3e84b3357d": [
       "nothing_written",
       "nothing_written"
@@ -1022,7 +1027,14 @@
       "review_fail"
     ]
   },
-  "last_failure": {},
+  "last_failure": {
+    "p17652417b0": {
+      "kind": "smoke_fail",
+      "text": "test.sh exit=1: == unit test ==\n  \"Q2_0\": 2,\n  \"Q8_0\": 1\n }\n}\n== mutation self-tests (each mutant must be caught) ==\nmutant packorder killed\nmutant pad killed\nmutant q6hi killed\nmutant bias killed\nmutant q3mask killed\nmutant scalemin killed\nmutant q50high killed\nmutant nibsplit killed\nmutant bf16 killed\nmutant interleave killed\nmutant planeoff killed\nmutant planeoff2 killed\nmutant buildorder killed\nmutant q4sign killed\nmutant q2cands killed\nmutant q8scale killed\nmutant q2tie killed\nmutant actround killed\nmutant bytemap killed\nmutant bpeorder killed\nmutant dataoff killed\nmutant writerpad killed\nmutant q2deq killed\nmutant expertname killed\nmutant refbits killed\nmutant refscale killed\nmutant refdigest killed\nmutant refalign killed\nmutant refexpflag killed\nmutant refdup killed\nmutant modelbytes killed\nmutant overlay killed\nmutant rangeslice killed\nmutant hdrstart killed\nmutant arenawhole killed\nmutant gguf_py: pattern not found\nTESTS FAILED",
+      "base_ref": "einsteinOS/dev-af57b5e66f-wip-p17652417b0",
+      "base_sha": "6466ddc0c2eab776c41da779b60ac4b4431583c7"
+    }
+  },
   "infra_fails": 0,
   "port_units": [
     {
@@ -1264,6 +1276,7 @@
   "verify_seen": {
     "p07483d6c70": true,
     "p150f8257d5": true,
+    "p17652417b0": true,
     "p23c45d5e6e": true,
     "p3199202ac2": true,
     "p3798e66f3c": true,
