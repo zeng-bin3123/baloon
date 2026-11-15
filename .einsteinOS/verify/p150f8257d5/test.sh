@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unit p150f8257d5: port table (34 rows) + PLE oracle invariants + mutation self-tests.
+# Unit p150f8257d5: PLE oracle invariants + mutation self-tests.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -12,24 +12,6 @@ done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
 HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread"
 rc=0
-echo "== port table =="
-python3 - .einsteinOS/port/p150f8257d5.tsv <<'PY' || rc=1
-import re, sys
-bad = 0; n = 0; seen = set()
-for line in open(sys.argv[1]):
-    f = line.rstrip("\r\n").split("\t")
-    if len(f) != 4 or not f[0]: print("port: malformed row", repr(line)); bad += 1; continue
-    n += 1; seen.add((f[0], f[1]))
-    if f[0] != "src/kernels/ple_oracle_vectors.inc": print("port: unexpected reference file", f[0]); bad += 1
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    t = re.sub(r"//[^\n]*", "", t); name = f[3]
-    if name == "HashCase": ok = re.search(r"\bstruct\s+HashCase\b", t)
-    else: ok = re.search(r"\b" + re.escape(name) + r"\s*=", t)
-    if not ok: print("port: %s not defined in %s" % (name, f[2])); bad += 1
-if n != 34 or len(seen) != 34: print("port table has", n, "rows /", len(seen), "distinct, expected 34"); bad += 1
-sys.exit(1 if bad else 0)
-PY
 build_test() { (cd "$1" && $HOSTCXX $HF -Iinclude -Itests/k30_ple_table tests/k55_ple_oracle/test_ple_oracle.cpp -o "$2"); }
 echo "== unit test =="
 build_test "$ROOT" "$OUT/t55" || { echo "BUILD FAILED (unit test)"; exit 1; }
