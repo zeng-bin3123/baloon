@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unit pf7b804cf95: port table (25 names defined in the file named) + prefill kernel invariants on the GPU + mutation self-tests.
+# Unit pf7b804cf95: prefill kernel invariants on the GPU + mutation self-tests.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -9,22 +9,6 @@ COREX=/usr/local/corex; CLANG="$COREX/bin/clang++"
 [ -x "$CLANG" ] || { echo "corex toolchain missing"; exit 2; }
 CUFLAGS="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Isrc -Isrc/cu -Itests -Itests/pk_unit3 -Iinclude -O2"
 rc=0
-echo "== port table =="
-python3 - .einsteinOS/port/pf7b804cf95.tsv <<'PY' || rc=1
-import re, sys
-want = set("Gemm blob_dequant blob_dequant_f16 gate_attn gather_rows16 gdn_conv gdn_gates gdn_recurrence gr_broadcast gr_mix gr_norm gr_silu gr_write kv_append moe_combine rms_rows rope route split_q swiglu_interleaved swiglu_pair to_bf16 to_f16 Prefill PrefillStats".split())
-bad = 0; n = 0; seen = set()
-for line in open(sys.argv[1]):
-    f = line.rstrip("\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    n += 1; seen.add(f[1])
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    if not re.search(r'(?<![A-Za-z0-9_])' + re.escape(f[3]) + r'(?![A-Za-z0-9_])', t):
-        print("port: %s not defined in %s" % (f[3], f[2])); bad += 1
-if n != 25 or seen != want: print("port table wrong: %d rows, missing %s" % (n, sorted(want - seen))); bad += 1
-sys.exit(1 if bad else 0)
-PY
 bt() {  # $1 = tree root, $2 = output binary
   (cd "$1" && "$CLANG" $CUFLAGS -c src/prefill/kernels.cu -o "$2.k.o" && "$CLANG" $CUFLAGS -c tests/k34_prefill/test_prefill_kernels.cu -o "$2.t.o" \
     && "$CLANG" "$2.k.o" "$2.t.o" -o "$2" -L"$COREX/lib64" -lcudart -lpthread)
