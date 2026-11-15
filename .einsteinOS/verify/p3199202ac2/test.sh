@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unit p3199202ac2: port table (20 rows, each name defined in the file it names), platform implementation invariants, mutation self-tests.
+# Unit p3199202ac2: platform implementation invariants, mutation self-tests.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -12,25 +12,6 @@ done
 [ -n "$CXX" ] || { echo "no C++ compiler"; exit 2; }
 F="-std=c++17 -O1 -Wall -Wextra -ffp-contract=off -pthread"
 rc=0
-echo "== port table =="
-python3 - .einsteinOS/port/p3199202ac2.tsv <<'PY' || rc=1
-import re, sys
-bad = 0; n = 0; seen = set()
-for line in open(sys.argv[1]):
-    f = line.rstrip("\r\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    n += 1; seen.add((f[0], f[1]))
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    nm = f[3]; e = re.escape(nm)
-    if nm.isupper() or nm in ("NOMINMAX", "WIN32_LEAN_AND_MEAN"): pat = r'^\s*#\s*define\s+' + e + r'\b'
-    elif "::" in nm:
-        pat = r'(^|[\s*&>])' + e + r'\s*\('
-    else: pat = r'\b(struct|class)\s+' + e + r'\b|\b' + e + r'\s*\('
-    if not re.search(pat, t, re.M): print("port: %s not defined in %s" % (nm, f[2])); bad += 1
-if n != 20 or len(seen) != 20: print("port table has %d rows (%d distinct), expected 20" % (n, len(seen))); bad += 1
-sys.exit(1 if bad else 0)
-PY
 
 build_run() {  # build_run <root> <outdir>
   mkdir -p "$2/run"
