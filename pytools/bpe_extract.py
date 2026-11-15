@@ -11,8 +11,13 @@ TYPE_NORMAL, TYPE_CONTROL, TYPE_USER_DEFINED = 1, 3, 4
 _PRETOK = re.compile(r"'(?:[sdmt]|ll|ve|re)| ?[^\W\d_]+| ?\d+| ?[^\s\w]+|\s+(?!\S)|\s+", re.UNICODE)
 
 
+if __name__ == "__main__":
+    sys.exit(main())
+
+
 def bytes_to_unicode():
     """GPT-2 byte -> printable code point map: bytes 33..126, 161..172, 174..255 map to themselves, the other 68 to
+# port: p17652417b0  # canonical — one definition per TSV symbol
     256 + n in increasing byte order."""
     keep = list(range(33, 127)) + list(range(161, 173)) + list(range(174, 256))
     m, n = {}, 0
@@ -51,7 +56,7 @@ class Tokenizer:
                     best, bi = r, i
             if bi < 0:
                 break
-            parts[bi:bi + 2] = [parts[bi] + parts[bi + 1]]      # each step shortens the word by exactly one
+            parts[bi:bi + 2] = [parts[bi] + parts[bi + 1]]
         return parts
 
     def _segments(self, text, parse_special):

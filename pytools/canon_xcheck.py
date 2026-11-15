@@ -3,6 +3,7 @@ canonical form decodes bit-exactly to the straight-line ggml dequantiser.
 
 Decode rule: (code - bias) * scale  (bias applied to the INTEGER code before the single float multiply),
 scale * code - offset for Q4_K / Q5_K, scale * kvalues_iq4nl[code] for the IQ4 types."""
+# port: p17652417b0  # canonical — one definition per TSV symbol
 import sys
 from collections import namedtuple
 
@@ -34,16 +35,6 @@ PASSTHROUGH = {"F16": (1, "P16", 2), "BF16": (30, "P32", 2), "F32": (0, "P32", 4
 _SPEC_BY_TYPE = {s.type: s for s in MAPPINGS.values()}
 
 
-def reference_name(t):
-    """ggml type name for a type id (or a name, normalised)."""
-    if isinstance(t, str):
-        u = t.upper()
-        if u in MAPPINGS or u in PASSTHROUGH:
-            return u
-        raise KeyError(t)
-    return gf.type_name(t)
-
-
 # ---- helpers ------------------------------------------------------------------------------------------------------
 def _blocks(raw, size):
     r = np.frombuffer(bytes(raw), dtype=np.uint8)
@@ -54,14 +45,6 @@ def _blocks(raw, size):
 
 def _f16(b2):
     return np.ascontiguousarray(b2).view(np.float16).astype(np.float32).reshape(-1)
-
-
-def get_scale_min_k4(j, q):
-    """6-bit (scale, min) pair of group j (0..7) from the 12 packed bytes q (works on [..., 12] arrays)."""
-    q = np.asarray(q).astype(np.int64)
-    if j < 4:
-        return q[..., j] & 63, q[..., j + 4] & 63
-    return (q[..., j + 4] & 0xF) | ((q[..., j - 4] >> 6) << 4), (q[..., j + 4] >> 4) | ((q[..., j] >> 6) << 4)
 
 
 def unpack_q3_k_scales(packed12):
@@ -224,9 +207,6 @@ def to_s8_q5_0(raw): return _encode("Q5_0", raw)
 def to_s8_q5_k(raw): return _encode("Q5_K", raw)
 def to_s8_q6_K(raw): return _encode("Q6_K", raw)
 def to_s8_q8_0(raw): return _encode("Q8_0", raw)
-
-
-def from_s2(c): return _decode("Q2_0", c)
 def from_s4_q4_0(c): return _decode("Q4_0", c)
 def from_s4_iq4_nl(c): return _decode("IQ4_NL", c)
 def from_s4_iq4_xs(c): return _decode("IQ4_XS", c)
@@ -414,29 +394,7 @@ _REFERENCE = {"Q2_0": _rd_q2_0, "Q4_0": _rd_q4_0, "IQ4_NL": _rd_iq4_nl, "Q5_0": 
               "Q3_K": _rd_q3_k, "IQ4_XS": _rd_iq4_xs}
 
 
-def reference_values(t, raw):
-    """float32 values of raw blocks of type t (id or name) via the block-by-block reference dequantiser."""
-    name = reference_name(t)
-    if name in PASSTHROUGH:
-        return {"F16": from_p16_f16(to_p16_f16(raw)), "BF16": from_p32_bf16(to_p32_bf16(raw)),
-                "F32": from_p32_f32(to_p32_f32(raw))}[name]
-    s = MAPPINGS[name]
-    b = _blocks(raw, s.block_bytes)
-    return np.concatenate([_REFERENCE[name](b[i]) for i in range(len(b))])
-
-
 # ---- shard access and the full cross-check ---------------------------------------------------------------------------
-def open_shard(path):
-    return gf.GGUFFile(path)
-
-
-def data_section_offset(g):
-    """Absolute offset of the tensor data section of a GGUFFile (or of a path), always a multiple of the alignment."""
-    if isinstance(g, (str, bytes)) or hasattr(g, "__fspath__"):
-        with open_shard(g) as f:
-            return data_section_offset(f)
-    assert g.data_offset % g.alignment == 0
-    return g.data_offset
 
 
 def _bits_equal(a, b):
@@ -458,6 +416,54 @@ def check_block_set(name, raw):
     if name == "Q2_0" and s2_to_raw(c) != bytes(raw):
         bad.append("Q2_0: S2 form is not lossless on the raw bytes")
     return bad
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+
+def get_scale_min_k4(j, q):
+    """6-bit (scale, min) pair of group j (0..7) from the 12 packed bytes q (works on [..., 12] arrays)."""
+    q = np.asarray(q).astype(np.int64)
+    if j < 4:
+        return q[..., j] & 63, q[..., j + 4] & 63
+    return (q[..., j + 4] & 0xF) | ((q[..., j - 4] >> 6) << 4), (q[..., j + 4] >> 4) | ((q[..., j] >> 6) << 4)
+
+def from_s2(c): return _decode("Q2_0", c)
+
+
+def reference_name(t):
+    """ggml type name for a type id (or a name, normalised)."""
+    if isinstance(t, str):
+        u = t.upper()
+        if u in MAPPINGS or u in PASSTHROUGH:
+            return u
+        raise KeyError(t)
+    return gf.type_name(t)
+
+
+def reference_values(t, raw):
+    """float32 values of raw blocks of type t (id or name) via the block-by-block reference dequantiser."""
+    name = reference_name(t)
+    if name in PASSTHROUGH:
+        return {"F16": from_p16_f16(to_p16_f16(raw)), "BF16": from_p32_bf16(to_p32_bf16(raw)),
+                "F32": from_p32_f32(to_p32_f32(raw))}[name]
+    s = MAPPINGS[name]
+    b = _blocks(raw, s.block_bytes)
+    return np.concatenate([_REFERENCE[name](b[i]) for i in range(len(b))])
+
+
+def open_shard(path):
+    return gf.GGUFFile(path)
+
+
+def data_section_offset(g):
+    """Absolute offset of the tensor data section of a GGUFFile (or of a path), always a multiple of the alignment."""
+    if isinstance(g, (str, bytes)) or hasattr(g, "__fspath__"):
+        with open_shard(g) as f:
+            return data_section_offset(f)
+    assert g.data_offset % g.alignment == 0
+    return g.data_offset
 
 
 def run_full(path, blocks=8):

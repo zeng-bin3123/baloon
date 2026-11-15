@@ -5,6 +5,7 @@ the source file.
 Entry = {name, type, shape, expert, kind, bits, scale_dtype, planes: {role: {offset, nbytes, count, sha256}}, sha256}
 where `sha256` is the digest of the ORIGINAL raw tensor bytes. Roles: codes, scales, offsets (passthrough types: one
 `codes` plane holding the 16/32-bit words)."""
+# port: p17652417b0  # canonical — one definition per TSV symbol
 import hashlib
 import json
 import os
@@ -20,6 +21,42 @@ from . import planes
 VERSION = 1
 ROLES = ("codes", "scales", "offsets")
 _WORD = {"F16": ("P16", 16), "BF16": ("P32", 32), "F32": ("P32", 32)}
+
+
+def _fdt(d):
+    if d not in ("f16", "f32"):
+        raise ValueError("scale dtype must be f16 or f32")
+    return "<f2" if d == "f16" else "<f4"
+
+
+def cx_type_id(t):
+    n = cx.reference_name(t)
+    return cx.PASSTHROUGH[n][0] if n in cx.PASSTHROUGH else cx.MAPPINGS[n].type
+
+
+def _plane(w, data, count):
+    off = w.append_plane(data)
+    return {"offset": off, "nbytes": len(data), "count": int(count), "sha256": sha256(data)}
+
+
+def _slice(entry, blob, role):
+    p = entry["planes"][role]
+    d = bytes(blob[p["offset"]:p["offset"] + p["nbytes"]])
+    if len(d) != p["nbytes"]:
+        raise ValueError("%s: plane %s is truncated" % (entry["name"], role))
+    return d
+
+
+def _check_entry(e, blob):
+    for role, p in e["planes"].items():
+        if p["offset"] % planes.ALIGN:
+            raise ValueError("%s: plane %s is not 64-byte aligned" % (e["name"], role))
+        if sha256(_slice(e, blob, role)) != p["sha256"]:
+            raise ValueError("%s: plane %s digest mismatch" % (e["name"], role))
+
+
+if __name__ == "__main__":
+    sys.exit(main())
 
 
 def sha256(data):
@@ -72,12 +109,6 @@ def unpack_codes(data, bits):
     return planes.unpack_codes(np.frombuffer(bytes(data), dtype=np.uint8), bits)
 
 
-def _fdt(d):
-    if d not in ("f16", "f32"):
-        raise ValueError("scale dtype must be f16 or f32")
-    return "<f2" if d == "f16" else "<f4"
-
-
 def tensor_entry(name, type_, shape, raw, writer=None):
     """Canonicalise one tensor, append its planes to `writer` (a planes.PlaneWriter; fresh one if None).
     Returns (entry, writer); plane offsets are relative to the writer's buffer."""
@@ -101,48 +132,6 @@ def tensor_entry(name, type_, shape, raw, writer=None):
     return e, w
 
 
-def cx_type_id(t):
-    n = cx.reference_name(t)
-    return cx.PASSTHROUGH[n][0] if n in cx.PASSTHROUGH else cx.MAPPINGS[n].type
-
-
-def _plane(w, data, count):
-    off = w.append_plane(data)
-    return {"offset": off, "nbytes": len(data), "count": int(count), "sha256": sha256(data)}
-
-
-def _slice(entry, blob, role):
-    p = entry["planes"][role]
-    d = bytes(blob[p["offset"]:p["offset"] + p["nbytes"]])
-    if len(d) != p["nbytes"]:
-        raise ValueError("%s: plane %s is truncated" % (entry["name"], role))
-    return d
-
-
-def rebuild_role(entry, blob, role):
-    """One canonical plane back from the blob: codes -> unpacked array, scales/offsets -> float32 (nb, groups)."""
-    if role not in entry["planes"]:
-        raise ValueError("%s has no %s plane" % (entry["name"], role))
-    d = _slice(entry, blob, role)
-    if role == "codes":
-        c = unpack_codes(d, entry["bits"])
-        if entry["bits"] in (16, 32):
-            return c
-        return c.reshape(entry["blocks"], -1)
-    a = np.frombuffer(d, dtype=_fdt(entry["scale_dtype"])).astype(np.float32)
-    return a.reshape(entry["blocks"], -1)
-
-
-def decode_entry(entry, blob):
-    """Float32 values of a packed tensor (same numbers as the reference dequantiser)."""
-    n = entry["type"]
-    codes = rebuild_role(entry, blob, "codes")
-    if n in _WORD:
-        return {"F16": cx.from_p16_f16, "BF16": cx.from_p32_bf16, "F32": cx.from_p32_f32}[n](codes)
-    c = cx.Canon(codes, rebuild_role(entry, blob, "scales"), rebuild_role(entry, blob, "offsets"))
-    return cx._decode(n, c).reshape(-1)
-
-
 def build(tensors):
     """tensors: iterable of (name, type, shape, raw). Returns (index dict, blob bytes) with unique names."""
     w = planes.PlaneWriter()
@@ -154,14 +143,6 @@ def build(tensors):
         e, _ = tensor_entry(name, type_, shape, raw, w)
         ents.append(e)
     return {"version": VERSION, "tensors": ents, "blob_bytes": len(w.buf)}, bytes(w.buf)
-
-
-def _check_entry(e, blob):
-    for role, p in e["planes"].items():
-        if p["offset"] % planes.ALIGN:
-            raise ValueError("%s: plane %s is not 64-byte aligned" % (e["name"], role))
-        if sha256(_slice(e, blob, role)) != p["sha256"]:
-            raise ValueError("%s: plane %s digest mismatch" % (e["name"], role))
 
 
 def verify(index, blob):
@@ -202,6 +183,29 @@ def info(index):
         for r, p in e["planes"].items():
             out["plane_bytes"][r] += p["nbytes"]
     return out
+
+
+def rebuild_role(entry, blob, role):
+    if role not in entry["planes"]:
+        raise ValueError("%s has no %s plane" % (entry["name"], role))
+    d = _slice(entry, blob, role)
+    if role == "codes":
+        c = unpack_codes(d, entry["bits"])
+        if entry["bits"] in (16, 32):
+            return c
+        return c.reshape(entry["blocks"], -1)
+    a = np.frombuffer(d, dtype=_fdt(entry["scale_dtype"])).astype(np.float32)
+    return a.reshape(entry["blocks"], -1)
+
+
+def decode_entry(entry, blob):
+    """Float32 values of a packed tensor (same numbers as the reference dequantiser)."""
+    n = entry["type"]
+    codes = rebuild_role(entry, blob, "codes")
+    if n in _WORD:
+        return {"F16": cx.from_p16_f16, "BF16": cx.from_p32_bf16, "F32": cx.from_p32_f32}[n](codes)
+    c = cx.Canon(codes, rebuild_role(entry, blob, "scales"), rebuild_role(entry, blob, "offsets"))
+    return cx._decode(n, c).reshape(-1)
 
 
 def main(argv=None):

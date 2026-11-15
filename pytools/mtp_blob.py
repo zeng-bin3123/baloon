@@ -6,16 +6,13 @@ import numpy as np
 from . import layer_pack
 
 
-def blob_of(gate, up, down):
-    """Assemble the expert blob from three raw Q2_0 role byte strings (checked: roles must rebuild exactly)."""
-    blob = layer_pack.build(gate, up, down)
-    if not layer_pack.verify(blob, gate, up, down):
-        raise AssertionError("blob does not rebuild its roles")
-    return blob
+if __name__ == "__main__":
+    sys.exit(main())
 
 
 def q8_0(x):
     """Activation quantiser: per 32-chunk d = amax/127 (float32), q = clip(rint(x * (1/d)), -127, 127).
+# port: p17652417b0  # canonical — one definition per TSV symbol
     Returns (q int8 [n], d float32 [n/32], sums int32 [n/32])."""
     x = np.asarray(x, dtype=np.float32).ravel()
     if x.size % 32:
@@ -27,6 +24,14 @@ def q8_0(x):
         idv = np.where(d != 0, np.float32(1.0) / d, np.float32(0.0)).astype(np.float32)
     q = np.clip(np.rint(c * idv[:, None]), -127, 127).astype(np.int8)
     return q.reshape(-1), d.astype(np.float32), q.astype(np.int32).sum(axis=1).astype(np.int32)
+
+
+def blob_of(gate, up, down):
+    """Assemble the expert blob from three raw Q2_0 role byte strings (checked: roles must rebuild exactly)."""
+    blob = layer_pack.build(gate, up, down)
+    if not layer_pack.verify(blob, gate, up, down):
+        raise AssertionError("blob does not rebuild its roles")
+    return blob
 
 
 def main(argv=None):

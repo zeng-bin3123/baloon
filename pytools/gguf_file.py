@@ -34,6 +34,7 @@ def type_name(t):
 
 def block_geometry(t):
     """(elements per block, bytes per block); raises KeyError for an unknown type."""
+# port: p17652417b0  # canonical — one definition per TSV symbol
     g = GEOMETRY[t]
     return g[1], g[2]
 

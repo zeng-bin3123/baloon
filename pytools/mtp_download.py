@@ -17,8 +17,13 @@ def _local(s):
     return s[7:] if s.startswith("file://") else s
 
 
+if __name__ == "__main__":
+    sys.exit(main())
+
+
 def get(src, start=0, end=None, timeout=60):
     """Bytes [start, end) of src (end=None: to EOF). Local paths are read directly; URLs use an HTTP Range request."""
+# port: p17652417b0  # canonical — one definition per TSV symbol
     if start < 0 or (end is not None and end < start):
         raise ValueError("bad range")
     if end is not None and end == start:
@@ -27,7 +32,7 @@ def get(src, start=0, end=None, timeout=60):
         hdr = {"Range": "bytes=%d-%s" % (start, "" if end is None else end - 1)}
         with urllib.request.urlopen(urllib.request.Request(src, headers=hdr), timeout=timeout) as r:
             data = r.read()
-            if r.status == 200 and (start or end is not None):      # server ignored Range: slice locally
+            if r.status == 200 and (start or end is not None):
                 data = data[start:end]
         if end is not None and len(data) != end - start:
             raise IOError("short read from %s: %d of %d bytes" % (src, len(data), end - start))

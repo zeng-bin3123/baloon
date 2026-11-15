@@ -2,25 +2,13 @@
 
 A standalone index describes one GGUF. A layered index starts from a base GGUF and lets an overlay GGUF replace
 tensors (typically the routed experts re-quantised to an IQ type); every tensor ends up with exactly one source."""
+# port: p17652417b0  # canonical — one definition per TSV symbol
 import json
 import sys
 
 from . import gguf_file as gf
 
 VERSION = 1
-
-
-def is_expert(name):
-    """Routed-expert tensors: fused `_exps` GGUF names or `.experts.` checkpoint names."""
-    return ".experts." in name or "_exps" in name
-
-
-def tensor_bytes(type_id, shape):
-    """Byte size of a tensor of ggml type `type_id` and `shape`; ValueError if not whole blocks."""
-    n = 1
-    for d in shape:
-        n *= int(d)
-    return gf.tensor_nbytes(type_id, n)
 
 
 def _entries(path, fileno):
@@ -31,23 +19,6 @@ def _entries(path, fileno):
                            "file": fileno, "offset": g.data_offset + t.offset,
                            "nbytes": tensor_bytes(t.type, t.shape), "expert": is_expert(t.name)}
     return out
-
-
-def index_standalone(path):
-    """Index of a single GGUF."""
-    ents = _entries(path, 0)
-    return {"version": VERSION, "files": [str(path)], "tensors": list(ents.values())}
-
-
-def index_from_base(base, overlay):
-    """Index over base with overlay tensors replacing same-named base tensors (shapes must agree)."""
-    b, o = _entries(base, 0), _entries(overlay, 1)
-    for name, e in o.items():
-        if name in b and b[name]["shape"] != e["shape"]:
-            raise ValueError("overlay tensor %s has shape %s, base has %s" % (name, e["shape"], b[name]["shape"]))
-    merged = dict(b)
-    merged.update(o)
-    return {"version": VERSION, "files": [str(base), str(overlay)], "tensors": list(merged.values())}
 
 
 def validate(index):
@@ -65,6 +36,40 @@ def validate(index):
             raise ValueError("tensor %s size does not match its type/shape" % e["name"])
         if e["expert"] != is_expert(e["name"]):
             raise ValueError("tensor %s has a wrong expert flag" % e["name"])
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+
+def is_expert(name):
+    """Routed-expert tensors: fused `_exps` GGUF names or `.experts.` checkpoint names."""
+    return ".experts." in name or "_exps" in name
+
+
+def tensor_bytes(type_id, shape):
+    """Byte size of a tensor of ggml type `type_id` and `shape`; ValueError if not whole blocks."""
+    n = 1
+    for d in shape:
+        n *= int(d)
+    return gf.tensor_nbytes(type_id, n)
+
+
+def index_standalone(path):
+    """Index of a single GGUF."""
+    ents = _entries(path, 0)
+    return {"version": VERSION, "files": [str(path)], "tensors": list(ents.values())}
+
+
+def index_from_base(base, overlay):
+    """Index over base with overlay tensors replacing same-named base tensors (shapes must agree)."""
+    b, o = _entries(base, 0), _entries(overlay, 1)
+    for name, e in o.items():
+        if name in b and b[name]["shape"] != e["shape"]:
+            raise ValueError("overlay tensor %s has shape %s, base has %s" % (name, e["shape"], b[name]["shape"]))
+    merged = dict(b)
+    merged.update(o)
+    return {"version": VERSION, "files": [str(base), str(overlay)], "tensors": list(merged.values())}
 
 
 def write_index(path, index):

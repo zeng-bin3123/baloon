@@ -1,5 +1,6 @@
 """Quantisation of the MTP block's fused routed experts into Q2_0 / Q4_0 / Q8_0 blocks (same arithmetic order as the
 C++ quantiser: float32 scale math, float64 error accumulation, round-to-nearest-even)."""
+# port: p17652417b0  # canonical — one definition per TSV symbol
 import json
 import struct
 import sys
@@ -24,6 +25,16 @@ def _half_bytes(h):
     return h.view(np.uint16)[:, None].view(np.uint8).reshape(-1, 2)
 
 
+def total_bytes(fmt):
+    """Bytes of both fused tensors of the MTP block (gate_up [E,GU_OUT,HID] + down [E,HID,INTER]) in `fmt`."""
+    block, by = FORMATS[fmt]
+    return E * GU_OUT * (HID // block * by) + E * HID * (INTER // block * by)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+
 def q2_0(x):
     """Per 64-block: try d = fp16(amax * (16+k)/32), k = 0..16; keep the first minimum of the squared error.
     code = clip(rint(x/d), -1, 2) + 1 (LSB-first, four per byte)."""
@@ -39,7 +50,7 @@ def q2_0(x):
         with np.errstate(divide="ignore", invalid="ignore"):
             s = np.where(d[:, None] != 0, np.clip(np.rint(bd / d[:, None]), -1, 2), 0.0)
         err = np.zeros(len(b))
-        for j in range(64):                                  # sequential accumulation, as in the scalar code
+        for j in range(64):
             e = bd[:, j] - d * s[:, j]
             err = err + e * e
         better = (best_err < 0) | (err < best_err)
@@ -143,18 +154,12 @@ class _Experts:
         return self.w.shape[0] * self.expert_bytes(fmt)
 
 
-def total_bytes(fmt):
-    """Bytes of both fused tensors of the MTP block (gate_up [E,GU_OUT,HID] + down [E,HID,INTER]) in `fmt`."""
-    block, by = FORMATS[fmt]
-    return E * GU_OUT * (HID // block * by) + E * HID * (INTER // block * by)
-
-
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv[:1] == ["totals"]:
         print(json.dumps({f: total_bytes(f) for f in FORMATS}))
         return 0
-    if len(argv) == 4 and argv[0] == "quantize":      # quantize SAFETENSORS NAME FMT -> raw bytes on stdout size only
+    if len(argv) == 4 and argv[0] == "quantize":
         w = load_bf16(argv[1], argv[2])
         ex = _Experts(w if w.ndim == 3 else w[None])
         n = sum(len(b) for b in ex.quantize(argv[3]))

@@ -15,6 +15,19 @@ def _pad(a, n):
     return (a - n % a) % a
 
 
+def _p32(v):
+    return struct.pack("<I", v)
+
+
+def _p64(v):
+    return struct.pack("<Q", v)
+
+
+def _pstr(s):
+    b = s.encode("utf-8")
+    return _p64(len(b)) + b
+
+
 @dataclass
 class _Tensor:
     name: str
@@ -32,19 +45,6 @@ class _Tensor:
             raise ValueError("tensor %r has inconsistent size/shape/type" % self.name)
 
 
-def _p32(v):
-    return struct.pack("<I", v)
-
-
-def _p64(v):
-    return struct.pack("<Q", v)
-
-
-def _pstr(s):
-    b = s.encode("utf-8")
-    return _p64(len(b)) + b
-
-
 class GGUFWriter:
     def __init__(self, alignment=gf.DEFAULT_ALIGNMENT):
         if alignment <= 0:
@@ -55,6 +55,7 @@ class GGUFWriter:
 
     def add_kv(self, key, value):
         """str -> STRING, bool -> BOOL, float -> F32, int -> U32 (U64 when it does not fit),
+# port: p17652417b0  # canonical — one definition per TSV symbol
         non-empty list of str -> STRING array, of int -> I32 array."""
         if any(k == key for k, _ in self.kv):
             raise ValueError("duplicate key %r" % key)
@@ -149,17 +150,14 @@ def dequantize_q2_0(raw):
 def _selfcheck():
     """Round-trip invariants; raises AssertionError on failure, returns True."""
     rng = np.random.default_rng(37)
-    # packing: LSB-first, four codes per byte, code = symbol + 1
     blk = np.zeros(64, dtype=np.float32)
     blk[0], blk[1], blk[2], blk[3] = -1.0, 0.0, 1.0, 2.0
     blk[63] = 2.0
     raw = quantize_q2_0(blk)
     assert len(raw) == 18
     d = np.frombuffer(raw[:2], dtype=np.float16)[0]
-    assert float(d) == 2.0                                   # amax
-    # symbols are rint(x/2) = {-0.5->-0, 0, 0.5->0, 1}: codes 1,1,1,2 (RNE ties to even)
+    assert float(d) == 2.0
     assert raw[2] == (1 | (1 << 2) | (1 << 4) | (2 << 6))
-    # dequantisation never leaves the {-1,0,1,2} * d grid
     x = rng.standard_normal(64 * 7).astype(np.float32)
     y = dequantize_q2_0(quantize_q2_0(x))
     assert y.shape == x.shape
@@ -167,9 +165,7 @@ def _selfcheck():
         dd = float(np.frombuffer(quantize_q2_0(x[i * 64:(i + 1) * 64])[:2], dtype=np.float16)[0])
         syms = np.rint(y[i * 64:(i + 1) * 64] / dd)
         assert syms.min() >= -1 and syms.max() <= 2
-    # writer -> reader round trip with alignment 64
-    import os
-    import tempfile
+    import os, tempfile
     w = GGUFWriter(alignment=64)
     w.add_kv("general.architecture", "test")
     w.add_kv("test.count", 7)

@@ -10,6 +10,7 @@ def valid_bits(bits):
 
 def pack_codes(codes, bits):
     """Pack unsigned codes LSB-first, 8/bits per byte. Raises ValueError on a bad width, length or out-of-range code."""
+# port: p17652417b0  # canonical — one definition per TSV symbol
     if not valid_bits(bits):
         raise ValueError("bits must be 2, 4 or 8")
     c = np.asarray(codes).astype(np.int64).ravel()

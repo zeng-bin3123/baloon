@@ -1,6 +1,7 @@
 """Expert blob layout: planes in order gu_codes, d_codes, gu_scales, d_scales (offsets 0, 819200, 1228800, 1331200); every plane 64-aligned.
 
 One expert blob (H=2560, FF=640, 64-weight Q2_0 blocks) is 1,382,400 bytes = 3 roles x 25600 blocks x 18 bytes."""
+# port: p17652417b0  # canonical — one definition per TSV symbol
 import numpy as np
 
 H, FF, QK = 2560, 640, 64
@@ -17,17 +18,6 @@ EXPERTS_PER_LAYER = 512
 ROLES = ("gate", "up", "down")
 
 
-def blob_offsets():
-    """name -> (offset, nbytes) of the four planes inside a blob; asserts the 64-byte alignment of each."""
-    off, cur = {}, 0
-    for name, n in (("gu_codes", GU_CODES), ("d_codes", D_CODES), ("gu_scales", GU_SCALES), ("d_scales", D_SCALES)):
-        assert cur % 64 == 0, name
-        off[name] = (cur, n)
-        cur += n
-    assert cur == BLOB_BYTES
-    return off
-
-
 def expert_offset(layer, expert):
     """Byte offset of expert blob (layer, expert) in the flat expert arena."""
     if not (0 <= expert < EXPERTS_PER_LAYER) or layer < 0:
@@ -41,18 +31,6 @@ def _role(raw, rows, sc):
         raise ValueError("role has %d bytes, expected %d" % (a.size, rows * sc * BLOCK))
     a = a.reshape(rows, sc, BLOCK)
     return a[:, :, :2], a[:, :, 2:]          # scales (rows, sc, 2), codes (rows, sc, 16)
-
-
-def build(gate, up, down):
-    """Raw Q2_0 role bytes (block order row*SC + b) -> expert blob bytes."""
-    gs, gc = _role(gate, FF, SC_GU)
-    us, uc = _role(up, FF, SC_GU)
-    ds, dc = _role(down, H, SC_D)
-    gu_s = np.stack([gs, us], axis=1).reshape(2 * FF, SC_GU, 2)      # gate is slot 2r, up is slot 2r+1
-    gu_c = np.stack([gc, uc], axis=1).reshape(2 * FF, SC_GU, 16)
-    blob = b"".join(np.ascontiguousarray(p).tobytes() for p in (gu_c, dc, gu_s, ds))
-    assert len(blob) == BLOB_BYTES
-    return blob
 
 
 def rebuild_role(blob, role):
@@ -79,3 +57,26 @@ def rebuild_role(blob, role):
 def verify(blob, gate, up, down):
     return (rebuild_role(blob, "gate") == bytes(gate) and rebuild_role(blob, "up") == bytes(up)
             and rebuild_role(blob, "down") == bytes(down))
+
+
+def blob_offsets():
+    """name -> (offset, nbytes) of the four planes inside a blob; asserts the 64-byte alignment of each."""
+    off, cur = {}, 0
+    for name, n in (("gu_codes", GU_CODES), ("d_codes", D_CODES), ("gu_scales", GU_SCALES), ("d_scales", D_SCALES)):
+        assert cur % 64 == 0, name
+        off[name] = (cur, n)
+        cur += n
+    assert cur == BLOB_BYTES
+    return off
+
+
+def build(gate, up, down):
+    """Raw Q2_0 role bytes (block order row*SC + b) -> expert blob bytes."""
+    gs, gc = _role(gate, FF, SC_GU)
+    us, uc = _role(up, FF, SC_GU)
+    ds, dc = _role(down, H, SC_D)
+    gu_s = np.stack([gs, us], axis=1).reshape(2 * FF, SC_GU, 2)
+    gu_c = np.stack([gc, uc], axis=1).reshape(2 * FF, SC_GU, 16)
+    blob = b"".join(np.ascontiguousarray(p).tobytes() for p in (gu_c, dc, gu_s, ds))
+    assert len(blob) == BLOB_BYTES
+    return blob
