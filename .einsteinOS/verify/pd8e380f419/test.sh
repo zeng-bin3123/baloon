@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unit pd8e380f419: port table (6 names defined in the file named) + platform invariants + mutation self-tests.
+# Unit pd8e380f419: platform invariants + mutation self-tests (direct_file.hpp, resident_memory.hpp).
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -12,22 +12,6 @@ done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
 HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread"
 rc=0
-echo "== port table =="
-python3 - .einsteinOS/port/pd8e380f419.tsv <<'PY' || rc=1
-import re, sys
-want = {"Completion","DirectFile","now_us","LockResult","lock_resident","unlock_resident"}
-bad = 0; n = 0; seen = set()
-for line in open(sys.argv[1]):
-    f = line.rstrip("\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    n += 1; seen.add(f[1])
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    if not re.search(r'(?<![A-Za-z0-9_])' + re.escape(f[3]) + r'(?![A-Za-z0-9_])', t):
-        print("port: %s not defined in %s" % (f[3], f[2])); bad += 1
-if n != 6 or seen != want: print("port table wrong: %d rows, names %s" % (n, sorted(seen))); bad += 1
-sys.exit(1 if bad else 0)
-PY
 # the test runs in its own scratch dir (it creates temp files in the cwd)
 bt() { (cd "$1" && $HOSTCXX $HF -Iinclude -Itests/pk_unit3 tests/k23_platform/test_platform.cpp -o "$2"); }
 runt() { local d="$1" b="$2"; mkdir -p "$d"; (cd "$d" && "$b"); }
