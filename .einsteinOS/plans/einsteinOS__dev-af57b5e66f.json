@@ -3,7 +3,7 @@
     "host": "cc-9cdb0db1-bd86-4754-8571-54e663a9f23c-0",
     "pid": 7297,
     "started": "2026-11-15T08:53:46.338756462Z",
-    "renewed": "2026-11-15T11:11:00.482912126Z"
+    "renewed": "2026-11-15T11:12:19.976341588Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -1024,12 +1024,6 @@
   },
   "last_failure": {},
   "infra_fails": 0,
-  "review_pending": {
-    "pea19e6d264": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "port_units": [
     {
       "id": "pfcccb31b26",
@@ -1257,6 +1251,7 @@
     "p4fde6588a6": true,
     "p984d0d954f": true,
     "pd8e380f419": true,
+    "pea19e6d264": true,
     "pf30daed133": true,
     "pf7b804cf95": true,
     "pfcccb31b26": true
