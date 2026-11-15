@@ -248,6 +248,24 @@ private:
     }
 };
 
+// ---- Python-name port aliases (reference names kept here as thin wrappers) ---------------------
+struct ToolCall : ToolInvocation { ToolCall() = default; };
+struct Event    : ChatEvent      { Event()    = default; };
+class  OutputParser : public ReplyParser {
+public:
+    explicit OutputParser(bool start_in_reasoning = true) : ReplyParser(start_in_reasoning) {}
+};
+inline bool _has_image(const Message& m) { return has_image(m); }
+inline ImageSource _image_source(const std::string& url) { return image_source(url); }
+inline std::vector<Part> _parts_of(const std::string& content) { return parts_of(content); }
+inline std::string _text_of(const Message& m) { return text_of(m); }
+inline std::optional<std::vector<Message>> anthropic_to_messages(const std::string& sys, const std::vector<Message>& in) { return from_anthropic(sys, in); }
+inline const char* budget_effort(uint64_t budget) { return budget_effort_name(budget); }
+inline TemplateKwargs effort_kwargs(const std::string& e) { return template_kwargs(e); }
+inline std::vector<std::string> images_of(const std::vector<Message>& ms) { return collect_images(ms); }
+inline std::optional<std::vector<Message>> openai_to_messages(const std::vector<Message>& in) { return from_openai(in); }
+inline std::optional<ToolInvocation> parse_tool_call(const std::string& body) { return decode_tool_call(body); }
+
 }  // namespace serve_api
 }  // namespace baloon
 

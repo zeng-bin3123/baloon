@@ -524,6 +524,39 @@ inline int serve_main(int argc, char** argv, std::istream& in = std::cin, std::o
     return 0;
 }
 
+// ---- Python-name port aliases (reference names kept here as thin wrappers) ---------------------
+struct ByteTokenizer : ByteCodec { ByteTokenizer() = default; };
+class  Detokenizer   : public StreamDecoder { public: Detokenizer() = default; };
+struct Engine        : GenEngine {};  // abstract; concrete engines override generate()
+class  MockEngine    : public ScriptedEngine {
+public:
+    explicit MockEngine(std::vector<uint32_t> s) : ScriptedEngine(std::move(s)) {}
+};
+class  RefEngine     : public LineEngine {
+public:
+    explicit RefEngine(LineTransport& t) : LineEngine(t) {}
+};
+class  Vision        : public ImageEmbedder {
+public:
+    explicit Vision(std::function<uint32_t(const std::string&)> c) : ImageEmbedder(std::move(c)) {}
+};
+class  Service       : public ChatService {
+public:
+    Service(GenEngine& e, ImageEmbedder& v, uint64_t ctx) : ChatService(e, v, ctx) {}
+};
+class  Server        : public HttpServer {
+public:
+    Server(ChatService& s, std::string k) : HttpServer(s, std::move(k)) {}
+};
+inline std::string anthropic_collect(const std::string& id, const std::string& model, const Completion& c) { return anthropic_body(id, model, c); }
+inline std::vector<std::string> anthropic_events(const std::string& id, const std::string& model, const Completion& c) { return anthropic_stream(id, model, c); }
+inline std::vector<std::string> child_env(const std::vector<std::string>& base, const std::string& gpus) { return worker_env(base, gpus); }
+inline Handler make_handler(HttpServer& s) { return build_handler(s); }
+inline std::string openai_collect(const std::string& id, const std::string& model, const Completion& c) { return openai_body(id, model, c); }
+inline std::vector<std::string> openai_chunks(const std::string& id, const std::string& model, const Completion& c) { return openai_stream(id, model, c); }
+inline std::vector<ApiResponse> serve(const Handler& h, const std::vector<ApiRequest>& rs) { return run_requests(h, rs); }
+inline int main(int argc, char** argv, std::istream& in = std::cin, std::ostream& out = std::cout) { return serve_main(argc, argv, in, out); }
+
 }  // namespace serve_api
 }  // namespace baloon
 

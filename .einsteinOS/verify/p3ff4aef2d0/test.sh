@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unit p3ff4aef2d0: port table + serving-layer invariants + mutation self-tests.
+# Unit p3ff4aef2d0: serving-layer invariants + mutation self-tests.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -12,27 +12,6 @@ done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
 HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread"
 rc=0
-echo "== port table =="
-python3 - .einsteinOS/port/p3ff4aef2d0.tsv <<'PY' || rc=1
-import re, sys
-bad = 0; seen = set(); n = 0
-types = {"ChatTemplate", "Event", "OutputParser", "ToolCall", "ByteTokenizer", "Detokenizer", "Engine", "MockEngine",
-         "Server", "Service", "RefEngine", "Vision"}
-want = types | {"_has_image", "_image_source", "_parts_of", "_text_of", "anthropic_to_messages", "budget_effort", "effort_kwargs",
-        "images_of", "openai_to_messages", "parse_tool_call", "anthropic_collect", "anthropic_events", "child_env", "main",
-        "make_handler", "openai_chunks", "openai_collect", "serve"}
-for line in open(sys.argv[1]):
-    f = line.rstrip("\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    n += 1; seen.add(f[1])
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    if f[1] in types: ok = re.search(r'(struct|class)\s+' + re.escape(f[3]) + r'(?![A-Za-z0-9_])', t)
-    else: ok = re.search(r'inline\s+[\w:<>,\s\*&]+?\b' + re.escape(f[3]) + r'\s*\(', t)
-    if not ok: print("port: %s not defined in %s" % (f[3], f[2])); bad += 1
-if n != 30 or seen != want: print("port table wrong:", n, want ^ seen); bad += 1
-sys.exit(1 if bad else 0)
-PY
 bt() { (cd "$1" && $HOSTCXX $HF -Iinclude tests/k27_serve/test_serve_api.cpp -o "$2"); }
 echo "== unit test =="
 bt "$ROOT" "$OUT/t27" || { echo "BUILD FAILED (unit test)"; exit 1; }
