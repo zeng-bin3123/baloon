@@ -16,6 +16,7 @@ namespace {
 thread_local char g_err[256] = "";
 }
 
+// ck: CUDA error gate — records the first failure text in a thread-local buffer and returns false; true means success.
 bool ck(cudaError_t e, const char* what) {
     if (e == cudaSuccess) return true;
     std::snprintf(g_err, sizeof g_err, "%s: %s", what ? what : "cuda", cudaGetErrorString(e));
@@ -24,12 +25,53 @@ bool ck(cudaError_t e, const char* what) {
 const char* ck_last() { return g_err; }
 void ck_clear() { g_err[0] = 0; }
 
+// ~Gemm: delegates to release(), which conditionally frees owned resources; borrowed resources are left untouched.
+Gemm::~Gemm() { release(); }
+
+void Gemm::release() {
+    if (owned_) {
+        if (ws_) ck(cudaFree(ws_), "cudaFree workspace");
+        if (stream_) ck(cudaStreamDestroy(stream_), "cudaStreamDestroy");
+    }
+    ready_ = false; owned_ = false; ws_ = nullptr; ws_bytes_ = 0; stream_ = 0;
+}
+
+// init: selects device, allocates workspace_bytes on device (0 is valid), creates a private stream; sets owned_=true.
+bool Gemm::init(int device, uint64_t workspace_bytes) {
+    release();
+    if (!ck(cudaSetDevice(device), "cudaSetDevice")) return false;
+    void* ws = nullptr;
+    if (workspace_bytes > 0 && !ck(cudaMalloc(&ws, (size_t)workspace_bytes), "cudaMalloc workspace")) return false;
+    cudaStream_t st = 0;
+    if (!ck(cudaStreamCreate(&st), "cudaStreamCreate")) { if (ws) cudaFree(ws); return false; }
+    device_ = device; ws_ = ws; ws_bytes_ = workspace_bytes; stream_ = st; owned_ = true; ready_ = true;
+    return true;
+}
+
+bool Gemm::sync() {
+    if (!ready_) return false;
+    return ck(cudaStreamSynchronize(stream_), "cudaStreamSynchronize");
+}
+
+// init_external: borrows workspace (must be 16-byte aligned if bytes > 0) and stream; owned_=false so release() is a no-op.
+bool Gemm::init_external(void* workspace, uint64_t bytes, cudaStream_t stream) {
+    release();
+    if (bytes > 0 && (workspace == nullptr || ((uintptr_t)workspace & 15u) != 0)) return false;
+    if (bytes == 0 && workspace != nullptr) workspace = nullptr;
+    int dev = 0;
+    if (!ck(cudaGetDevice(&dev), "cudaGetDevice")) return false;
+    device_ = dev; ws_ = workspace; ws_bytes_ = bytes; stream_ = stream; owned_ = false; ready_ = true;
+    return true;
+}
+
 namespace {
 
+// Tile and thread-block geometry: 64x64 output tile per block of 16x16=256 threads, each holding a 4x4 register tile.
 constexpr int TM = (int)pfgemm::kTileM, TN = (int)pfgemm::kTileN, TK = (int)pfgemm::kTileK;   // 64, 64, 32
 constexpr int TX = 16, TY = 16, REG = 4;                                                       // 16 * 4 = 64
 constexpr uint64_t kRowsPerLaunch = 1ull << 16;                                                // gridDim.y <= 1024 (safe on every device)
 
+// Loaders: get() converts element i of the buffer to f32 for accumulation.
 struct LdF32 {
     static constexpr uint64_t bytes = 4;
     __device__ static float get(const void* p, uint64_t i) { return ((const float*)p)[i]; }
@@ -43,6 +85,8 @@ struct LdF16 {
     __device__ static float get(const void* p, uint64_t i) { return f16bits::f32_from_f16(((const uint16_t*)p)[i]); }
 };
 
+// gemm_tile_kernel: each block computes a TM x TN tile of C = A * W^T, loading TK-wide slices of A and W into shared
+// memory in ascending k order and accumulating in f32 register tiles. Bounds are checked; out-of-range entries read as 0.
 template <class LA, class LW>
 __global__ void gemm_tile_kernel(const void* A, const void* W, float* C, uint64_t m, uint64_t n, uint64_t k) {
     __shared__ float As[TK][TM + 1];
@@ -88,12 +132,14 @@ __global__ void gemm_tile_kernel(const void* A, const void* W, float* C, uint64_
     }
 }
 
+// to_half_kernel: converts count f32 elements to fp16 or bf16 bits (BF template param selects rounding).
 template <bool BF>
 __global__ void to_half_kernel(const float* src, uint16_t* dst, uint64_t count) {
     const uint64_t i = (uint64_t)blockIdx.x * blockDim.x + threadIdx.x;
     if (i < count) dst[i] = BF ? f16bits::round_f32_to_bf16_bits(src[i]) : f16bits::f16_from_f32(src[i]);
 }
 
+// launch_tiles: splits m into kRowsPerLaunch-row launches (keeps gridDim.y <= 1024) and dispatches gemm_tile_kernel.
 template <class LA, class LW>
 bool launch_tiles(const void* a, const void* w, float* out, uint64_t m, uint64_t n, uint64_t k, cudaStream_t s) {
     const uint64_t gx = (n + TN - 1) / TN;
@@ -108,6 +154,7 @@ bool launch_tiles(const void* a, const void* w, float* out, uint64_t m, uint64_t
     return true;
 }
 
+// convert_rows: converts count f32 elements to fp16 (bf=false) or bf16 (bf=true) bits in-place via to_half_kernel.
 bool convert_rows(const float* src, uint16_t* dst, uint64_t count, bool bf, cudaStream_t s) {
     const uint64_t blocks = (count + 255) / 256;
     if (blocks > 2147483647ull) return false;
@@ -118,42 +165,7 @@ bool convert_rows(const float* src, uint16_t* dst, uint64_t count, bool bf, cuda
 
 }  // namespace
 
-Gemm::~Gemm() { release(); }
-
-void Gemm::release() {
-    if (owned_) {
-        if (ws_) ck(cudaFree(ws_), "cudaFree workspace");
-        if (stream_) ck(cudaStreamDestroy(stream_), "cudaStreamDestroy");
-    }
-    ready_ = false; owned_ = false; ws_ = nullptr; ws_bytes_ = 0; stream_ = 0;
-}
-
-bool Gemm::init(int device, uint64_t workspace_bytes) {
-    release();
-    if (!ck(cudaSetDevice(device), "cudaSetDevice")) return false;
-    void* ws = nullptr;
-    if (workspace_bytes > 0 && !ck(cudaMalloc(&ws, (size_t)workspace_bytes), "cudaMalloc workspace")) return false;
-    cudaStream_t st = 0;
-    if (!ck(cudaStreamCreate(&st), "cudaStreamCreate")) { if (ws) cudaFree(ws); return false; }
-    device_ = device; ws_ = ws; ws_bytes_ = workspace_bytes; stream_ = st; owned_ = true; ready_ = true;
-    return true;
-}
-
-bool Gemm::init_external(void* workspace, uint64_t bytes, cudaStream_t stream) {
-    release();
-    if (bytes > 0 && (workspace == nullptr || ((uintptr_t)workspace & 15u) != 0)) return false;
-    if (bytes == 0 && workspace != nullptr) workspace = nullptr;
-    int dev = 0;
-    if (!ck(cudaGetDevice(&dev), "cudaGetDevice")) return false;
-    device_ = dev; ws_ = workspace; ws_bytes_ = bytes; stream_ = stream; owned_ = false; ready_ = true;
-    return true;
-}
-
-bool Gemm::sync() {
-    if (!ready_) return false;
-    return ck(cudaStreamSynchronize(stream_), "cudaStreamSynchronize");
-}
-
+// native: f32-activation f32-weight matrix product; no scratch workspace required.
 bool Gemm::native(const float* a, const float* w, float* out, uint64_t m, uint64_t n, uint64_t k) {
     if (!ready_ || !a || !w || !out) return false;
     pfgemm::Gemm d; d.m = m; d.n = n; d.k = k; d.a_type = Elem::F32; d.w_type = Elem::F32;
@@ -161,6 +173,7 @@ bool Gemm::native(const float* a, const float* w, float* out, uint64_t m, uint64
     return launch_tiles<LdF32, LdF32>(a, w, out, m, n, k, stream_);
 }
 
+// run: shared dispatch — if a_type != w_type (f32 activations with half weights), converts A into the scratch workspace first.
 bool Gemm::run(const void* a, Elem a_type, Elem w_type, const void* w, float* out, uint64_t m, uint64_t n, uint64_t k) {
     if (!ready_ || !a || !w || !out) return false;
     if (a_type != Elem::F32 && a_type != w_type) return false;
@@ -178,10 +191,12 @@ bool Gemm::run(const void* a, Elem a_type, Elem w_type, const void* w, float* ou
               : launch_tiles<LdF16, LdF16>(a, w, out, m, n, k, stream_);
 }
 
+// bf16: W holds bf16 bits; A is bf16 (a_type=BF16) or f32 (a_type=F32, converted through the workspace).
 bool Gemm::bf16(const void* a, Elem a_type, const uint16_t* w, float* out, uint64_t m, uint64_t n, uint64_t k) {
     return run(a, a_type, Elem::BF16, w, out, m, n, k);
 }
 
+// f16: W holds f16 bits; A is f16 (a_type=F16) or f32 (a_type=F32, converted through the workspace).
 bool Gemm::f16(const void* a, Elem a_type, const uint16_t* w, float* out, uint64_t m, uint64_t n, uint64_t k) {
     return run(a, a_type, Elem::F16, w, out, m, n, k);
 }
