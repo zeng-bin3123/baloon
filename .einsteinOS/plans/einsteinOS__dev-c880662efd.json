@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 15384,
     "started": "2026-11-16T08:04:20.369682557Z",
-    "renewed": "2026-11-16T18:33:17.893743785Z"
+    "renewed": "2026-11-16T18:33:32.216771234Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -565,6 +565,11 @@
       "hash": "eb8f5c79eeef",
       "pass": true,
       "unit_id": "ub25e8eba7f"
+    },
+    "GenerateDriver.lean#items: traceLayer_valid, autoSlots, autoSlots_fit, withProfile, withProfile_le, ceilDiv, ceilDiv_mul_ge, prefillMib, prefillMib_borrow, swapOK, swapOK_lt, decay_le, pleAdvance, pleAdvance_fst, pleAdvance_snd, imgPos, imgPos_h_lt, imgPos_w_lt, image_advance_pos, admitted, admitted_fits, producedStep, producedStep_le, producedStep_progress": {
+      "hash": "eb8f5c79eeef",
+      "pass": true,
+      "unit_id": "u3a5d6ac51e"
     },
     "GgufLazyLoader.lean": {
       "hash": "4c8cfaa7a4fa",
