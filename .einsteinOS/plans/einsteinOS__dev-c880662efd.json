@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 15384,
     "started": "2026-11-16T08:04:20.369682557Z",
-    "renewed": "2026-11-16T19:35:53.346097718Z"
+    "renewed": "2026-11-16T19:59:54.380816957Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -249,7 +249,7 @@
         "ChatFrontend.lean"
       ],
       "reason": "added after theory changed",
-      "conv": "f62fce92-47c3-4cc5-a60b-37b98c8eaab6"
+      "conv": "9ca847b1-6503-4922-b0e0-e1d3d32089e4"
     },
     {
       "id": "uc81136f4d9",
@@ -832,6 +832,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "u32f71e85a9": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "reopen": {
     "p00a7a246af": {
       "kind": "port_incomplete",
@@ -1362,6 +1368,7 @@
     "u12d8dd5102": true,
     "u253a75befe": true,
     "u316bd6b9ec": true,
+    "u32f71e85a9": true,
     "u52d156705c": true,
     "u89be81de0b": true,
     "ubb09633f12": true
