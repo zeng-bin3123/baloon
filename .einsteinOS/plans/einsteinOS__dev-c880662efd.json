@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 15384,
     "started": "2026-11-16T08:04:20.369682557Z",
-    "renewed": "2026-11-16T10:29:07.915026583Z"
+    "renewed": "2026-11-16T11:38:03.084055666Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -325,7 +325,7 @@
         "PrefillKernels.lean"
       ],
       "reason": "3 fix attempts used",
-      "conv": "22100b51-9c0c-45e3-ba42-f1873e7a0844"
+      "conv": "21c8b4f4-bbd5-4199-9c78-362bbd6919d6"
     },
     {
       "id": "u253a75befe",
@@ -788,6 +788,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "u7991572426": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "reopen": {
     "p00a7a246af": {
       "kind": "port_incomplete",
