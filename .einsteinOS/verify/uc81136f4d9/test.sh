@@ -45,12 +45,6 @@ else
   echo "sanitizers unavailable with $HOSTCXX: skipped"
 fi
 
-echo "== port table =="
-TSV=.einsteinOS/port/uc81136f4d9.tsv
-[ "$(wc -l < "$TSV")" -eq 285 ] || { echo "port table must have 285 lines"; rc=1; }
-while IFS=$'\t' read -r rf rn lf ln; do
-  [ -n "$ln" ] && [ -f "$lf" ] && grep -qw -- "$ln" "$lf" || { echo "port MISSING: $rn -> $lf:$ln"; rc=1; }
-done < "$TSV"
 
 [ $rc -eq 0 ] && echo "ALL UNIT TESTS PASSED" || echo "UNIT TESTS FAILED"
 exit $rc

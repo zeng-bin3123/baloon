@@ -12,7 +12,7 @@
 namespace baloon {
 namespace core {
 
-constexpr int64_t kGgufExpertsPerChunk = 16;
+constexpr int64_t kGgufExpertsPerChunk = 16; // GGUF expert loading chunk: gate|up|down regions tile the blob exactly.
 
 class ExpertSource {
 public:

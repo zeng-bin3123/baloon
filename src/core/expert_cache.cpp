@@ -57,6 +57,9 @@ std::vector<uint8_t> encode_expert_profile(int64_t n_layers, int64_t n_expert,
     return b;
 }
 
+// ExpertCache: profile validation (n_layers x n_expert header), flat residency table (layer*n_expert+expert),
+// per-layer admission ranges ([l*q,(l+1)*q) with q=slots/n_layers, last layer takes remainder),
+// 256-aligned slot arena (open_sized), and bounded fill_slot copies.
 ExpertCache::~ExpertCache() { close(); }
 
 void ExpertCache::close() {

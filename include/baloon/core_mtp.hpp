@@ -50,6 +50,7 @@ public:
     const MtpTensor* q8(const std::string& name) const;
 
     NativeHead native_head(const std::string& name, uint64_t n_embd) const;   // bf16 lookup + shape check
+    // draft: runs the chain for up to max_t-1 steps; continues while prob >= min_p (probability-gated fuel model).
     uint64_t window() const { return window_; }
     uint64_t cap() const { return cap_; }
     uint64_t round_T() const { return round_T_; }

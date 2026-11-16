@@ -24,6 +24,9 @@ constexpr uint64_t GEMM_WS = 16ull << 20;         // default GEMM workspace
 inline double ms_since(Clock::time_point t0) { return std::chrono::duration<double, std::milli>(Clock::now() - t0).count(); }
 inline void need(bool cond, const char* what) { if (!cond) throw std::runtime_error(std::string("prefill: ") + what); }
 
+// Alloc: 3-mode bump allocator (Count → measure, Bump → carve from region, Owned → own the region).
+// bytes_needed() uses Count mode; init() switches to Bump; Prefill::run() chunks the prompt into C tokens,
+// groups experts by counting sort, and runs GDN state through DQ/STAGE rings.
 // Allocator with the three modes of the driver; every request is charged round_bytes().
 struct Alloc {
     enum Mode { Count, Bump, Owned } mode = Count;

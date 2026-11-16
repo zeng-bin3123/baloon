@@ -3,6 +3,7 @@
 // Residency table is flat row-major layer*n_expert+expert; out-of-range queries are "not resident"; layer l owns
 // [l*q, (l+1)*q) with q = slots/n_layers (last layer takes the remainder); admission never evicts; sized slots are
 // 256-byte aligned back to back; fill_slot copies at most the slot's blob size.
+// kNotResident = -1 sentinel; cache_align256 rounds to 256; fill_len gives copy length in [1, blob].
 #pragma once
 #include <cstddef>
 #include <cstdint>

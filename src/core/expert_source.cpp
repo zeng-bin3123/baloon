@@ -115,6 +115,8 @@ const uint8_t* ArenaExpertSource::blob(int64_t layer, int64_t expert) {
 }
 
 // ---------------------------------------------------------------- hit / miss job building
+// expert_hit_run: partitions k entries into gpu_hits (resident), jobs (CPU-load misses),
+// and gpu_pcie (last m=miss_count*pcie_num>>8 misses in routing order, 0<=pcie_num<=256).
 bool expert_hit_run(const std::vector<bool>& is_hit, int pcie_num, ExpertDispatch& out, const int32_t* experts) {
     out = ExpertDispatch{};
     if (pcie_num < 0 || pcie_num > 256) return false;

@@ -67,6 +67,7 @@ bool session_replay_stages_per_layer(Session& s, std::vector<std::vector<int64_t
 std::vector<int64_t> stage_diffs(const std::vector<int64_t>& prefix_ns);
 
 // Scratch for the parts staging of the loop: k * n_embd * 4 bytes (non-empty for positive inputs).
+// SessionLoopScratch: temporary buffers for the session loop; init() allocates; free() releases.
 struct SessionLoopScratch {
     std::vector<float> parts;
     uint64_t k = 0, n_embd = 0;

@@ -14,7 +14,7 @@ namespace baloon {
 namespace core {
 namespace mtp_impl {
 
-using Clock = std::chrono::steady_clock;
+using Clock = std::chrono::steady_clock;  // alias for duration measurements (ms_since)
 [[maybe_unused]] constexpr double EPS = 1e-6;
 [[maybe_unused]] constexpr int GGML_Q8_0 = 8;       // ggml type id of Q8_0 (the "q8" kind)
 

@@ -11,6 +11,8 @@
 namespace baloon {
 namespace core {
 
+// Verifier: ring/group tiling of KV window; monotone flag (raise_flag never lowers); accepted prefix = longest greedy match;
+// commit vector tracks ring positions; fetch budget limits DMA transfer to staging arena.
 class Verifier {
 public:
     struct Config {

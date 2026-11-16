@@ -14,10 +14,10 @@ namespace core {
 namespace weights_impl {
 
 // Short local names for the loader's vocabulary (type aliases and the staging chunk size).
-using Conv = WConv;
-using IndexRow = WIndexRow;
-using Seg = WSeg;
-[[maybe_unused]] static constexpr uint64_t CHUNK = kWeightChunk;
+using Conv = WConv;        // alias: fp16/bf16 conversion descriptor
+using IndexRow = WIndexRow; // alias: index row (name, offset, size, kind, shape)
+using Seg = WSeg;           // alias: file segment for chunk-wise loading
+[[maybe_unused]] constexpr uint64_t CHUNK = kWeightChunk; // default streaming chunk size
 
 static double now_ms() {
     using C = std::chrono::steady_clock;

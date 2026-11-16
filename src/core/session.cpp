@@ -16,6 +16,8 @@
 namespace baloon {
 namespace core {
 
+// session_bytes: sum of all parts each rounded up to SESSION_STATE_ALIGN, plus a 4096-byte guard page.
+// session_init carves one sub-slice per part; session_capture/session_run_token/stage_token drive the token loop.
 uint64_t session_bytes(const std::vector<uint64_t>& parts) {
     uint64_t sum = 0;
     for (uint64_t p : parts) sum += p;

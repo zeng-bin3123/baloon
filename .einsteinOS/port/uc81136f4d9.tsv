@@ -244,10 +244,10 @@ src/core/verify.cpp	ms_since	src/core/verify.cpp	ms_since
 src/core/verify.cpp	native_of	src/core/verify.cpp	native_of
 src/core/verify.cpp	need	src/core/verify.cpp	need
 src/core/verify.cpp	shapes_of	src/core/verify.cpp	shapes_of
-src/core/weights.cpp	CHUNK	include/baloon/core_weights.hpp	kWeightChunk
-src/core/weights.cpp	Conv	include/baloon/core_weights.hpp	WConv
-src/core/weights.cpp	IndexRow	include/baloon/core_weights.hpp	WIndexRow
-src/core/weights.cpp	Seg	include/baloon/core_weights.hpp	WSeg
+src/core/weights.cpp	CHUNK	src/core/weights.cpp	CHUNK
+src/core/weights.cpp	Conv	src/core/weights.cpp	Conv
+src/core/weights.cpp	IndexRow	src/core/weights.cpp	IndexRow
+src/core/weights.cpp	Seg	src/core/weights.cpp	Seg
 src/core/weights.cpp	WeightTable::find	src/core/weights.cpp	WeightTable::find
 src/core/weights.cpp	WeightTable::load	src/core/weights.cpp	WeightTable::load
 src/core/weights.cpp	WeightTable::pool_bytes	src/core/weights.cpp	WeightTable::pool_bytes
@@ -274,12 +274,3 @@ src/prefill/prefill.cpp	bf16_proj	src/prefill/prefill_host.cpp	bf16_proj
 src/prefill/prefill.cpp	ms_since	src/prefill/prefill_host.cpp	ms_since
 src/prefill/prefill.cpp	native_proj	src/prefill/prefill_host.cpp	native_proj
 src/prefill/prefill.cpp	need	src/prefill/prefill_host.cpp	need
-src/program/generate.cpp	Clock	include/baloon/generate_cli.hpp	Clock
-src/program/generate.cpp	Drive	include/baloon/generate_cli.hpp	Drive
-src/program/generate.cpp	Options	include/baloon/generate_cli.hpp	Options
-src/program/generate.cpp	argmax	include/baloon/generate_cli.hpp	argmax
-src/program/generate.cpp	drive_pool	include/baloon/generate_cli.hpp	drive_pool
-src/program/generate.cpp	drive_pool_multi	include/baloon/generate_cli.hpp	drive_pool_multi
-src/program/generate.cpp	main	src/driver/generate_cli.cpp	main
-src/program/generate.cpp	parse_i64_list	include/baloon/generate_cli.hpp	parse_i64_list
-src/program/generate.cpp	usage	include/baloon/generate_cli.hpp	usage

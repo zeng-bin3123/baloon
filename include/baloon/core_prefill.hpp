@@ -12,6 +12,8 @@
 namespace baloon {
 namespace core {
 
+// Ring sizes: kPrefillStageRing=8 (host→device lookahead 7), kPrefillDqRing=2 (dequant).
+// bytes_needed() uses Count mode (no alloc); init() switches to Bump mode — same allocation sequence.
 constexpr uint64_t kPrefillStageRing = 8;       // STAGE
 constexpr uint64_t kPrefillDqRing = 2;          // DQ
 constexpr uint64_t kPrefillLookahead = 7;

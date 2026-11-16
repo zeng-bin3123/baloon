@@ -20,6 +20,7 @@ namespace core {
 
 constexpr uint64_t kWeightChunk = 8388608ull;     // 8 MiB of source per staging round
 
+// WConv: conversion kind for each weight segment — Copy (identity), WidenF16 (fp16→f32), Bf16High (bf16→f32 high), ToF16 (f32→f16).
 enum class WConv { Copy, WidenF16, Bf16High, ToF16 };
 
 struct WSeg { uint64_t src_off = 0, dst_off = 0, src_bytes = 0, dst_bytes = 0; WConv conv = WConv::Copy; };

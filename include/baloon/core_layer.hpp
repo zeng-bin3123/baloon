@@ -71,6 +71,8 @@ struct MoeDims { uint64_t T = 1, n_embd = 0, n_expert = 0, k = 0; };
 struct QsaDims { uint64_t T = 1, n_head = 0, head_dim = 0, n_head_kv = 0, cap = 0; };
 struct QsaStateDims { uint64_t max_cells = 0, n_head_kv = 0, head_dim = 0, block = 64; };
 
+// Buffer region types: each is an array of Regions slices (pointer + bytes) carved from a single arena.
+// block_buffers_bytes/gdn_buffers_bytes/moe_buffers_bytes/qsa_buffers_bytes/qsa_state_bytes give the required size.
 constexpr int kBlockRegions = 6, kGdnRegions = 5, kMoeRegions = 6, kQsaRegions = 5, kQsaStateRegions = 4;
 template <int N> struct Regions {
     uint8_t* base = nullptr;

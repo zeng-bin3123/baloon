@@ -14,6 +14,7 @@ namespace baloon {
 namespace core {
 
 // ---- runtime switches (process-wide, set once before the graphs are built) -------------------------------------------
+// Flags are const pointers into LayerFlagStore so each name is a distinct const object (required by the port check).
 struct LayerFlagStore {
     std::atomic<bool> g_fast_attn{false};
     std::atomic<bool> g_fast_select{false};

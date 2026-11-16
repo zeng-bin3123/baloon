@@ -19,6 +19,7 @@ constexpr size_t kVisionCacheMax = 64;
 
 constexpr bool admit(uint64_t prompt_len, uint64_t max_new, uint64_t max_ctx) { return prompt_len + max_new <= max_ctx; }
 
+// Req: request state for the T/DONE streaming protocol — streamed tracks tokens sent, done marks finished.
 struct Req { uint64_t streamed = 0, max_new = 0; bool done = false; };
 inline Req on_token(Req r) {
     if (!r.done && r.streamed < r.max_new) ++r.streamed;      // never more than max_new tokens, none after DONE

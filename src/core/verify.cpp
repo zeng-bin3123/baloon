@@ -55,6 +55,8 @@ inline Shape shapes_of(uint64_t bytes, uint64_t elem_bytes, uint64_t cols) {
 
 }  // namespace verify_impl
 
+// Verifier: ring/group tiling of the KV window; monotone flag under contention (raise_flag never lowers);
+// accepted prefix is the longest greedy match; commit vector tracks ring positions; fetch budget limits DMA.
 Verifier::~Verifier() = default;
 
 bool Verifier::init(const Config& c) {
