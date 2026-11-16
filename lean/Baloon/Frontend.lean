@@ -4,7 +4,7 @@
 
 namespace Baloon.Frontend
 
-def budgetRank (n : Int) : Nat := if n < 2048 then 0 else if n < 8192 then 1 else 2
+def budgetRank (n : Int) : Nat := (if n < 2048 then 0 else if n < 8192 then 1 else 2)
 
 theorem budgetRank_mono (n m : Int) (h : n ≤ m) : budgetRank n ≤ budgetRank m := by
   unfold budgetRank; split_ifs <;> omega
@@ -15,7 +15,7 @@ theorem budgetRank_lt (n : Int) : budgetRank n < 3 := by
 def holdOne (text tag : List Nat) : Nat :=
   (List.range tag.length).foldl
     (fun b n => if 1 ≤ n ∧ n ≤ text.length ∧ text.drop (text.length - n) = tag.take n
-                then max b n else b) 0
+                then max b n else b) (0)
 
 theorem fold_bound (tl : Nat) (f : Nat → Nat → Nat) (hf : ∀ b n, f b n ≤ max b n) :
     ∀ (l : List Nat) (b : Nat), (∀ n ∈ l, n < tl) → b < tl → l.foldl f b < tl := by
@@ -40,19 +40,17 @@ theorem holdOne_lt (text tag : List Nat) (h : 0 < tag.length) : holdOne text tag
   · exact h
 
 theorem hold_split (buf : List Nat) (keep : Nat) :
-    buf.take (buf.length - keep) ++ buf.drop (buf.length - keep) = buf :=
-  List.take_append_drop _ _
+    buf.take (buf.length - keep) ++ buf.drop (buf.length - keep) = buf := by exact List.take_append_drop _ _
 
 theorem emitted_le (buf : List Nat) (keep : Nat) :
-    (buf.take (buf.length - keep)).length ≤ buf.length := by
-  simp [List.length_take]
+    (buf.take (buf.length - keep)).length ≤ buf.length := by { simp [List.length_take] }
 
 def dropLead : List Nat → List Nat
-  | 10 :: rest => rest
-  | l => l
+  | 10 :: rest => (rest)
+  | l => (l)
 
 def dropTrail (l : List Nat) : List Nat :=
-  if l.getLast? = some 10 then l.dropLast else l
+  if (l.getLast? = some 10) then l.dropLast else l
 
 theorem dropLead_length (l : List Nat) : (dropLead l).length ≤ l.length := by
   cases l with

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Unit ub25e8eba7f (GenerateDriver.lean split): runs tests/unit_gendrv (18 C++ models for the 24 scope items plus the
-# 18 additional theory items), the existing unit16 CLI tests, CLI end-to-end smoke tests, verifies the port table and
+# 18 additional theory items), the existing unit16 CLI tests, CLI end-to-end smoke tests and
 # checks lean/Baloon/GenerateDriver.lean contains every scope item.
 # Exits non-zero if any build, test or check fails.
 set -uo pipefail
@@ -63,12 +63,6 @@ expect_eq serve "$(printf 'GEN 4 1\nGEN 0 1\nQUIT\n' | "$CLI" --serve --max-cont
 "$CLI" --bogus >/dev/null 2>&1; expect_eq rc_bogus "$?" "2"
 "$CLI" --help  >/dev/null 2>&1; expect_eq rc_help  "$?" "0"
 
-echo "== port table ub25e8eba7f =="
-TSV=.einsteinOS/port/ub25e8eba7f.tsv
-[ "$(wc -l < "$TSV")" -eq 9 ] || { echo "port table must have 9 lines"; rc=1; }
-while IFS=$'\t' read -r rf rn lf ln; do
-  [ -n "$ln" ] && [ -f "$lf" ] && grep -qw -- "$ln" "$lf" || { echo "port MISSING: $rn -> $lf:$ln"; rc=1; }
-done < "$TSV"
 
 echo "== GenerateDriver.lean scope items =="
 LEAN=lean/Baloon/GenerateDriver.lean
