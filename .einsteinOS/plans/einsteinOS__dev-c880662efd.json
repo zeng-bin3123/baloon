@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 15384,
     "started": "2026-11-16T08:04:20.369682557Z",
-    "renewed": "2026-11-16T11:44:59.61284819Z"
+    "renewed": "2026-11-16T12:20:57.407297759Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -334,7 +334,7 @@
         "GenerateDriver.lean"
       ],
       "reason": "3 fix attempts used",
-      "conv": "a7f1b378-79cf-4b47-beb6-d122721dab28"
+      "conv": "f1cac064-e9b2-4c99-9711-ada41f24a612"
     },
     {
       "id": "u95fce8dc9d",
@@ -678,7 +678,7 @@
     "pb0569948de": 2,
     "pb7e2533792": 1,
     "pe1f7ca5c00": 1,
-    "u253a75befe": 1
+    "u253a75befe": 2
   },
   "fail_history": {
     "pb0569948de": [
@@ -707,7 +707,8 @@
       "isa_path_missing"
     ],
     "u253a75befe": [
-      "smoke_fail"
+      "smoke_fail",
+      "lean_copied"
     ],
     "u316bd6b9ec": [
       "compile_fail"
@@ -782,9 +783,10 @@
       "base_ref": "einsteinOS/dev-c880662efd"
     },
     "u253a75befe": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 9 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/program/generate.cpp alias Clock: no line in .einsteinOS/port/u253a75befe.tsv\n  src/program/generate.cpp type Drive: no line in .einsteinOS/port/u253a75befe.tsv\n  src/program/generate.cpp type Options: no line in .einsteinOS/port/u253a75befe.tsv\n  src/program/generate.cpp func argmax: no line in .einsteinOS/port/u253a75befe.tsv\n  src/program/generate.cpp func drive_pool: no line in .einsteinOS/port/u253a75befe.tsv\n  src/program/generate.cpp func drive_pool_multi: no line in .einsteinOS/port/u253a75befe.tsv\n  src/program/generate.cpp func main: no line in .einsteinOS/port/u253a75befe.tsv\n  src/program/generate.cpp func parse_i64_list: no line in .einsteinOS/port/u253a75befe.tsv\n  src/program/generate.cpp func usage: no line in .einsteinOS/port/u253a75befe.tsv",
-      "base_ref": ""
+      "kind": "lean_copied",
+      "text": "lean_copied: 25 declaration(s) of the unit's Lean are the theory's own text, not the unit's (.einsteinOS/theory.md holds each, comments and white space aside):\n  lean/Baloon/GenerateDriver.lean: def RunFits\n  lean/Baloon/GenerateDriver.lean: theorem runFits_total\n  lean/Baloon/GenerateDriver.lean: def dumpPositions\n  lean/Baloon/GenerateDriver.lean: def producedAfter\n  lean/Baloon/GenerateDriver.lean: def nextInput\n  lean/Baloon/GenerateDriver.lean: def nBatched\n  lean/Baloon/GenerateDriver.lean: def accept\n  lean/Baloon/GenerateDriver.lean: def windowLen\n  lean/Baloon/GenerateDriver.lean: theorem commit_le_window\n  lean/Baloon/GenerateDriver.lean: def pcieNum\n  lean/Baloon/GenerateDriver.lean: def traceLayer\n  lean/Baloon/GenerateDriver.lean: def autoSlots\n  lean/Baloon/GenerateDriver.lean: theorem autoSlots_fit\n  lean/Baloon/GenerateDriver.lean: def withProfile\n  lean/Baloon/GenerateDriver.lean: def ceilDiv\n  lean/Baloon/GenerateDriver.lean: def prefillMib\n  lean/Baloon/GenerateDriver.lean: def swapOK\n  lean/Baloon/GenerateDriver.lean: theorem decay_le\n  lean/Baloon/GenerateDriver.lean: def pleAdvance\n  lean/Baloon/GenerateDriver.lean: theorem pleAdvance_fst\n  lean/Baloon/GenerateDriver.lean: theorem pleAdvance_snd\n  lean/Baloon/GenerateDriver.lean: def imgPos\n  lean/Baloon/GenerateDriver.lean: theorem imgPos_w_lt\n  lean/Baloon/GenerateDriver.lean: def admitted\n  lean/Baloon/GenerateDriver.lean: def producedStep\nport_count_in_script: .einsteinOS/verify/u253a75befe/test.sh read the port map — the kernel checks .einsteinOS/port/u253a75befe.tsv against the 9 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-u253a75befe",
+      "base_sha": "3142c5ec23e598af5e82e97972f25bf0e52c02ed"
     }
   },
   "infra_fails": 0,
@@ -1321,6 +1323,7 @@
     "u0868e10073": true,
     "u0e60a9f272": true,
     "u12d8dd5102": true,
+    "u253a75befe": true,
     "u316bd6b9ec": true,
     "u52d156705c": true,
     "u89be81de0b": true,
