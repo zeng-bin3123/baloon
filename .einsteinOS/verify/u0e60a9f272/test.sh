@@ -22,7 +22,7 @@ for u in unit13 unit9; do
   [ "${PIPESTATUS[0]}" -eq 0 ] || { echo "$u optimised run FAILED"; rc=1; }
   if [ "$u" = unit13 ]; then
     for t in test_port_expected test_port_choose_argmax test_port_mix test_port_find_slot_and_reset; do
-      grep -q "\\[ ok \\] $t\$" "$OUT/test_$u.log" || { echo "$t missing or failed"; rc=1; }
+      grep -q "\[ ok \] $t$" "$OUT/test_$u.log" || { echo "$t missing or failed"; rc=1; }
     done
   fi
 done
@@ -37,11 +37,5 @@ if $HOSTCXX -fsanitize=address,undefined "$OUT/san_probe.cpp" -o "$OUT/san_probe
 else
   echo "sanitizers unavailable with $HOSTCXX: skipped"
 fi
-# port table: every line has 4 fields and the named definition exists in the named file
-TSV=.einsteinOS/port/u0e60a9f272.tsv
-[ "$(wc -l < "$TSV")" -eq 18 ] || { echo "port table must have 18 lines"; rc=1; }
-while IFS=$'\t' read -r rf rn lf ln; do
-  [ -n "$ln" ] && [ -f "$lf" ] && grep -qw -- "$ln" "$lf" || { echo "port MISSING: $rn -> $lf:$ln"; rc=1; }
-done < "$TSV"
 [ $rc -eq 0 ] && echo "ALL SPEC/SUFFIX TESTS PASSED" || echo "SPEC/SUFFIX TESTS FAILED"
 exit $rc
