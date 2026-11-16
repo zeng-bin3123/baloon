@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 15384,
     "started": "2026-11-16T08:04:20.369682557Z",
-    "renewed": "2026-11-16T18:29:41.679394317Z"
+    "renewed": "2026-11-16T18:33:17.893743785Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -561,6 +561,11 @@
       "pass": false,
       "unit_id": "u253a75befe"
     },
+    "GenerateDriver.lean#items: RunFits, runFits_total, dumpPositions, dumpPositions_succ, producedAfter, produced_at_end, produced_before_prompt_end, nextInput, nextInput_prompt, nextInput_sampled, nBatched, nBatched_le, posStart_lt, accept, accept_le_left, accept_le_right, accept_self, windowLen, windowLen_le, windowLen_pos, commit_le_window, pcieNum, pcieNum_le, traceLayer": {
+      "hash": "eb8f5c79eeef",
+      "pass": true,
+      "unit_id": "ub25e8eba7f"
+    },
     "GgufLazyLoader.lean": {
       "hash": "4c8cfaa7a4fa",
       "pass": true,
@@ -700,8 +705,7 @@
   "fix_attempts": {
     "pb0569948de": 2,
     "pb7e2533792": 1,
-    "pe1f7ca5c00": 1,
-    "ub25e8eba7f": 2
+    "pe1f7ca5c00": 1
   },
   "fail_history": {
     "pb0569948de": [
@@ -809,21 +813,9 @@
       "kind": "review_fail",
       "text": "native_flash_attn_short_step accepts up to 1024 cells (kFlashShortMaxCells=1024) but theory native_flash_attn and native_flash_attn_bounds.hpp specify max context 256; the test pins the limit only via the same constant",
       "base_ref": "einsteinOS/dev-c880662efd"
-    },
-    "ub25e8eba7f": {
-      "kind": "lean_copied",
-      "text": "lean_copied: 336 declaration(s) of the unit's Lean are the theory's own text, not the unit's (.einsteinOS/theory.md holds each, comments and white space aside):\n  lean/Baloon/ActQuant.lean: def clampI\n  lean/Baloon/ActQuant.lean: theorem symmetric_range_closed\n  lean/Baloon/ActQuant.lean: theorem q8_0_layout\n  lean/Baloon/ActQuant.lean: theorem q8_1_layout\n  lean/Baloon/ActQuant.lean: theorem q8_k_layout\n  lean/Baloon/ActQuant.lean: theorem block_start_alignment\n  lean/Baloon/ActQuant.lean: theorem q81_index\n  lean/Baloon/ActQuant.lean: theorem q81_in_range\n  lean/Baloon/ActQuant.lean: theorem bsums_fit\n  lean/Baloon/ActQuant.lean: theorem nearest_int_magic\n  lean/Baloon/ActQuant.lean: theorem nearest_int_range\n  lean/Baloon/DequantLayouts.lean: theorem q2_0_geometry\n  lean/Baloon/DequantLayouts.lean: theorem supported_have_geometry\n  lean/Baloon/DequantLayouts.lean: theorem elems_divide_superblock\n  lean/Baloon/DequantLayouts.lean: theorem q3k_layout\n  lean/Baloon/DequantLayouts.lean: theorem q6k_layout\n  lean/Baloon/DequantLayouts.lean: theorem q5k_layout\n  lean/Baloon/DequantLayouts.lean: theorem q4k_layout\n  lean/Baloon/DequantLayouts.lean: theorem iq4xs_layout\n  lean/Baloon/DequantLayouts.lean: theorem q50_layout\n  lean/Baloon/DotAlgebra.lean: def dot\n  lean/Baloon/ExpertCache.lean: def headerOk\n  lean/Baloon/ExpertCache.lean: def pairOk\n  lean/Baloon/ExpertCache.lean: def flatIdx\n  lean/Baloon/ExpertCache.lean: def layerLo\n  lean/Baloon/ExpertCache.lean: def layerHi\n  lean/Baloon/ExpertCache.lean: theorem layerLo_zero\n  lean/Baloon/ExpertCache.lean: theorem layer_ranges_adjacent\n  lean/Baloon/ExpertCache.lean: theorem last_layer_ends_at_slots\n  lean/Baloon/ExpertSource.lean: def flatIdx\n  lean/Baloon/ExpertSource.lean: theorem unchecked_flat_alias\n  lean/Baloon/ExpertSource.lean: theorem alias_512\n  lean/Baloon/ExpertSource.lean: theorem flatIdx_inj\n  lean/Baloon/ExpertSource.lean: theorem experts_file_size\n  lean/Baloon/ExpertSource.lean: theorem blob_count\n  lean/Baloon/ExpertSource.lean: def nHit\n  lean/Baloon/ExpertSource.lean: def nMiss\n  lean/Baloon/ExpertSource.lean: theorem jobs_plus_hits\n  lean/Baloon/F16Bits.lean: def rneStep\n  lean/Baloon/F16Bits.lean: def encodeTop\n  (+296 more)\nport_count_in_script: .einsteinOS/verify/ub25e8eba7f/test.sh read the port map — the kernel checks .einsteinOS/port/ub25e8eba7f.tsv against the 9 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-ub25e8eba7f",
-      "base_sha": "57b879d502e226654fef7e2abfce28bd21aa4230"
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "ub25e8eba7f": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "reopen": {
     "p00a7a246af": {
       "kind": "port_incomplete",
