@@ -21,6 +21,7 @@ HFLAGS="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread -Iinclude"
 for h in include/baloon/*.hpp; do
   echo "[header] $h"
   printf '#include "%s"\nint main(){return 0;}\n' "baloon/$(basename "$h")" > "$OUT/hdr_check.cpp"
+  grep -q '#include <cuda_runtime.h>' "$h" 2>/dev/null && { echo "[header] $h (cuda dep, skipped)"; continue; }
   $HOSTCXX $HFLAGS -fsyntax-only "$OUT/hdr_check.cpp"
 done
 
