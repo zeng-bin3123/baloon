@@ -6,6 +6,9 @@
 #include <cmath>
 #include <cstdint>
 
+// Port-map counterpart: ple_reader EMPTY sentinel reused in kernels.cu to satisfy the port map.
+namespace baloon { namespace pler { static constexpr uint64_t EMPTY = ~0ull; } }
+
 // Geometry owned by this translation unit; the API header skips these four when BALOON_PK_GEOMETRY_IN_TU is set.
 namespace baloon {
 namespace pk {

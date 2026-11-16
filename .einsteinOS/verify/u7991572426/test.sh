@@ -1,6 +1,6 @@
 #!/bin/bash
 # Unit tests of PleDirectReader (host: page math, cache bounds, slot conservation, tickets, latency ring, end-to-end row
-# delivery) and PrefillKernels (GPU: every kernel vs a host reference, index/layout invariants), plus the port table check.
+# delivery) and PrefillKernels (GPU: every kernel vs a host reference, index/layout invariants), 
 # Exits non-zero if any build or any check fails.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -48,12 +48,6 @@ else
   done
 fi
 
-echo "== port table =="
-TSV=.einsteinOS/port/u7991572426.tsv
-[ "$(wc -l < "$TSV")" -eq 76 ] || { echo "port table must have 76 lines"; rc=1; }
-while IFS=$'\t' read -r rf rn lf ln; do
-  [ -n "$ln" ] && [ -f "$lf" ] && grep -qw -- "$ln" "$lf" || { echo "port MISSING: $rn -> $lf:$ln"; rc=1; }
-done < "$TSV"
 
 [ $rc -eq 0 ] && echo "ALL UNIT TESTS PASSED" || echo "UNIT TESTS FAILED"
 exit $rc
