@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 15384,
     "started": "2026-11-16T08:04:20.369682557Z",
-    "renewed": "2026-11-16T20:02:16.991221784Z"
+    "renewed": "2026-11-16T22:01:05.896126164Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -264,7 +264,7 @@
         "ServeEngine.lean"
       ],
       "reason": "added after theory changed",
-      "conv": "b00cfe1b-f7ec-4243-98e8-e9702357dc32"
+      "conv": "fb584e49-9e50-4e48-9066-19721d44b739"
     },
     {
       "id": "uca8d125571",
@@ -711,7 +711,7 @@
     "pb0569948de": 2,
     "pb7e2533792": 1,
     "pe1f7ca5c00": 1,
-    "uc81136f4d9": 1
+    "uc81136f4d9": 2
   },
   "fail_history": {
     "pb0569948de": [
@@ -795,7 +795,8 @@
     ],
     "uc81136f4d9": [
       "port_incomplete",
-      "port_incomplete"
+      "port_incomplete",
+      "lean_unproved"
     ],
     "uca8d125571": [
       "compile_fail",
@@ -825,9 +826,10 @@
       "base_ref": "einsteinOS/dev-c880662efd"
     },
     "uc81136f4d9": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 276 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/core/expert_cache.hpp type ExpertCache: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_cache.hpp const kNotResident: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_cache.hpp func read_expert_profile: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp type ArenaExpertSource: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp type ExpertDispatch: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp type ExpertSource: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp type FileExpertSource: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp type GpuPlanSink: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp func expert_hit_run: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp func expert_pool_dispatch: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp func expert_pool_dispatch_multi: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type BlockBuffers: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type Doorbell: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type GdnBuffers: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type MoEBuffers: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type PleRun: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type QsaBuffers: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type QsaState: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func block_buffers_bytes: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func block_buffers_init: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func block_layer: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func block_layer_post: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func block_layer_pre: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func doorbell_free: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func doorbell_init: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func doorbell_reset: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func embed_row: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func gdn_buffers_bytes: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func gdn_buffers_init: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func gdn_buffers_zero_state: no line in .einsteinOS/port/uc81136f4d9.tsv\n  … 246 more",
-      "base_ref": ""
+      "kind": "lean_unproved",
+      "text": "lean_unproved: lean/Baloon/LayerComposition.lean does not check in Lean (Axle, lean-4.35.0): -:63:11-64:11: error: expected identifier",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-uc81136f4d9",
+      "base_sha": "265783d0591b85dbd912e692f85555f660af0291"
     }
   },
   "infra_fails": 0,
@@ -1359,7 +1361,8 @@
     "u32f71e85a9": true,
     "u52d156705c": true,
     "u89be81de0b": true,
-    "ubb09633f12": true
+    "ubb09633f12": true,
+    "uc81136f4d9": true
   },
   "gates": "build+test+gpu+isa+port+integration",
   "integration_unit": {
