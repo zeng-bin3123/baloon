@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 15384,
     "started": "2026-11-16T08:04:20.369682557Z",
-    "renewed": "2026-11-16T08:42:37.489017417Z"
+    "renewed": "2026-11-16T09:20:23.653036392Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -218,7 +218,7 @@
         "PleNgramHash.lean"
       ],
       "reason": "initial plan",
-      "conv": "5c7b153f-d008-4003-b895-36505df6740f"
+      "conv": "4eef9c2e-f806-4df6-bd9a-199840c06689"
     },
     {
       "id": "u0e60a9f272",
@@ -788,6 +788,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "u89be81de0b": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "reopen": {
     "p00a7a246af": {
       "kind": "port_incomplete",
@@ -1338,6 +1344,7 @@
     "u12d8dd5102": true,
     "u316bd6b9ec": true,
     "u52d156705c": true,
+    "u89be81de0b": true,
     "ubb09633f12": true
   },
   "gates": "build+test+gpu+isa+port+integration",
