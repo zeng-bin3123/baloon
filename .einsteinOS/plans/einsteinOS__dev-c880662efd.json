@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 15384,
     "started": "2026-11-16T08:04:20.369682557Z",
-    "renewed": "2026-11-16T17:14:43.824562996Z"
+    "renewed": "2026-11-16T18:29:41.679394317Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -473,7 +473,7 @@
       ],
       "scope": "items: RunFits, runFits_total, dumpPositions, dumpPositions_succ, producedAfter, produced_at_end, produced_before_prompt_end, nextInput, nextInput_prompt, nextInput_sampled, nBatched, nBatched_le, posStart_lt, accept, accept_le_left, accept_le_right, accept_self, windowLen, windowLen_le, windowLen_pos, commit_le_window, pcieNum, pcieNum_le, traceLayer",
       "reason": "3 fix attempts used",
-      "conv": "036c459f-a799-4906-8f58-605b8a704c8e"
+      "conv": "bd11b991-16b1-4412-995a-da9406aea881"
     },
     {
       "id": "u3a5d6ac51e",
@@ -818,6 +818,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "ub25e8eba7f": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "reopen": {
     "p00a7a246af": {
       "kind": "port_incomplete",
