@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 15384,
     "started": "2026-11-16T08:04:20.369682557Z",
-    "renewed": "2026-11-16T19:59:54.380816957Z"
+    "renewed": "2026-11-16T20:02:02.610594208Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -503,7 +503,7 @@
     },
     "ChatFrontend.lean": {
       "hash": "e30953cb2b0d",
-      "pass": false,
+      "pass": true,
       "unit_id": "u32f71e85a9"
     },
     "DequantBlockLayouts.lean": {
@@ -710,8 +710,7 @@
   "fix_attempts": {
     "pb0569948de": 2,
     "pb7e2533792": 1,
-    "pe1f7ca5c00": 1,
-    "u32f71e85a9": 3
+    "pe1f7ca5c00": 1
   },
   "fail_history": {
     "pb0569948de": [
@@ -823,21 +822,9 @@
       "kind": "review_fail",
       "text": "native_flash_attn_short_step accepts up to 1024 cells (kFlashShortMaxCells=1024) but theory native_flash_attn and native_flash_attn_bounds.hpp specify max context 256; the test pins the limit only via the same constant",
       "base_ref": "einsteinOS/dev-c880662efd"
-    },
-    "u32f71e85a9": {
-      "kind": "smoke_fail",
-      "text": "test.sh exit=1: == unit17 (host) ==\n[ ok ] test_budget\n[ ok ] test_hold\n[ ok ] test_strip\n[ ok ] test_expand\n[ ok ] test_fits_delta\n[ ok ] test_prefill\nchecks=292958 failures=0\nUNIT17 TESTS PASSED\n== vision tool end to end ==\n== port table ==\nport table must have 14 lines\nUNIT TESTS FAILED",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-u32f71e85a9",
-      "base_sha": "b0595111c825d626b5006daa117c8fc6a9c1066d"
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "u32f71e85a9": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "reopen": {
     "p00a7a246af": {
       "kind": "port_incomplete",
