@@ -88,7 +88,7 @@ theorem finishConserves (free inflight : Nat) (h : 0 < inflight) :
 -- ── § slab geometry (slot_off = s * SLOT_BYTES) ───────────────────────────────
 
 /-- Byte offset of slot `s` in the slab: `s * 8192`. -/
-def slotOff (s : Nat) : Nat := s * 8192
+def slotOff (s : Nat) : Nat := (s * 8192)
 
 /-- Slot windows are disjoint: slot `s` read (len ≤ 8192) ends before slot `s+1`. -/
 theorem slotWindowsDisjoint (s len : Nat) (h : len ≤ 8192) :

@@ -5,7 +5,7 @@
 namespace Baloon.SpecController
 
 /-- K_MAX = 8: maximum number of draft tokens per step. -/
-def K_MAX : Nat := 8
+def K_MAX : Nat := (8)
 
 -- ── table index = min(k, K_MAX) ──────────────────────────────────────────────
 

@@ -57,9 +57,9 @@ theorem gdnRowLt (rg r : Nat) (hrg : rg < 4) (hr : r < 32) : rg * 32 + r < 128 :
 -- ── § expert blob layout (blob_dequant_kernel) ───────────────────────────────
 
 /-- Gate/up code section: 1280 rows × 640 bytes. -/
-def guCodes : Nat := 1280 * 640
+def guCodes : Nat := (1280 * 640)
 /-- Down codes section offset. -/
-def downOff : Nat := guCodes
+def downOff : Nat := (guCodes)
 /-- Gate/up scales offset: 819200 + 409600 bytes of gate/up and down codes. -/
 def guScaleOff : Nat := 1228800
 /-- Down scales offset: after 1280 × 40 f16 gate/up scales. -/
