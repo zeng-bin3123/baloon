@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 15384,
     "started": "2026-11-16T08:04:20.369682557Z",
-    "renewed": "2026-11-16T20:02:02.610594208Z"
+    "renewed": "2026-11-16T20:02:16.991221784Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -518,7 +518,7 @@
     },
     "ExpertCache.lean": {
       "hash": "b5c930321ff3",
-      "pass": true,
+      "pass": false,
       "unit_id": "uc81136f4d9"
     },
     "ExpertPoolScheduling.lean": {
@@ -528,7 +528,7 @@
     },
     "ExpertSource.lean": {
       "hash": "11f19c5505c2",
-      "pass": true,
+      "pass": false,
       "unit_id": "uc81136f4d9"
     },
     "F16BitsRounding.lean#items: encodeTop, finite_overflow_is_inf, nan_stays_nan, inf_stays_inf, conflation_hazard": {
@@ -583,7 +583,7 @@
     },
     "LayerComposition.lean": {
       "hash": "0996008c92f8",
-      "pass": true,
+      "pass": false,
       "unit_id": "uc81136f4d9"
     },
     "MmvqIterationGeometry.lean": {
@@ -593,7 +593,7 @@
     },
     "MtpDrafter.lean": {
       "hash": "272e6ff6cb9c",
-      "pass": true,
+      "pass": false,
       "unit_id": "uc81136f4d9"
     },
     "NativeFlashAttn.lean": {
@@ -628,7 +628,7 @@
     },
     "PrefillOrchestration.lean": {
       "hash": "5aef6597d767",
-      "pass": true,
+      "pass": false,
       "unit_id": "uc81136f4d9"
     },
     "Q2Avx2GgufRows.lean": {
@@ -673,12 +673,12 @@
     },
     "ServeEngine.lean": {
       "hash": "8ee05fd8bb2b",
-      "pass": true,
+      "pass": false,
       "unit_id": "uc81136f4d9"
     },
     "SessionGraphs.lean": {
       "hash": "09cc594f517f",
-      "pass": true,
+      "pass": false,
       "unit_id": "uc81136f4d9"
     },
     "SpecController.lean": {
@@ -703,14 +703,15 @@
     },
     "WeightLoader.lean": {
       "hash": "e81627089f2b",
-      "pass": true,
+      "pass": false,
       "unit_id": "uc81136f4d9"
     }
   },
   "fix_attempts": {
     "pb0569948de": 2,
     "pb7e2533792": 1,
-    "pe1f7ca5c00": 1
+    "pe1f7ca5c00": 1,
+    "uc81136f4d9": 1
   },
   "fail_history": {
     "pb0569948de": [
@@ -822,6 +823,11 @@
       "kind": "review_fail",
       "text": "native_flash_attn_short_step accepts up to 1024 cells (kFlashShortMaxCells=1024) but theory native_flash_attn and native_flash_attn_bounds.hpp specify max context 256; the test pins the limit only via the same constant",
       "base_ref": "einsteinOS/dev-c880662efd"
+    },
+    "uc81136f4d9": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 276 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/core/expert_cache.hpp type ExpertCache: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_cache.hpp const kNotResident: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_cache.hpp func read_expert_profile: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp type ArenaExpertSource: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp type ExpertDispatch: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp type ExpertSource: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp type FileExpertSource: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp type GpuPlanSink: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp func expert_hit_run: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp func expert_pool_dispatch: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp func expert_pool_dispatch_multi: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type BlockBuffers: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type Doorbell: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type GdnBuffers: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type MoEBuffers: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type PleRun: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type QsaBuffers: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type QsaState: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func block_buffers_bytes: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func block_buffers_init: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func block_layer: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func block_layer_post: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func block_layer_pre: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func doorbell_free: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func doorbell_init: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func doorbell_reset: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func embed_row: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func gdn_buffers_bytes: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func gdn_buffers_init: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func gdn_buffers_zero_state: no line in .einsteinOS/port/uc81136f4d9.tsv\n  … 246 more",
+      "base_ref": ""
     }
   },
   "infra_fails": 0,
@@ -954,11 +960,6 @@
     "ubb09633f12": {
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 6 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/kernels/cpu/q2_avx2.cpp func act_quant_q8_1_avx2: no line in .einsteinOS/port/ubb09633f12.tsv\n  src/kernels/cpu/q2_avx2.cpp func h2f: no line in .einsteinOS/port/ubb09633f12.tsv\n  src/kernels/cpu/q2_avx2.cpp func q2_0_gguf_rows_multi_avx2: no line in .einsteinOS/port/ubb09633f12.tsv\n  src/kernels/cpu/q2_avx2.cpp func row_multi: no line in .einsteinOS/port/ubb09633f12.tsv\n  src/kernels/cpu/q2_avx2.cpp func rows: no line in .einsteinOS/port/ubb09633f12.tsv\n  src/kernels/cpu/q2_avx2.cpp func unpack64: no line in .einsteinOS/port/ubb09633f12.tsv",
-      "base_ref": ""
-    },
-    "uc81136f4d9": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 276 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/core/expert_cache.hpp type ExpertCache: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_cache.hpp const kNotResident: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_cache.hpp func read_expert_profile: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp type ArenaExpertSource: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp type ExpertDispatch: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp type ExpertSource: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp type FileExpertSource: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp type GpuPlanSink: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp func expert_hit_run: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp func expert_pool_dispatch: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/expert_source.hpp func expert_pool_dispatch_multi: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type BlockBuffers: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type Doorbell: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type GdnBuffers: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type MoEBuffers: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type PleRun: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type QsaBuffers: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp type QsaState: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func block_buffers_bytes: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func block_buffers_init: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func block_layer: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func block_layer_post: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func block_layer_pre: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func doorbell_free: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func doorbell_init: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func doorbell_reset: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func embed_row: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func gdn_buffers_bytes: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func gdn_buffers_init: no line in .einsteinOS/port/uc81136f4d9.tsv\n  include/strata/core/layer.hpp func gdn_buffers_zero_state: no line in .einsteinOS/port/uc81136f4d9.tsv\n  … 246 more",
       "base_ref": ""
     },
     "uebd9b81357": {
