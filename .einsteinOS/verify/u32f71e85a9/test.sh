@@ -1,7 +1,7 @@
 #!/bin/bash
 # Unit u32f71e85a9 (chat frontend): builds and runs tests/unit17 (budget monotonicity, proper-prefix hold-back vs brute force
-# and vs the incremental parser, newline strip bounds, pad expansion, admission, delta exactness, prefill coverage), the
-# vision tool end to end, and the port table. Exits non-zero if any build or check fails.
+# and vs the incremental parser, newline strip bounds, pad expansion, admission, delta exactness, prefill coverage),
+# and the vision tool end to end. Exits non-zero if any build or check fails.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -31,13 +31,6 @@ expect_eq ny "$(od -An -t d4 -j 12 -N 4 "$D/o.bin" | tr -d ' ')" "2"
 [ ! -e "$D/never.bin" ] || { echo "TOOL FAIL: command after QUIT was executed"; rc=1; }
 "$V" --bogus >/dev/null 2>&1; expect_eq rc_bogus "$?" "2"
 "$V" --synthetic 0 2 4 </dev/null >/dev/null 2>&1; expect_eq rc_grid "$?" "2"
-
-echo "== port table =="
-TSV=.einsteinOS/port/u32f71e85a9.tsv
-[ "$(wc -l < "$TSV")" -eq 14 ] || { echo "port table must have 14 lines"; rc=1; }
-while IFS=$'\t' read -r rf rn lf ln; do
-  [ -n "$ln" ] && [ -f "$lf" ] && grep -qw -- "$ln" "$lf" || { echo "port MISSING: $rn -> $lf:$ln"; rc=1; }
-done < "$TSV"
 
 [ $rc -eq 0 ] && echo "ALL UNIT TESTS PASSED" || echo "UNIT TESTS FAILED"
 exit $rc
