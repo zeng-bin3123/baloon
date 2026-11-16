@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 15384,
     "started": "2026-11-16T08:04:20.369682557Z",
-    "renewed": "2026-11-16T18:33:46.190238778Z"
+    "renewed": "2026-11-16T19:16:45.392330092Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -249,7 +249,7 @@
         "ChatFrontend.lean"
       ],
       "reason": "added after theory changed",
-      "conv": "1368ef6a-fc26-45d0-8252-c36dea953049"
+      "conv": "99b55571-7b71-47a2-9f19-71534b87e5a9"
     },
     {
       "id": "uc81136f4d9",
@@ -711,7 +711,7 @@
     "pb0569948de": 2,
     "pb7e2533792": 1,
     "pe1f7ca5c00": 1,
-    "u32f71e85a9": 1
+    "u32f71e85a9": 2
   },
   "fail_history": {
     "pb0569948de": [
@@ -746,6 +746,9 @@
     ],
     "u316bd6b9ec": [
       "compile_fail"
+    ],
+    "u32f71e85a9": [
+      "lean_copied"
     ],
     "u433ffdf2e4": [
       "gpu_not_compiled"
@@ -821,9 +824,10 @@
       "base_ref": "einsteinOS/dev-c880662efd"
     },
     "u32f71e85a9": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 5 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/prefill/prefill.hpp type Prefill: no line in .einsteinOS/port/u32f71e85a9.tsv\n  include/strata/prefill/prefill.hpp type PrefillStats: no line in .einsteinOS/port/u32f71e85a9.tsv\n  tools/vision/strata_vision.cpp func main: no line in .einsteinOS/port/u32f71e85a9.tsv\n  tools/vision/strata_vision.cpp func parse_enc: no line in .einsteinOS/port/u32f71e85a9.tsv\n  tools/vision/strata_vision.cpp func quiet_log: no line in .einsteinOS/port/u32f71e85a9.tsv",
-      "base_ref": ""
+      "kind": "lean_copied",
+      "text": "lean_copied: 11 declaration(s) of the unit's Lean are the theory's own text, not the unit's (.einsteinOS/theory.md holds each, comments and white space aside):\n  lean/Baloon/ChatFrontend.lean: def budgetRank\n  lean/Baloon/ChatFrontend.lean: def holdOne\n  lean/Baloon/ChatFrontend.lean: theorem hold_split\n  lean/Baloon/ChatFrontend.lean: theorem emitted_le\n  lean/Baloon/ChatFrontend.lean: def dropLead\n  lean/Baloon/ChatFrontend.lean: def dropTrail\n  lean/Baloon/ChatFrontend.lean: def stripNl\n  lean/Baloon/ChatFrontend.lean: def expand\n  lean/Baloon/ChatFrontend.lean: theorem expand_nil_counts\n  lean/Baloon/ChatFrontend.lean: def fits\n  lean/Baloon/ChatFrontend.lean: def deltaLen\nport_count_in_script: .einsteinOS/verify/u32f71e85a9/test.sh read the port map — the kernel checks .einsteinOS/port/u32f71e85a9.tsv against the 5 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)\nport_ref_file_unknown: 1 reference file(s) in .einsteinOS/port/u32f71e85a9.tsv are not files of the reference the kernel measured — that column is the reference's, and a header written in this repository is not one of its files, whatever it is called:\n  src/program/generate.cpp Clock → include/baloon/generate_cli.hpp:Clock: src/program/generate.cpp is not one of the unit's reference files\nthe unit's reference files: include/ref/prefill/prefill.hpp tools/vision/ref_vision.cpp\nport_extra: 9 line(s) of .einsteinOS/port/u32f71e85a9.tsv name no definition this unit ports — the map holds exactly the 5 the kernel measured from the reference:\n  src/program/generate.cpp Clock → include/baloon/generate_cli.hpp:Clock: the line names no definition this unit ports\n  src/program/generate.cpp Drive → include/baloon/generate_cli.hpp:Drive: the line names no definition this unit ports\n  src/program/generate.cpp Options → include/baloon/generate_cli.hpp:Options: the line names no definition this unit ports\n  src/program/generate.cpp argmax → include/baloon/generate_cli.hpp:argmax: the line names no definition this unit ports\n  src/program/generate.cpp drive_pool → include/baloon/generate_cli.hpp:drive_pool: the line names no definition this unit ports\n  src/program/generate.cpp drive_pool_multi → include/baloon/generate_cli.hpp:drive_pool_multi: the line names no definition this unit ports\n  src/program/generate.cpp parse_i64_list → include/baloon/generate_cli.hpp:parse_i64_list: the line names no definition this unit ports\n  src/program/generate.cpp usage → include/baloon/generate_cli.hpp:usage: the line names no definition this unit ports\n  src/program/generate.cpp main → src/driver/generate_cli.cpp:main: the line names no definition this unit ports",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-u32f71e85a9",
+      "base_sha": "11f7f3e7d55d005cb099384e8d211598a52f9f16"
     }
   },
   "infra_fails": 0,
