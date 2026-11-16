@@ -63,12 +63,14 @@ theorem chainRow_above_catchup (T j : Nat) (hj : 1 ≤ j) : T ≤ chainRow T j :
 
 /-- Chain rows lie strictly below the full-layer row and inside the 2T rows. -/
 theorem chainRow_below_full (T j : Nat) (hj : j ≤ T - 2) (hT : 3 ≤ T) :
-    (chainRow T j < fullRow T) ∧ (fullRow T < 2 * T := by)
+    (chainRow T j < fullRow T) ∧ (fullRow T < 2 * T) := by
   simp only [chainRow, fullRow]; omega
 
 /-- Distinct chain steps use distinct rows. -/
 theorem chainRow_inj (T j k : Nat) (hj : 1 ≤ j) (hk : 1 ≤ k) (h : chainRow T j = chainRow T k) :
-    j = k := by { simp only [chainRow, at, h]; omega }
+    j = k := by
+  simp only [chainRow] at h
+  omega
 
 /-- The step-row block count of a cell: `(cell + 1) / 4` is monotone in the cell. -/
 theorem step_block_mono (a b : Nat) (h : a ≤ b) : (a + 1) / 4 ≤ (b + 1) / 4 := by { omega }
@@ -79,15 +81,16 @@ theorem step_block_mono (a b : Nat) (h : a ≤ b) : (a + 1) / 4 ≤ (b + 1) / 4 
 enough; returns the final `j`, which equals the number of drafts produced. -/
 def chainFuel (maxT minP : Nat) (p : Nat → Nat) : Nat → Nat → Nat
   | 0, j => j
-  (| fuel + 1, j => if (j < maxT - 1) ∧ (p (j - 1) ≥ minP) then chainFuel maxT minP p fuel (j + 1) else j)
+  | fuel + 1, j => if (j < maxT - 1) ∧ (p (j - 1) ≥ minP) then chainFuel maxT minP p fuel (j + 1) else j
 
 /-- The chain never produces fewer drafts than it started with. -/
 theorem chain_ge (maxT minP : Nat) (p : Nat → Nat) :
     ∀ fuel j, j ≤ chainFuel maxT minP p fuel j
   | 0, j => by simp only [chainFuel]
   | fuel + 1, j => by
-    simp only [chainFuel, split]
-    · have := (chain_ge maxT minP p fuel (j + 1))
+    simp only [chainFuel]
+    split_ifs with hc
+    · have := chain_ge maxT minP p fuel (j + 1)
       omega
     · omega
 
@@ -96,16 +99,17 @@ theorem chain_le (maxT minP : Nat) (p : Nat → Nat) :
     ∀ fuel j, j ≤ maxT - 1 → chainFuel maxT minP p fuel j ≤ maxT - 1
   | 0, j, h => by simpa [chainFuel] using h
   | fuel + 1, j, h => by
-    simp only [chainFuel, split]
-    · rename_i hc
-      exact chain_le maxT minP p fuel (j + 1) (by omega)
+    simp only [chainFuel]
+    split_ifs with hc
+    · exact chain_le maxT minP p fuel (j + 1) (by omega)
     · exact h
 
 /-- A draft whose probability is below the threshold stops the chain at once. -/
 theorem chain_stops_on_low (maxT minP : Nat) (p : Nat → Nat) (fuel j : Nat) (h : p (j - 1) < minP) :
     chainFuel maxT minP p (fuel + 1) j = j := by
-  simp only [chainFuel, split]
-  · rename_i hc; omega
+  simp only [chainFuel]
+  split_ifs with hc
+  · exact absurd hc.2 (Nat.not_le.mpr h)
   · rfl
 
 -- § argument validity of `draft`
@@ -149,7 +153,11 @@ def findTensor (ts : List Tensor) (name kind : String) : Option Tensor :=
 
 /-- A hit always has the requested name and kind. -/
 theorem findTensor_sound (ts : List Tensor) (name kind : String) (t : Tensor)
-    (h : findTensor ts name kind = some t) : t.name = name ∧ t.kind = kind := by { have := (List.find?_some h; simpa using this })
+    (h : findTensor ts name kind = some t) : t.name = name ∧ t.kind = kind := by
+  unfold findTensor at h
+  have hpred := List.find?_some h
+  simp only [Bool.and_eq_true, beq_iff_eq] at hpred
+  exact hpred
 
 /-- An empty table finds nothing. -/
 theorem findTensor_nil (name kind : String) : findTensor [] name kind = none := by { rfl }

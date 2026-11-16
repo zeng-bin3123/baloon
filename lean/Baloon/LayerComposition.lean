@@ -58,8 +58,8 @@ structure PlaneRef where
   offset : Nat
   bytes : Nat
   codeBits : Nat
-  deriving Repr
   hasOffset : Bool
+  deriving Repr
 
 /-- `plane_ptrs` acceptance: S2/S4/S8, non-empty codes and scales, planes add up, `has_offset` agrees. -/
 def planesOk (r : PlaneRef) : Prop :=
@@ -104,7 +104,8 @@ theorem cursorTake_covers (used count size : Nat) : used + count * size ≤ curs
 theorem cursorTake_mod (used count size : Nat) : cursorTake used count size % 16 = 0 := by { simp only [cursorTake]; exact align16_mod _ }
 
 /-- The cursor never moves backwards. -/
-theorem cursorTake_mono (used count size : Nat) : used ≤ cursorTake used count size := by { have h := (cursorTake_covers used count size; omega })
+theorem cursorTake_mono (used count size : Nat) : used ≤ cursorTake used count size := by
+  have h := cursorTake_covers used count size; omega
 
 /-- Sum of 16-byte aligned parts (the `*_buffers_bytes` totals). -/
 def alignedTotal : List Nat → Nat
@@ -154,10 +155,16 @@ def dispatch (native : Bool) (codeBits : Nat) (wantsQ8k : Bool) : Gemv :=
 theorem dispatch_native (c : Nat) (w : Bool) : dispatch true c w = Gemv.native := by { simp only [dispatch] }
 
 /-- A non-native 2-bit tensor always takes the S2/Q8_0 path. -/
-theorem dispatch_s2 (c : Nat) (w : Bool) (hc : c = 2) : dispatch false c w = Gemv.s2q80 := by { simp only [dispatch, hc] }
+theorem dispatch_s2 (c : Nat) (w : Bool) (hc : c = 2) : dispatch false c w = Gemv.s2q80 := by
+  simp only [dispatch, hc]
 
 /-- A legacy 4/8-bit tensor that does not want Q8_K takes the legacy Q8_0 path. -/
-theorem dispatch_legacy (c : Nat) (hc : c ≠ 2) : dispatch false c false = Gemv.legacyQ80 := by { simp only [dispatch, hc] }
+theorem dispatch_legacy (c : Nat) (hc : c ≠ 2) : dispatch false c false = Gemv.legacyQ80 := by
+  simp only [dispatch]
+  split_ifs with h1 h2
+  · exact absurd h1 hc
+  · cases h2
+  · rfl
 
 /-- The Q8_K path is never reached by a 2-bit tensor (which has no Q8_K contract). -/
 theorem dispatch_q8k_not_s2 (n : Bool) (c : Nat) (w : Bool) (h : dispatch n c w = Gemv.q8k) :
@@ -202,7 +209,7 @@ def verifyCompatible (nb gr gdnFused nativeGdn fastAttn flashShort fastSel qsaId
 theorem verifyCompatible_iff (nb gr gdnFused nativeGdn fastAttn flashShort fastSel qsaIdx : Bool) :
     verifyCompatible nb gr gdnFused nativeGdn fastAttn flashShort fastSel qsaIdx = true ↔
       (nb = true ∧ gr = true ∧ gdnFused = true ∧ nativeGdn = true ∧ fastAttn = true ∧
-        (flashShort = false) ∧ (fastSel = true) ∧ (qsaIdx = true) := by)
+        flashShort = false ∧ fastSel = true ∧ qsaIdx = true) := by
   cases nb <;> cases gr <;> cases gdnFused <;> cases nativeGdn <;> cases fastAttn <;>
     cases flashShort <;> cases fastSel <;> cases qsaIdx <;> simp only [verifyCompatible]
 
@@ -214,7 +221,10 @@ def fusedGr (flag : Bool) (stagePrefix half : Nat) (supported : Bool) : Bool :=
 
 /-- Fusion implies the default call shape. -/
 theorem fusedGr_default (flag : Bool) (sp half : Nat) (s : Bool)
-    (h : fusedGr flag sp half s = true) : sp = 0 ∧ half = 0 := by { simp only [fusedGr, at, h, simp, at, h]; exact ⟨h.1.1.2, h.1.2⟩ }
+    (h : fusedGr flag sp half s = true) : sp = 0 ∧ half = 0 := by
+  simp only [fusedGr, Bool.and_eq_true, decide_eq_true_eq] at h
+  obtain ⟨_, hsp, hhalf, _⟩ := h
+  exact ⟨hsp, hhalf⟩
 
 /-- The post half writes the residual itself unless fused, and always on the last layer. -/
 def postWritesR (fusedOn : Bool) (layer nLayers : Nat) : Bool :=
@@ -227,7 +237,9 @@ theorem postWritesR_unfused (layer n : Nat) : postWritesR false layer n = true :
 theorem postWritesR_last (n : Nat) : postWritesR true n (n + 1) = true := by { simp only [postWritesR] }
 
 /-- With fusion an inner layer defers its write. -/
-theorem postWritesR_inner (layer n : Nat) (h : layer + 1 ≠ n) : postWritesR true layer n = false := by { simp only [postWritesR, h] }
+theorem postWritesR_inner (layer n : Nat) (h : layer + 1 ≠ n) : postWritesR true layer n = false := by
+  simp only [postWritesR, Bool.not_true, Bool.false_or, decide_eq_false_iff_not]
+  exact h
 
 -- § PLE gating
 
@@ -236,10 +248,11 @@ def pleApplies (ready : Bool) (layer half : Nat) : Bool :=
   (ready && decide (layer = 1) && decide (half = 0 ∨ half = 1))
 
 /-- No PLE outside layer 1. -/
-theorem pleApplies_layer (r : Bool) (l half : Nat) (h : l ≠ 1) : pleApplies r l half = false := by { simp only [pleApplies, h] }
+theorem pleApplies_layer (r : Bool) (l half : Nat) (h : l ≠ 1) : pleApplies r l half = false := by
+  simp only [pleApplies, decide_eq_false_iff_not.mpr h, Bool.and_false, Bool.false_and]
 
 /-- No PLE in the FFN-front half. -/
-theorem pleApplies_ffn (r : Bool) : pleApplies r 1 2 = false := by { simp only [pleApplies] }
+theorem pleApplies_ffn (r : Bool) : pleApplies r 1 2 = false := by cases r <;> simp [pleApplies]
 
 -- § layer kinds
 

@@ -36,12 +36,12 @@ theorem alignUp256_mod (n : Nat) : alignUp256 n % 256 = 0 := by { simp only [ali
 
 /-- `session_init`'s chain of `take` calls: advance the cursor by each region, re-aligned to 256. -/
 def takeAll : Nat → List Nat → Nat
-  | a0, [] => u
+  | a0, [] => a0
   | a0, v :: vs => takeAll (alignUp256 (a0 + v)) vs
 
 /-- Each take wastes fewer than 256 bytes, so the end cursor is bounded by sum plus 255 per region. -/
 theorem takeAll_le : ∀ (l : List Nat) (u : Nat), takeAll u l ≤ u + l.sum + 255 * l.length
-  | [], u => by simp only [takeAll]
+  | [], u => by simp [takeAll]
   | x :: xs, u => by
     have h1 := (alignUp256_le (u + x))
     have h2 := (takeAll_le xs (alignUp256 (u + x)))
@@ -56,9 +56,14 @@ theorem session_init_fits (parts : List Nat) (hlen : parts.length ≤ 16) :
     takeAll 0 parts ≤ sessionBytes parts := by
   have h1 := (takeAll_le parts 0)
   have h2 := (alignUp256_ge parts.sum)
-  simp only [sessionBytes, omega]
+  simp only [sessionBytes]
+  omega
+
 /-- The reported size is a multiple of 256 (4096 is a multiple of 256). -/
-theorem sessionBytes_mod (parts : List Nat) : sessionBytes parts % 256 = 0 := by { have := (alignUp256_mod parts.sum; simp only [sessionBytes]; omega })
+theorem sessionBytes_mod (parts : List Nat) : sessionBytes parts % 256 = 0 := by
+  have := alignUp256_mod parts.sum
+  simp only [sessionBytes]
+  omega
 
 -- § per-layer state indices
 
@@ -117,7 +122,8 @@ theorem dump_slot_in_bounds (l L n : Nat) (h : l < L) : (l + 1) * n + n ≤ (L +
 -- § per-token handoff bookkeeping
 
 /-- Parts staging size `k * n_embd * 4` is positive for positive inputs, so the pinned scratch is non-empty. -/
-theorem parts_bytes_pos (k n : Nat) (hk : 0 < k) (hn : 0 < n) : 0 < k * n * 4 := by { have : 0 < k * n := (Nat.mul_pos hk hn; omega })
+theorem parts_bytes_pos (k n : Nat) (hk : 0 < k) (hn : 0 < n) : 0 < k * n * 4 :=
+  Nat.mul_pos (Nat.mul_pos hk hn) (by decide)
 
 /-- Token-graph flush interval check: a ring wait is only escalated after a `1024`-spin boundary. -/
 def spinBoundary (spins : Nat) : Bool := (decide ((spins + 1) % 1024 = 0))

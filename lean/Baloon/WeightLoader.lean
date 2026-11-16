@@ -70,15 +70,23 @@ theorem promoted_saves (elems src dst : Nat) (h1 : src = elems * 4) (h2 : dst = 
 def chunkLen (rem : Nat) : Nat := (min CHUNK rem)
 
 /-- While bytes remain, the next chunk is non-empty and strictly shrinks the remainder. -/
-theorem chunk_progress (rem : Nat) (h : 0 < rem) : 0 < chunkLen rem ∧ rem - chunkLen rem < rem := by { simp only [chunkLen, CHUNK, omega] }
+theorem chunk_progress (rem : Nat) (h : 0 < rem) : 0 < chunkLen rem ∧ rem - chunkLen rem < rem := by
+  simp only [chunkLen, CHUNK]
+  omega
+
 /-- A chunk never exceeds the staging size. -/
 theorem chunk_le (rem : Nat) : chunkLen rem ≤ CHUNK := by { simp only [chunkLen]; omega }
 
 /-- The chunk size is even (needed so widening never splits an element). -/
-theorem chunk_even_of_full (rem : Nat) (h : CHUNK ≤ rem) : chunkLen rem % 2 = 0 := by { simp only [chunkLen, CHUNK] at *; omega }
+theorem chunk_even_of_full (rem : Nat) (h : CHUNK ≤ rem) : chunkLen rem % 2 = 0 := by
+  simp only [chunkLen, CHUNK] at *
+  omega
 
 /-- When the remainder is a multiple of 4, so is the next chunk. -/
-theorem chunk_mult4 (rem : Nat) (h : rem % 4 = 0) : chunkLen rem % 4 = 0 := by { simp only [chunkLen, CHUNK, omega] }
+theorem chunk_mult4 (rem : Nat) (h : rem % 4 = 0) : chunkLen rem % 4 = 0 := by
+  simp only [chunkLen, CHUNK]
+  omega
+
 -- § arena placement and compaction
 
 /-- Round up to a multiple of 256 (the default alignment). -/
@@ -113,7 +121,8 @@ theorem placeAll_ge : ∀ (l : List Nat) (a : Nat), a + l.sum ≤ placeAll a l
     omega
 
 /-- Each row's end is at or below the next row's start (rows never overlap). -/
-theorem row_end_le_next (at_ x : Nat) : at_ + x ≤ at_ + alignUp256 x := by { have := (alignUp256_ge x; omega })
+theorem row_end_le_next (at_ x : Nat) : at_ + x ≤ at_ + alignUp256 x :=
+  Nat.add_le_add_left (alignUp256_ge x) at_
 
 -- § index kinds
 
