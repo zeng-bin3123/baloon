@@ -1,9 +1,9 @@
 {
   "holder": {
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
-    "pid": 31201,
-    "started": "2026-11-17T10:09:31.338491831Z",
-    "renewed": "2026-11-17T12:05:38.507542489Z"
+    "pid": 55569,
+    "started": "2026-11-17T12:33:59.09054199Z",
+    "renewed": "2026-11-17T12:57:36.582369079Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -218,7 +218,7 @@
         "PleNgramHash.lean"
       ],
       "reason": "initial plan",
-      "conv": "4eef9c2e-f806-4df6-bd9a-199840c06689"
+      "conv": "8e22ec83-aa48-426d-acc4-04c74f788d28"
     },
     {
       "id": "u0e60a9f272",
@@ -901,6 +901,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "u89be81de0b": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "reopen": {
     "p00a7a246af": {
       "kind": "port_incomplete",
