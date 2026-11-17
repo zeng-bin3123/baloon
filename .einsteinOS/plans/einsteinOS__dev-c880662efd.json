@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 31201,
     "started": "2026-11-17T10:09:31.338491831Z",
-    "renewed": "2026-11-17T12:02:18.986488551Z"
+    "renewed": "2026-11-17T12:04:59.158570594Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -688,8 +688,8 @@
     },
     "PrefillOrchestration.lean": {
       "hash": "5aef6597d767",
-      "pass": false,
-      "unit_id": "uc81136f4d9"
+      "pass": true,
+      "unit_id": "u2b02268397"
     },
     "Q2Avx2GgufRows.lean": {
       "hash": "da3d71d3b07b",
@@ -895,12 +895,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "u2b02268397": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "reopen": {
     "p00a7a246af": {
       "kind": "port_incomplete",
