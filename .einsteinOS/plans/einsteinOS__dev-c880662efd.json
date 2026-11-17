@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 31201,
     "started": "2026-11-17T10:09:31.338491831Z",
-    "renewed": "2026-11-17T11:24:57.740745027Z"
+    "renewed": "2026-11-17T11:30:59.541790483Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -577,8 +577,8 @@
     },
     "ExpertCache.lean": {
       "hash": "b5c930321ff3",
-      "pass": false,
-      "unit_id": "uc81136f4d9"
+      "pass": true,
+      "unit_id": "u6561d2f27c"
     },
     "ExpertPoolScheduling.lean": {
       "hash": "1c2c77389750",
@@ -587,8 +587,8 @@
     },
     "ExpertSource.lean": {
       "hash": "11f19c5505c2",
-      "pass": false,
-      "unit_id": "uc81136f4d9"
+      "pass": true,
+      "unit_id": "u6561d2f27c"
     },
     "F16BitsRounding.lean#items: encodeTop, finite_overflow_is_inf, nan_stays_nan, inf_stays_inf, conflation_hazard": {
       "hash": "7c4403b77fca",
@@ -894,12 +894,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "u6561d2f27c": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "reopen": {
     "p00a7a246af": {
       "kind": "port_incomplete",
