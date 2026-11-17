@@ -86,23 +86,12 @@ public:
     double mtp_p[K_MAX];
     double lookup_q[4];
 
-    Controller() {
-        for (uint64_t i = 0; i < K_MAX; ++i) mtp_p[i] = 0.5;
-        const double q[4] = {0.3, 0.5, 0.7, 0.85};
-        for (int i = 0; i < 4; ++i) lookup_q[i] = q[i];
-    }
+    Controller();
 
     // Expected committed tokens of a k-token draft from `src`: 1 + sum of running acceptance products. MTP uses the
     // per-position table; lookup uses one bucket entry (chosen by match length) for every position. k is clipped to
     // K_MAX; plain decoding commits exactly one token.
-    double expected(Source src, uint64_t k, uint64_t lookup_match = 0) const {
-        if (src == Source::None || k == 0) return 1.0;
-        k = std::min(k, K_MAX);
-        if (src == Source::Mtp) return spec::expected(mtp_p, k);
-        double q[K_MAX];
-        for (uint64_t i = 0; i < K_MAX; ++i) q[i] = lookup_q[bucket(lookup_match)];
-        return spec::expected(q, k);
-    }
+    double expected(Source src, uint64_t k, uint64_t lookup_match = 0) const;
 
     // mtp_k_max: longest MTP chain available; lookup_avail/lookup_match: size and match length of the lookup proposal.
     Choice choose(uint64_t mtp_k_max, uint64_t lookup_avail, uint64_t lookup_match) const;
@@ -110,6 +99,21 @@ public:
     // Learn from one verify round: `accepted` of `k` drafts were accepted.
     void observe(Drafter d, uint64_t k, uint64_t accepted, uint64_t lookup_match = 0);
 };
+
+inline Controller::Controller() {
+    for (uint64_t i = 0; i < K_MAX; ++i) mtp_p[i] = 0.5;
+    const double q[4] = {0.3, 0.5, 0.7, 0.85};
+    for (int i = 0; i < 4; ++i) lookup_q[i] = q[i];
+}
+
+inline double Controller::expected(Source src, uint64_t k, uint64_t lookup_match) const {
+    if (src == Source::None || k == 0) return 1.0;
+    k = std::min(k, K_MAX);
+    if (src == Source::Mtp) return spec::expected(mtp_p, k);
+    double q[K_MAX];
+    for (uint64_t i = 0; i < K_MAX; ++i) q[i] = lookup_q[bucket(lookup_match)];
+    return spec::expected(q, k);
+}
 
 inline Choice Controller::choose(uint64_t mtp_k_max, uint64_t lookup_avail, uint64_t lookup_match) const {
     const double base = 1.0 / cost.step_ms(0);

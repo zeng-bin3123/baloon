@@ -65,14 +65,7 @@ inline uint64_t probe_next_mask(uint64_t i, uint64_t mask) { return (i + 1) & ma
 
 class SuffixDrafter {
 public:
-    explicit SuffixDrafter(uint64_t table_slots = 1u << 12, uint64_t min_match = 3, uint64_t max_match = 32)
-        : min_match_(std::max<uint64_t>(3, min_match)), max_match_(0) {
-        max_match_ = max_match_of(min_match, max_match);  // raw min_match: a degenerate pair can never match
-        uint64_t cap = 16;
-        while (cap < table_slots) cap <<= 1;
-        slots_.assign(cap, Slot{});
-        mask_ = cap - 1;
-    }
+    explicit SuffixDrafter(uint64_t table_slots = 1u << 12, uint64_t min_match = 3, uint64_t max_match = 32);
     uint64_t min_match() const { return min_match_; }
     uint64_t max_match() const { return max_match_; }
     uint64_t size() const { return hist_.size(); }
@@ -107,6 +100,15 @@ private:
     std::vector<uint32_t> hist_;
     uint64_t mask_ = 0, min_match_, max_match_;
 };
+
+inline SuffixDrafter::SuffixDrafter(uint64_t table_slots, uint64_t min_match, uint64_t max_match)
+    : min_match_(std::max<uint64_t>(3, min_match)), max_match_(0) {
+    max_match_ = max_match_of(min_match, max_match);  // raw min_match: a degenerate pair can never match
+    uint64_t cap = 16;
+    while (cap < table_slots) cap <<= 1;
+    slots_.assign(cap, Slot{});
+    mask_ = cap - 1;
+}
 
 inline void SuffixDrafter::reset() {
     hist_.clear();

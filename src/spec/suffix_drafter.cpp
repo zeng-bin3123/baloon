@@ -8,7 +8,9 @@ namespace suffix {
 
 // Explicit anchor TU ─────────────────────────────────────────────────────────
 
-// mix anchor: ensures one definition site for the FNV-based hash round.
+// mix: FNV-based one-round hash fold; also the port-table entry for suffix_drafter mix.
+// The free function mix() is defined inline in suffix_drafter.hpp; this TU provides
+// an out-of-line reference point for LTO-disabled builds.
 uint64_t mix_anchor(uint64_t x, uint32_t tok) {
     return mix(x, tok);
 }
