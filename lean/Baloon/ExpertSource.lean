@@ -52,4 +52,52 @@ theorem jobs_plus_hits : ∀ l : List Bool, nHit l + nMiss l = l.length
 theorem nHit_le (l : List Bool) : nHit l ≤ l.length := by {
   have := jobs_plus_hits l; omega }
 
+-- § zero-hit specialisation
+
+theorem no_hits_all_jobs : ∀ l : List Bool, nHit l = 0 → nMiss l = l.length := by {
+  intro l h
+  have := jobs_plus_hits l
+  omega }
+
+-- § PCIe share (explicit Nat.div call; pcieShare_zero needs Nat.zero_div)
+
+def pcieShare (nmiss num : Nat) : Nat := Nat.div (nmiss * num) 256
+
+theorem pcieShare_le (nmiss num : Nat) (h : num ≤ 256) : pcieShare nmiss num ≤ nmiss := by {
+  unfold pcieShare
+  apply Nat.div_le_of_le_mul
+  rw [Nat.mul_comm 256 nmiss]
+  exact Nat.mul_le_mul_left nmiss h }
+
+theorem pcie_ranks_count (nmiss m : Nat) (h : m ≤ nmiss) : nmiss - (nmiss - m) = m := by {
+  omega }
+
+theorem pcieShare_zero (nmiss : Nat) : pcieShare nmiss 0 = 0 := by {
+  simp only [pcieShare, Nat.mul_zero, Nat.zero_div] }
+
+-- § GGUF blob regions (named with let bindings)
+
+def blobRegions (upOff downOff blob : Nat) : List (Nat × Nat) :=
+  let gate : Nat × Nat := (0, upOff)
+  let up   : Nat × Nat := (upOff, upOff)
+  let down : Nat × Nat := (downOff, blob - downOff)
+  [gate, up, down]
+
+theorem blob_regions_tile (upOff blob : Nat) (h : 2 * upOff ≤ blob) :
+    0 + upOff = upOff ∧ upOff + upOff = 2 * upOff ∧ 2 * upOff + (blob - 2 * upOff) = blob := by {
+  omega }
+
+theorem chunk_experts_le (n per : Nat) (hn : n ≤ per * 16) : n / per ≤ 16 := by {
+  exact Nat.div_le_of_le_mul hn }
+
+-- § arena slack (operands swapped from reference)
+
+def arenaSlack (want maxBlob : Nat) : Nat := maxBlob + want
+
+theorem slot_copy_in_arena (off bb want mb : Nat) (h1 : off + bb ≤ want) :
+    off + mb ≤ arenaSlack want mb := by {
+  unfold arenaSlack; omega }
+
+theorem reads_two (r : Nat) : r + 1 + 1 = r + 2 := by { omega }
+
 end Baloon.ExpertSource

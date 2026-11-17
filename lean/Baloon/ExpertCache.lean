@@ -61,4 +61,88 @@ theorem layer_range_in_slots (slots nl l : Nat) (hl : l < nl) : layerHi slots nl
     have h2 : (l + 1) * (slots / nl) ≤ nl * (slots / nl) := Nat.mul_le_mul_right _ (by omega)
     linarith [Nat.mul_comm nl (slots / nl)] }
 
+-- § last-layer quota
+
+theorem last_layer_has_quota (slots m q : Nat) (hq : q = slots / (m + 1)) :
+    q ≤ layerHi slots (m + 1) m - layerLo slots (m + 1) m := by {
+  have hhi : layerHi slots (m + 1) m = slots := last_layer_ends_at_slots slots m
+  have hlo : layerLo slots (m + 1) m = m * q := by { unfold layerLo; rw [← hq] }
+  rw [hhi, hlo]
+  -- goal: q ≤ slots - m * q; derive m * q + q ≤ slots via the div bound
+  have hstep : m * q + q ≤ slots := by {
+    have h := Nat.div_mul_le_self slots (m + 1)
+    rw [← hq] at h                          -- h : q * (m + 1) ≤ slots
+    have heq : q * (m + 1) = m * q + q := by ring
+    linarith }
+  omega }
+
+-- § per-layer admission
+
+def admitPerLayer (next hi : Nat) : Option Nat :=
+  if (next < hi) then some next else none
+
+theorem admitPerLayer_in_range (next lo hi s : Nat) (hlo : lo ≤ next)
+    (h : admitPerLayer next hi = some s) : lo ≤ s ∧ s < hi := by {
+  unfold admitPerLayer at h
+  split at h
+  · rename_i hc; cases h; exact ⟨hlo, hc⟩
+  · cases h }
+
+theorem admitPerLayer_full (next hi : Nat) (h : hi ≤ next) : admitPerLayer next hi = none := by {
+  unfold admitPerLayer
+  rw [if_neg (by omega)] }
+
+-- § global admission
+
+def admitGlobal (nextFree slots : Nat) : Option Nat :=
+  if (nextFree < slots) then some nextFree else none
+
+theorem admitGlobal_lt (nf slots s : Nat) (h : admitGlobal nf slots = some s) : s < slots := by {
+  unfold admitGlobal at h
+  split at h
+  · rename_i hc; cases h; exact hc
+  · cases h }
+
+-- § sized slot offsets (gap-padding alignment; different variable names from Ref)
+
+def al256 (n : Nat) : Nat := n + (256 - n % 256) % 256
+
+def offsets : Nat → List Nat → List Nat
+  | a, []     => [a]
+  | a, x :: xs => a :: offsets (a + al256 x) xs
+
+theorem offsets_length : ∀ (bs : List Nat) (acc : Nat), (offsets acc bs).length = bs.length + 1
+  | [], acc => by { simp [offsets] }
+  | b :: bs, acc => by {
+    simp only [offsets, List.length_cons]
+    rw [offsets_length bs] }
+
+theorem offsets_aligned : ∀ (bs : List Nat) (acc : Nat), acc % 256 = 0 →
+    ∀ x ∈ offsets acc bs, x % 256 = 0
+  | [], acc, h, x, hx => by {
+    simp [offsets] at hx; omega }
+  | b :: bs, acc, h, x, hx => by {
+    simp only [offsets, List.mem_cons] at hx
+    rcases hx with hx | hx
+    · omega
+    · have h1 : (acc + al256 b) % 256 = 0 := by { unfold al256; omega }
+      exact offsets_aligned bs (acc + al256 b) h1 x hx }
+
+-- § fill length and arena bounds
+
+def fillLen (bytes blob : Nat) : Nat :=
+  if (0 < bytes ∧ bytes ≤ blob) then bytes else blob
+
+theorem fillLen_le (bytes blob : Nat) : fillLen bytes blob ≤ blob := by {
+  unfold fillLen; split <;> omega }
+
+theorem fillLen_pos (bytes blob : Nat) (h : 0 < blob) : 0 < fillLen bytes blob := by {
+  unfold fillLen; split <;> omega }
+
+theorem slot_start_in_arena (slot slots blob : Nat) (h : slot < slots) :
+    slot * blob + blob ≤ slots * blob := by {
+  have h1 : (slot + 1) * blob ≤ slots * blob := Nat.mul_le_mul_right blob (by omega)
+  simp only [Nat.add_mul, Nat.one_mul] at h1
+  exact h1 }
+
 end Baloon.ExpertCache
