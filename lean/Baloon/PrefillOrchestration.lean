@@ -26,7 +26,9 @@ theorem sum_chunksAux (T : Nat) (hT : 0 < T) :
     by_cases hn : n = 0
     · simp [chunksAux, hn]
     · simp only [chunksAux, hn, ite_false]
-      have hm : 0 < Nat.min T n := by omega
+      have hm : 0 < Nat.min T n := by
+        unfold Nat.min; rw [min_def]; split_ifs with h; exact hT; omega
+      have hle : Nat.min T n ≤ n := min_le_right T n
       rw [List.sum_cons, ih _ (by omega)]; omega
 
 theorem sum_chunks (T n : Nat) (hT : 0 < T) : (chunks T n).sum = n :=
@@ -43,7 +45,9 @@ theorem chunksAux_bounds (T : Nat) (hT : 0 < T) :
     · simp [chunksAux, hn] at hx
     · simp only [chunksAux, hn, ite_false, List.mem_cons] at hx
       rcases hx with rfl | hx'
-      · exact ⟨by omega, Nat.min_le_left T n⟩
+      · have hm : 0 < Nat.min T n := by
+          unfold Nat.min; rw [min_def]; split_ifs with h; exact hT; omega
+        exact ⟨hm, min_le_left T n⟩
       · exact ih _ x hx'
 
 -- § bump allocator
@@ -73,9 +77,9 @@ theorem allocAll_le (cap : Nat) : ∀ (bs : List Nat) (used u : Nat),
   | cons b bs ih =>
     intro used u hu h
     simp only [allocAll] at h
-    split_ifs at h with hb
-    · exact ih _ u (by omega) h
-    · exact absurd h (by simp)
+    by_cases hb : b + used ≤ cap
+    · rw [if_pos hb] at h; exact ih _ u (by omega) h
+    · rw [if_neg hb] at h; exact absurd h (by simp)
 
 theorem alloc_single_iff (cap used b : Nat) :
     (allocAll cap [b] used).isSome = true ↔ used + b ≤ cap := by

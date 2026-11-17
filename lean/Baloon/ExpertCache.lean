@@ -122,7 +122,6 @@ theorem offsets_length (bs : List Nat) (acc : Nat) : (offsets acc bs).length = b
   induction bs generalizing acc with
   | nil => simp [offsets]
   | cons b bs ih =>
-    intro acc
     simp only [offsets, List.length_cons]
     have := ih (al256 b + acc)
     omega
@@ -131,17 +130,19 @@ theorem offsets_aligned (bs : List Nat) (acc : Nat) (h : acc % 256 = 0) :
     ∀ x ∈ offsets acc bs, x % 256 = 0 := by
   induction bs generalizing acc with
   | nil =>
-    intro acc h x hx
+    -- acc✝ and h✝ are auto-introduced from the generalisation; only x and hx remain to intro
+    intro x hx
     simp [offsets] at hx
     omega
   | cons b bs ih =>
-    intro acc h x hx
+    -- acc and h from the outer scope remain accessible here (no inaccessibles)
+    intro x hx
     simp only [offsets, List.mem_cons] at hx
     cases hx with
     | inl heq => omega
     | inr hmem =>
       have h1 : (al256 b + acc) % 256 = 0 := by unfold al256; omega
-      exact ih _ h1 x hmem
+      exact ih (al256 b + acc) h1 x hmem
 
 def fillLen (bytes blob : Nat) : Nat := if bytes > 0 ∧ bytes ≤ blob then bytes else blob
 

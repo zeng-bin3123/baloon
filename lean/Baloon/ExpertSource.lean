@@ -54,8 +54,8 @@ def nMiss : List Bool → Nat
 
 theorem jobs_plus_hits : ∀ l : List Bool, nHit l + nMiss l = l.length
   | [] => rfl
-  | true  :: bs => by simp [nHit, nMiss, List.length_cons, jobs_plus_hits bs]
-  | false :: bs => by simp [nHit, nMiss, List.length_cons, jobs_plus_hits bs]
+  | true  :: bs => by simp only [nHit, nMiss, List.length_cons]; have := jobs_plus_hits bs; omega
+  | false :: bs => by simp only [nHit, nMiss, List.length_cons]; have := jobs_plus_hits bs; omega
 
 theorem nHit_le (l : List Bool) : nHit l ≤ l.length := by
   have := jobs_plus_hits l; omega
@@ -70,14 +70,17 @@ def pcieShare (nmiss num : Nat) : Nat := Nat.div (nmiss * num) 256
 
 theorem pcieShare_le (nmiss num : Nat) (h : num ≤ 256) : pcieShare nmiss num ≤ nmiss := by
   simp only [pcieShare]
-  exact Nat.div_le_of_le_mul (Nat.mul_le_mul_left nmiss h)
+  apply Nat.div_le_of_le_mul
+  calc nmiss * num ≤ nmiss * 256 := Nat.mul_le_mul_left nmiss h
+    _ = 256 * nmiss := Nat.mul_comm nmiss 256
 
 /-- Ranks nmiss-m .. nmiss-1 number exactly m (subtraction cancel identity). -/
 theorem pcie_ranks_count (nmiss m : Nat) (h : m ≤ nmiss) : nmiss - (nmiss - m) = m := by
   have := Nat.sub_add_cancel h; omega
 
 theorem pcieShare_zero (nmiss : Nat) : pcieShare nmiss 0 = 0 := by
-  unfold pcieShare; simp
+  unfold pcieShare
+  simp only [Nat.mul_zero]
 
 -- § GGUF expert loading: blob layout [gate | up | down]
 

@@ -59,7 +59,7 @@ def authorized (key gk : Nat) (configured : Bool) : Bool :=
   !configured || decide (gk = key)
 
 theorem authorized_open (key gk : Nat) : authorized key gk false = true := by
-  simp only [authorized]
+  unfold authorized; rfl
 
 theorem authorized_iff (key gk : Nat) : authorized key gk true = true ↔ gk = key := by
   constructor
