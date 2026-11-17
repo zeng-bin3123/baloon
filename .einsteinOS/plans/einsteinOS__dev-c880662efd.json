@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 15384,
     "started": "2026-11-16T08:04:20.369682557Z",
-    "renewed": "2026-11-16T22:47:36.299529335Z"
+    "renewed": "2026-11-17T00:08:55.637530173Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -263,6 +263,10 @@
         "PrefillOrchestration.lean",
         "ServeEngine.lean"
       ],
+      "children": [
+        "uf7cdc0dcca",
+        "u77baf5bde3"
+      ],
       "reason": "added after theory changed",
       "conv": "9a1b27f9-dc08-498a-92eb-b546026ef245"
     },
@@ -482,6 +486,28 @@
         "GenerateDriver.lean"
       ],
       "scope": "items: traceLayer_valid, autoSlots, autoSlots_fit, withProfile, withProfile_le, ceilDiv, ceilDiv_mul_ge, prefillMib, prefillMib_borrow, swapOK, swapOK_lt, decay_le, pleAdvance, pleAdvance_fst, pleAdvance_snd, imgPos, imgPos_h_lt, imgPos_w_lt, image_advance_pos, admitted, admitted_fits, producedStep, producedStep_le, producedStep_progress",
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "uf7cdc0dcca",
+      "parent": "uc81136f4d9",
+      "modules": [
+        "LayerComposition.lean",
+        "SessionGraphs.lean",
+        "WeightLoader.lean",
+        "MtpDrafter.lean"
+      ],
+      "reason": "3 fix attempts used"
+    },
+    {
+      "id": "u77baf5bde3",
+      "parent": "uc81136f4d9",
+      "modules": [
+        "ExpertCache.lean",
+        "ExpertSource.lean",
+        "PrefillOrchestration.lean",
+        "ServeEngine.lean"
+      ],
       "reason": "3 fix attempts used"
     }
   ],
@@ -710,8 +736,7 @@
   "fix_attempts": {
     "pb0569948de": 2,
     "pb7e2533792": 1,
-    "pe1f7ca5c00": 1,
-    "uc81136f4d9": 3
+    "pe1f7ca5c00": 1
   },
   "fail_history": {
     "pb0569948de": [
@@ -825,12 +850,6 @@
       "kind": "review_fail",
       "text": "native_flash_attn_short_step accepts up to 1024 cells (kFlashShortMaxCells=1024) but theory native_flash_attn and native_flash_attn_bounds.hpp specify max context 256; the test pins the limit only via the same constant",
       "base_ref": "einsteinOS/dev-c880662efd"
-    },
-    "uc81136f4d9": {
-      "kind": "lean_copied",
-      "text": "lean_copied: 3 declaration(s) of the unit's Lean are the theory's own text, not the unit's (.einsteinOS/theory.md holds each, comments and white space aside):\n  lean/Baloon/PrefillOrchestration.lean: def allocAll\n  lean/Baloon/ServeEngine.lean: def admit\n  lean/Baloon/ServeEngine.lean: def onToken",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-uc81136f4d9",
-      "base_sha": "2230deba72b57844f1f65f90c856d5181c010ab0"
     }
   },
   "infra_fails": 0,
