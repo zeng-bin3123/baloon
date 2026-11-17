@@ -55,14 +55,14 @@ include/ref/core/layer.hpp	stage_mark_end	include/baloon/core_layer.hpp	stage_ma
 include/ref/core/layer.hpp	stage_timing_enable	include/baloon/core_layer.hpp	stage_timing_enable
 include/ref/core/layer.hpp	stage_timing_name	include/baloon/core_layer.hpp	stage_timing_name
 include/ref/core/layer.hpp	stage_timing_report	include/baloon/core_layer.hpp	stage_timing_report
-src/core/layer.cpp	Cursor	src/core/layer.cpp	Cursor
+src/core/layer.cpp	Cursor	include/baloon/core_layer.hpp	Cursor
 src/core/layer.cpp	EMBEDDING_NAME	include/baloon/core_layer.hpp	EMBEDDING_NAME
-src/core/layer.cpp	Planes	src/core/layer.cpp	Planes
+src/core/layer.cpp	Planes	include/baloon/core_layer.hpp	Planes
 src/core/layer.cpp	Q8K_BYTES_PER_BLOCK	include/baloon/core_layer.hpp	Q8K_BYTES_PER_BLOCK
 src/core/layer.cpp	Q8K_ELEMS_PER_BLOCK	include/baloon/core_layer.hpp	Q8K_ELEMS_PER_BLOCK
 src/core/layer.cpp	RMS_EPS	include/baloon/core_layer.hpp	RMS_EPS
-src/core/layer.cpp	STAGE_SLOTS	src/core/layer.cpp	STAGE_SLOTS
-src/core/layer.cpp	StageTimer	src/core/layer.cpp	StageTimer
+src/core/layer.cpp	STAGE_SLOTS	include/baloon/core_layer.hpp	STAGE_SLOTS
+src/core/layer.cpp	StageTimer	include/baloon/core_layer.hpp	StageTimer
 src/core/layer.cpp	TPR	include/baloon/core_layer.hpp	TPR
 src/core/layer.cpp	align_up16	include/baloon/core_layer.hpp	align_up16
 src/core/layer.cpp	block_buffers_bytes	src/core/layer.cpp	block_buffers_bytes
@@ -117,7 +117,7 @@ src/core/layer.cpp	ple_issue_token	src/core/layer.cpp	ple_issue_token
 src/core/layer.cpp	ple_run_scratch_bytes	src/core/layer.cpp	ple_run_scratch_bytes
 src/core/layer.cpp	ple_stage_token	src/core/layer.cpp	ple_stage_token
 src/core/layer.cpp	project_bf16	src/core/layer.cpp	project_bf16
-src/core/layer.cpp	q8k_bytes	src/core/layer.cpp	q8k_bytes
+src/core/layer.cpp	q8k_bytes	include/baloon/core_layer.hpp	q8k_bytes
 src/core/layer.cpp	qsa_buffers_bytes	src/core/layer.cpp	qsa_buffers_bytes
 src/core/layer.cpp	qsa_buffers_init	src/core/layer.cpp	qsa_buffers_init
 src/core/layer.cpp	qsa_kv_int8	src/core/layer.cpp	qsa_kv_int8

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Unit uf7cdc0dcca (layer composition, session graphs, weight loader, MTP drafter):
 # adds lean/Baloon/LayerComposition.lean, SessionGraphs.lean, WeightLoader.lean,
-# MtpDrafter.lean and the port table .einsteinOS/port/uf7cdc0dcca.tsv.
+# MtpDrafter.lean.
 # Builds the WHOLE project: (1) every header in include/baloon compiles standalone,
 # (2) every library source of this unit compiles as its own object with warnings on,
 # (3) every host test directory builds, (4) the PLE reader, generate CLI and vision
