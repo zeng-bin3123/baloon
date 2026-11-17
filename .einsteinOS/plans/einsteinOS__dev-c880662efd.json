@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 31610,
     "started": "2026-11-17T04:12:56.048444881Z",
-    "renewed": "2026-11-17T06:48:39.926497445Z"
+    "renewed": "2026-11-17T07:43:00.066618392Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -510,7 +510,7 @@
         "ServeEngine.lean"
       ],
       "reason": "3 fix attempts used",
-      "conv": "157e4fa7-83b1-43a9-a5d8-e0261be1aa11"
+      "conv": "e304fbce-27d1-49a3-86d9-197f1064c6e2"
     }
   ],
   "state": {
@@ -739,7 +739,7 @@
     "pb0569948de": 2,
     "pb7e2533792": 1,
     "pe1f7ca5c00": 1,
-    "u77baf5bde3": 1
+    "u77baf5bde3": 2
   },
   "fail_history": {
     "pb0569948de": [
@@ -800,6 +800,7 @@
       "nothing_written"
     ],
     "u77baf5bde3": [
+      "lean_unproved",
       "lean_unproved"
     ],
     "u7991572426": [
@@ -862,9 +863,9 @@
     },
     "u77baf5bde3": {
       "kind": "lean_unproved",
-      "text": "lean_unproved: lean/Baloon/ExpertCache.lean does not check in Lean (Axle, lean-4.35.0): -:91:20-91:27: error: unsolved goals\nnext lo hi s : ℕ\nhlo : lo ≤ next\nhge : ¬next ≥ hi\nh : some next = some s\n⊢ ¬next = s",
+      "text": "lean_unproved: lean/Baloon/ExpertCache.lean does not check in Lean (Axle, lean-4.35.0): -:124:10-124:13: error: Tactic `introN` failed: There are no additional binders or `let` bindings in the goal to introduce\n\ncase cons\nb : ℕ\nbs : List ℕ\nih : ∀ (acc : ℕ), (offsets acc bs).length = bs.length + 1\nacc : ℕ\n⊢ (offsets acc (b :: bs)).length = (b :: bs).length + 1",
       "base_ref": "einsteinOS/dev-c880662efd-wip-u77baf5bde3",
-      "base_sha": "dab79ef0ee99d9eee9bcbef86c9e33c2d95fdc83"
+      "base_sha": "9e5684f2283e08ed115c5edf05ed95e10c34c723"
     }
   },
   "infra_fails": 0,
