@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 55569,
     "started": "2026-11-17T12:33:59.09054199Z",
-    "renewed": "2026-11-17T13:49:16.665876205Z"
+    "renewed": "2026-11-17T13:49:38.930868822Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -673,7 +673,7 @@
     },
     "PleDirectReader.lean": {
       "hash": "0737652f0030",
-      "pass": true,
+      "pass": false,
       "unit_id": "u7991572426"
     },
     "PleNgramHash.lean": {
@@ -683,7 +683,7 @@
     },
     "PrefillKernels.lean": {
       "hash": "b421174abfd6",
-      "pass": true,
+      "pass": false,
       "unit_id": "u7991572426"
     },
     "PrefillOrchestration.lean": {
@@ -770,7 +770,8 @@
   "fix_attempts": {
     "pb0569948de": 2,
     "pb7e2533792": 1,
-    "pe1f7ca5c00": 1
+    "pe1f7ca5c00": 1,
+    "u7991572426": 1
   },
   "fail_history": {
     "pb0569948de": [
@@ -892,6 +893,11 @@
       "kind": "review_fail",
       "text": "native_flash_attn_short_step accepts up to 1024 cells (kFlashShortMaxCells=1024) but theory native_flash_attn and native_flash_attn_bounds.hpp specify max context 256; the test pins the limit only via the same constant",
       "base_ref": "einsteinOS/dev-c880662efd"
+    },
+    "u7991572426": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 76 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/ngram/ple_reader.cpp const EMPTY: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp type Job: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp const LATENCY_RING: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp type PleReader: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::PleReader: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::cache_capacity: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::cache_size: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::close: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::collect: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::is_open: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::issue: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::open: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::reset_stats: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::set_injected_delay_us: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::stats: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::~PleReader: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func ReaderStats::percentile: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp type RowCache: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp type TicketState: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp type Use: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp const WAYS: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu const N: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu const RG: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu const S: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu func bf: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu func blob_dequant: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu func blob_dequant_f16: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu kernel blob_dequant_kernel: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu func block_sum: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu func blocks_for: no line in .einsteinOS/port/u7991572426.tsv\n  … 46 more",
+      "base_ref": ""
     }
   },
   "infra_fails": 0,
@@ -1024,11 +1030,6 @@
     "u52d156705c": {
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 87 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/kernels/verify_kernels.hpp func add_streams_broadcast: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func broadcast_streams: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func copy_indexed: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func dense_steps: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func embedding_gather_dev: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func fetch_blobs: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func gather_rows: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func gdn_ab_multi: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func gdn_conv_commit: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func gdn_conv_l2_multi: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func gdn_step_norm_multi: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func ident_hits: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp const kVerifyMaxT: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func map_ids: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func mtp_select: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func rebase_ptrs: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func row_top_prob: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func wait_flag_ge: no line in .einsteinOS/port/u52d156705c.tsv\n  include/strata/kernels/verify_kernels.hpp func window_ids: no line in .einsteinOS/port/u52d156705c.tsv\n  src/kernels/cuda/qsa_decode_attn.cu const CHUNK: no line in .einsteinOS/port/u52d156705c.tsv\n  src/kernels/cuda/qsa_decode_attn.cu const G: no line in .einsteinOS/port/u52d156705c.tsv\n  src/kernels/cuda/qsa_decode_attn.cu const HD: no line in .einsteinOS/port/u52d156705c.tsv\n  src/kernels/cuda/qsa_decode_attn.cu const THREADS: no line in .einsteinOS/port/u52d156705c.tsv\n  src/kernels/cuda/qsa_decode_attn.cu const WARPS: no line in .einsteinOS/port/u52d156705c.tsv\n  src/kernels/cuda/qsa_decode_attn.cu kernel attn_chunk_kernel: no line in .einsteinOS/port/u52d156705c.tsv\n  src/kernels/cuda/qsa_decode_attn.cu kernel attn_merge_kernel: no line in .einsteinOS/port/u52d156705c.tsv\n  src/kernels/cuda/qsa_decode_attn.cu func load8: no line in .einsteinOS/port/u52d156705c.tsv\n  src/kernels/cuda/qsa_decode_attn.cu func qsa_decode_attn_batch: no line in .einsteinOS/port/u52d156705c.tsv\n  src/kernels/cuda/qsa_decode_attn.cu func qsa_decode_attn_scratch_floats: no line in .einsteinOS/port/u52d156705c.tsv\n  src/kernels/cuda/qsa_decode_attn.cu func qsa_decode_attn_step: no line in .einsteinOS/port/u52d156705c.tsv\n  … 57 more",
-      "base_ref": ""
-    },
-    "u7991572426": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 76 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/ngram/ple_reader.cpp const EMPTY: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp type Job: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp const LATENCY_RING: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp type PleReader: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::PleReader: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::cache_capacity: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::cache_size: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::close: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::collect: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::is_open: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::issue: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::open: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::reset_stats: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::set_injected_delay_us: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::stats: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::~PleReader: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func ReaderStats::percentile: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp type RowCache: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp type TicketState: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp type Use: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp const WAYS: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu const N: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu const RG: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu const S: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu func bf: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu func blob_dequant: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu func blob_dequant_f16: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu kernel blob_dequant_kernel: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu func block_sum: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu func blocks_for: no line in .einsteinOS/port/u7991572426.tsv\n  … 46 more",
       "base_ref": ""
     },
     "ub25e8eba7f": {
