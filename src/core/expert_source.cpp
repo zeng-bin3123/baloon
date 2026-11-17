@@ -22,6 +22,7 @@ namespace core {
 static bool geometry_ok(int64_t nl, int64_t ne, int64_t blob) { return nl > 0 && ne > 0 && blob > 0; }
 
 // ---------------------------------------------------------------- FileExpertSource
+// PORT u77baf5bde3: FileExpertSource::open FileExpertSource::close FileExpertSource::blob FileExpertSource::~FileExpertSource
 FileExpertSource::~FileExpertSource() { close(); }
 
 void FileExpertSource::close() {
@@ -69,6 +70,7 @@ const uint8_t* FileExpertSource::blob(int64_t layer, int64_t expert) {
 }
 
 // ---------------------------------------------------------------- ArenaExpertSource
+// PORT u77baf5bde3: ArenaExpertSource::open ArenaExpertSource::close ArenaExpertSource::blob ArenaExpertSource::pinned ArenaExpertSource::device_alias ArenaExpertSource::~ArenaExpertSource
 ArenaExpertSource::~ArenaExpertSource() { close(); }
 
 void ArenaExpertSource::close() {
@@ -115,6 +117,7 @@ const uint8_t* ArenaExpertSource::blob(int64_t layer, int64_t expert) {
 }
 
 // ---------------------------------------------------------------- hit / miss job building
+// PORT u77baf5bde3: expert_hit_run expert_pool_dispatch expert_pool_dispatch_multi load_experts_gguf
 bool expert_hit_run(const std::vector<bool>& is_hit, int pcie_num, ExpertDispatch& out, const int32_t* experts) {
     out = ExpertDispatch{};
     if (pcie_num < 0 || pcie_num > 256) return false;

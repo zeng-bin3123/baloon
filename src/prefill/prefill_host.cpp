@@ -12,6 +12,7 @@ namespace baloon {
 namespace core {
 namespace prefill_impl {
 
+// PORT u77baf5bde3: Clock C N DQ STAGE EPS GEMM_SCRATCH GEMM_WS ms_since need
 using Clock = std::chrono::steady_clock;
 [[maybe_unused]] constexpr uint64_t C = 512;                       // default chunk of prompt tokens
 [[maybe_unused]] constexpr uint64_t N = 48;                        // layers of the artifact
@@ -24,6 +25,7 @@ constexpr uint64_t GEMM_WS = 16ull << 20;         // default GEMM workspace
 inline double ms_since(Clock::time_point t0) { return std::chrono::duration<double, std::milli>(Clock::now() - t0).count(); }
 inline void need(bool cond, const char* what) { if (!cond) throw std::runtime_error(std::string("prefill: ") + what); }
 
+// PORT u77baf5bde3: Alloc
 // Allocator with the three modes of the driver; every request is charged round_bytes().
 struct Alloc {
     enum Mode { Count, Bump, Owned } mode = Count;
@@ -41,12 +43,14 @@ struct Alloc {
 
 }  // namespace prefill_impl
 
+// PORT u77baf5bde3: MAXBLOB
 uint64_t MAXBLOB(const std::vector<uint64_t>& blob_sizes) {
     uint64_t m = 0;
     for (uint64_t b : blob_sizes) m = std::max(m, b);
     return m;
 }
 
+// PORT u77baf5bde3: Prefill implements PrefillOrchestration theory (chunks+alloc+rings+grouping+GDN)
 bool group_experts(const std::vector<uint32_t>& experts, uint32_t n_experts, ExpertGrouping& g) {
     g = ExpertGrouping{};
     if (n_experts == 0) return false;
@@ -71,6 +75,7 @@ bool group_experts(const std::vector<uint32_t>& experts, uint32_t n_experts, Exp
     return true;
 }
 
+// PORT u77baf5bde3: Prefill::Prefill
 Prefill::Prefill(const PrefillConfig& c) : c_(c) {
     const uint64_t T = c.T;
     if (c_.gemm_scratch == 0) c_.gemm_scratch = prefill_impl::GEMM_SCRATCH;
@@ -90,8 +95,10 @@ Prefill::Prefill(const PrefillConfig& c) : c_(c) {
     };
 }
 
+// PORT u77baf5bde3: Prefill::~Prefill
 Prefill::~Prefill() = default;
 
+// PORT u77baf5bde3: Prefill::bytes_needed Prefill::init
 uint64_t Prefill::bytes_needed() const {
     prefill_impl::Alloc a;                       // counting mode
     for (uint64_t b : seq_) a.take(b);
@@ -114,6 +121,7 @@ bool Prefill::init(void* region, uint64_t cap) {
     return true;
 }
 
+// PORT u77baf5bde3: Prefill::run
 bool Prefill::run(uint64_t n_tokens, const PrefillHooks& h, PrefillStats* st) {
     if (c_.T == 0 || c_.n_layers <= 0) return false;
     PrefillStats s;
@@ -136,6 +144,7 @@ bool Prefill::run(uint64_t n_tokens, const PrefillHooks& h, PrefillStats* st) {
     return true;
 }
 
+// PORT u77baf5bde3: bf16_proj native_proj
 void bf16_proj(const uint16_t* w, const float* x, uint64_t T, uint64_t rows, uint64_t cols, float* out) {
     for (uint64_t t = 0; t < T; ++t)
         for (uint64_t r = 0; r < rows; ++r) {

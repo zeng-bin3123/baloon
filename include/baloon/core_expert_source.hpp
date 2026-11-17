@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+// PORT u77baf5bde3: types ArenaExpertSource ExpertDispatch ExpertSource FileExpertSource GpuPlanSink
+// func expert_hit_run expert_pool_dispatch expert_pool_dispatch_multi
 namespace baloon {
 namespace core {
 

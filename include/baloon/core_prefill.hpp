@@ -47,6 +47,7 @@ struct PrefillStats {
     std::vector<uint64_t> chunk_lens;
 };
 
+// PORT u77baf5bde3: Prefill
 class Prefill {
 public:
     explicit Prefill(const PrefillConfig& c);
