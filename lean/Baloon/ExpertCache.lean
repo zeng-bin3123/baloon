@@ -87,10 +87,12 @@ def admitPerLayer (next hi : Nat) : Option Nat := if next ≥ hi then none else 
 
 theorem admitPerLayer_in_range (next lo hi s : Nat) (hlo : lo ≤ next)
     (h : admitPerLayer next hi = some s) : lo ≤ s ∧ s < hi := by
-  simp only [admitPerLayer] at h
-  split_ifs at h with hge
-  · exact absurd h (by simp)
-  · cases h; exact ⟨hlo, by omega⟩
+  unfold admitPerLayer at h
+  by_cases hge : next ≥ hi
+  · simp [hge] at h
+  · simp [hge] at h
+    subst h
+    exact ⟨hlo, by omega⟩
 
 theorem admitPerLayer_full (next hi : Nat) (h : hi ≤ next) : admitPerLayer next hi = none := by
   simp only [admitPerLayer, if_pos h]
@@ -99,10 +101,12 @@ theorem admitPerLayer_full (next hi : Nat) (h : hi ≤ next) : admitPerLayer nex
 def admitGlobal (nextFree slots : Nat) : Option Nat := if nextFree ≥ slots then none else some nextFree
 
 theorem admitGlobal_lt (nf slots s : Nat) (h : admitGlobal nf slots = some s) : s < slots := by
-  simp only [admitGlobal] at h
-  split_ifs at h with hge
-  · exact absurd h (by simp)
-  · cases h; omega
+  unfold admitGlobal at h
+  by_cases hge : nf ≥ slots
+  · simp [hge] at h
+  · simp [hge] at h
+    subst h
+    omega
 
 -- § sized slots
 
@@ -114,22 +118,30 @@ def offsets : Nat → List Nat → List Nat
   | acc, [] => [acc]
   | acc, b :: bs => acc :: offsets (al256 b + acc) bs
 
-theorem offsets_length : ∀ (bs : List Nat) (acc : Nat), (offsets acc bs).length = bs.length + 1
-  | [], _ => by simp [offsets]
-  | _ :: bs, acc => by
+theorem offsets_length (bs : List Nat) (acc : Nat) : (offsets acc bs).length = bs.length + 1 := by
+  induction bs generalizing acc with
+  | nil => simp [offsets]
+  | cons b bs ih =>
+    intro acc
     simp only [offsets, List.length_cons]
-    rw [offsets_length bs]; ring
+    have := ih (al256 b + acc)
+    omega
 
-theorem offsets_aligned : ∀ (bs : List Nat) (acc : Nat), acc % 256 = 0 →
-    ∀ x ∈ offsets acc bs, x % 256 = 0
-  | [], acc, h, x, hx => by simp [offsets] at hx; omega
-  | b :: bs, acc, h, x, hx => by
+theorem offsets_aligned (bs : List Nat) (acc : Nat) (h : acc % 256 = 0) :
+    ∀ x ∈ offsets acc bs, x % 256 = 0 := by
+  induction bs generalizing acc with
+  | nil =>
+    intro acc h x hx
+    simp [offsets] at hx
+    omega
+  | cons b bs ih =>
+    intro acc h x hx
     simp only [offsets, List.mem_cons] at hx
     cases hx with
     | inl heq => omega
     | inr hmem =>
       have h1 : (al256 b + acc) % 256 = 0 := by unfold al256; omega
-      exact offsets_aligned bs _ h1 x hmem
+      exact ih _ h1 x hmem
 
 def fillLen (bytes blob : Nat) : Nat := if bytes > 0 ∧ bytes ≤ blob then bytes else blob
 
