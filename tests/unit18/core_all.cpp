@@ -7,3 +7,4 @@
 #include "../../src/core/verify.cpp"
 #include "../../src/core/weights.cpp"
 #include "../../src/prefill/prefill_host.cpp"
+#include "../../src/prefill/prefill.cpp"
