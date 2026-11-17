@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 31201,
     "started": "2026-11-17T10:09:31.338491831Z",
-    "renewed": "2026-11-17T12:05:19.456214984Z"
+    "renewed": "2026-11-17T12:05:38.507542489Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -678,7 +678,7 @@
     },
     "PleNgramHash.lean": {
       "hash": "255f933f6849",
-      "pass": true,
+      "pass": false,
       "unit_id": "u89be81de0b"
     },
     "PrefillKernels.lean": {
@@ -770,7 +770,8 @@
   "fix_attempts": {
     "pb0569948de": 2,
     "pb7e2533792": 1,
-    "pe1f7ca5c00": 1
+    "pe1f7ca5c00": 1,
+    "u89be81de0b": 1
   },
   "fail_history": {
     "pb0569948de": [
@@ -892,6 +893,11 @@
       "kind": "review_fail",
       "text": "native_flash_attn_short_step accepts up to 1024 cells (kFlashShortMaxCells=1024) but theory native_flash_attn and native_flash_attn_bounds.hpp specify max context 256; the test pins the limit only via the same constant",
       "base_ref": "einsteinOS/dev-c880662efd"
+    },
+    "u89be81de0b": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 25 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/kernels/ngram.hpp const HEADS_PER_NGRAM: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const NGRAM_SIZE: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const NG_HC: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const NG_HC_DIM: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const NG_HIST: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const NG_N_EMBD: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const NG_RMS_EPS: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const PLE_CONV_KERNEL: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const PLE_EOS_TOKEN_ID: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const PLE_HEAD_DIM: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const PLE_N_HEADS: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const PLE_ROW_BYTES: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const PLE_TABLE_ROWS: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp type PleConsts: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp type PleIo: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp type PleIoOptions: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp type PleTable: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const TOKEN_NULL: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp func iq4nl_code: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp func iq4nl_dequant_row: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp func ngram_mixed: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp func ngram_rows: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp func ple_artifact_consts: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp func ple_prefetch_enable: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp func ple_prefetch_enabled: no line in .einsteinOS/port/u89be81de0b.tsv",
+      "base_ref": ""
     }
   },
   "infra_fails": 0,
@@ -1034,11 +1040,6 @@
     "u7991572426": {
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 76 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/ngram/ple_reader.cpp const EMPTY: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp type Job: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp const LATENCY_RING: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp type PleReader: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::PleReader: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::cache_capacity: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::cache_size: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::close: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::collect: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::is_open: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::issue: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::open: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::reset_stats: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::set_injected_delay_us: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::stats: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func PleReader::~PleReader: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp func ReaderStats::percentile: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp type RowCache: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp type TicketState: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp type Use: no line in .einsteinOS/port/u7991572426.tsv\n  src/ngram/ple_reader.cpp const WAYS: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu const N: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu const RG: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu const S: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu func bf: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu func blob_dequant: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu func blob_dequant_f16: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu kernel blob_dequant_kernel: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu func block_sum: no line in .einsteinOS/port/u7991572426.tsv\n  src/prefill/kernels.cu func blocks_for: no line in .einsteinOS/port/u7991572426.tsv\n  … 46 more",
-      "base_ref": ""
-    },
-    "u89be81de0b": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 25 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/kernels/ngram.hpp const HEADS_PER_NGRAM: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const NGRAM_SIZE: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const NG_HC: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const NG_HC_DIM: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const NG_HIST: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const NG_N_EMBD: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const NG_RMS_EPS: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const PLE_CONV_KERNEL: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const PLE_EOS_TOKEN_ID: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const PLE_HEAD_DIM: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const PLE_N_HEADS: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const PLE_ROW_BYTES: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const PLE_TABLE_ROWS: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp type PleConsts: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp type PleIo: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp type PleIoOptions: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp type PleTable: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp const TOKEN_NULL: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp func iq4nl_code: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp func iq4nl_dequant_row: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp func ngram_mixed: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp func ngram_rows: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp func ple_artifact_consts: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp func ple_prefetch_enable: no line in .einsteinOS/port/u89be81de0b.tsv\n  include/strata/kernels/ngram.hpp func ple_prefetch_enabled: no line in .einsteinOS/port/u89be81de0b.tsv",
       "base_ref": ""
     },
     "ub25e8eba7f": {
