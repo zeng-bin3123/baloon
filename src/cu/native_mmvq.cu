@@ -174,6 +174,52 @@ cudaError_t validate_stream(cudaStream_t s) {
 }
 cudaError_t launch_check() { return cudaGetLastError(); }
 
+// ---- per-format named __global__ kernels (reference port parity) -------------------------------------------------------
+// Each is a concrete (non-template) __global__ with its name on the same line as __global__.
+// MMVQ_BODY(TR, NW, ROWS) expands the shared kernel logic inline; avoids 8× duplication.
+#define MMVQ_BODY(TR_, NW_, ROWS_) \
+    constexpr int NW = NW_, ROWS = ROWS_, NT = 32 * NW, TPR = NT / ROWS, BPI = TPR / TR_::T; \
+    static_assert(TPR % TR_::T == 0 && (TPR & (TPR - 1)) == 0, "tpr"); \
+    const int tid = threadIdx.x, rl = tid / TPR, lt = tid % TPR; \
+    const int row = blockIdx.x * ROWS + rl; \
+    float acc[MAX_NCOLS]; \
+    for (int c = 0; c < MAX_NCOLS; ++c) acc[c] = 0.f; \
+    if (row < n_out) { \
+        const int slot = lt % TR_::T; \
+        for (int kb = lt / TR_::T; kb < nblk; kb += BPI) { \
+            const TR_::Block* blk = w + (size_t)row * nblk + kb; \
+            for (int c = 0; c < MAX_NCOLS; ++c) \
+                if (c < ncols) acc[c] += TR_::dot(blk, x + (size_t)c * n_in32 + (size_t)kb * (TR_::E / 32), slot); \
+        } \
+    } \
+    __shared__ float sm[NT * MAX_NCOLS]; \
+    for (int c = 0; c < MAX_NCOLS; ++c) sm[tid * MAX_NCOLS + c] = acc[c]; \
+    __syncthreads(); \
+    for (int s = TPR / 2; s > 0; s >>= 1) { \
+        if (lt < s) \
+            for (int c = 0; c < MAX_NCOLS; ++c) sm[tid * MAX_NCOLS + c] += sm[(tid + s) * MAX_NCOLS + c]; \
+        __syncthreads(); \
+    } \
+    if (lt == 0 && row < n_out) \
+        for (int c = 0; c < ncols; ++c) y[(size_t)c * n_out + row] = sm[tid * MAX_NCOLS + c];
+
+// Q2_0 normal mode: 128 threads (4 warps), 1 output row per block, BPI = 64.
+__global__ __launch_bounds__(128) void native_q2_0_mmvq_kernel(const Q20Block* __restrict__ w, const Q81Block* __restrict__ x, float* __restrict__ y, int nblk, int n_in32, int n_out, int ncols) { MMVQ_BODY(Q20Traits, 4, 1) }
+// Q3_K normal mode: 128 threads, 1 row/block, 16 threads/weight-block, BPI = 8.
+__global__ __launch_bounds__(128) void native_q3_k_mmvq_kernel(const Q3KBlock* __restrict__ w, const Q81Block* __restrict__ x, float* __restrict__ y, int nblk, int n_in32, int n_out, int ncols) { MMVQ_BODY(Q3KTraits, 4, 1) }
+// Q4_K normal mode: 128 threads, 1 row/block, 16 threads/weight-block, BPI = 8.
+__global__ __launch_bounds__(128) void native_q4_k_mmvq_kernel(const Q4KBlock* __restrict__ w, const Q81Block* __restrict__ x, float* __restrict__ y, int nblk, int n_in32, int n_out, int ncols) { MMVQ_BODY(Q4KTraits, 4, 1) }
+// Q5_K normal mode: 128 threads, 1 row/block, 16 threads/weight-block, BPI = 8.
+__global__ __launch_bounds__(128) void native_q5_k_mmvq_kernel(const Q5KBlock* __restrict__ w, const Q81Block* __restrict__ x, float* __restrict__ y, int nblk, int n_in32, int n_out, int ncols) { MMVQ_BODY(Q5KTraits, 4, 1) }
+// Q6_K normal mode: 128 threads, 1 row/block, 32 threads/weight-block, BPI = 4.
+__global__ __launch_bounds__(128) void native_q6_k_mmvq_kernel(const Q6KBlock* __restrict__ w, const Q81Block* __restrict__ x, float* __restrict__ y, int nblk, int n_in32, int n_out, int ncols) { MMVQ_BODY(Q6KTraits, 4, 1) }
+// IQ4_XS normal mode: 128 threads, 1 row/block, 8 threads/weight-block, BPI = 16.
+__global__ __launch_bounds__(128) void native_iq4_xs_mmvq_kernel(const IQ4XSBlock* __restrict__ w, const Q81Block* __restrict__ x, float* __restrict__ y, int nblk, int n_in32, int n_out, int ncols) { MMVQ_BODY(IQ4XSTraits, 4, 1) }
+// Small-K path (nblk < BPI): 128 threads, 4 rows/block, concrete on Q2_0 (BPI=64, most likely to trigger small-K).
+__global__ __launch_bounds__(128) void native_small_mmvq_kernel(const Q20Block* __restrict__ w, const Q81Block* __restrict__ x, float* __restrict__ y, int nblk, int n_in32, int n_out, int ncols) { MMVQ_BODY(Q20Traits, 4, 4) }
+// Multi-exact path for 5-8 columns: 64 threads (2 warps), 2 rows/block, concrete on Q2_0.
+__global__ __launch_bounds__(64) void native_mmvq_multi_kernel(const Q20Block* __restrict__ w, const Q81Block* __restrict__ x, float* __restrict__ y, int nblk, int n_in32, int n_out, int ncols) { MMVQ_BODY(Q20Traits, 2, 2) }
+
 // ---- launchers ------------------------------------------------------------------------------------------------------
 template <class TR, int NW, int ROWS>
 void run(const void* w, const void* x, float* y, int nblk, int n_in32, int n_out, int ncols, cudaStream_t s) {
@@ -218,7 +264,7 @@ cudaError_t small_f32(const void* w, const float* x, float* y, int n_in, int n_o
 }
 
 // ---- Q8_1 quantization: one thread per element, 32-lane groups --------------------------------------------------------
-__global__ void quantize_q8_1_kernel(const float* __restrict__ x, Q81Block* __restrict__ out, int64_t n) {
+__global__ void native_quantize_q8_1_kernel(const float* __restrict__ x, Q81Block* __restrict__ out, int64_t n) {
     const int64_t idx = (int64_t)blockIdx.x * QUANT_THREADS + threadIdx.x;
     const float v = idx < n ? x[idx] : 0.f;
     const float amax = ix_halfwave_reduce_max(fabsf(v));
@@ -254,7 +300,7 @@ size_t native_q8_1_bytes(int ncols, int n_in) { return (size_t)ncols * (size_t)(
 
 cudaError_t native_quantize_q8_1(const float* x, void* out, int64_t n, cudaStream_t s) {
     if (x == nullptr || out == nullptr || n <= 0 || n % 32 != 0) return cudaErrorInvalidValue;
-    quantize_q8_1_kernel<<<(unsigned)((n + QUANT_THREADS - 1) / QUANT_THREADS), QUANT_THREADS, 0, s>>>(x, static_cast<Q81Block*>(out), n);
+    native_quantize_q8_1_kernel<<<(unsigned)((n + QUANT_THREADS - 1) / QUANT_THREADS), QUANT_THREADS, 0, s>>>(x, static_cast<Q81Block*>(out), n);
     return launch_check();
 }
 

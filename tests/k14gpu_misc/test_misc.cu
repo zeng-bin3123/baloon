@@ -517,9 +517,24 @@ static void test_ple() {
             ple_set_native_bf16(bf != 0);
             ple_set_native_postops(post != 0);
             CHECK(ple_native_postops_enabled() == (post != 0));
+            // Zero scratch before each call: ensures bcast_kernel mutations cannot hide behind
+            // stale bc values left by a previous iteration (all 4 iterations use the same inputs).
+            CUOK(cudaMemsetAsync(scratch, 0, ple_block_scratch_bytes(), 0));
             CHECK(ple_block(w, dn, dh, dhid, po, scratch, 0) == cudaSuccess);
             sync();
             const auto o = fetch(dout, NE_), g = fetch(dgate, HC);
+            // Direct bcast_kernel output check: bc[i] = hidden[i%NE] * gate[i/NE].
+            // bc lies at scratch + 2*HCD floats (scratch layout: conv | nrm | bc | s3 | ...).
+            {
+                const int HCD_ = NE_ * HC;
+                std::vector<float> bc_host(HCD_);
+                CUOK(cudaMemcpy(bc_host.data(), (const float*)scratch + 2 * HCD_, HCD_ * sizeof(float), cudaMemcpyDeviceToHost));
+                bool ok_bc = true;
+                for (int i = 0; i < HCD_; ++i)
+                    ok_bc &= near_tol(bc_host[i], (double)hidden[i % NE_] * g[i / NE_], 1e-5, 1e-5);
+                CHECK(ok_bc);
+                if (!ok_bc) std::printf("  bcast_kernel output mismatch (bf16=%d postops=%d)\n", bf, post);
+            }
             bool ok = true, okg = true;
             for (int s = 0; s < HC; ++s) okg &= near_tol(g[s], gate[s], 1e-4, 1e-3);
             CHECK(okg);

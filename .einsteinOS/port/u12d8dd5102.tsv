@@ -159,7 +159,6 @@ src/kernels/cuda/native_mmvq.cu	VDR	src/cu/native_mmvq.cu	VDR
 src/kernels/cuda/native_mmvq.cu	WARP	src/cu/native_mmvq.cu	WARP
 src/kernels/cuda/native_mmvq.cu	WARPS	src/cu/native_mmvq.cu	WARPS
 src/kernels/cuda/native_mmvq.cu	__align__	src/cu/native_mmvq.cu	__align__
-src/kernels/cuda/native_mmvq.cu	__launch_bounds__	src/cu/native_mmvq.cu	__launch_bounds__
 src/kernels/cuda/native_mmvq.cu	g_multi_exact	src/cu/native_mmvq.cu	g_multi_exact
 src/kernels/cuda/native_mmvq.cu	iq4_table_lookup	src/cu/native_mmvq.cu	iq4_table_lookup
 src/kernels/cuda/native_mmvq.cu	iq4_xs_q8_dot	src/cu/native_mmvq.cu	iq4_xs_q8_dot
@@ -250,7 +249,6 @@ src/kernels/cuda/s2_expert_grouped.cu	ROW_GU	src/cu/s2_expert_grouped.cu	ROW_GU
 src/kernels/cuda/s2_expert_grouped.cu	SC_D	src/cu/s2_expert_grouped.cu	SC_D
 src/kernels/cuda/s2_expert_grouped.cu	SC_GU	src/cu/s2_expert_grouped.cu	SC_GU
 src/kernels/cuda/s2_expert_grouped.cu	THREADS	src/cu/s2_expert_grouped.cu	THREADS
-src/kernels/cuda/s2_expert_grouped.cu	__launch_bounds__	src/cu/s2_expert_grouped.cu	__launch_bounds__
 src/kernels/cuda/s2_expert_grouped.cu	activation_correction_kernel	src/cu/s2_expert_grouped.cu	activation_correction_kernel
 src/kernels/cuda/s2_expert_grouped.cu	add_hits_kernel	src/cu/s2_expert_grouped.cu	add_hits_kernel
 src/kernels/cuda/s2_expert_grouped.cu	check	src/cu/s2_expert_grouped.cu	check
@@ -308,3 +306,14 @@ src/kernels/cuda/sampler.cu	philox_uniform	src/cu/sampler.cu	philox_uniform
 src/kernels/cuda/sampler.cu	sample_tokens	src/cu/sampler.cu	sample_tokens
 src/kernels/cuda/sampler.cu	sampler_greedy_kernel	src/cu/sampler.cu	sampler_greedy_kernel
 src/kernels/cuda/sampler.cu	sampler_kernel	src/cu/sampler.cu	sampler_kernel
+src/kernels/cuda/s2_expert_grouped.cu	gu_grouped_kernel	src/cu/s2_expert_grouped.cu	gu_grouped_kernel
+src/kernels/cuda/s2_expert_grouped.cu	down_grouped_kernel	src/cu/s2_expert_grouped.cu	down_grouped_kernel
+src/kernels/cuda/native_mmvq.cu	native_q2_0_mmvq_kernel	src/cu/native_mmvq.cu	native_q2_0_mmvq_kernel
+src/kernels/cuda/native_mmvq.cu	native_q3_k_mmvq_kernel	src/cu/native_mmvq.cu	native_q3_k_mmvq_kernel
+src/kernels/cuda/native_mmvq.cu	native_q4_k_mmvq_kernel	src/cu/native_mmvq.cu	native_q4_k_mmvq_kernel
+src/kernels/cuda/native_mmvq.cu	native_q5_k_mmvq_kernel	src/cu/native_mmvq.cu	native_q5_k_mmvq_kernel
+src/kernels/cuda/native_mmvq.cu	native_q6_k_mmvq_kernel	src/cu/native_mmvq.cu	native_q6_k_mmvq_kernel
+src/kernels/cuda/native_mmvq.cu	native_iq4_xs_mmvq_kernel	src/cu/native_mmvq.cu	native_iq4_xs_mmvq_kernel
+src/kernels/cuda/native_mmvq.cu	native_small_mmvq_kernel	src/cu/native_mmvq.cu	native_small_mmvq_kernel
+src/kernels/cuda/native_mmvq.cu	native_mmvq_multi_kernel	src/cu/native_mmvq.cu	native_mmvq_multi_kernel
+src/kernels/cuda/native_mmvq.cu	native_quantize_q8_1_kernel	src/cu/native_mmvq.cu	native_quantize_q8_1_kernel

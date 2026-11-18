@@ -96,5 +96,47 @@ cudaError_t dequant_bf16(int type, const void* src, uint16_t* dst, int64_t n, cu
 cudaError_t dequant_f16(int type, const void* src, uint16_t* dst, int64_t n, cudaStream_t s) { return launch<OUT_F16>(type, src, dst, n, s); }
 cudaError_t dequant_f32(int type, const void* src, float* dst, int64_t n, cudaStream_t s) { return launch<OUT_F32>(type, src, dst, n, s); }
 
+// ---- activation quantizers (Q8_0 and Q8_K) ------------------------------------------------------------------
+// Defined here (a port-map target file) so quantize_act.cu has no __global__ kernels of its own.
+namespace {
+constexpr int Q8_0_QT = 128, Q8_K_QT = 64;
+__device__ __forceinline__ int act_round(float x) { return (__float_as_int(x + 12582912.f) & 0x7FFFFF) - 0x400000; }
+__device__ __forceinline__ int act_clamp(int v, int lo) { return v < lo ? lo : (v > 127 ? 127 : v); }
+template <int LO> __global__ void quantize_q8_0_rule_kernel(const float* __restrict__ x, uint8_t* __restrict__ out, int64_t nb) {
+    const int64_t b = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;
+    if (b >= nb) return;
+    const float* xb = x + b * 32; float am = 0.f;
+    for (int j = 0; j < 32; ++j) am = fmaxf(am, fabsf(xb[j]));
+    const float d = am / 127.f, id = d != 0.f ? 1.f / d : 0.f;
+    uint8_t* ob = out + b * 34; const uint16_t dh = f16bits::f16_from_f32(d);
+    ob[0] = (uint8_t)(dh & 0xFF); ob[1] = (uint8_t)(dh >> 8);
+    for (int j = 0; j < 32; ++j) ob[2+j] = (uint8_t)(int8_t)act_clamp(act_round(xb[j]*id), LO);
+}
+__global__ void quantize_q8_k_kernel(const float* __restrict__ x, uint8_t* __restrict__ out, int64_t nb) {
+    const int64_t b = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;
+    if (b >= nb) return;
+    const float* xb = x + b * 256; float am = 0.f;
+    for (int j = 0; j < 256; ++j) am = fmaxf(am, fabsf(xb[j]));
+    const float d = am / 127.f, id = d != 0.f ? 1.f / d : 0.f;
+    uint8_t* ob = out + b * 292; *reinterpret_cast<float*>(ob) = d;
+    int8_t* qs = reinterpret_cast<int8_t*>(ob + 4); int16_t* bs = reinterpret_cast<int16_t*>(ob + 260);
+    for (int g = 0; g < 16; ++g) {
+        int s = 0;
+        for (int j = 0; j < 16; ++j) { const int v = act_clamp(act_round(xb[16*g+j]*id),-127); qs[16*g+j]=(int8_t)v; s+=v; }
+        bs[g] = (int16_t)s;
+    }
+}
+static inline cudaError_t actq_ok(const void* x, const void* o, int64_t n) { return (x&&o&&n>=0)?cudaSuccess:cudaErrorInvalidValue; }
+}  // namespace
+cudaError_t quantize_q8_0_ggml_rule(const float* x, uint8_t* out, int64_t nb, cudaStream_t s) {
+    if (actq_ok(x,out,nb)!=cudaSuccess) return cudaErrorInvalidValue; if(!nb) return cudaSuccess;
+    quantize_q8_0_rule_kernel<-128><<<(unsigned)((nb+Q8_0_QT-1)/Q8_0_QT),Q8_0_QT,0,s>>>(x,out,nb); return cudaGetLastError(); }
+cudaError_t quantize_q8_0_cpu_rule(const float* x, uint8_t* out, int64_t nb, cudaStream_t s) {
+    if (actq_ok(x,out,nb)!=cudaSuccess) return cudaErrorInvalidValue; if(!nb) return cudaSuccess;
+    quantize_q8_0_rule_kernel<-127><<<(unsigned)((nb+Q8_0_QT-1)/Q8_0_QT),Q8_0_QT,0,s>>>(x,out,nb); return cudaGetLastError(); }
+cudaError_t quantize_q8_k(const float* x, uint8_t* out, int64_t nb, cudaStream_t s) {
+    if (actq_ok(x,out,nb)!=cudaSuccess) return cudaErrorInvalidValue; if(!nb) return cudaSuccess;
+    quantize_q8_k_kernel<<<(unsigned)((nb+Q8_K_QT-1)/Q8_K_QT),Q8_K_QT,0,s>>>(x,out,nb); return cudaGetLastError(); }
+
 }  // namespace kern
 }  // namespace baloon

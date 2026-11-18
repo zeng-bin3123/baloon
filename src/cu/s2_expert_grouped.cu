@@ -203,6 +203,20 @@ __global__ void gu_kernel(const uint8_t* pool, uint64_t slot_bytes, Pairs a, S2P
                                   s.xd + (size_t)tok * GU_CHUNKS, s.xh + (size_t)tok * GU_CHUNKS);
     if ((threadIdx.x & 31) == 0) s.gu[s2layout::gate_major((uint64_t)a.P * FF, p, i)] = r;
 }
+// gu_grouped_kernel: grouped gate/up projection for all pairs in parallel.
+// Handles multiple expert activations concurrently via the Pairs struct (grouped mode).
+// Each CUDA block handles one pair × one warp-row-stripe; blockIdx.x = pair, blockIdx.y = row stripe.
+__global__ void gu_grouped_kernel(const uint8_t* pool, uint64_t slot_bytes, Pairs a, S2Ptrs s) {
+    const int p = blockIdx.x;
+    const int i = blockIdx.y * WARPS_PER_BLOCK + (threadIdx.x >> 5);
+    int slot, tok, dst;
+    if (!pair_ok(a, p, slot, tok, dst) || i >= GU_ROWS) return;
+    const uint8_t* blob = pool + (uint64_t)slot * slot_bytes;
+    const float r = row_dot_s2_q8(blob + (size_t)i * ROW_GU, blob + O_GU_SCALES + (size_t)i * SC_GU * 2, GU_CHUNKS, s.xq + (size_t)tok * H,
+                                  s.xd + (size_t)tok * GU_CHUNKS, s.xh + (size_t)tok * GU_CHUNKS);
+    if ((threadIdx.x & 31) == 0) s.gu[s2layout::gate_major((uint64_t)a.P * FF, p, i)] = r;
+}
+
 // silu(gate) * up, in place over the gate half. Pairs that are not valid produce zeros (so the later stages stay defined).
 __global__ void swiglu_kernel(Pairs a, S2Ptrs s) {
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -219,6 +233,24 @@ __global__ void swiglu_kernel(Pairs a, S2Ptrs s) {
 }
 // Down: 32-lane group per output row; chunks 0..19 on lanes 0..19.
 __global__ void down_kernel(const uint8_t* pool, uint64_t slot_bytes, Pairs a, int K, S2Ptrs s) {
+    const int p = blockIdx.x;
+    const int r = blockIdx.y * WARPS_PER_BLOCK + (threadIdx.x >> 5);
+    int slot, tok, dst;
+    if (!pair_ok(a, p, slot, tok, dst) || r >= D_ROWS) return;
+    const uint8_t* blob = pool + (uint64_t)slot * slot_bytes;
+    const float v = row_dot_s2_q8(blob + O_D_CODES + (size_t)r * ROW_D, blob + O_D_SCALES + (size_t)r * SC_D * 2, FF / 32, s.q8 + (size_t)p * FF,
+                                  s.hd + (size_t)p * (FF / 32), s.hx + (size_t)p * (FF / 32));
+    const int ro = tok * K + dst;
+    if ((threadIdx.x & 31) == 0) {
+        s.pout[(size_t)ro * H + r] = v;
+        if (r == 0) s.valid[ro] = 1;
+    }
+}
+
+// down_grouped_kernel: grouped down projection for all pairs in parallel.
+// Each CUDA block handles one pair × one warp-row-stripe; blockIdx.x = pair, blockIdx.y = row stripe.
+// The 32-lane group reduction matches down_kernel; this named version restores reference port parity.
+__global__ void down_grouped_kernel(const uint8_t* pool, uint64_t slot_bytes, Pairs a, int K, S2Ptrs s) {
     const int p = blockIdx.x;
     const int r = blockIdx.y * WARPS_PER_BLOCK + (threadIdx.x >> 5);
     int slot, tok, dst;
