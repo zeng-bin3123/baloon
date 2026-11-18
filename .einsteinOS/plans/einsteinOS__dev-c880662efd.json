@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 22487,
     "started": "2026-11-18T15:14:51.726946148Z",
-    "renewed": "2026-11-18T17:51:08.57193411Z"
+    "renewed": "2026-11-18T17:51:24.034814293Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -663,7 +663,7 @@
     },
     "NativeQsaScore.lean": {
       "hash": "98165629712f",
-      "pass": true,
+      "pass": false,
       "unit_id": "u316bd6b9ec"
     },
     "PleBlockGeometry.lean": {
@@ -703,7 +703,7 @@
     },
     "QsaCacheStep.lean": {
       "hash": "e94687212f66",
-      "pass": true,
+      "pass": false,
       "unit_id": "u316bd6b9ec"
     },
     "QsaDecodeAttn.lean": {
@@ -713,7 +713,7 @@
     },
     "QsaSelect.lean": {
       "hash": "ded819668ab3",
-      "pass": true,
+      "pass": false,
       "unit_id": "u316bd6b9ec"
     },
     "RouterSamplerSelection.lean": {
@@ -770,7 +770,8 @@
   "fix_attempts": {
     "pb0569948de": 2,
     "pb7e2533792": 1,
-    "pe1f7ca5c00": 1
+    "pe1f7ca5c00": 1,
+    "u316bd6b9ec": 1
   },
   "fail_history": {
     "pb0569948de": [
@@ -892,6 +893,11 @@
       "kind": "review_fail",
       "text": "native_flash_attn_short_step accepts up to 1024 cells (kFlashShortMaxCells=1024) but theory native_flash_attn and native_flash_attn_bounds.hpp specify max context 256; the test pins the limit only via the same constant",
       "base_ref": "einsteinOS/dev-c880662efd"
+    },
+    "u316bd6b9ec": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 23 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/kernels/qsa.hpp type QsaIndexerBuffers: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp type QsaShapes: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp type QsaStep: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func indexer_key_append: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp const kTopkMaxCells: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func kv_append: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func kv_append_step: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func kv_gather: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func kv_gather_step: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_attend: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_attend_step: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_freq_base: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_gate_apply: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_gate_apply_f32: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_index: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_index_step: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_real_shapes: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_rms_eps: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_selection_width: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_step_bytes: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_step_fill: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func topk_512: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func topk_512_step: no line in .einsteinOS/port/u316bd6b9ec.tsv",
+      "base_ref": ""
     }
   },
   "infra_fails": 0,
@@ -1004,11 +1010,6 @@
     "u12d8dd5102": {
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 319 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/kernels/cpu/expert.hpp type ActQ: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const BB: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const BLOB: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp type CpuFeatures: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp type ExpertScratch: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp type ExpertScratchMulti: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const FF: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const H: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const MAXC: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const MAXT: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const NE: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const O_D_CODES: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const O_D_SCALES: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const O_GU_CODES: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const O_GU_SCALES: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const QK: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const QKA: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const ROW_D: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const ROW_GU: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const SC_D: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp const SC_GU: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp func act_quant_q8_1: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp func act_quant_q8_1_avx2: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp func cpu_features: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp func cpu_require_expert_support: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp func expert_oracle_q8_0_enabled: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp func expert_set_oracle_q8_0: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp func q2_0_gguf_rows_multi: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp func q2_0_gguf_rows_multi_avx2: no line in .einsteinOS/port/u12d8dd5102.tsv\n  include/strata/kernels/cpu/expert.hpp func s2_expert_down_rows: no line in .einsteinOS/port/u12d8dd5102.tsv\n  … 289 more",
-      "base_ref": ""
-    },
-    "u316bd6b9ec": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 23 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/kernels/qsa.hpp type QsaIndexerBuffers: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp type QsaShapes: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp type QsaStep: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func indexer_key_append: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp const kTopkMaxCells: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func kv_append: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func kv_append_step: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func kv_gather: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func kv_gather_step: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_attend: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_attend_step: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_freq_base: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_gate_apply: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_gate_apply_f32: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_index: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_index_step: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_real_shapes: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_rms_eps: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_selection_width: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_step_bytes: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func qsa_step_fill: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func topk_512: no line in .einsteinOS/port/u316bd6b9ec.tsv\n  include/strata/kernels/qsa.hpp func topk_512_step: no line in .einsteinOS/port/u316bd6b9ec.tsv",
       "base_ref": ""
     },
     "u52d156705c": {
