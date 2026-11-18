@@ -12,6 +12,10 @@
 #ifndef BALOON_DEQUANT_MAIN_DISABLED
 #define BALOON_DEQUANT_MAIN_DISABLED 0
 #endif
+// Port map: reference uses REF_GGUF_MAIN_DISABLED; map it to the local name.
+#ifndef REF_GGUF_MAIN_DISABLED
+#define REF_GGUF_MAIN_DISABLED BALOON_DEQUANT_MAIN_DISABLED
+#endif
 
 namespace baloon {
 namespace artifact {

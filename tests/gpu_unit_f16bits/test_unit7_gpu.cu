@@ -125,10 +125,17 @@ static void test_quantize_act() {
     sync();
     q = q80.get();
     mism = 0;
+    // The stored fp16 scale must equal f16(max(|x[j]*sc|)/127): this is sc times
+    // smaller than the unscaled value.  A no-op kernel leaves the old (unscaled)
+    // data in the buffer, making the scale ~2.7x too large; this check detects it.
+    long scale_bad = 0;
     for (int64_t b = 0; b < n / 32; ++b) {
         float amax = 0.f;
         for (int j = 0; j < 32; ++j) amax = std::max(amax, std::fabs(x[b * 32 + j] * sc));
         const float d = amax / 127.f;
+        const uint16_t dh_got = (uint16_t)(q[b * 34] | (q[b * 34 + 1] << 8));
+        const uint16_t dh_want = fb::f16_from_f32(d);
+        scale_bad += std::abs((int)dh_got - (int)dh_want) > 1;                           // allow 1 fp16 ULP
         for (int j = 0; j < 32; ++j) {
             const int c = (int8_t)q[b * 34 + 2 + j];
             CHECK(c >= -127 && c <= 127);                                                 // never -128
@@ -138,6 +145,7 @@ static void test_quantize_act() {
         if (amax == 0.f) for (int j = 0; j < 32; ++j) CHECK((int8_t)q[b * 34 + 2 + j] == 0);
     }
     CHECK(mism == 0);
+    CHECK(scale_bad == 0);                                                                // scale field must reflect sc
 
     // Q8_K
     const int64_t nk = 256 * 512;
