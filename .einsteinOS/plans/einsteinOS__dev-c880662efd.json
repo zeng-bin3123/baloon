@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 22487,
     "started": "2026-11-18T15:14:51.726946148Z",
-    "renewed": "2026-11-18T15:43:17.82393234Z"
+    "renewed": "2026-11-18T17:06:26.036603175Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -457,7 +457,7 @@
       ],
       "scope": "items: rneStep, rne_below_half, rne_above_half, rne_tie_even, rne_le_succ",
       "reason": "3 fix attempts used",
-      "conv": "a471681f-d024-4a10-bbaf-7d6b289868b1"
+      "conv": "54005caf-eca0-48e2-b4f1-4f4308172f34"
     },
     {
       "id": "u02c65ed515",
@@ -901,6 +901,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "uebd9b81357": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "reopen": {
     "p00a7a246af": {
       "kind": "port_incomplete",
