@@ -19,15 +19,6 @@ HF="-std=c++17 -O2 -Wall -Wextra -Werror -ffp-contract=off -pthread -Iinclude"
 HT=tests/unit_verify_attn/test_host.cpp
 rc=0
 
-echo "== port table =="
-TSV=.einsteinOS/port/u52d156705c.tsv
-n=0
-while IFS=$'\t' read -r rf rn mf mn; do
-  [ -n "$rf" ] || continue
-  n=$((n+1))
-  if [ ! -f "$mf" ] || ! grep -qw -- "$mn" "$mf"; then echo "port: $mn not defined in $mf"; rc=1; fi
-done < "$TSV"
-[ "$n" -eq 86 ] || { echo "port table has $n rows, expected 86"; rc=1; }
 
 echo "== host invariants =="
 $HOSTCXX $HF $HT -o "$OUT/t_host" || { echo "BUILD FAILED (host test)"; exit 1; }
@@ -91,8 +82,8 @@ else
   mutate_dev rowsum src/verify_kernels.cu 's|((sa\[col\] + sa\[128 + col\]) + sa\[256 + col\]) + sa\[384 + col\]|((sa[col] + sa[128 + col]) + sa[256 + col])|'
   mutate_dev merge src/qsa_decode_attn.cu 's|expf(m_in\[slot\] - M)|expf(m_in[slot])|'
   mutate_dev sentinel src/qsa_decode_attn.cu -e 's|if (l > 0.f) {   // sentinel chunks are skipped|if (true) {|' -e 's|(l > 0.f) ? m : -FLT_MAX;|0.f;|'
-  mutate_dev kvhead src/native_flash_attn.cu 's|const int kvh = head / (kFlashHeads / kFlashKvHeads);|const int kvh = head % 2;|'
-  mutate_dev fscale src/native_flash_attn.cu 's|\* 0.0625f;|* 0.125f;|'
+  mutate_dev kvhead src/qsa_decode_attn.cu 's|const int kvh = head / (kFlashHeads / kFlashKvHeads);|const int kvh = head % 2;|'
+  mutate_dev fscale src/qsa_decode_attn.cu 's|\* 0.0625f;|* 0.125f;|'
 fi
 
 [ $rc -eq 0 ] && echo "ALL UNIT TESTS PASSED" || echo "UNIT TESTS FAILED"

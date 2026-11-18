@@ -67,13 +67,13 @@ link "$OUT/test_ilu_gdn" "$OUT/src__ilu_gdn_prep.cu.o" "$OUT/src__ilu_gdn_warp_s
 link "$OUT/test_ilu_qsa" "$OUT/src__ilu_qsa_decode.cu.o" "$OUT/src__ilu_qsa_select.cu.o" "$OUT/src__ilu_qsa_score.cu.o" \
      "$OUT/src__ilu_qsa_append.cu.o" "$OUT/tests__gpu_unit7__test_ilu_qsa.cu.o"
 link "$OUT/test_prefill_gpu" "$OUT/src__prefill_kernels.cu.o" "$OUT/tests__gpu_unit12__test_prefill_gpu.cu.o"
-link "$OUT/test_prefill_kernels" "$OUT/src__prefill__kernels.cu.o" "$OUT/tests__pk_unit3__test_prefill_kernels.cu.o"
 link "$OUT/test_unit7_gpu" "$OUT/src__ilu_kv_q8.cu.o" "$OUT/src__ilu_qsa_step.cu.o" "$OUT/src__ilu_quantize_act.cu.o" \
      "$OUT/tests__gpu_unit_f16bits__test_unit7_gpu.cu.o"
 link "$OUT/test_encode_top_gpu" "$OUT/src__ilu_f16_encode_top.cu.o" "$OUT/tests__gpu_unit_f16bits_top__test_encode_top_gpu.cu.o"
 link "$OUT/test_decode_bf16_gpu" "$OUT/src__ilu_f16_decode_bf16.cu.o" "$OUT/tests__gpu_unit_f16bits_decode__test_decode_bf16_gpu.cu.o"
 link "$OUT/test_qsa_cache_step_gpu" "$OUT/src__ilu_qsa_geometry.cu.o" "$OUT/src__ilu_qsa_step.cu.o" "$OUT/src__ilu_qsa_score.cu.o" \
      "$OUT/tests__gpu_unit_qsa_cache_step__test_qsa_cache_step_gpu.cu.o"
+link "$OUT/test_prefill_kernels" "$OUT/src__prefill__kernels.cu.o" "$OUT/tests__pk_unit3__test_prefill_kernels.cu.o"
 link "$OUT/test_verify_attn_gpu" "$OUT/src__verify_kernels.cu.o" "$OUT/src__qsa_decode_attn.cu.o" "$OUT/src__native_flash_attn.cu.o" \
      "$OUT/tests__gpu_unit_verify_attn__test_verify_attn_gpu.cu.o"
 echo "BUILD OK"
