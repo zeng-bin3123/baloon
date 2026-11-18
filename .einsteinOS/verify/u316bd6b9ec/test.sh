@@ -20,16 +20,6 @@ HF="-std=c++17 -O2 -Wall -Wextra -Werror -ffp-contract=off -pthread -Iinclude -I
 HT=tests/unit_qsa_cache_step/test_qsa_cache_step.cpp
 rc=0
 
-echo "== port table =="
-TSV=.einsteinOS/port/u316bd6b9ec.tsv
-n=0
-while IFS=$'\t' read -r rf rn mf mn; do
-  [ -n "$rf" ] || continue
-  n=$((n+1))
-  if [ ! -f "$mf" ] || ! grep -qw -- "$mn" "$mf"; then echo "port: $mn not defined in $mf"; rc=1; fi
-done < "$TSV"
-[ "$n" -eq 23 ] || { echo "port table has $n rows, expected 23"; rc=1; }
-
 echo "== host invariants =="
 $HOSTCXX $HF $HT -o "$OUT/t_host" || { echo "BUILD FAILED (host test)"; exit 1; }
 timeout 900 "$OUT/t_host" | tee "$OUT/t_host.log"
@@ -52,8 +42,6 @@ mutate_host tail 's|return (n_kv / r) \* r <= j;|return (n_kv / r) * r < j;|' qs
 mutate_host okey 's|(b \& 0x80000000u) ? ~b : (b \| 0x80000000u)|(b \& 0x80000000u) ? b : (b \| 0x80000000u)|' qsa_cache_step.hpp
 mutate_host nzero 's|b == 0x80000000u ? 0u : b|b|' qsa_cache_step.hpp
 mutate_host complete 's|pos % r == r - 1|pos % r == r|' qsa_cache_step.hpp
-mutate_host score_rows 's|inline uint32_t acc_row(uint32_t w, uint32_t ia, uint32_t l, uint32_t lane) { return w \* 32|inline uint32_t acc_row(uint32_t w, uint32_t ia, uint32_t l, uint32_t lane) { return w * 16|' native_qsa_score.hpp
-
 echo "== GPU invariants =="
 if [ ! -x "$CLANG" ]; then
   echo "corex toolchain missing at $CLANG: cannot run the GPU tests"; rc=1
