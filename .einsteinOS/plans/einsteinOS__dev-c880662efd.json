@@ -1,9 +1,9 @@
 {
   "holder": {
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
-    "pid": 45238,
-    "started": "2026-11-18T00:47:14.715890893Z",
-    "renewed": "2026-11-18T03:49:17.858707189Z"
+    "pid": 22487,
+    "started": "2026-11-18T15:14:51.726946148Z",
+    "renewed": "2026-11-18T15:40:53.105314593Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -498,7 +498,7 @@
         "MtpDrafter.lean"
       ],
       "reason": "3 fix attempts used",
-      "conv": "7ad91890-6296-40ef-b611-2643aec80960"
+      "conv": "35f0ed24-c6d0-4a4c-8839-ced110a9d8ad"
     },
     {
       "id": "u77baf5bde3",
@@ -901,6 +901,12 @@
     }
   },
   "infra_fails": 1,
+  "review_pending": {
+    "uf7cdc0dcca": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "reopen": {
     "p00a7a246af": {
       "kind": "port_incomplete",
