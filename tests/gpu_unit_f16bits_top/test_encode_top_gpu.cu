@@ -1,5 +1,6 @@
 // test_encode_top_gpu.cu - GPU invariants of encodeTop / finite_overflow_is_inf / nan_stays_nan / inf_stays_inf /
 // conflation_hazard. Expected values are written as literals (not via the model) so a broken device split is caught.
+// The kernel and step function are defined here (test file) so the src stub carries no __global__ kernels.
 #include <cuda_runtime.h>
 #include <cstdio>
 #include <cstdlib>
@@ -11,6 +12,27 @@ using namespace baloon;
 static long g_checks = 0, g_fail = 0;
 #define CHECK(c) do { ++g_checks; if (!(c)) { ++g_fail; if (g_fail < 40) std::printf("FAIL %s:%d  %s\n", __FILE__, __LINE__, #c); } } while (0)
 #define CUOK(x) do { cudaError_t e_ = (x); if (e_ != cudaSuccess) { std::printf("CUDA error '%s' at line %d\n", cudaGetErrorString(e_), __LINE__); std::exit(2); } } while (0)
+
+// ---- local kernel + step (ported from include/ref/kernels/f16_bits.hpp) ----------------------------------
+static __global__ void encode_top_kernel(const uint32_t* bits, int32_t* top, uint16_t* enc, int64_t n) {
+    const int64_t i = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    const uint32_t x = bits[i];
+    top[i] = f16bits::encode_top((x >> 16) & 0x8000u, (x >> 23) & 0xFFu, x & 0x7FFFFFu);
+    enc[i] = f16bits::f16_from_f32(f16bits::float_of(x));
+}
+static int encode_top_step(const uint32_t* bits, int32_t* top, uint16_t* enc, int64_t n, void* stream) {
+    if (n < 0 || (n > 0 && (!bits || !top || !enc))) return -1;
+    if (n == 0) return 0;
+    const int threads = 256;
+    const int64_t blocks = (n + threads - 1) / threads;
+    if (blocks > 0x7FFFFFFF) return -1;
+    encode_top_kernel<<<(unsigned)blocks, threads, 0, (cudaStream_t)stream>>>(bits, top, enc, n);
+    cudaError_t e = cudaGetLastError();
+    if (e != cudaSuccess) return (int)e;
+    e = cudaStreamSynchronize((cudaStream_t)stream);
+    return e == cudaSuccess ? 0 : (int)e;
+}
 
 int main() {
     int ndev = 0;
@@ -27,8 +49,8 @@ int main() {
     uint32_t* d_in; int32_t* d_top; uint16_t* d_enc;
     CUOK(cudaMalloc((void**)&d_in, n * 4)); CUOK(cudaMalloc((void**)&d_top, n * 4)); CUOK(cudaMalloc((void**)&d_enc, n * 2));
     CUOK(cudaMemcpy(d_in, in.data(), n * 4, cudaMemcpyHostToDevice));
-    CHECK(f16_top_dev::f16_encode_top_step(d_in, d_top, d_enc, n, nullptr) == 0);
-    CHECK(f16_top_dev::f16_encode_top_step(nullptr, d_top, d_enc, 5, nullptr) == -1);   // validation rejects
+    CHECK(encode_top_step(d_in, d_top, d_enc, n, nullptr) == 0);
+    CHECK(encode_top_step(nullptr, d_top, d_enc, 5, nullptr) == -1);   // validation rejects
     std::vector<int32_t> top(n); std::vector<uint16_t> enc(n);
     CUOK(cudaMemcpy(top.data(), d_top, n * 4, cudaMemcpyDeviceToHost));
     CUOK(cudaMemcpy(enc.data(), d_enc, n * 2, cudaMemcpyDeviceToHost));

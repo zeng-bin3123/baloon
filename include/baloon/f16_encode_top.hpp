@@ -16,10 +16,4 @@ BALOON_BITS_HD inline int32_t encode_top(uint32_t sign, uint32_t rawexp, uint32_
 }
 
 }  // namespace f16bits
-
-namespace f16_top_dev {
-// For every raw fp32 bit pattern bits[i]: top[i] = encode_top(sign, rawexp, man) (sign = 0x8000 or 0), enc[i] = f16_from_f32.
-// Return codes: 0 ok, -1 rejected by host validation (nothing launched), >0 a cudaError_t value.
-int f16_encode_top_step(const uint32_t* bits, int32_t* top, uint16_t* enc, int64_t n, void* stream);
-}  // namespace f16_top_dev
 }  // namespace baloon

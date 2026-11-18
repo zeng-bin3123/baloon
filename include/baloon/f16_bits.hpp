@@ -14,6 +14,8 @@
 #else
 #define BALOON_BITS_HD
 #endif
+// REF_HD: reference-compatible alias for the port map (same as BALOON_BITS_HD).
+#define REF_HD BALOON_BITS_HD
 
 namespace baloon {
 namespace f16bits {
