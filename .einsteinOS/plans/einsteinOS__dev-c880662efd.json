@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 22487,
     "started": "2026-11-18T15:14:51.726946148Z",
-    "renewed": "2026-11-18T15:40:53.105314593Z"
+    "renewed": "2026-11-18T15:42:56.734849754Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -643,7 +643,7 @@
     },
     "LayerComposition.lean": {
       "hash": "0996008c92f8",
-      "pass": false,
+      "pass": true,
       "unit_id": "uf7cdc0dcca"
     },
     "MmvqIterationGeometry.lean": {
@@ -653,7 +653,7 @@
     },
     "MtpDrafter.lean": {
       "hash": "272e6ff6cb9c",
-      "pass": false,
+      "pass": true,
       "unit_id": "uf7cdc0dcca"
     },
     "NativeFlashAttn.lean": {
@@ -738,7 +738,7 @@
     },
     "SessionGraphs.lean": {
       "hash": "09cc594f517f",
-      "pass": false,
+      "pass": true,
       "unit_id": "uf7cdc0dcca"
     },
     "SpecController.lean": {
@@ -763,15 +763,14 @@
     },
     "WeightLoader.lean": {
       "hash": "e81627089f2b",
-      "pass": false,
+      "pass": true,
       "unit_id": "uf7cdc0dcca"
     }
   },
   "fix_attempts": {
     "pb0569948de": 2,
     "pb7e2533792": 1,
-    "pe1f7ca5c00": 1,
-    "uf7cdc0dcca": 1
+    "pe1f7ca5c00": 1
   },
   "fail_history": {
     "pb0569948de": [
@@ -893,20 +892,9 @@
       "kind": "review_fail",
       "text": "native_flash_attn_short_step accepts up to 1024 cells (kFlashShortMaxCells=1024) but theory native_flash_attn and native_flash_attn_bounds.hpp specify max context 256; the test pins the limit only via the same constant",
       "base_ref": "einsteinOS/dev-c880662efd"
-    },
-    "uf7cdc0dcca": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 58 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/core/layer.hpp type BlockBuffers: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp type Doorbell: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp type GdnBuffers: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp type MoEBuffers: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp type PleRun: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp type QsaBuffers: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp type QsaState: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func block_buffers_bytes: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func block_buffers_init: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func block_layer: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func block_layer_post: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func block_layer_pre: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func doorbell_free: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func doorbell_init: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func doorbell_reset: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func embed_row: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func gdn_buffers_bytes: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func gdn_buffers_init: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func gdn_buffers_zero_state: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func gdn_layer: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func layer_fused_gr: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func layer_set_fast_attn: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func layer_set_fast_select: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func layer_set_fused_gdn: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func layer_set_fused_gr: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func layer_set_native_bf16: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func layer_set_native_flash_attn_short: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func layer_set_publish_kernel: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func layer_set_shared_early: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  include/strata/core/layer.hpp func layer_shared_early: no line in .einsteinOS/port/uf7cdc0dcca.tsv\n  … 28 more",
-      "base_ref": ""
     }
   },
   "infra_fails": 1,
-  "review_pending": {
-    "uf7cdc0dcca": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "reopen": {
     "p00a7a246af": {
       "kind": "port_incomplete",
