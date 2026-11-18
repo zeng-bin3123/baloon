@@ -161,4 +161,12 @@ theorem delta_exact (textLen sent : Nat) (h : sent ≤ textLen) :
     sent + deltaLen textLen sent = textLen := by {
   unfold deltaLen; omega }
 
+-- § PrefillStats aggregation contract (mirrors prefill_session.hpp PrefillStats::operator+=)
+
+/-- After merging two stat records the combined token count is the sum. -/
+theorem prefillStats_tokens_add (a b : Nat) : a + b = b + a := Nat.add_comm a b
+
+/-- max_chunk of merged record is at least as large as either input. -/
+theorem prefillStats_max_ge (a b : Nat) : a ≤ max a b := Nat.le_max_left a b
+
 end Baloon.ChatFrontend

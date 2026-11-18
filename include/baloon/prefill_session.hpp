@@ -12,14 +12,41 @@ struct PrefillStats {
     uint64_t chunks = 0;     // callbacks issued
     uint64_t tokens = 0;     // positions covered (== n on completion)
     uint64_t max_chunk = 0;  // largest piece issued
+
+    // Merge another stats record into this one (for aggregating across sessions).
+    PrefillStats& operator+=(const PrefillStats& o) {
+        chunks    += o.chunks;
+        tokens    += o.tokens;
+        max_chunk  = std::max(max_chunk, o.max_chunk);
+        return *this;
+    }
+
+    // Average tokens per callback (0 when no callbacks issued).
+    double avg_chunk() const {
+        return chunks ? static_cast<double>(tokens) / static_cast<double>(chunks) : 0.0;
+    }
+
+    bool empty() const { return chunks == 0; }
 };
 
 class Prefill {
 public:
     using Fn = std::function<void(uint64_t start, uint64_t len)>;
+
+    // chunk=0 is clamped to 1 so at least one token is always processed per call.
     explicit Prefill(uint64_t chunk) : chunk_(chunk ? chunk : 1) {}
+
     uint64_t chunk() const { return chunk_; }
-    // Covers positions [0, n): pieces [c0, c0 + min(chunk, n - c0)).
+
+    // True when chunk size is usable (always true after construction, exposed for contract tests).
+    bool valid() const { return chunk_ > 0; }
+
+    // Number of callbacks required to cover n tokens (matches PrefillStats::chunks after run()).
+    uint64_t call_count(uint64_t n) const {
+        return n ? (n + chunk_ - 1) / chunk_ : 0;
+    }
+
+    // Covers positions [0, n): issues pieces [c0, c0 + min(chunk, n - c0)).
     PrefillStats run(uint64_t n, const Fn& fn) const {
         PrefillStats s;
         for (uint64_t c0 = 0; c0 < n;) {

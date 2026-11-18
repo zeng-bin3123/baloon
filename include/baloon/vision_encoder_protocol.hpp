@@ -1,5 +1,5 @@
 // vision_encoder_protocol.hpp - wire format and command handling of the resident image encoder:
-// `ENC <image> <output>` (image path ends at the LAST space), 20-byte header {SVE1, n_tokens, nx, ny, n_embd} of
+// `ENC <image> <o>` (image path ends at the LAST space), 20-byte header {SVE1, n_tokens, nx, ny, n_embd} of
 // int32 little-endian, then n_tokens*n_embd float32; grid recovered from the last token's position.
 #pragma once
 #include <cstddef>
@@ -20,12 +20,25 @@ inline bool accepts(uint64_t sp, uint64_t len) { return 0 < sp && sp + 1 < len; 
 struct Command { bool ok = false; std::string image, output; };
 
 // rest = remainder after "ENC ". Split at the last space; both parts must be non-empty.
+// Image path may contain spaces; the LAST space is the separator.
 inline Command parse_enc(const std::string& rest) {
     Command c;
     const size_t sp = rest.rfind(' ');
     if (sp == std::string::npos || !accepts(sp, rest.size())) return c;
-    c.ok = true; c.image = rest.substr(0, sp); c.output = rest.substr(sp + 1);
+    c.image  = rest.substr(0, sp);
+    c.output = rest.substr(sp + 1);
+    if (c.image.empty() || c.output.empty()) return c;  // guard: both parts non-empty
+    c.ok = true;
     return c;
+}
+
+// Error detail from parse_enc: empty string on success, human-readable reason on failure.
+inline std::string parse_enc_error(const std::string& rest) {
+    if (rest.empty()) return "empty payload";
+    const size_t sp = rest.rfind(' ');
+    if (sp == std::string::npos) return "no space separator found";
+    if (!accepts(sp, rest.size())) return "image or output path is empty";
+    return "";
 }
 
 inline uint64_t file_bytes(uint64_t n, uint64_t e) { return HEADER_BYTES + n * (4 * e); }
