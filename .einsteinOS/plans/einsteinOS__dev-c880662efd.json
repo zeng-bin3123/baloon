@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 22487,
     "started": "2026-11-18T15:14:51.726946148Z",
-    "renewed": "2026-11-18T17:09:10.201485919Z"
+    "renewed": "2026-11-18T17:46:35.158468253Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -467,7 +467,7 @@
       ],
       "scope": "items: encodeTop, finite_overflow_is_inf, nan_stays_nan, inf_stays_inf, conflation_hazard",
       "reason": "3 fix attempts used",
-      "conv": "21cd1d4b-e481-4b99-a526-1c2a484350f7"
+      "conv": "73d5e1f6-48b8-4ee2-85f6-9d0a05e99c30"
     },
     {
       "id": "ub25e8eba7f",
@@ -901,6 +901,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "u02c65ed515": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "reopen": {
     "p00a7a246af": {
       "kind": "port_incomplete",
