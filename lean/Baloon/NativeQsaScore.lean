@@ -11,7 +11,8 @@ def stepValid (n pos full width maxCells : Nat) : Prop :=
 
 theorem stepValid_of_fill (pos maxCells : Nat) (h : pos + 1 ≤ maxCells) :
     stepValid (pos + 1) pos ((pos + 1) / 4) (if pos + 1 < 2051 then pos + 1 else 2051) maxCells := by
-  simp only [stepValid]; exact ⟨by omega, h, by omega, rfl, rfl⟩
+  unfold stepValid
+  exact ⟨by omega, h, by omega, rfl, rfl⟩
 
 theorem guard_width_is_min (n : Nat) : (if n < 2051 then n else 2051) = min n 2051 := by
   split_ifs with h <;> omega

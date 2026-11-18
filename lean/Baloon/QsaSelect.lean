@@ -59,9 +59,9 @@ theorem cntGe_split (l : List Nat) (t : Nat) : cntGe l t = cntGt l t + cntEq l t
         simp [h1, h2, h3, ih]
 
 theorem cntGt_eq_cntGe_succ (l : List Nat) (t : Nat) : cntGt l t = cntGe l (t + 1) := by
-  simp only [cntGt, cntGe]
-  congr 1; ext k
-  simp [Nat.lt_iff_add_one_le]
+  unfold cntGt cntGe
+  have h : (fun x => decide (t < x)) = (fun x => decide (t + 1 ≤ x)) := rfl
+  rw [h]
 
 /-- Selected count using a let binding for the gt component. -/
 def selCount (l : List Nat) (t width : Nat) : Nat :=
@@ -121,8 +121,8 @@ theorem total_weight (nBid nKv r : Nat) (h : nBid * r ≤ nKv) :
 
 theorem full_block_cell_lt (b c nBid nKv : Nat) (hb : b < nBid) (hc : c < 4) (h : nBid * 4 ≤ nKv) :
     b * 4 + c < nKv := by
-  have hbid : b * 4 < nBid * 4 := Nat.mul_lt_mul_right 4 hb
-  omega
+  have hlt : b * 4 + 4 ≤ nBid * 4 := by omega
+  linarith
 
 theorem tail_block_cell_lt (c nBid nKv : Nat) (hc : c < nKv - nBid * 4) : nBid * 4 + c < nKv := by
   have hc' := hc; omega

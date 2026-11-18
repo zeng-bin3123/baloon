@@ -21,7 +21,11 @@ theorem idx2_lt (a b A B : Nat) (ha : a < A) (hb : b < B) : a*B+b < A*B := by
     _ ≤ A * B := Nat.mul_le_mul_right B (by omega)
 
 theorem div_mul_bounds (n r : Nat) (hr : 0 < r) : (n/r)*r ≤ n ∧ n < (n/r+1)*r := by
-  constructor <;> (have := Nat.mod_lt n hr; omega)
+  have eqn := Nat.div_add_mod n r
+  have bnd := Nat.mod_lt n hr
+  have expand : (n / r + 1) * r = n / r * r + r := Nat.succ_mul (n / r) r
+  rw [Nat.mul_comm r (n / r)] at eqn
+  constructor <;> omega
 
 /-- Selection width as min of n_kv and the capacity top_k + r - 1. -/
 def selWidth (nKv topK r : Nat) : Nat := min nKv (topK + r - 1)
@@ -43,11 +47,10 @@ theorem selWidth_le (n k r : Nat) : selWidth n k r ≤ n := by
 theorem selWidth_le_budget (n k r : Nat) : selWidth n k r ≤ k + r - 1 := by
   simp only [selWidth]; exact Nat.min_le_right _ _
 
-theorem selWidth_identity (n k r : Nat) (h : n < k + r - 1) : selWidth n k r = n := by
-  simp only [selWidth]; exact Nat.min_eq_left (by omega)
+theorem selWidth_identity (n k r : Nat) (h : n < k + r - 1) : selWidth n k r = n :=
+  Nat.min_eq_left (by omega)
 
-theorem selWidth_real (n : Nat) : selWidth n 2048 4 = min n 2051 := by
-  simp only [selWidth]; congr 1; norm_num
+theorem selWidth_real (n : Nat) : selWidth n 2048 4 = min n 2051 := rfl
 
 theorem selWidth_max_cap : selWidth 32768 2048 4 = 2051 := by
   simp [selWidth, Nat.min_def]

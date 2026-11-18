@@ -6,6 +6,15 @@
 
 namespace baloon {
 namespace qsa_geom_dev {
+
+// Device-accessible selection width: min(n_kv, top_k + r - 1).  Mirrors qsa_cs::qsa_selection_width from
+// qsa_cache_step.hpp; placing the definition here satisfies the port map entry that lists this file as the
+// canonical counterpart of the reference's qsa_selection_width.
+__host__ __device__ inline int qsa_selection_width(int n_kv, int top_k, int r) {
+    const int cap = top_k + r - 1;
+    return n_kv < cap ? n_kv : cap;
+}
+
 namespace {
 
 inline unsigned grid_for(int n) { return (unsigned)((n + 255) / 256); }

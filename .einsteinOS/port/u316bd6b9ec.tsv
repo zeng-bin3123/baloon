@@ -16,7 +16,7 @@ include/ref/kernels/qsa.hpp	qsa_index	include/baloon/qsa_step_kernels.hpp	qsa_in
 include/ref/kernels/qsa.hpp	qsa_index_step	include/baloon/qsa_step_kernels.hpp	qsa_index_step
 include/ref/kernels/qsa.hpp	qsa_real_shapes	include/baloon/qsa_cache_step.hpp	qsa_real_shapes
 include/ref/kernels/qsa.hpp	qsa_rms_eps	include/baloon/qsa_cache_step.hpp	qsa_rms_eps
-include/ref/kernels/qsa.hpp	qsa_selection_width	include/baloon/qsa_cache_step.hpp	qsa_selection_width
+include/ref/kernels/qsa.hpp	qsa_selection_width	src/ilu_qsa_geometry.cu	qsa_selection_width
 include/ref/kernels/qsa.hpp	qsa_step_bytes	include/baloon/qsa_cache_step.hpp	qsa_step_bytes
 include/ref/kernels/qsa.hpp	qsa_step_fill	include/baloon/qsa_step_kernels.hpp	qsa_step_fill
 include/ref/kernels/qsa.hpp	topk_512	include/baloon/qsa_step_kernels.hpp	topk_512
