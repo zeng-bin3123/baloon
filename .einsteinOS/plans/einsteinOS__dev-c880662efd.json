@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 22487,
     "started": "2026-11-18T15:14:51.726946148Z",
-    "renewed": "2026-11-18T18:35:51.552350753Z"
+    "renewed": "2026-11-18T19:40:57.985462858Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -368,7 +368,7 @@
         "QsaCacheStep.lean"
       ],
       "reason": "3 fix attempts used",
-      "conv": "4e104940-9839-4b78-9d0d-6e0aaa91da46"
+      "conv": "b5e2ea99-333c-4c0d-93d8-188d5d938643"
     },
     {
       "id": "u52d156705c",
@@ -903,6 +903,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "u316bd6b9ec": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "reopen": {
     "p00a7a246af": {
       "kind": "port_incomplete",
