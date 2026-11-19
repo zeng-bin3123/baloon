@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 22487,
     "started": "2026-11-18T15:14:51.726946148Z",
-    "renewed": "2026-11-19T03:53:07.946392115Z"
+    "renewed": "2026-11-19T03:53:24.29522015Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -769,6 +769,7 @@
   },
   "fix_attempts": {
     "p00a7a246af": 1,
+    "p3798e66f3c": 1,
     "p61ad38075a": 1,
     "pb0569948de": 2,
     "pb7e2533792": 1,
@@ -887,6 +888,11 @@
       "text": "port_incomplete: measured again when the run restarted, 55 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/core/device.hpp type CudaError: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/device.hpp type DeviceArena: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/device.hpp type DeviceInfo: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/device.hpp func device_info: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/graph.hpp type CapturedGraph: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/graph.hpp type GraphRegistry: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/graph.hpp type LayerType: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/graph.hpp func to_string: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/hit_hook.hpp alias HitFn: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/hit_hook.hpp type HitPhase: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/layout.hpp type LayerView: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/layout.hpp type ModelGeometry: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/layout.hpp func check_all: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/layout.hpp func check_layer: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/layout.hpp func is_qsa_layer: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_dense.hpp type NativeDense: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_dense.hpp type WeightTable: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_head.hpp type NativeEmbed: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_head.hpp type NativeHead: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_head.hpp func native_embed: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_head.hpp func set_native_embed: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp type LoadStats: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp type PageBacking: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp type PinnedArena: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp type StreamStats: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp func fnv1a64: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp func load_experts: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp func load_experts_ranges: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp func stream_bandwidth: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/session.hpp alias PoolFn: no line in .einsteinOS/port/p00a7a246af.tsv\n  … 25 more",
       "base_ref": ""
     },
+    "p3798e66f3c": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 4 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/ngram/ple_reader.hpp const PAGE: no line in .einsteinOS/port/p3798e66f3c.tsv\n  include/strata/ngram/ple_reader.hpp type PleReader: no line in .einsteinOS/port/p3798e66f3c.tsv\n  include/strata/ngram/ple_reader.hpp const ROW_BYTES: no line in .einsteinOS/port/p3798e66f3c.tsv\n  include/strata/ngram/ple_reader.hpp type ReaderStats: no line in .einsteinOS/port/p3798e66f3c.tsv",
+      "base_ref": ""
+    },
     "p61ad38075a": {
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 18 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/kernels/cpu/expert_layout.hpp type ExpertLayout: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/expert_layout.hpp func act_quant_any: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/expert_layout.hpp func cpu_avx512_ok: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/expert_layout.hpp func expert_layout: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/expert_layout.hpp func expert_layout_load: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/expert_layout.hpp func q2_rows_any: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/iq_avx512.hpp func iq512_gu_rows: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/iq_avx512.hpp func iq512_rows: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/iq_avx512.hpp func iq512_supported: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/native_expert.hpp type NativeFmt: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/native_expert.hpp const kNativeActBytes: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/native_expert.hpp const kNativeHBytes: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/native_expert.hpp func native_down_rows: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/native_expert.hpp func native_experts_available: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/native_expert.hpp func native_fmt: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/native_expert.hpp func native_gu_rows: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/native_expert.hpp func native_quant_act: no line in .einsteinOS/port/p61ad38075a.tsv\n  include/strata/kernels/cpu/native_expert.hpp func native_quant_h: no line in .einsteinOS/port/p61ad38075a.tsv",
@@ -933,11 +939,6 @@
     "p3199202ac2": {
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 20 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/platform/direct_file.cpp type DirectFile: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::DirectFile: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::alloc_aligned: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::close: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::free_aligned: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::is_open: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::open: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::size: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::submit: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::wait: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::wake: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::~DirectFile: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp macro NOMINMAX: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp type Req: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp macro WIN32_LEAN_AND_MEAN: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func now_us: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/memory.cpp macro NOMINMAX: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/memory.cpp macro WIN32_LEAN_AND_MEAN: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/memory.cpp func lock_resident: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/memory.cpp func unlock_resident: no line in .einsteinOS/port/p3199202ac2.tsv",
-      "base_ref": ""
-    },
-    "p3798e66f3c": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 4 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/ngram/ple_reader.hpp const PAGE: no line in .einsteinOS/port/p3798e66f3c.tsv\n  include/strata/ngram/ple_reader.hpp type PleReader: no line in .einsteinOS/port/p3798e66f3c.tsv\n  include/strata/ngram/ple_reader.hpp const ROW_BYTES: no line in .einsteinOS/port/p3798e66f3c.tsv\n  include/strata/ngram/ple_reader.hpp type ReaderStats: no line in .einsteinOS/port/p3798e66f3c.tsv",
       "base_ref": ""
     },
     "p3ff4aef2d0": {
@@ -1341,7 +1342,6 @@
     "p1bc270de01": true,
     "p25f728b4fe": true,
     "p3199202ac2": true,
-    "p3798e66f3c": true,
     "p3ff4aef2d0": true,
     "p42de699ebc": true,
     "p45808a8a9c": true,
