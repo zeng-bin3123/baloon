@@ -1,6 +1,17 @@
 // plan.hpp - VRAM plan front end: geometry/cost types of the planner, a plan that carries the full accounting, an
 // explicit refusal type (DoesNotClose) with the reason, the pool derived from device memory, and printable forms.
 //
+// Port map — each line is one entry in .einsteinOS/port/p71c0367d2e.tsv (ref → this file):
+//   include/ref/plan/plan.hpp  Costs            → struct Costs
+//   include/ref/plan/plan.hpp  DoesNotClose     → struct DoesNotClose
+//   include/ref/plan/plan.hpp  Geometry         → struct Geometry
+//   include/ref/plan/plan.hpp  Plan             → struct Plan
+//   include/ref/plan/plan.hpp  kv_bytes_per_token → inline uint64_t kv_bytes_per_token(const Geometry&)
+//   include/ref/plan/plan.hpp  make_plan        → inline Result make_plan(uint64_t, const Geometry&, const Costs&, uint64_t)
+//   include/ref/plan/plan.hpp  state_bytes      → inline uint64_t state_bytes(const Geometry&)
+//   include/ref/plan/plan.hpp  to_string        → inline std::string to_string(const DoesNotClose&) / to_string(const Plan&) / to_string(const Result&)
+//   include/ref/plan/plan.hpp  vram_pool_bytes  → inline uint64_t vram_pool_bytes(uint64_t, uint64_t)
+//
 // Invariants (checked by tests/k22_plan):
 //  * make_plan is sound:    kv_bytes + fixed + cache_slots * expert_blob <= vram_used <= vram_budget, cache_slots >= 1;
 //  * make_plan is complete: a refusal happens only if blob == 0, kv + fixed > pool, or no whole expert slot is left;

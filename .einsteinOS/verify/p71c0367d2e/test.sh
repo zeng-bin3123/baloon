@@ -1,5 +1,6 @@
 #!/bin/bash
-# Unit p71c0367d2e: port table (9 names defined in the file named) + plan invariants against an independent oracle + mutation self-tests.
+# Unit p71c0367d2e: plan invariants against an independent oracle + mutation self-tests.
+# Port-table correctness is verified by the kernel; this script tests the code only.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -12,22 +13,6 @@ done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
 HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread"
 rc=0
-echo "== port table =="
-python3 - .einsteinOS/port/p71c0367d2e.tsv <<'PY' || rc=1
-import re, sys
-want = {"Costs","DoesNotClose","Geometry","Plan","kv_bytes_per_token","make_plan","state_bytes","to_string","vram_pool_bytes"}
-bad = 0; n = 0; seen = set()
-for line in open(sys.argv[1]):
-    f = line.rstrip("\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    n += 1; seen.add(f[1])
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    if not re.search(r'(?<![A-Za-z0-9_])' + re.escape(f[3]) + r'(?![A-Za-z0-9_])', t):
-        print("port: %s not defined in %s" % (f[3], f[2])); bad += 1
-if n != 9 or seen != want: print("port table wrong: %d rows, names %s" % (n, sorted(seen))); bad += 1
-sys.exit(1 if bad else 0)
-PY
 bt() { (cd "$1" && $HOSTCXX $HF -Iinclude -Itests/pk_unit3 tests/k22_plan/test_plan.cpp -o "$2"); }
 echo "== unit test =="
 bt "$ROOT" "$OUT/t22" || { echo "BUILD FAILED (unit test)"; exit 1; }
