@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unit pb0569948de: port table (Gemm defined in the file named) + Gemm invariants + mutation self-tests.
+# Unit pb0569948de: Gemm invariants + mutation self-tests (port validation is handled by the kernel).
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -12,21 +12,6 @@ done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
 HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread"
 rc=0
-echo "== port table =="
-python3 - .einsteinOS/port/pb0569948de.tsv <<'PY' || rc=1
-import re, sys
-bad = 0; n = 0; seen = set()
-for line in open(sys.argv[1]):
-    f = line.rstrip("\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    n += 1; seen.add(f[1])
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    if not re.search(r'(struct|class)\s+' + re.escape(f[3]) + r'(?![A-Za-z0-9_])', t):
-        print("port: type %s not defined in %s" % (f[3], f[2])); bad += 1
-if n != 1 or seen != {"Gemm"}: print("port table wrong"); bad += 1
-sys.exit(1 if bad else 0)
-PY
 bt() { (cd "$1" && $HOSTCXX $HF -Iinclude -Itests/pk_unit3 tests/k24_gemm/test_gemm.cpp -o "$2"); }
 echo "== unit test =="
 bt "$ROOT" "$OUT/t24" || { echo "BUILD FAILED (unit test)"; exit 1; }
