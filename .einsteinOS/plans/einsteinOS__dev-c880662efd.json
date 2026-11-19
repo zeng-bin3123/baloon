@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 58059,
     "started": "2026-11-19T06:17:44.898104244Z",
-    "renewed": "2026-11-19T06:40:57.615070299Z"
+    "renewed": "2026-11-19T06:53:07.309319903Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -776,7 +776,7 @@
     "p3798e66f3c": 1,
     "p3ff4aef2d0": 1,
     "p42de699ebc": 1,
-    "p45808a8a9c": 1,
+    "p45808a8a9c": 2,
     "p4fde6588a6": 1,
     "p61ad38075a": 1,
     "p61c3495016": 1,
@@ -792,6 +792,9 @@
   },
   "fail_history": {
     "p1bc270de01": [
+      "existing_code_fails"
+    ],
+    "p45808a8a9c": [
       "existing_code_fails"
     ],
     "pb0569948de": [
@@ -941,9 +944,9 @@
       "base_ref": ""
     },
     "p45808a8a9c": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 1 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/artifact/gguf_reader.cpp func main: no line in .einsteinOS/port/p45808a8a9c.tsv",
-      "base_ref": ""
+      "kind": "existing_code_fails",
+      "text": "the conversation wrote no file, and the code already on the branch for this unit fails on the real machine:\ntest_mutates_missing: .einsteinOS/verify/p45808a8a9c/test.sh mutates include/baloon/gguf_reader.hpp, which is not among the 5 file(s) the kernel has from this unit, so the verification tree does not hold it and the mutation finds nothing (.einsteinOS/port/p45808a8a9c.tsv .einsteinOS/verify/p45808a8a9c/build.sh .einsteinOS/verify/p45808a8a9c/test.sh src/artifact/gguf_reader.cpp tests/k28_gguf_cli/test_gguf_cli.cpp). Mutate the files this unit wrote, or add that file to the unit.\nport_count_in_script: .einsteinOS/verify/p45808a8a9c/test.sh read the port map — the kernel checks .einsteinOS/port/p45808a8a9c.tsv against the 1 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": "einsteinOS/dev-c880662efd"
     },
     "p4fde6588a6": {
       "kind": "port_incomplete",
