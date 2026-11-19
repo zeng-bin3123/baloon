@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unit p1bc270de01: port table (19 rows, each name defined in the file it names), traits/backend invariant test,
+# Unit p1bc270de01: native expert traits and backend selection, invariant test for traits/backend,
 # the earlier native-expert test (unit 20), and mutation self-tests proving the tests can fail.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
