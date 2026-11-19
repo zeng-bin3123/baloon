@@ -9,7 +9,7 @@
 #ifndef MAP_HUGETLB
 #define MAP_HUGETLB 0x40000
 #endif
-#define PIN_HUGE_2MB (21 << 26)   // MAP_HUGE_SHIFT(26) | log2(2 MiB)
+#define MAP_HUGE_2MB (21 << 26)   // MAP_HUGE_SHIFT(26) | log2(2 MiB)
 
 namespace baloon {
 namespace rt {
@@ -36,16 +36,16 @@ int clear_error() {
     return n;
 }
 
-PinArena::PinArena() {}
+PinnedArena::PinnedArena() {}
 
-bool PinArena::reserve(uint64_t bytes, uint64_t slices) {
+bool PinnedArena::reserve(uint64_t bytes, uint64_t slices) {
     release();
     if (bytes == 0 || bytes > (uint64_t)SIZE_MAX / 2) return false;
     const uint64_t huge = 2ull << 20;
     void* m = MAP_FAILED; uint64_t mapped = 0;
     if (bytes >= huge) {
         const uint64_t hb = (bytes + huge - 1) / huge * huge;
-        m = mmap(nullptr, (size_t)hb, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB | PIN_HUGE_2MB, -1, 0);
+        m = mmap(nullptr, (size_t)hb, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_HUGETLB | MAP_HUGE_2MB, -1, 0);
         if (m != MAP_FAILED) { mapped = hb; backing_ = Backing::HugePinned; }
     }
     if (m == MAP_FAILED) {
@@ -74,7 +74,7 @@ bool PinArena::reserve(uint64_t bytes, uint64_t slices) {
     return true;
 }
 
-void PinArena::release() {
+void PinnedArena::release() {
     if (p_) {
         for (size_t i = 0; i < pinned_.size(); ++i) if (pinned_[i]) { cudaHostUnregister(p_ + bounds_[i]); }
         clear_error();
@@ -84,9 +84,9 @@ void PinArena::release() {
     bounds_.clear(); pinned_.clear();
 }
 
-PinArena::~PinArena() { release(); }
+PinnedArena::~PinnedArena() { release(); }
 
-static bool load_span(PinArena& a, const Reader& rd, uint64_t off, uint64_t n, uint64_t dst_off, uint64_t chunk, LoadReport& st) {
+static bool load_span(PinnedArena& a, const Reader& rd, uint64_t off, uint64_t n, uint64_t dst_off, uint64_t chunk, LoadReport& st) {
     if (chunk == 0 || dst_off > a.bytes() || n > a.bytes() - dst_off) return st.ok = false;
     for (uint64_t pos = 0; pos < n;) {
         const uint64_t m = n - pos < chunk ? n - pos : chunk;
@@ -97,7 +97,7 @@ static bool load_span(PinArena& a, const Reader& rd, uint64_t off, uint64_t n, u
     return true;
 }
 
-LoadReport load_experts(PinArena& a, const Reader& rd, uint64_t layers, uint64_t blobs, uint64_t blob_bytes, uint64_t chunk) {
+LoadReport load_experts(PinnedArena& a, const Reader& rd, uint64_t layers, uint64_t blobs, uint64_t blob_bytes, uint64_t chunk) {
     LoadReport st;
     if (blobs != 0 && blob_bytes > UINT64_MAX / blobs) { st.ok = false; return st; }
     const uint64_t lb = blobs * blob_bytes;
@@ -106,7 +106,7 @@ LoadReport load_experts(PinArena& a, const Reader& rd, uint64_t layers, uint64_t
     return st;
 }
 
-LoadReport load_experts_ranges(PinArena& a, const Reader& rd, const std::vector<std::pair<uint64_t, uint64_t>>& ranges, uint64_t chunk) {
+LoadReport load_experts_ranges(PinnedArena& a, const Reader& rd, const std::vector<std::pair<uint64_t, uint64_t>>& ranges, uint64_t chunk) {
     LoadReport st; uint64_t dst = 0;
     for (auto& r : ranges) {
         if (!st.ok) break;
@@ -116,7 +116,7 @@ LoadReport load_experts_ranges(PinArena& a, const Reader& rd, const std::vector<
     return st;
 }
 
-BandwidthReport stream_bandwidth(PinArena& a, void* dst, uint64_t chunk, uint64_t passes, cudaStream_t stream) {
+BandwidthReport stream_bandwidth(PinnedArena& a, void* dst, uint64_t chunk, uint64_t passes, cudaStream_t stream) {
     BandwidthReport s;
     if (chunk == 0 || !dst || !a.data()) { s.ok = false; return s; }
     const uint64_t moved = a.bytes() / chunk * chunk;

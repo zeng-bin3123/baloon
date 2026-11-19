@@ -45,13 +45,13 @@ int main(int argc, char** argv) {
     if (dev < 0 || dev >= device_count() || chunks < 2) { std::fprintf(stderr, "bad device or chunk count\n"); return 1; }
     if (cudaSetDevice(dev) != cudaSuccess) return 1;
 
-    PinArena pin;
+    PinnedArena pin;
     if (!pin.reserve(kChunk * chunks, 4)) { std::fprintf(stderr, "cannot reserve host arena\n"); return 1; }
     XorRng rng(3);
     { std::vector<uint16_t> w = make_bf16(rng, kChunk * chunks / 2); std::memcpy(pin.data(), w.data(), w.size() * 2); }
     std::vector<float> x = make_f32(rng, kCols);
 
-    DevArena arena(dev, 4 * kChunk + (4ull << 20));
+    DeviceArena arena(dev, 4 * kChunk + (4ull << 20));
     if (!arena.ok()) return 1;
     uint16_t* buf[2] = {(uint16_t*)arena.alloc(kChunk), (uint16_t*)arena.alloc(kChunk)};
     float* dx = (float*)arena.alloc(kCols * 4);

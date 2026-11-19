@@ -101,21 +101,21 @@ static void test_layout() {
     T29(check_one(one, v1, Want2{"x", 0, 0}) && check_one(one, v1, Want2{"x", 6, 4}) && !check_one(one, v1, Want2{"x", 4, 6}));
     T29(!check_one(one, v1, Want2{"y", 0, 0}) && check_one(one, v1, Want1{"y", 6}) && !check_one(one, v1, Want1{"x", 6}));
     T29(!check_one(one, v1, Want1{"nope", 1}));
-    T29(!layout_fail(nullptr, "x"));
-    std::string w; T29(!layout_fail(&w, "boom") && w == "boom");
+    T29(!fail(nullptr, "x"));
+    std::string w; T29(!fail(&w, "boom") && w == "boom");
 }
 
 // ------------------------------------------------------------------------------------------------ device arena
 static void test_arena() {
     T29(device_count() >= 1);
     DeviceDesc d; std::string err;
-    T29(query_device(0, &d, &err) && d.ordinal == 0 && !d.name.empty() && d.total_mem > 0 && d.warp > 0);
-    err.clear(); T29(!query_device(-1, &d, &err) && err == "invalid device ordinal");
-    err.clear(); T29(!query_device(device_count(), &d, &err) && err == "invalid device ordinal");
-    T29(RT_CUDA(cudaSuccess) && !cuda_ok(cudaErrorInvalidValue, "t", "f", 1));
+    T29(device_info(0, &d, &err) && d.ordinal == 0 && !d.name.empty() && d.total_mem > 0 && d.warp > 0);
+    err.clear(); T29(!device_info(-1, &d, &err) && err == "invalid device ordinal");
+    err.clear(); T29(!device_info(device_count(), &d, &err) && err == "invalid device ordinal");
+    T29(RT_CUDA(cudaSuccess) && !check(cudaErrorInvalidValue, "t", "f", 1));
     cudaGetLastError();
 
-    DevArena a(0, 1 << 20);
+    DeviceArena a(0, 1 << 20);
     T29(a.ok() && a.capacity() == (1u << 20) && a.used() == 0);
     std::vector<std::pair<uint64_t, uint64_t>> got;
     XorRng rng(9);
@@ -130,7 +130,7 @@ static void test_arena() {
         got.push_back({off, n});
     }
     T29(got.size() >= 20);
-    DevArena b(0, 4096);
+    DeviceArena b(0, 4096);
     T29(b.alloc(4097) == nullptr);                       // bigger than capacity
     T29(b.alloc(UINT64_MAX) == nullptr && b.alloc(UINT64_MAX - 100) == nullptr);   // overflow-safe
     T29(b.alloc(1) != nullptr);                          // used = 1
@@ -140,11 +140,11 @@ static void test_arena() {
     T29(b.used() == 4096);
     b.reset(); T29(b.used() == 0 && b.alloc(4096) == b.base());
     // reset(poison) overwrites the whole block
-    DevArena c(0, 8192); void* p = c.alloc(8192);
+    DeviceArena c(0, 8192); void* p = c.alloc(8192);
     std::vector<uint8_t> pat(8192, 0x37); cudaMemcpy(p, pat.data(), 8192, cudaMemcpyHostToDevice);
     c.reset(true);
     std::vector<uint8_t> back(8192); cudaMemcpy(back.data(), c.base(), 8192, cudaMemcpyDeviceToHost);
-    bool all = true; for (uint8_t x : back) all = all && x == DevArena::kPoisonByte; T29(all);
+    bool all = true; for (uint8_t x : back) all = all && x == DeviceArena::kPoisonByte; T29(all);
     // poison_fill honours n exactly and handles odd sizes
     uint8_t* q = (uint8_t*)c.base();
     cudaMemset(q, 0, 8192);
@@ -152,14 +152,14 @@ static void test_arena() {
     cudaMemcpy(back.data(), q, 8192, cudaMemcpyDeviceToHost);
     bool pat_ok = true; for (int i = 0; i < 8192; ++i) pat_ok = pat_ok && back[i] == ((i >= 3 && i < 1004) ? 0xA5 : 0x00); T29(pat_ok);
     T29(poison_fill(nullptr, 0, 1) && !poison_fill(nullptr, 5, 1));
-    DevArena bad(0, 0); T29(!bad.ok() && bad.alloc(1) == nullptr);
-    DevArena bad2(device_count() + 3, 4096); T29(!bad2.ok());
+    DeviceArena bad(0, 0); T29(!bad.ok() && bad.alloc(1) == nullptr);
+    DeviceArena bad2(device_count() + 3, 4096); T29(!bad2.ok());
     cudaGetLastError();
 }
 
 // ------------------------------------------------------------------------------------------------ pinned arena
 static void test_pinned() {
-    PinArena a;
+    PinnedArena a;
     T29(!a.reserve(0) && a.backing() == Backing::None && a.data() == nullptr);
     T29(a.reserve(1000003, 7));
     T29(a.bytes() == 1000003 && a.slices() == 7 && a.registered_bytes() <= a.bytes() && a.backing() != Backing::None);
@@ -174,7 +174,7 @@ static void test_pinned() {
     auto src = [](uint64_t i) { return (uint8_t)(i * 2654435761ull >> 13); };
     long calls = 0;
     Reader rd = [&](uint64_t off, uint64_t n, uint8_t* dst) { ++calls; for (uint64_t i = 0; i < n; ++i) dst[i] = src(off + i); return true; };
-    PinArena b; T29(b.reserve(5 * 3 * 100, 3));
+    PinnedArena b; T29(b.reserve(5 * 3 * 100, 3));
     LoadReport r = load_experts(b, rd, 5, 3, 100, 64);
     T29(r.ok && r.bytes == 1500);
     T29(r.reads == 5 * ((300 + 63) / 64) && calls == (long)r.reads);
@@ -198,7 +198,7 @@ static void test_pinned() {
 
     // streaming to the device moves exactly the whole chunks and lands byte for byte
     for (uint64_t i = 0; i < b.bytes(); ++i) b.data()[i] = src(i + 17);
-    DevArena dev(0, 4096);
+    DeviceArena dev(0, 4096);
     uint8_t* d = (uint8_t*)dev.alloc(1500); T29(d != nullptr);
     cudaMemset(d, 0xEE, 1500);
     BandwidthReport bw = stream_bandwidth(b, d, 400, 3);
@@ -212,7 +212,7 @@ static void test_pinned() {
 // ------------------------------------------------------------------------------------------------ replay graphs
 static void test_graph() {
     uint8_t* d = nullptr; cudaMalloc((void**)&d, 64);
-    ReplayGraph g;
+    CapturedGraph g;
     T29(!g.ready() && !g.launch() && g.wait_ms() < 0 && !g.push([](cudaStream_t) { return cudaSuccess; }) && !g.end());
     cudaStream_t s; cudaStreamCreate(&s);
     g.begin();
@@ -241,16 +241,16 @@ static void test_graph() {
     g.begin(); T29(!g.ready() && g.size() == 0);            // begin drops the old recording
     g.end(); g.reset(); T29(!g.ready() && g.size() == 0 && !g.launch(s));
 
-    GraphBook book; int count = 0;
+    GraphRegistry book; int count = 0;
     T29(book.size() == 0 && book.find("a") == nullptr && !book.launch("a"));
-    T29(book.record("a", [&](ReplayGraph& r) { r.push([&](cudaStream_t) { ++count; return cudaSuccess; }); }));
+    T29(book.record("a", [&](CapturedGraph& r) { r.push([&](cudaStream_t) { ++count; return cudaSuccess; }); }));
     T29(book.size() == 1 && book.find("a") && book.find("a")->ready() && book.find("b") == nullptr);
     T29(book.launch("a", s) && book.launch("a", s) && count == 2);
-    T29(book.record("a", [&](ReplayGraph& r) { r.push([&](cudaStream_t) { count += 10; return cudaSuccess; }); }));
+    T29(book.record("a", [&](CapturedGraph& r) { r.push([&](cudaStream_t) { count += 10; return cudaSuccess; }); }));
     T29(book.size() == 1 && book.launch("a", s) && count == 12);   // replaced, not duplicated
-    T29(book.record("b", [](ReplayGraph&) {}) && book.size() == 2 && book.launch("b", s));
+    T29(book.record("b", [](CapturedGraph&) {}) && book.size() == 2 && book.launch("b", s));
     cudaStreamSynchronize(s); cudaStreamDestroy(s); cudaFree(d);
-    T29(!graph_fail("expected test message"));
+    T29(!fail("expected test message"));
 }
 
 // ------------------------------------------------------------------------------------------------ kernels + native
@@ -304,7 +304,7 @@ static void test_native() {
     std::vector<uint8_t> arena(placer.pool_bytes() ? placer.pool_bytes() : 1);
     T29(tab.load_from(index, rd, arena.data(), arena.size(), {}, &err));
     ShapeMap shapes; shapes["zeta.w"] = {R1, C1}; shapes["alpha.w"] = {R2, C2}; shapes["other.f32"] = {4, 2}; shapes["ghost"] = {1, 1};
-    DenseBank bank;
+    NativeDense bank;
     T29(bank.load(tab, arena.data(), shapes, 0, &err));
     T29((bank.served_names() == std::vector<std::string>{"alpha.w", "zeta.w"}));           // sorted; f32 + unknown rows skipped
     T29(bank.resident_bytes() == (w1.size() + w2.size()) * 2 && bank.ordinal() == 0);
@@ -327,7 +327,7 @@ static void test_native() {
 
     // embedding table
     const int64_t V = 50, N = 24; auto tbl = make_f32(rng, V * N);
-    EmbedTable emb; T29(!emb.valid() && !emb.gather_one(0, nullptr));
+    NativeEmbed emb; T29(!emb.valid() && !emb.gather_one(0, nullptr));
     T29(emb.load(tbl.data(), V, N, 0, &err) && emb.valid() && emb.vocab() == V && emb.width() == N);
     std::vector<float> row(N);
     T29(emb.gather_one(0, row.data()) && std::memcmp(row.data(), tbl.data(), N * 4) == 0);
@@ -349,7 +349,7 @@ static void test_native() {
     // process-wide binding is cleared when the bound table dies
     T29(native_embed() == nullptr);
     {
-        EmbedTable tmp; T29(tmp.load(tbl.data(), V, N, 0, &err));
+        NativeEmbed tmp; T29(tmp.load(tbl.data(), V, N, 0, &err));
         set_native_embed(&tmp); T29(native_embed() == &tmp);
     }
     T29(native_embed() == nullptr);
@@ -358,7 +358,7 @@ static void test_native() {
 
     // head projection
     const int64_t HV = 37, HN = 90; auto hw = make_bf16(rng, HV * HN); auto hx = make_f32(rng, HN);
-    HeadProj head; std::vector<float> logits(HV);
+    NativeHead head; std::vector<float> logits(HV);
     T29(!head.valid() && !head.run(hx.data(), logits.data()));
     T29(head.load(hw.data(), HV, HN, 0, &err) && head.valid() && head.vocab() == HV && head.width() == HN);
     T29(head.run(hx.data(), logits.data()));

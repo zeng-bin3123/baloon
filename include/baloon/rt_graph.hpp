@@ -1,5 +1,5 @@
-// rt_graph.hpp - recorded launch sequences replayed on a stream with event timing. A ReplayGraph stores an ordered list
-// of stream operations (kernel launches / async copies as callables) and replays them in recording order; a GraphBook
+// rt_graph.hpp - recorded launch sequences replayed on a stream with event timing. A CapturedGraph stores an ordered list
+// of stream operations (kernel launches / async copies as callables) and replays them in recording order; a GraphRegistry
 // owns named graphs.
 #pragma once
 #include <cuda_runtime.h>
@@ -15,12 +15,12 @@ namespace rt {
 
 using StreamOp = std::function<cudaError_t(cudaStream_t)>;
 
-class ReplayGraph {
+class CapturedGraph {
 public:
-    ReplayGraph() = default;
-    ~ReplayGraph() { reset(); }
-    ReplayGraph(const ReplayGraph&) = delete;
-    ReplayGraph& operator=(const ReplayGraph&) = delete;
+    CapturedGraph() = default;
+    ~CapturedGraph() { reset(); }
+    CapturedGraph(const CapturedGraph&) = delete;
+    CapturedGraph& operator=(const CapturedGraph&) = delete;
     void begin();                      // starts a fresh recording (drops old ops, marks not-ready)
     bool push(StreamOp op);            // only while recording
     bool end();                        // finishes; false when not recording
@@ -40,19 +40,19 @@ private:
     cudaEvent_t e0_ = nullptr, e1_ = nullptr;
 };
 
-class GraphBook {
+class GraphRegistry {
 public:
     // Records `name` by running `body` between begin() and end(); an existing graph of that name is replaced.
-    bool record(const std::string& name, const std::function<void(ReplayGraph&)>& body);
-    ReplayGraph* find(const std::string& name);
+    bool record(const std::string& name, const std::function<void(CapturedGraph&)>& body);
+    CapturedGraph* find(const std::string& name);
     bool launch(const std::string& name, cudaStream_t s = nullptr);
     size_t size() const { return g_.size(); }
 private:
-    std::map<std::string, std::unique_ptr<ReplayGraph>> g_;
+    std::map<std::string, std::unique_ptr<CapturedGraph>> g_;
 };
 
-// Prints "graph: <msg>" to stderr and returns false (so callers can `return graph_fail(...)`).
-bool graph_fail(const char* msg);
+// Prints "graph: <msg>" to stderr and returns false (so callers can `return fail(...)`).
+bool fail(const char* msg);
 
 }  // namespace rt
 }  // namespace baloon

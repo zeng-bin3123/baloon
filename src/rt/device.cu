@@ -6,7 +6,7 @@
 namespace baloon {
 namespace rt {
 
-bool cuda_ok(cudaError_t e, const char* what, const char* file, int line) {
+bool check(cudaError_t e, const char* what, const char* file, int line) {
     if (e == cudaSuccess) return true;
     std::fprintf(stderr, "%s:%d: %s: %s\n", file, line, what, cudaGetErrorString(e));
     return false;
@@ -18,7 +18,7 @@ int device_count() {
     return n;
 }
 
-bool query_device(int ordinal, DeviceDesc* out, std::string* err) {
+bool device_info(int ordinal, DeviceDesc* out, std::string* err) {
     const int n = device_count();
     if (ordinal < 0 || ordinal >= n) { if (err) *err = n == 0 ? "no device" : "invalid device ordinal"; return false; }
     int prev = 0; cudaGetDevice(&prev);
@@ -48,7 +48,7 @@ bool poison_fill(void* dst, uint64_t n, uint8_t pattern, cudaStream_t stream) {
     return RT_CUDA(cudaGetLastError());
 }
 
-DevArena::DevArena(int ordinal, uint64_t capacity) : ord_(ordinal) {
+DeviceArena::DeviceArena(int ordinal, uint64_t capacity) : ord_(ordinal) {
     int prev = 0; cudaGetDevice(&prev);
     if (!RT_CUDA(cudaSetDevice(ordinal))) return;
     void* p = nullptr;
@@ -56,13 +56,13 @@ DevArena::DevArena(int ordinal, uint64_t capacity) : ord_(ordinal) {
     cudaSetDevice(prev);
 }
 
-DevArena::~DevArena() {
+DeviceArena::~DeviceArena() {
     if (!base_) return;
     int prev = 0; cudaGetDevice(&prev);
     cudaSetDevice(ord_); cudaFree(base_); cudaSetDevice(prev);
 }
 
-void* DevArena::alloc(uint64_t bytes) {
+void* DeviceArena::alloc(uint64_t bytes) {
     if (!base_) return nullptr;
     if (used_ > UINT64_MAX - (kArenaAlign - 1)) return nullptr;       // alignment itself would wrap
     const uint64_t at = (used_ + kArenaAlign - 1) / kArenaAlign * kArenaAlign;
@@ -71,7 +71,7 @@ void* DevArena::alloc(uint64_t bytes) {
     return base_ + at;
 }
 
-void DevArena::reset(bool poison) {
+void DeviceArena::reset(bool poison) {
     used_ = 0;
     if (poison && base_) {
         int prev = 0; cudaGetDevice(&prev);

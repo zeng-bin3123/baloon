@@ -10,8 +10,8 @@ namespace baloon {
 namespace rt {
 
 // Returns true when `e` is cudaSuccess; otherwise prints "<what>: <message>" to stderr and returns false.
-bool cuda_ok(cudaError_t e, const char* what, const char* file = "", int line = 0);
-#define RT_CUDA(x) ::baloon::rt::cuda_ok((x), #x, __FILE__, __LINE__)
+bool check(cudaError_t e, const char* what, const char* file = "", int line = 0);
+#define RT_CUDA(x) ::baloon::rt::check((x), #x, __FILE__, __LINE__)
 
 struct DeviceDesc {
     int ordinal = -1;
@@ -23,18 +23,18 @@ struct DeviceDesc {
 // Number of visible devices (0 when the runtime reports none or an error).
 int device_count();
 // Fills `out` for a visible device ordinal; false (and `err` set) otherwise. Leaves the current device unchanged.
-bool query_device(int ordinal, DeviceDesc* out, std::string* err = nullptr);
+bool device_info(int ordinal, DeviceDesc* out, std::string* err = nullptr);
 
 constexpr uint64_t kArenaAlign = 256;
 
 // Bump allocator over one cudaMalloc block. alloc() hands out 256-byte aligned, non-overlapping ranges and
 // returns nullptr when the request does not fit (including when sizes would overflow 64 bits).
-class DevArena {
+class DeviceArena {
 public:
-    DevArena(int ordinal, uint64_t capacity);
-    ~DevArena();
-    DevArena(const DevArena&) = delete;
-    DevArena& operator=(const DevArena&) = delete;
+    DeviceArena(int ordinal, uint64_t capacity);
+    ~DeviceArena();
+    DeviceArena(const DeviceArena&) = delete;
+    DeviceArena& operator=(const DeviceArena&) = delete;
     bool ok() const { return base_ != nullptr; }
     void* alloc(uint64_t bytes);
     void reset(bool poison = false);   // rewinds; with poison the whole block is overwritten with kPoisonByte

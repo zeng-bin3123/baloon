@@ -33,7 +33,7 @@ static void run_device(int dev, int iters, Run* r) {
     XorRng rng(7);                                   // same seed on every device
     std::vector<uint16_t> w = make_bf16(rng, (uint64_t)kRows * kCols);
     std::vector<float> x = make_f32(rng, kCols);
-    DevArena arena(dev, 16ull << 20);
+    DeviceArena arena(dev, 16ull << 20);
     if (!arena.ok()) { r->msg = "arena"; return; }
     if (cudaSetDevice(dev) != cudaSuccess) { r->msg = "setdevice"; return; }
     auto* dw = (uint16_t*)arena.alloc(w.size() * 2);

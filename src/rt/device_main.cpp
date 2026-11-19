@@ -22,14 +22,14 @@ std::string human(uint64_t bytes) {
 #ifndef RT_DEVICE_MAIN_DISABLED
 static bool selftest(int ord) {
     const uint64_t cap = 1ull << 20;
-    DevArena a(ord, cap);
+    DeviceArena a(ord, cap);
     if (!a.ok()) return false;
     void* p = a.alloc(4096);
     if (!p || ((uintptr_t)p % kArenaAlign) != 0) return false;
     a.reset(true);
     std::vector<uint8_t> back(cap);
     if (cudaMemcpy(back.data(), a.base(), cap, cudaMemcpyDeviceToHost) != cudaSuccess) return false;
-    for (uint8_t b : back) if (b != DevArena::kPoisonByte) return false;
+    for (uint8_t b : back) if (b != DeviceArena::kPoisonByte) return false;
     return true;
 }
 
@@ -45,7 +45,7 @@ int main(int argc, char** argv) {
     int rc = 0;
     for (int i = 0; i < n; ++i) {
         DeviceDesc d; std::string err;
-        if (!query_device(i, &d, &err)) { std::printf("device %d: %s\n", i, err.c_str()); rc = 1; continue; }
+        if (!device_info(i, &d, &err)) { std::printf("device %d: %s\n", i, err.c_str()); rc = 1; continue; }
         std::printf("device %d: %s, %s total, %s free, warp %d, %d SMs, cc %d.%d\n", d.ordinal, d.name.c_str(),
                     human(d.total_mem).c_str(), human(d.free_mem).c_str(), d.warp, d.sm_count, d.cc_major, d.cc_minor);
         if (st) { const bool ok = selftest(i); std::printf("device %d selftest: %s\n", i, ok ? "ok" : "FAILED"); if (!ok) rc = 1; }

@@ -101,12 +101,12 @@ int main(int argc, char** argv) {
 
     core::WeightTable table;
     if (!table.place(index_text, {}, &err)) { std::fprintf(stderr, "place: %s\n", err.c_str()); return 1; }
-    PinArena host;
+    PinnedArena host;
     if (!host.reserve(table.pool_bytes() ? table.pool_bytes() : 1, 2)) { std::fprintf(stderr, "cannot reserve host arena\n"); return 1; }
     core::WeightTable loaded;
     if (!loaded.load(dir, host.data(), host.bytes(), {}, &err)) { std::fprintf(stderr, "load: %s\n", err.c_str()); return 1; }
 
-    DenseBank bank;
+    NativeDense bank;
     if (!bank.load(loaded, host.data(), dense, dev, &err)) { std::fprintf(stderr, "upload: %s\n", err.c_str()); return 1; }
 
     // every served tensor must read back identical to the host bytes

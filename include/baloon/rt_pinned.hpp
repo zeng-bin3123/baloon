@@ -24,12 +24,12 @@ int clear_error();
 
 enum class Backing { None, Pageable, Pinned, HugePinned };
 
-class PinArena {
+class PinnedArena {
 public:
-    PinArena();
-    ~PinArena();
-    PinArena(const PinArena&) = delete;
-    PinArena& operator=(const PinArena&) = delete;
+    PinnedArena();
+    ~PinnedArena();
+    PinnedArena(const PinnedArena&) = delete;
+    PinnedArena& operator=(const PinnedArena&) = delete;
     // Maps `bytes` (>0) of zeroed host memory, asks for 2 MiB pages first and falls back to normal pages, then
     // page-locks it in up to `slices` page-aligned, roughly equal registrations (never more than the page count). Pinning failure
     // degrades to Backing::Pageable rather than failing. Returns false only when no memory could be mapped.
@@ -54,11 +54,11 @@ struct BandwidthReport { uint64_t bytes = 0, passes = 0; double ms = 0, gbps = 0
 
 // Layer L of `blob_bytes`-sized blobs (`blobs` per layer) is read from source offset L*blobs*blob_bytes into the same
 // arena offset, in `chunk`-byte reads. The checksum is the left-fold FNV over all bytes in order.
-LoadReport load_experts(PinArena& a, const Reader& rd, uint64_t layers, uint64_t blobs, uint64_t blob_bytes, uint64_t chunk);
+LoadReport load_experts(PinnedArena& a, const Reader& rd, uint64_t layers, uint64_t blobs, uint64_t blob_bytes, uint64_t chunk);
 // Arbitrary (offset,length) source ranges packed back to back from arena offset 0.
-LoadReport load_experts_ranges(PinArena& a, const Reader& rd, const std::vector<std::pair<uint64_t, uint64_t>>& ranges, uint64_t chunk);
+LoadReport load_experts_ranges(PinnedArena& a, const Reader& rd, const std::vector<std::pair<uint64_t, uint64_t>>& ranges, uint64_t chunk);
 // Streams the arena to `dst` (device, >= bytes) `passes` times in `chunk`-byte async copies; only whole chunks move.
-BandwidthReport stream_bandwidth(PinArena& a, void* dst, uint64_t chunk, uint64_t passes, cudaStream_t stream = nullptr);
+BandwidthReport stream_bandwidth(PinnedArena& a, void* dst, uint64_t chunk, uint64_t passes, cudaStream_t stream = nullptr);
 
 }  // namespace rt
 }  // namespace baloon

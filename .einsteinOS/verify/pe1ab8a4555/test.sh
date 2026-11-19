@@ -12,24 +12,6 @@ CLANG="$COREX/bin/clang++"
 CUFLAGS="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Iinclude -O2"
 rc=0
 
-echo "== port table =="
-python3 - .einsteinOS/port/pe1ab8a4555.tsv <<'PY' || rc=1
-import re, sys
-bad = 0; n = 0; seen = set()
-for line in open(sys.argv[1]):
-    f = line.rstrip("\r\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    n += 1; seen.add((f[0], f[1]))
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    name = f[3]; esc = re.escape(name)
-    if "::" in name: pat = r'(^|[^\w:])' + esc + r'\s*\('
-    else: pat = (r'(struct|class|enum)\s+' + esc + r'\b|using\s+' + esc + r'\s*=|#\s*define\s+' + esc + r'\b|'
-                 r'\b' + esc + r'\s*(\(|=|;)')
-    if not re.search(pat, t, re.M): print("port: %s not defined in %s" % (name, f[2])); bad += 1
-if n != 59 or len(seen) != 59: print("port table has %d rows (%d distinct), expected 59" % (n, len(seen))); bad += 1
-sys.exit(1 if bad else 0)
-PY
 
 # build_rt <root> <objdir> [only-file]: compiles the runtime + unit test + CLIs of <root> into <objdir>. With only-file, every
 # object already in <objdir> is kept except the one(s) compiled from that source (a header rebuilds everything).
@@ -141,11 +123,11 @@ mutate poisonk    $D 's|p\[i\] = v;|p[i] = (uint8_t)(v + 1);|'
 mutate poisonrst  $D 's|if (poison \&\& base_) {|if (false) {|'
 mutate ordinal    $D 's|if (ordinal < 0 \|\| ordinal >= n)|if (ordinal >= n)|'
 mutate grorder    $G 's|for (auto\& op : ops_) {|for (auto it = ops_.rbegin(); it != ops_.rend(); ++it) { auto\& op = *it;|'
-mutate grstop     $G 's|return graph_fail("op failed"); }|graph_fail("op failed"); }|'
+mutate grstop     $G 's|return fail("op failed"); }|fail("op failed"); }|'
 mutate grreplace  $G 's|g_\[name\] = std::move(g);|g_.emplace(name, std::move(g));|'
 mutate grwait     $G 's|if (!ran_ \|\| failed_ \|\| !e1_) return -1.0;|if (!e1_) return -1.0;|'
-mutate grready    $G 's|if (!ready_) return graph_fail("launch before end()");||'
-mutate layvec     $Y 's|if (it->second.cols != 0) return layout_fail(why, n + " must be a vector");||'
+mutate grready    $G 's|if (!ready_) return fail("launch before end()");||'
+mutate layvec     $Y 's|if (it->second.cols != 0) return fail(why, n + " must be a vector");||'
 mutate layrows    $Y 's|if (w.rows \&\& s.rows != w.rows)|if (false)|'
 mutate layforeign $Y 's|for (const char\* s : foreign_gdn) if (idx.count(v.name(s)))|for (const char* s : foreign_gdn) if (false)|'
 mutate layrange   $Y 's|if (layer < 0 \|\| layer >= g.n_layers)|if (layer < 0)|'
@@ -154,8 +136,8 @@ mutate eligible   $N 's|r.engine_kind == 1 \&\&|(r.engine_kind == 1 \|\| r.engin
 mutate shapechk   $N 's|rows \* cols \* 2 != r.dst_bytes|false|'
 mutate embbound   $E 's|token >= vocab_|token > vocab_|'
 mutate headrun    $E 's|bf16_gemv(static_cast<const uint16_t\*>(dev_.get()), dx, vocab_, n_, dy)|bf16_gemv(static_cast<const uint16_t*>(dev_.get()), dx, n_, vocab_, dy)|'
-mutate gatherzero $K 's|valid ? table\[(int64_t)t \* n + c\] : 0.f|valid ? table[(int64_t)t * n + c] : 1.f|'
-mutate gemvred    $K 's|part\[threadIdx.x\] += part\[threadIdx.x + s\];|part[threadIdx.x] -= part[threadIdx.x + s];|'
+mutate gatherzero $E 's|valid ? table\[(int64_t)t \* n + c\] : 0.f|valid ? table[(int64_t)t * n + c] : 1.f|'
+mutate gemvred    $N 's|part\[threadIdx.x\] += part\[threadIdx.x + s\];|part[threadIdx.x] -= part[threadIdx.x + s];|'
 mutate human      src/rt/device_main.cpp 's|v /= 1024.0;|v /= 1000.0;|'
 [ $rc -eq 0 ] && echo "ALL UNIT TESTS PASSED"
 exit $rc

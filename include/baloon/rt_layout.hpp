@@ -29,7 +29,7 @@ struct LayerView {
 struct Want1 { const char* suffix; uint64_t len; };           // vector of exactly len elements
 struct Want2 { const char* suffix; uint64_t rows, cols; };    // matrix; a 0 dimension accepts any positive value
 
-bool layout_fail(std::string* why, const std::string& msg);   // stores msg, returns false
+bool fail(std::string* why, const std::string& msg);   // stores msg, returns false
 bool check_one(const LayoutIndex& idx, const LayerView& v, const Want1& w, std::string* why = nullptr);
 bool check_one(const LayoutIndex& idx, const LayerView& v, const Want2& w, std::string* why = nullptr);
 bool check_layer(const LayoutIndex& idx, const LayoutGeometry& g, int layer, std::string* why = nullptr);
