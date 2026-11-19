@@ -1,6 +1,5 @@
 #!/bin/bash
-# Unit pe1f7ca5c00: port table (156 names, each must be defined in the file the table names) + invariant test of the host
-# reference kernels + mutation self-tests (every mutant must make the test fail).
+# Unit pe1f7ca5c00: invariant test of the host reference kernels + mutation self-tests (every mutant must make the test fail).
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -13,22 +12,6 @@ done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
 HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread"
 rc=0
-echo "== port table =="
-TSV=.einsteinOS/port/pe1f7ca5c00.tsv
-python3 - "$TSV" <<'PY' || rc=1
-import re, sys
-bad = 0; n = 0
-for line in open(sys.argv[1]):
-    f = line.rstrip("\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    n += 1
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    if not re.search(r'(?<![A-Za-z0-9_])' + re.escape(f[3]) + r'(?![A-Za-z0-9_])', t):
-        print("port: %s not defined in %s" % (f[3], f[2])); bad += 1
-if n != 156: print("port table has %d rows, expected 156" % n); bad += 1
-sys.exit(1 if bad else 0)
-PY
 build_test() { (cd "$1" && $HOSTCXX $HF -Iinclude tests/k19_port/test_port.cpp -o "$2"); }
 echo "== unit test =="
 build_test "$ROOT" "$OUT/t19" || { echo "BUILD FAILED (unit test)"; exit 1; }

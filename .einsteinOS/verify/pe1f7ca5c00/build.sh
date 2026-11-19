@@ -1,6 +1,6 @@
 #!/bin/bash
 # Unit pe1f7ca5c00 (host reference math for the decode kernels: include/baloon/port_scalar.hpp, port_kernels_ref.hpp, tests/k19_port).
-# Adds: include/baloon/port_{scalar,kernels_ref}.hpp, tests/k19_port, .einsteinOS/port/pe1f7ca5c00.tsv.
+# Adds: include/baloon/port_{scalar,kernels_ref}.hpp, tests/k19_port.
 # Builds the WHOLE project: every header standalone (CUDA headers as CUDA), every library source, every host test, every CUDA
 # source/test with the corex clang++, the CLIs, and the host + GPU test binaries of this unit. Exits 0 only if everything builds.
 set -euo pipefail

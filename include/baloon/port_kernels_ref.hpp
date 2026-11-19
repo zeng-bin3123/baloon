@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "baloon/f16_conversion.hpp"
+#include "baloon/native_flash_attn_bounds.hpp"
 #include "baloon/port_scalar.hpp"
 
 namespace baloon {
@@ -269,7 +270,8 @@ inline bool fused_gr_read_multi(const FusedGrArgs& a) {
 }
 
 // ================================================================== short flash step (single query, GQA)
-constexpr int kFlashShortMaxCells = 256;  // theory: short-context kernel valid for width in [1, 256]
+constexpr int kFlashShortMaxCells = static_cast<int>(baloon::flash_bounds::kMaxContext);
+static_assert(kFlashShortMaxCells == 256, "kFlashShortMaxCells must equal flash_bounds::kMaxContext (256)");
 inline NativeFlashAttnStatus native_flash_attn_short_step(const float* q, const float* k, const float* v, float* out, int heads, int kv_heads,
                                                           int hd, int n_cells, float scale) {
     if (heads <= 0 || kv_heads <= 0 || hd <= 0 || heads % kv_heads != 0 || n_cells < 1) return NativeFlashAttnStatus::BadShape;
