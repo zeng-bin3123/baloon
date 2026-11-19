@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 58059,
     "started": "2026-11-19T06:17:44.898104244Z",
-    "renewed": "2026-11-19T06:24:11.705712809Z"
+    "renewed": "2026-11-19T06:24:35.972175883Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -773,6 +773,7 @@
     "p4fde6588a6": 1,
     "p61ad38075a": 1,
     "p71c0367d2e": 1,
+    "p984d0d954f": 1,
     "pb0569948de": 1,
     "pb7e2533792": 1,
     "pd8e380f419": 1,
@@ -911,6 +912,11 @@
       "text": "port_incomplete: measured again when the run restarted, 9 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/plan/plan.hpp type Costs: no line in .einsteinOS/port/p71c0367d2e.tsv\n  include/strata/plan/plan.hpp type DoesNotClose: no line in .einsteinOS/port/p71c0367d2e.tsv\n  include/strata/plan/plan.hpp type Geometry: no line in .einsteinOS/port/p71c0367d2e.tsv\n  include/strata/plan/plan.hpp type Plan: no line in .einsteinOS/port/p71c0367d2e.tsv\n  include/strata/plan/plan.hpp func kv_bytes_per_token: no line in .einsteinOS/port/p71c0367d2e.tsv\n  include/strata/plan/plan.hpp func make_plan: no line in .einsteinOS/port/p71c0367d2e.tsv\n  include/strata/plan/plan.hpp func state_bytes: no line in .einsteinOS/port/p71c0367d2e.tsv\n  include/strata/plan/plan.hpp func to_string: no line in .einsteinOS/port/p71c0367d2e.tsv\n  include/strata/plan/plan.hpp func vram_pool_bytes: no line in .einsteinOS/port/p71c0367d2e.tsv",
       "base_ref": ""
     },
+    "p984d0d954f": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 4 definition(s) the reference requires of this unit have no counterpart on the branch:\n  ref/load.py type Gguf: no line in .einsteinOS/port/p984d0d954f.tsv\n  ref/load.py func _bf16_to_f32: no line in .einsteinOS/port/p984d0d954f.tsv\n  ref/load.py func _dequant_flat: no line in .einsteinOS/port/p984d0d954f.tsv\n  ref/load.py func _discover_shards: no line in .einsteinOS/port/p984d0d954f.tsv",
+      "base_ref": ""
+    },
     "pb0569948de": {
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 1 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/prefill/gemm.hpp type Gemm: no line in .einsteinOS/port/pb0569948de.tsv",
@@ -977,11 +983,6 @@
     "p61c3495016": {
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 61 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/kernels/ngram.cpp macro NOMINMAX: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp type PleTable: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func PleTable::PleTable: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func PleTable::bytes_read: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func PleTable::close: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func PleTable::collect: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func PleTable::gather: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func PleTable::gather_batch: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func PleTable::io_report: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func PleTable::is_open: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func PleTable::issue: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func PleTable::mode: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func PleTable::open: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func PleTable::read_row: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func PleTable::rows: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func PleTable::set_injected_delay_us: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func PleTable::~PleTable: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp macro WIN32_LEAN_AND_MEAN: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp const g_ple_prefetch: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func iq4nl_code: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func iq4nl_dequant_row: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp const kIq4Nl: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func ngram_mixed: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func ngram_rows: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func ple_artifact_consts: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func ple_prefetch_enable: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ngram.cpp func ple_prefetch_enabled: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ple_oracle_vectors.inc type HashCase: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ple_oracle_vectors.inc const case0_prev: no line in .einsteinOS/port/p61c3495016.tsv\n  src/kernels/ple_oracle_vectors.inc const case0_rows: no line in .einsteinOS/port/p61c3495016.tsv\n  … 31 more",
-      "base_ref": ""
-    },
-    "p984d0d954f": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 4 definition(s) the reference requires of this unit have no counterpart on the branch:\n  ref/load.py type Gguf: no line in .einsteinOS/port/p984d0d954f.tsv\n  ref/load.py func _bf16_to_f32: no line in .einsteinOS/port/p984d0d954f.tsv\n  ref/load.py func _dequant_flat: no line in .einsteinOS/port/p984d0d954f.tsv\n  ref/load.py func _discover_shards: no line in .einsteinOS/port/p984d0d954f.tsv",
       "base_ref": ""
     },
     "pcd027bc02f": {
@@ -1345,7 +1346,6 @@
     "p45808a8a9c": true,
     "p61ad38075a": true,
     "p61c3495016": true,
-    "p984d0d954f": true,
     "pb7e2533792": true,
     "pcd027bc02f": true,
     "pd9efd3692a": true,
