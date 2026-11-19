@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unit p00a7a246af: port table (55 names) + invariant test + mutation self-tests.
+# Unit p00a7a246af: invariant test + mutation self-tests (port table checked by the kernel).
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -12,15 +12,6 @@ done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
 HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread"
 rc=0
-echo "== port table =="
-TSV=.einsteinOS/port/p00a7a246af.tsv
-n=$(awk -F'\t' 'NF>=4 && $1!=""' "$TSV" | wc -l)
-awk -F'\t' 'NF>=4 && $1!="" {print $3 "\t" $4}' "$TSV" > "$OUT/port.lst"
-while IFS= read -r line; do
-  mf="${line%%$'\t'*}"; mn="${line#*$'\t'}"
-  if [ ! -f "$mf" ] || ! grep -qw -- "$mn" "$mf"; then echo "port: $mn not defined in $mf"; rc=1; fi
-done < "$OUT/port.lst"
-[ "$n" -eq 55 ] || { echo "port table has $n rows, expected 55"; rc=1; }
 SRCS="src/core/layer.cpp src/core/session.cpp src/core/weights.cpp"
 build_test() { (cd "$1" && $HOSTCXX $HF -Iinclude tests/k18_core/test_core.cpp $SRCS -o "$2"); }
 echo "== unit test =="

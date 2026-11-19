@@ -134,6 +134,16 @@ int main() {
     PoolMultiFn pm = [](int, const int32_t*, int rows, int k, float* o) { o[0] = (float)(rows * k); return true; };
     float po = 0; int32_t ex[2] = {1, 2}; CHECK(pf(0, ex, 2, &po) && po == 2 && pm(0, ex, 3, 2, &po) && po == 6);
 
+    // session loop scratch: lifecycle, boundary zeros, bytes accounting
+    SessionLoopScratch sc;
+    CHECK(sc.bytes() == 0 && sc.k == 0 && sc.n_embd == 0 && sc.parts.empty());
+    CHECK(!sc.init(0, 128) && sc.bytes() == 0);   // zero k: init fails, state stays zeroed
+    CHECK(!sc.init(4, 0)  && sc.bytes() == 0);    // zero n_embd: init fails
+    CHECK(sc.init(4, 128) && sc.bytes() == 4 * 128 * 4 && sc.k == 4 && sc.n_embd == 128);
+    CHECK(sc.parts.size() == 4 * 128 && sc.parts[0] == 0.f && sc.parts.back() == 0.f);
+    sc.free();
+    CHECK(sc.bytes() == 0 && sc.k == 0 && sc.n_embd == 0 && sc.parts.empty());
+
     if (fails) { std::printf("%d CHECK(S) FAILED\n", fails); return 1; }
     std::printf("CORE UNIT 18 TESTS PASSED\n");
     return 0;
