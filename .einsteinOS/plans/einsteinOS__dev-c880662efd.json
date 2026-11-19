@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 58059,
     "started": "2026-11-19T06:17:44.898104244Z",
-    "renewed": "2026-11-19T06:24:35.972175883Z"
+    "renewed": "2026-11-19T06:25:00.037060416Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -770,6 +770,7 @@
   "fix_attempts": {
     "p00a7a246af": 1,
     "p3798e66f3c": 1,
+    "p3ff4aef2d0": 1,
     "p4fde6588a6": 1,
     "p61ad38075a": 1,
     "p71c0367d2e": 1,
@@ -897,6 +898,11 @@
       "text": "port_incomplete: measured again when the run restarted, 4 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/ngram/ple_reader.hpp const PAGE: no line in .einsteinOS/port/p3798e66f3c.tsv\n  include/strata/ngram/ple_reader.hpp type PleReader: no line in .einsteinOS/port/p3798e66f3c.tsv\n  include/strata/ngram/ple_reader.hpp const ROW_BYTES: no line in .einsteinOS/port/p3798e66f3c.tsv\n  include/strata/ngram/ple_reader.hpp type ReaderStats: no line in .einsteinOS/port/p3798e66f3c.tsv",
       "base_ref": ""
     },
+    "p3ff4aef2d0": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 30 definition(s) the reference requires of this unit have no counterpart on the branch:\n  serve/frontend.py type ChatTemplate: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py type Event: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py type OutputParser: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py type ToolCall: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func _has_image: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func _image_source: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func _parts_of: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func _text_of: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func anthropic_to_messages: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func budget_effort: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func effort_kwargs: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func images_of: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func openai_to_messages: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func parse_tool_call: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type ByteTokenizer: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type Detokenizer: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type Engine: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type MockEngine: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type Server: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type Service: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type StrataEngine: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type Vision: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func anthropic_collect: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func anthropic_events: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func child_env: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func main: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func make_handler: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func openai_chunks: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func openai_collect: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func serve: no line in .einsteinOS/port/p3ff4aef2d0.tsv",
+      "base_ref": ""
+    },
     "p4fde6588a6": {
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 3 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/program/logits_selection.hpp func parse_stride: no line in .einsteinOS/port/p4fde6588a6.tsv\n  include/strata/program/logits_selection.hpp func row_count: no line in .einsteinOS/port/p4fde6588a6.tsv\n  include/strata/program/logits_selection.hpp func selected: no line in .einsteinOS/port/p4fde6588a6.tsv",
@@ -963,11 +969,6 @@
     "p3199202ac2": {
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 20 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/platform/direct_file.cpp type DirectFile: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::DirectFile: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::alloc_aligned: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::close: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::free_aligned: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::is_open: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::open: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::size: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::submit: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::wait: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::wake: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func DirectFile::~DirectFile: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp macro NOMINMAX: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp type Req: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp macro WIN32_LEAN_AND_MEAN: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/direct_file.cpp func now_us: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/memory.cpp macro NOMINMAX: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/memory.cpp macro WIN32_LEAN_AND_MEAN: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/memory.cpp func lock_resident: no line in .einsteinOS/port/p3199202ac2.tsv\n  src/platform/memory.cpp func unlock_resident: no line in .einsteinOS/port/p3199202ac2.tsv",
-      "base_ref": ""
-    },
-    "p3ff4aef2d0": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 30 definition(s) the reference requires of this unit have no counterpart on the branch:\n  serve/frontend.py type ChatTemplate: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py type Event: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py type OutputParser: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py type ToolCall: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func _has_image: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func _image_source: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func _parts_of: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func _text_of: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func anthropic_to_messages: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func budget_effort: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func effort_kwargs: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func images_of: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func openai_to_messages: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/frontend.py func parse_tool_call: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type ByteTokenizer: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type Detokenizer: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type Engine: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type MockEngine: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type Server: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type Service: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type StrataEngine: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py type Vision: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func anthropic_collect: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func anthropic_events: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func child_env: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func main: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func make_handler: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func openai_chunks: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func openai_collect: no line in .einsteinOS/port/p3ff4aef2d0.tsv\n  serve/server.py func serve: no line in .einsteinOS/port/p3ff4aef2d0.tsv",
       "base_ref": ""
     },
     "p42de699ebc": {
@@ -1341,7 +1342,6 @@
     "p1bc270de01": true,
     "p25f728b4fe": true,
     "p3199202ac2": true,
-    "p3ff4aef2d0": true,
     "p42de699ebc": true,
     "p45808a8a9c": true,
     "p61ad38075a": true,
