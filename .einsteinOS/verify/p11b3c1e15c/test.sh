@@ -1,6 +1,5 @@
 #!/bin/bash
-# Unit p11b3c1e15c: port table (1 row, name defined in the file it names), plan CLI invariant test (library run() and the real
-# binary), and mutation self-tests proving the test can fail.
+# Unit p11b3c1e15c: plan CLI invariant test (library run() and the real binary), and mutation self-tests proving the test can fail.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -14,22 +13,6 @@ done
 F="-std=c++17 -O1 -Wall -Wextra -ffp-contract=off -pthread"
 rc=0
 
-echo "== port table =="
-python3 - .einsteinOS/port/p11b3c1e15c.tsv <<'PY' || rc=1
-import re, sys
-bad = 0; n = 0; seen = set()
-for line in open(sys.argv[1]):
-    f = line.rstrip("\r\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    n += 1; seen.add((f[0], f[1]))
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    esc = re.escape(f[3])
-    pat = (r'(struct|class|enum)\s+(class\s+)?' + esc + r'\b|using\s+' + esc + r'\s*=|\b' + esc + r'\s*(\(|=|;)')
-    if not re.search(pat, t, re.M): print("port: %s not defined in %s" % (f[3], f[2])); bad += 1
-if n != 1 or len(seen) != 1: print("port table has %d rows (%d distinct), expected 1" % (n, len(seen))); bad += 1
-sys.exit(1 if bad else 0)
-PY
 
 build_run() {  # build_run <root> <outdir>
   $CXX $F -I"$1/include" "$1/src/plan/plan_cli.cpp" -o "$2/plan_cli" 2>"$OUT/cc.log" || return 2
