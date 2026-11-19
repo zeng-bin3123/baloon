@@ -19,6 +19,7 @@ setup.py	get_prebuilt	include/baloon/setup_tool.hpp	get_prebuilt
 setup.py	gpu_info	include/baloon/setup_tool.hpp	gpu_info
 setup.py	install_build_tools	include/baloon/setup_tool.hpp	install_build_tools
 setup.py	installed_configs	include/baloon/setup_tool.hpp	installed_configs
+setup.py	main	src/tools/setup_cli.cpp	main
 setup.py	mark	include/baloon/setup_tool.hpp	mark
 setup.py	ok	include/baloon/setup_tool.hpp	ok
 setup.py	out	include/baloon/setup_tool.hpp	out
@@ -30,4 +31,3 @@ setup.py	start	include/baloon/setup_tool.hpp	start
 setup.py	step	include/baloon/setup_tool.hpp	step
 setup.py	warn	include/baloon/setup_tool.hpp	warn
 setup.py	write_run_script	include/baloon/setup_tool.hpp	write_run_script
-setup.py	main	src/tools/setup_cli.cpp	main

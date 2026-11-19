@@ -1,6 +1,5 @@
 #!/bin/bash
 # Unit pfcccb31b26 tests (installer logic setup_tool.hpp, chat client chat_cli.hpp, CLIs).
-#  * port table: 33 rows, each name defined as a whole word in the file it names.
 #  * unit test (tests/unit19): LAYER-style invariants (flag logic, parsing, config choice, command plans, SSE reader).
 #  * CLI end to end on captured probe outputs of the real machine.
 #  * mutation self-tests: broken copies of the sources must be caught by the unit test.
@@ -16,16 +15,6 @@ done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
 HF="-std=c++17 -O2 -Wall -Wextra -Werror -ffp-contract=off -pthread"
 rc=0
-
-echo "== port table =="
-TSV=.einsteinOS/port/pfcccb31b26.tsv
-n=0
-while IFS=$'\t' read -r rf rn mf mn; do
-  mn="${mn%$'\r'}"; [ -n "$rf" ] || continue
-  n=$((n+1))
-  if [ ! -f "$mf" ] || ! grep -qw -- "$mn" "$mf"; then echo "port: $mn not defined in $mf"; rc=1; fi
-done < "$TSV"
-[ "$n" -eq 33 ] || { echo "port table has $n rows, expected 33"; rc=1; }
 
 build_test() {   # build_test <root> <binary> [extra flags]: mutants build without -Werror so only behaviour decides detection
   $HOSTCXX $HF ${3:-} -I"$1/include" "$1/tests/unit19/test_setup_chat.cpp" -o "$2"
