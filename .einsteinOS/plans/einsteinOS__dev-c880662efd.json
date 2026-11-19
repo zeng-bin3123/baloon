@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 60195,
     "started": "2026-11-19T08:01:44.917450495Z",
-    "renewed": "2026-11-19T08:15:23.90075204Z"
+    "renewed": "2026-11-19T08:25:46.310340316Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -784,7 +784,7 @@
     "p984d0d954f": 2,
     "pb0569948de": 2,
     "pb7e2533792": 1,
-    "pcd027bc02f": 1,
+    "pcd027bc02f": 2,
     "pd8e380f419": 1,
     "pe1ab8a4555": 1,
     "pe1f7ca5c00": 1,
@@ -807,6 +807,9 @@
     ],
     "pb7e2533792": [
       "review_fail"
+    ],
+    "pcd027bc02f": [
+      "existing_code_fails"
     ],
     "pe1f7ca5c00": [
       "review_fail"
@@ -988,9 +991,10 @@
       "base_ref": ""
     },
     "pcd027bc02f": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 308 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/kernels/cuda/bf16_gemv.cu const THREADS: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/bf16_gemv.cu func bf16_gemv: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/bf16_gemv.cu kernel bf16_gemv_naive_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/bf16_gemv.cu func bf16_gemv_split: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/bf16_gemv.cu kernel bf16_gemv_split_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/bf16_gemv.cu kernel bf16_gemv_warp_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/bf16_gemv.cu func finish: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/dequant_s2.cu const CODES_PER_BYTE: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/dequant_s2.cu const QK: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/dequant_s2.cu func dequant_s2: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/dequant_s2.cu kernel dequant_s2_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu const THREADS: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu func add_inplace: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu kernel add_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu func check_launch: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu func copy_from_mapped: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu kernel copy_from_mapped_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu func copy_i32_from_mapped: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu kernel copy_i32_from_mapped_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu func doorbell_publish: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu kernel doorbell_publish_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu func doorbell_ring: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu kernel doorbell_ring_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu func doorbell_wait: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu kernel doorbell_wait_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu func embedding_gather: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu kernel embedding_gather_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu func f32_to_bf16_bulk: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu func f32_to_f16_bulk: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/elementwise.cu func gdn_gate: no line in .einsteinOS/port/pcd027bc02f.tsv\n  … 278 more",
-      "base_ref": ""
+      "kind": "existing_code_fails",
+      "text": "the conversation wrote no file, and the code already on the branch for this unit fails on the real machine:\nport_count_in_script: .einsteinOS/verify/pcd027bc02f/test.sh read the port map — the kernel checks .einsteinOS/port/pcd027bc02f.tsv against the 308 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)\nport_extra: 5 line(s) of .einsteinOS/port/pcd027bc02f.tsv name no definition this unit ports — the map holds exactly the 308 the kernel measured from the reference:\n  src/kernels/cuda/fused_gdn.cu __launch_bounds__ → src/kernels/gpu/gdn_fused.cu:__launch_bounds__: the line names no definition this unit ports\n  src/kernels/cuda/fused_gr.cu __launch_bounds__ → src/kernels/gpu/gr_fused.cu:__launch_bounds__: the line names no definition this unit ports\n  src/kernels/cuda/iq_kernels.cu __launch_bounds__ → src/kernels/gpu/iq_quant.cu:__launch_bounds__: the line names no definition this unit ports\n  src/kernels/cuda/native_gdn.cu __launch_bounds__ → src/kernels/gpu/gdn_native.cu:__launch_bounds__: the line names no definition this unit ports\n  src/kernels/cuda/native_router.cu __launch_bounds__ → src/kernels/gpu/router_native.cu:__launch_bounds__: the line names no definition this unit ports\nport_name_foreign: 9 line(s) of .einsteinOS/port/pcd027bc02f.tsv give a counterpart the reference file does not define — a port keeps the reference's names:\n  src/kernels/cuda/fused_gdn.cu __launch_bounds__ → src/kernels/gpu/gdn_fused.cu:__launch_bounds__: __launch_bounds__ is not a name src/kernels/cuda/fused_gdn.cu defines\n  src/kernels/cuda/fused_gr.cu __launch_bounds__ → src/kernels/gpu/gr_fused.cu:__launch_bounds__: __launch_bounds__ is not a name src/kernels/cuda/fused_gr.cu defines\n  src/kernels/cuda/iq_kernels.cu GGML_COMMON_DECL_CUDA → src/kernels/gpu/iq_quant.cu:kDeclCommon: kDeclCommon is not a name src/kernels/cuda/iq_kernels.cu defines\n  src/kernels/cuda/iq_kernels.cu GGML_COMMON_IMPL_CUDA → src/kernels/gpu/iq_quant.cu:kImplCommon: kImplCommon is not a name src/kernels/cuda/iq_kernels.cu defines\n  src/kernels/cuda/iq_kernels.cu __launch_bounds__ → src/kernels/gpu/iq_quant.cu:__launch_bounds__: __launch_bounds__ is not a name src/kernels/cuda/iq_kernels.cu defines\n  src/kernels/cuda/iq_kernels.cu ggml_cuda_dp4a → src/kernels/gpu/iq_quant.cu:ggml_cuda_dp4a_: ggml_cuda_dp4a_ is not a name src/kernels/cuda/iq_kernels.cu defines\n  src/kernels/cuda/native_bf16.cu REF_MMVF_CASE → src/kernels/gpu/bf16_native.cu:MMVF_CASE: MMVF_CASE is not a name src/kernels/cuda/native_bf16.cu defines\n  src/kernels/cuda/native_gdn.cu __launch_bounds__ → src/kernels/gpu/gdn_native.cu:__launch_bounds__: __launch_bounds__ is not a name src/kernels/cuda/native_gdn.cu defines\n  src/kernels/cuda/native_router.cu __launch_bounds__ → src/kernels/gpu/router_native.cu:__launch_bounds__: __launch_bounds__ is not a name src/kernels/cuda/native_router.cu defines\nport_incomplete: 17 of the 308 definitions of the unit's reference files have no counterpart:\n  src/kernels/cuda/fused_gdn.cu kernel gdn_ab_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/fused_gdn.cu kernel gdn_conv_l2_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/fused_gdn.cu kernel gdn_step_norm_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/fused_gr.cu kernel gr_down_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/fused_gr.cu kernel gr_down_multi_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/fused_gr.cu kernel gr_norm_multi_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/fused_gr.cu kernel gr_up_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/fused_gr.cu kernel gr_up_multi_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/iq_kernels.cu kernel mmvq_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/iq_kernels.cu kernel native_down_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/iq_kernels.cu kernel native_gu_kernel: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/native_gdn.cu kernel step: no line in .einsteinOS/port/pcd027bc02f.tsv\n  src/kernels/cuda/native_gdn_preprocess.cu kernel beta_sigmoid → src/kernels/gpu/gdn_native_pre.cu:beta_sigmoid: defined there, but not as a __global__ kernel of a .cu/.cuh file — a host function about a kernel is not its port\n  src/kernels/cuda/native_gdn_preprocess.cu kernel gate_softplus → src/kernels/gpu/gdn_native_pre.cu:gate_softplus: defined there, but not as a __global__ kernel of a .cu/.cuh file — a host function about a kernel is not its port\n  src/kernels/cuda/native_qsa.cu kernel gate → src/kernels/gpu/qsa_native.cu:gate: defined there, but not as a __global__ kernel of a .cu/.cuh file — a host function about a kernel is not its port\n  src/kernels/cuda/native_rope.cu kernel apply → src/kernels/gpu/rope_native.cu:apply: defined there, but not as a __global__ kernel of a .cu/.cuh file — a host function about a kernel is not its port\n  src/kernels/cuda/native_router.cu kernel route: no line in .einsteinOS/port/pcd027bc02f.tsv",
+      "base_ref": "einsteinOS/dev-c880662efd",
+      "base_sha": "e134b0f05dec873d4c167916a58c2912086adac3"
     },
     "pd8e380f419": {
       "kind": "port_incomplete",
@@ -1014,12 +1018,6 @@
     }
   },
   "infra_fails": 0,
-  "review_pending": {
-    "pb0569948de": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
   "reopen_count": {
     "p00a7a246af": 1,
     "p11b3c1e15c": 1,
