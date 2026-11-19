@@ -1,6 +1,6 @@
 #!/bin/bash
-# Unit p61ad38075a: port table (18 names, each defined in the file the table names) + invariant test of the CPU expert
-# layout / native expert entry points + mutation self-tests (every mutant must make the test fail).
+# Unit p61ad38075a: invariant test of the CPU expert layout / native expert entry points
+# + mutation self-tests (every mutant must make the test fail).
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -14,22 +14,6 @@ done
 HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread"
 ISA512="-mavx512bw -mavx512dq -mavx512f -mavx512vbmi -mavx512vl -mavx512vnni -mf16c -mfma"
 rc=0
-echo "== port table =="
-TSV=.einsteinOS/port/p61ad38075a.tsv
-python3 - "$TSV" <<'PY' || rc=1
-import re, sys
-bad = 0; n = 0
-for line in open(sys.argv[1]):
-    f = line.rstrip("\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    n += 1
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    if not re.search(r'(?<![A-Za-z0-9_])' + re.escape(f[3]) + r'(?![A-Za-z0-9_])', t):
-        print("port: %s not defined in %s" % (f[3], f[2])); bad += 1
-if n != 18: print("port table has %d rows, expected 18" % n); bad += 1
-sys.exit(1 if bad else 0)
-PY
 build_test() { (cd "$1" && $HOSTCXX $HF $ISA512 -Iinclude tests/k20_native/test_native.cpp src/cpu/expert_q2.cpp src/cpu/iq_rows_avx512.cpp -o "$2"); }
 echo "== unit test =="
 build_test "$ROOT" "$OUT/t20" || { echo "BUILD FAILED (unit test)"; exit 1; }

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Unit p61ad38075a (CPU expert layout + format-generic native expert entry points: include/baloon/cpu_expert_layout.hpp, cpu_native_expert.hpp, tests/k20_native).
-# Adds: those two headers, tests/k20_native, .einsteinOS/port/p61ad38075a.tsv.
+# Adds: those two headers, tests/k20_native.
 # Builds the WHOLE project: every header standalone (CUDA headers as CUDA), every library source, every host test, every CUDA
 # source/test with the corex clang++, the CLIs, and the host + GPU test binaries of this unit. Exits 0 only if everything builds.
 set -euo pipefail

@@ -68,7 +68,7 @@ inline uint64_t native_act_bytes(NativeFmt f, uint32_t n, uint32_t nt) { return 
 
 // True when experts of this type and shape can be evaluated on this machine: a supported format, widths that are whole
 // blocks, and the CPU / codebook prerequisites of that format.
-inline bool native_experts_available(int ggml_type, int64_t n_embd, int64_t n_ff) {
+[[nodiscard]] inline bool native_experts_available(int ggml_type, int64_t n_embd, int64_t n_ff) {
     const NativeFmt f = native_fmt(ggml_type);
     if (f == NativeFmt::None || !expert_layout(ggml_type, n_embd, n_ff).ok) return false;
     if (n_embd % 32 || n_ff % 32) return false;
@@ -97,11 +97,11 @@ inline float silu(float v) { return v / (1.f + std::exp(-v)); }
 
 // Quantize nt hidden vectors (nt*n_embd floats) / nt SwiGLU vectors (nt*n_ff floats) into `out`
 // (native_act_bytes(f, n, nt) bytes, 4-byte aligned). false when the format or width is unsupported.
-inline bool native_quant_act(NativeFmt f, const float* x, uint32_t n_embd, uint32_t nt, void* out) { return native_detail::quant(f, x, n_embd, nt, out); }
-inline bool native_quant_h(NativeFmt f, const float* h, uint32_t n_ff, uint32_t nt, void* out) { return native_detail::quant(f, h, n_ff, nt, out); }
+[[nodiscard]] inline bool native_quant_act(NativeFmt f, const float* x, uint32_t n_embd, uint32_t nt, void* out) { return native_detail::quant(f, x, n_embd, nt, out); }
+[[nodiscard]] inline bool native_quant_h(NativeFmt f, const float* h, uint32_t n_ff, uint32_t nt, void* out) { return native_detail::quant(f, h, n_ff, nt, out); }
 
 // act[t*act_stride + r] = silu(gate_r . x_t) * (up_r . x_t) for r in [r0, r1), t < nt.
-inline bool native_gu_rows(NativeFmt f, const uint8_t* blob, uint32_t n_embd, uint32_t n_ff, uint32_t r0, uint32_t r1,
+[[nodiscard]] inline bool native_gu_rows(NativeFmt f, const uint8_t* blob, uint32_t n_embd, uint32_t n_ff, uint32_t r0, uint32_t r1,
                            const void* xq, uint32_t nt, float* act, size_t act_stride) {
     const int type = native_type_id(f);
     const ExpertLayout l = expert_layout(type, n_embd, n_ff);
@@ -126,7 +126,7 @@ inline bool native_gu_rows(NativeFmt f, const uint8_t* blob, uint32_t n_embd, ui
 }
 
 // out[t*out_stride + r] = down_r . h_t for r in [r0, r1) of the n_embd output rows.
-inline bool native_down_rows(NativeFmt f, const uint8_t* blob, uint32_t n_embd, uint32_t n_ff, uint32_t r0, uint32_t r1,
+[[nodiscard]] inline bool native_down_rows(NativeFmt f, const uint8_t* blob, uint32_t n_embd, uint32_t n_ff, uint32_t r0, uint32_t r1,
                              const void* hq, uint32_t nt, float* out, size_t out_stride) {
     const int type = native_type_id(f);
     const ExpertLayout l = expert_layout(type, n_embd, n_ff);

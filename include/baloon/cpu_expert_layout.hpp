@@ -55,7 +55,7 @@ inline ExpertLayout expert_layout(int type, int64_t n_embd, int64_t n_ff) {
 
 // Validates a stored expert blob of `blob_bytes` bytes: succeeds only when the layout is valid and the blob has exactly
 // the size the layout tiles (no slack, no truncation). On failure `out` is a default (ok == false) layout.
-inline bool expert_layout_load(ExpertLayout& out, int type, int64_t n_embd, int64_t n_ff, uint64_t blob_bytes) {
+[[nodiscard]] inline bool expert_layout_load(ExpertLayout& out, int type, int64_t n_embd, int64_t n_ff, uint64_t blob_bytes) {
     const ExpertLayout l = expert_layout(type, n_embd, n_ff);
     if (!l.ok || blob_bytes != (uint64_t)l.bytes) { out = ExpertLayout{}; return false; }
     out = l;
@@ -74,7 +74,7 @@ inline void act_quant_any(const float* x, uint32_t n, int8_t* q, float* d, int32
 
 // Rows [row0, row1) of a GGUF-layout Q2_0 matrix against nt quantized activations, on whatever the CPU offers.
 // Returns false (writing nothing) when the CPU has neither AVX-512 nor AVX2.
-inline bool q2_rows_any(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, uint32_t nt, const int8_t* q,
+[[nodiscard]] inline bool q2_rows_any(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, uint32_t nt, const int8_t* q,
                         size_t q_stride, const float* xd, const int32_t* hx, size_t ch_stride, float* out, size_t out_stride) {
     const kern::CpuFeatures f = kern::cpu_features();
     if (f.usable()) {
