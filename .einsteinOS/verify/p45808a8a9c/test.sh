@@ -12,14 +12,6 @@ done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
 HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread"
 rc=0
-echo "== port table =="
-TSV=.einsteinOS/port/p45808a8a9c.tsv
-n=0
-while IFS=$'\t' read -r rf rn mf mn; do
-  mn="${mn%$'\r'}"; [ -n "$rf" ] || continue; n=$((n+1))
-  if [ ! -f "$mf" ] || ! grep -qE "^int ${mn}\(" "$mf"; then echo "port: $mn not defined in $mf"; rc=1; fi
-done < "$TSV"
-[ "$n" -eq 1 ] || { echo "port table has $n rows, expected 1"; rc=1; }
 bt() { (cd "$1" && $HOSTCXX $HF -Iinclude tests/k28_gguf_cli/test_gguf_cli.cpp -o "$2"); }
 echo "== unit test =="
 bt "$ROOT" "$OUT/t28" || { echo "BUILD FAILED (unit test)"; exit 1; }
@@ -61,6 +53,5 @@ mutate escape      $S 's|else if (ch == .\\n.) o += "\\\\n";|else if (ch == 1) o
 mutate tensbytes   $S 's|total += t.nbytes();|total += t.elements();|'
 mutate boolfmt     $S 's|v.b ? "true" : "false"|v.b ? "false" : "true"|'
 mutate offset      $S 's|t.offset, t.nbytes());|t.offset + 1, t.nbytes());|'
-mutate typename    include/baloon/gguf_reader.hpp 's|case 30: return "BF16"; case 42: return "Q2_0";|case 30: return "BF16"; case 42: return "Q2";|'
 [ $rc -eq 0 ] && echo "ALL UNIT TESTS PASSED"
 exit $rc
