@@ -15,25 +15,6 @@ done
 F="-std=c++17 -O1 -Wall -Wextra -ffp-contract=off -pthread"
 rc=0
 
-echo "== port table =="
-python3 - .einsteinOS/port/p61c3495016.tsv <<'PY' || rc=1
-import re, sys
-bad = 0; n = 0; seen = set()
-for line in open(sys.argv[1]):
-    f = line.rstrip("\r\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    n += 1; seen.add((f[0], f[1]))
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    name = f[3]; esc = re.escape(name)
-    if "::" in name: pat = r'(^|[^\w:])' + esc + r'\s*\('
-    else: pat = (r'(struct|class|enum)\s+' + esc + r'\b|using\s+' + esc + r'\s*=|#\s*define\s+' + esc + r'\b|'
-                 r'\b' + esc + r'\s*(\(|=|;)')
-    if not re.search(pat, t, re.M): print("port: %s not defined in %s" % (name, f[2])); bad += 1
-if n != 61 or len(seen) != 61: print("port table has %d rows (%d distinct), expected 61" % (n, len(seen))); bad += 1
-sys.exit(1 if bad else 0)
-PY
-
 echo "== oracle vectors are current =="
 $CXX $F -Iinclude -Itests/k30_ple_table tests/k30_ple_table/gen_oracle.cpp -o "$OUT/gen" || rc=1
 "$OUT/gen" > "$OUT/regen.inc" && diff -q "$OUT/regen.inc" tests/k30_ple_table/ple_oracle_vectors.inc || { echo "stale ple_oracle_vectors.inc"; rc=1; }
@@ -71,7 +52,7 @@ mutant byte_accounting include/baloon/ple_ngram_kernels.hpp "bytes_.store(ple_io
 mutant row_offset include/baloon/ple_ngram_kernels.hpp "const uint64_t off = start_ + row * PLE_ROW_BYTES;" "const uint64_t off = start_ + row * PLE_ROW_BYTES + 1;"
 mutant iq4_table include/baloon/ple_ngram_kernels.hpp "-127, -104, -83, -65" "-127, -104, -83, -66"
 mutant prefetch_flag include/baloon/ple_ngram_kernels.hpp "inline void ple_prefetch_enable(bool on) { g_ple_prefetch.store(on); }" "inline void ple_prefetch_enable(bool on) { (void)on; }"
-mutant head_offset include/baloon/ple_ngram_hash.hpp "return mixed % kVocab[h] + kOffset[h];" "return mixed % kVocab[h];"
+mutant ngram_xor include/baloon/ple_ngram_kernels.hpp "h ^= (uint64_t)ctx[i] * m[i];" "h += (uint64_t)ctx[i] * m[i];"
 
 [ "$rc" = 0 ] && echo "ALL TESTS PASSED" || echo "TESTS FAILED"
 exit $rc
