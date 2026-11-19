@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 17850,
     "started": "2026-11-19T19:05:09.883185142Z",
-    "renewed": "2026-11-19T20:46:14.676744842Z"
+    "renewed": "2026-11-19T20:46:44.721169168Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -525,7 +525,7 @@
         "ExpertSource.lean"
       ],
       "reason": "3 fix attempts used",
-      "conv": "6a0caa08-dca9-4a9c-90eb-d2b65418ca1e"
+      "conv": "4cac7bb4-1a8a-467b-a505-6e058a3863b6"
     },
     {
       "id": "u2b02268397",
@@ -1024,6 +1024,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "pcd027bc02f": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "reopen_count": {
     "p00a7a246af": 1,
     "p11b3c1e15c": 1,
