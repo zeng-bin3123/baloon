@@ -40,7 +40,7 @@ void test_mtpq_scale_search() {
         uint8_t blk[20]; std::memset(blk, 0x42, sizeof blk);
         quantize_q2(x, blk);
         CHECK(blk[18] == 0x42 && blk[19] == 0x42);
-        uint8_t codes[64]; q2w::unpack_codes(blk, codes);
+        uint8_t codes[64]; q2w::unpack_q2_0_codes(blk, codes);
         const uint16_t hb = (uint16_t)(blk[0] | (blk[1] << 8));
         const float d = f16::half_to_float(hb);
         for (int j = 0; j < 64; ++j) CHECK(codes[j] <= 3);  // clip to [-1,2] then +1

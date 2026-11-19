@@ -34,7 +34,8 @@ inline void pack_block(uint16_t d_bits, const uint8_t codes[64], uint8_t* out) {
     std::memset(out + 2, 0, kCodeBytes);
     for (size_t j = 0; j < 64; ++j) out[2 + byte_index(j)] |= (uint8_t)((codes[j] & 3u) << bit_offset(j));
 }
-inline void unpack_codes(const uint8_t* block, uint8_t codes[64]) {
+// Renamed from unpack_codes to avoid colliding with pack::unpack_codes in ref_pack_builder.hpp.
+inline void unpack_q2_0_codes(const uint8_t* block, uint8_t codes[64]) {
     for (size_t j = 0; j < 64; ++j) codes[j] = (uint8_t)((block[2 + byte_index(j)] >> bit_offset(j)) & 3u);
 }
 
@@ -61,7 +62,7 @@ inline void quantize_block(const float* w, uint8_t* out18) {
 inline void dequantize_block(const uint8_t* b, float* y) {
     const float d = f16::half_to_float((uint16_t)(b[0] | (b[1] << 8)));
     uint8_t codes[64];
-    unpack_codes(b, codes);
+    unpack_q2_0_codes(b, codes);
     for (int j = 0; j < 64; ++j) y[j] = d * (float)symbol_of_code(codes[j]);
 }
 

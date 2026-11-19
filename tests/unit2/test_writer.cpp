@@ -38,7 +38,7 @@ void test_writer_packing() {
         q2w::pack_block(d, codes, blk);
         CHECK(blk[18] == 0xEE && blk[19] == 0xEE);
         CHECK((uint16_t)(blk[0] | (blk[1] << 8)) == d);
-        q2w::unpack_codes(blk, back);
+        q2w::unpack_q2_0_codes(blk, back);
         CHECK(std::memcmp(codes, back, 64) == 0);
         // LSB-first: element j in byte j/4 at bit 2*(j%4)
         for (int j = 0; j < 64; ++j) CHECK(((blk[2 + j / 4] >> (2 * (j % 4))) & 3) == codes[j]);
@@ -54,7 +54,7 @@ void test_writer_quantizer() {
         uint8_t blk[20]; std::memset(blk, 0x77, sizeof blk);
         q2w::quantize_block(w, blk);
         CHECK(blk[18] == 0x77 && blk[19] == 0x77);
-        uint8_t codes[64]; q2w::unpack_codes(blk, codes);
+        uint8_t codes[64]; q2w::unpack_q2_0_codes(blk, codes);
         for (int j = 0; j < 64; ++j) CHECK(codes[j] <= 3);
         const float d = f16::half_to_float((uint16_t)(blk[0] | (blk[1] << 8)));
         float y[64]; q2w::dequantize_block(blk, y);
@@ -75,7 +75,7 @@ void test_writer_quantizer() {
     // extreme element maps to symbol +/-1 (code 2 / 0)
     float w[64] = {0}; w[3] = 2.f; w[10] = -2.f;
     q2w::quantize_block(w, blk);
-    uint8_t codes[64]; q2w::unpack_codes(blk, codes);
+    uint8_t codes[64]; q2w::unpack_q2_0_codes(blk, codes);
     CHECK(codes[3] == 2 && codes[10] == 0 && codes[0] == 1);
 }
 
