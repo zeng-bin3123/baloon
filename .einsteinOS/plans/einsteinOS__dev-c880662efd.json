@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 58059,
     "started": "2026-11-19T06:17:44.898104244Z",
-    "renewed": "2026-11-19T06:28:25.121347Z"
+    "renewed": "2026-11-19T06:28:49.839281634Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -770,6 +770,7 @@
   "fix_attempts": {
     "p00a7a246af": 1,
     "p11b3c1e15c": 1,
+    "p17652417b0": 1,
     "p1bc270de01": 1,
     "p3199202ac2": 1,
     "p3798e66f3c": 1,
@@ -906,6 +907,11 @@
       "text": "port_incomplete: measured again when the run restarted, 1 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/plan/plan_main.cpp func main: no line in .einsteinOS/port/p11b3c1e15c.tsv",
       "base_ref": ""
     },
+    "p17652417b0": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 87 definition(s) the reference requires of this unit have no counterpart on the branch:\n  tools/_paths.py func add_gguf_py: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/_paths.py func gguf_py: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func data_section_offset: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_p16_f16: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_p32_bf16: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_p32_f32: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s2: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s4_iq4_nl: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s4_iq4_xs: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s4_q3_k: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s4_q4_0: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s4_q4_k: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s8_q5_0: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s8_q5_k: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s8_q6_K: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s8_q8_0: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func get_scale_min_k4: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func main: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func open_shard: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func reference_name: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func reference_values: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func run_full: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_p16_f16: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_p32_bf16: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_p32_f32: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_s2: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_s4_iq4_nl: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_s4_iq4_xs: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_s4_q3_k: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_s4_q4_0: no line in .einsteinOS/port/p17652417b0.tsv\n  … 57 more",
+      "base_ref": ""
+    },
     "p1bc270de01": {
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 19 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/kernels/cpu/expert_layout.cpp func act_quant_any: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/expert_layout.cpp func cpu_avx512_ok: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/expert_layout.cpp func expert_layout: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/expert_layout.cpp func expert_layout_load: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/expert_layout.cpp func native_down_rows: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/expert_layout.cpp func native_experts_available: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/expert_layout.cpp func native_fmt: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/expert_layout.cpp func native_gu_rows: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/expert_layout.cpp func native_quant_act: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/expert_layout.cpp func native_quant_h: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/expert_layout.cpp func q2_rows_any: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/native_expert.cpp func init_once: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/native_expert.cpp func native_down_rows: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/native_expert.cpp func native_experts_available: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/native_expert.cpp func native_fmt: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/native_expert.cpp func native_gu_rows: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/native_expert.cpp func native_quant_act: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/native_expert.cpp func native_quant_h: no line in .einsteinOS/port/p1bc270de01.tsv\n  src/kernels/cpu/native_expert.cpp func traits: no line in .einsteinOS/port/p1bc270de01.tsv",
@@ -998,13 +1004,6 @@
     }
   },
   "infra_fails": 0,
-  "reopen": {
-    "p17652417b0": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 87 definition(s) the reference requires of this unit have no counterpart on the branch:\n  tools/_paths.py func add_gguf_py: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/_paths.py func gguf_py: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func data_section_offset: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_p16_f16: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_p32_bf16: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_p32_f32: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s2: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s4_iq4_nl: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s4_iq4_xs: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s4_q3_k: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s4_q4_0: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s4_q4_k: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s8_q5_0: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s8_q5_k: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s8_q6_K: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func from_s8_q8_0: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func get_scale_min_k4: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func main: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func open_shard: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func reference_name: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func reference_values: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func run_full: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_p16_f16: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_p32_bf16: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_p32_f32: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_s2: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_s4_iq4_nl: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_s4_iq4_xs: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_s4_q3_k: no line in .einsteinOS/port/p17652417b0.tsv\n  tools/canonical_xcheck.py func to_s4_q4_0: no line in .einsteinOS/port/p17652417b0.tsv\n  … 57 more",
-      "base_ref": ""
-    }
-  },
   "reopen_count": {
     "p00a7a246af": 1,
     "p11b3c1e15c": 1,
@@ -1345,7 +1344,6 @@
   ],
   "port_pass": {
     "p00a7a246af": true,
-    "p17652417b0": true,
     "p25f728b4fe": true,
     "p61ad38075a": true,
     "pb7e2533792": true,
