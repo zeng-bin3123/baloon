@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 58059,
     "started": "2026-11-19T06:17:44.898104244Z",
-    "renewed": "2026-11-19T07:00:39.678722412Z"
+    "renewed": "2026-11-19T07:08:19.810596419Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -781,7 +781,7 @@
     "p61ad38075a": 1,
     "p61c3495016": 1,
     "p71c0367d2e": 1,
-    "p984d0d954f": 1,
+    "p984d0d954f": 2,
     "pb0569948de": 2,
     "pb7e2533792": 1,
     "pcd027bc02f": 1,
@@ -795,6 +795,9 @@
       "existing_code_fails"
     ],
     "p45808a8a9c": [
+      "existing_code_fails"
+    ],
+    "p984d0d954f": [
       "existing_code_fails"
     ],
     "pb0569948de": [
@@ -970,9 +973,9 @@
       "base_ref": ""
     },
     "p984d0d954f": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 4 definition(s) the reference requires of this unit have no counterpart on the branch:\n  ref/load.py type Gguf: no line in .einsteinOS/port/p984d0d954f.tsv\n  ref/load.py func _bf16_to_f32: no line in .einsteinOS/port/p984d0d954f.tsv\n  ref/load.py func _dequant_flat: no line in .einsteinOS/port/p984d0d954f.tsv\n  ref/load.py func _discover_shards: no line in .einsteinOS/port/p984d0d954f.tsv",
-      "base_ref": ""
+      "kind": "existing_code_fails",
+      "text": "the conversation wrote no file, and the code already on the branch for this unit fails on the real machine:\nport_count_in_script: .einsteinOS/verify/p984d0d954f/test.sh read the port map — the kernel checks .einsteinOS/port/p984d0d954f.tsv against the 4 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)\nport_name_foreign: 3 line(s) of .einsteinOS/port/p984d0d954f.tsv give a counterpart the reference file does not define — a port keeps the reference's names:\n  ref/load.py _bf16_to_f32 → include/baloon/gguf_file_loader.hpp:bf16_to_f32: bf16_to_f32 is not a name ref/load.py defines\n  ref/load.py _dequant_flat → include/baloon/gguf_file_loader.hpp:dequant_flat: dequant_flat is not a name ref/load.py defines\n  ref/load.py _discover_shards → include/baloon/gguf_file_loader.hpp:discover_shards: discover_shards is not a name ref/load.py defines",
+      "base_ref": "einsteinOS/dev-c880662efd"
     },
     "pb0569948de": {
       "kind": "existing_code_fails",
