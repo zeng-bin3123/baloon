@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 22487,
     "started": "2026-11-18T15:14:51.726946148Z",
-    "renewed": "2026-11-19T02:04:13.134109297Z"
+    "renewed": "2026-11-19T02:04:32.747299109Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -886,9 +886,9 @@
       "base_ref": "einsteinOS/dev-c880662efd"
     },
     "pb7e2533792": {
-      "kind": "review_fail",
-      "text": "block_geometry/ggml_type_name map Q2_0 to private id 100 and treat id 42 as unknown, but theory DequantBlockLayouts specifies geom 42 = (64,18); the test never checks id 42",
-      "base_ref": "einsteinOS/dev-c880662efd"
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 11 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/artifact/gguf_reader.hpp type Cursor: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp type GgufFile: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp type MetaType: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp type MetaValue: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp type Qwen4ExpGuard: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp type TensorInfo: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp macro WIN32_LEAN_AND_MEAN: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp func block_geometry: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp func check_architecture: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp func ggml_type_name: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp func read_value: no line in .einsteinOS/port/pb7e2533792.tsv",
+      "base_ref": ""
     },
     "pe1f7ca5c00": {
       "kind": "review_fail",
@@ -976,11 +976,6 @@
     "pb0569948de": {
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 1 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/prefill/gemm.hpp type Gemm: no line in .einsteinOS/port/pb0569948de.tsv",
-      "base_ref": ""
-    },
-    "pb7e2533792": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 11 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/artifact/gguf_reader.hpp type Cursor: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp type GgufFile: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp type MetaType: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp type MetaValue: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp type Qwen4ExpGuard: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp type TensorInfo: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp macro WIN32_LEAN_AND_MEAN: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp func block_geometry: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp func check_architecture: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp func ggml_type_name: no line in .einsteinOS/port/pb7e2533792.tsv\n  include/strata/artifact/gguf_reader.hpp func read_value: no line in .einsteinOS/port/pb7e2533792.tsv",
       "base_ref": ""
     },
     "pcd027bc02f": {
@@ -1359,7 +1354,6 @@
     "p71c0367d2e": true,
     "p984d0d954f": true,
     "pb0569948de": true,
-    "pb7e2533792": true,
     "pcd027bc02f": true,
     "pd8e380f419": true,
     "pd9efd3692a": true,
