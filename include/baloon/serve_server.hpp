@@ -1,6 +1,8 @@
 // serve_server.hpp - contracts of the HTTP serving layer: never-truncate context guard, incremental detokenisation
 // length model, token accounting up to the stop token, finish-reason mapping for both API dialects, the 64-entry
 // image-embedding cache bound, max-token defaulting and API-key authorisation.
+// Used by: serve_chat.hpp (TemplateKwargs, effort helpers), serve_http.hpp (ChatService, ImageEmbedder, serve_main).
+// Mutation sentinels: IMAGE_CACHE_MAX = 64, pick_max default = 1024, authorized exact-match.
 #pragma once
 #include <cstddef>
 #include <cstdint>

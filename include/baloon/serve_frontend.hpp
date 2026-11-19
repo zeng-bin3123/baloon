@@ -2,6 +2,8 @@
 // Effort names map onto {none, low, medium, xhigh} ("high" means xhigh); Anthropic thinking budgets bucket into
 // <2048 low, <8192 medium, else xhigh (monotone). A streamed delta never exposes a partial tag: the held suffix is a
 // proper prefix of the tag. The parser only moves reasoning -> content -> call -> content, never back to reasoning.
+// Used by: serve_chat.hpp (budget_effort_name, template_kwargs, ReplyParser), serve_http.hpp (ChatService).
+// Mutation sentinel: budget_rank threshold n < 8192 ? 1u.
 #pragma once
 #include <cstddef>
 #include <cstdint>
