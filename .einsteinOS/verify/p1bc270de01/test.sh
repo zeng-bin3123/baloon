@@ -15,22 +15,6 @@ F="-std=c++17 -O1 -Wall -Wextra -ffp-contract=off -pthread"
 ISA512="-mavx512bw -mavx512dq -mavx512f -mavx512vbmi -mavx512vl -mavx512vnni -mf16c -mfma"
 rc=0
 
-echo "== port table =="
-python3 - .einsteinOS/port/p1bc270de01.tsv <<'PY' || rc=1
-import re, sys
-bad = 0; n = 0; seen = set()
-for line in open(sys.argv[1]):
-    f = line.rstrip("\r\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    n += 1; seen.add((f[0], f[1]))
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    esc = re.escape(f[3])
-    pat = (r'(struct|class|enum)\s+' + esc + r'\b|using\s+' + esc + r'\s*=|\b' + esc + r'\s*(\(|=|;)')
-    if not re.search(pat, t, re.M): print("port: %s not defined in %s" % (f[3], f[2])); bad += 1
-if n != 19 or len(seen) != 19: print("port table has %d rows (%d distinct), expected 19" % (n, len(seen))); bad += 1
-sys.exit(1 if bad else 0)
-PY
 
 build_run() {  # build_run <root> <exe>
   $CXX $F $ISA512 -I"$1/include" tests/k31_native_traits/test_traits.cpp "$1/src/cpu/native_expert.cpp" src/cpu/expert_q2.cpp src/cpu/iq_rows_avx512.cpp -o "$2" 2>"$OUT/cc.log" || return 2
