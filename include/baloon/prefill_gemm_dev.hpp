@@ -19,7 +19,8 @@ using pfgemm::Elem;
 
 // true iff e == cudaSuccess; otherwise stores "<what>: <cuda error string>" (per thread) and returns false.
 bool ck(cudaError_t e, const char* what);
-const char* ck_last();   // last failure text of this thread ("" when none)
+const char* ck_last();         // last failure text of this thread ("" when none)
+cudaError_t ck_last_code();    // last CUDA error code (cudaSuccess when none)
 void ck_clear();
 
 class Gemm {

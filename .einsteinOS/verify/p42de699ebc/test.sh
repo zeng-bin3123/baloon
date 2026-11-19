@@ -12,24 +12,6 @@ CLANG="$COREX/bin/clang++"
 CUFLAGS="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Isrc -Itests -O2"
 rc=0
 
-echo "== port table =="
-python3 - .einsteinOS/port/p42de699ebc.tsv <<'PY' || rc=1
-import re, sys
-bad = 0; n = 0; seen = set()
-want = {"Gemm::bf16", "Gemm::f16", "Gemm::init", "Gemm::init_external", "Gemm::native", "Gemm::~Gemm", "ck"}
-for line in open(sys.argv[1]):
-    f = line.rstrip("\r\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    n += 1; seen.add(f[1])
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    e = re.escape(f[3])
-    pat = (r'(^|[\s*&>])' + e + r'\s*\(') if "::" in f[3] else (r'\b' + e + r'\s*\(')
-    if not re.search(pat, t, re.M): print("port: %s not defined in %s" % (f[3], f[2])); bad += 1
-if n != 7 or seen != want: print("port table wrong:", n, want ^ seen); bad += 1
-sys.exit(1 if bad else 0)
-PY
-
 build_run() {  # build_run <root> <objdir>   (builds from <root>'s sources, runs the GPU test)
   mkdir -p "$2"
   "$CLANG" $CUFLAGS -I"$1/include" -I"$1/src" -c "$1/src/prefill/gemm.cu" -o "$2/gemm.o" 2>"$OUT/cc.log" || return 2

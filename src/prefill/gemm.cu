@@ -14,15 +14,18 @@ namespace pfdev {
 
 namespace {
 thread_local char g_err[256] = "";
+thread_local cudaError_t g_err_code = cudaSuccess;
 }
 
 bool ck(cudaError_t e, const char* what) {
     if (e == cudaSuccess) return true;
+    g_err_code = e;
     std::snprintf(g_err, sizeof g_err, "%s: %s", what ? what : "cuda", cudaGetErrorString(e));
     return false;
 }
 const char* ck_last() { return g_err; }
-void ck_clear() { g_err[0] = 0; }
+cudaError_t ck_last_code() { return g_err_code; }
+void ck_clear() { g_err[0] = 0; g_err_code = cudaSuccess; }
 
 namespace {
 
