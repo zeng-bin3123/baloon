@@ -111,15 +111,15 @@ public:
 
     // Opens `path`; the table of `n_rows` rows starts at `table_off`. Fails (false) if the table does not fit inside the
     // file. cache_rows sizes the row cache, max_inflight the slot slab (>= 1).
-    bool open(const char* path, uint64_t table_off, uint64_t n_rows, uint64_t cache_rows, uint32_t max_inflight);
+    [[nodiscard]] bool open(const char* path, uint64_t table_off, uint64_t n_rows, uint64_t cache_rows, uint32_t max_inflight);
     void close();
-    bool is_open() const;
+    [[nodiscard]] bool is_open() const;
 
     // Requests `n` rows; row i is delivered to out + i*ROW_BYTES (out must stay valid until collect). Returns a non-zero
     // ticket, or 0 on rejection (closed, row out of range, null output).
-    uint32_t issue(const uint64_t* rows, size_t n, uint8_t* out);
+    [[nodiscard]] uint32_t issue(const uint64_t* rows, size_t n, uint8_t* out);
     // Waits for the ticket; true when every row was delivered intact. Unknown or already collected ticket: false.
-    bool collect(uint32_t ticket);
+    [[nodiscard]] bool collect(uint32_t ticket);
 
     uint64_t cache_capacity() const;
     uint64_t cache_size() const;
