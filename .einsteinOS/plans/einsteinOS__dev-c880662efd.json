@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 22487,
     "started": "2026-11-18T15:14:51.726946148Z",
-    "renewed": "2026-11-19T02:21:28.840738376Z"
+    "renewed": "2026-11-19T02:21:44.224918024Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -768,6 +768,7 @@
     }
   },
   "fix_attempts": {
+    "p00a7a246af": 1,
     "pb0569948de": 2,
     "pb7e2533792": 1,
     "pe1f7ca5c00": 1,
@@ -880,6 +881,11 @@
     ]
   },
   "last_failure": {
+    "p00a7a246af": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 55 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/core/device.hpp type CudaError: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/device.hpp type DeviceArena: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/device.hpp type DeviceInfo: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/device.hpp func device_info: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/graph.hpp type CapturedGraph: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/graph.hpp type GraphRegistry: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/graph.hpp type LayerType: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/graph.hpp func to_string: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/hit_hook.hpp alias HitFn: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/hit_hook.hpp type HitPhase: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/layout.hpp type LayerView: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/layout.hpp type ModelGeometry: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/layout.hpp func check_all: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/layout.hpp func check_layer: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/layout.hpp func is_qsa_layer: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_dense.hpp type NativeDense: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_dense.hpp type WeightTable: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_head.hpp type NativeEmbed: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_head.hpp type NativeHead: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_head.hpp func native_embed: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_head.hpp func set_native_embed: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp type LoadStats: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp type PageBacking: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp type PinnedArena: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp type StreamStats: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp func fnv1a64: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp func load_experts: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp func load_experts_ranges: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp func stream_bandwidth: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/session.hpp alias PoolFn: no line in .einsteinOS/port/p00a7a246af.tsv\n  … 25 more",
+      "base_ref": ""
+    },
     "pb0569948de": {
       "kind": "review_fail",
       "text": "Gemm::valid()'s scratch-bytes overflow check (a=F16/w=F32 scratch wrap, e.g. m=2^40,n=1,k=2^22) is untested and unmutated, so deleting it would still pass every test and mutant",
@@ -903,11 +909,6 @@
   },
   "infra_fails": 0,
   "reopen": {
-    "p00a7a246af": {
-      "kind": "port_incomplete",
-      "text": "port_incomplete: measured again when the run restarted, 55 definition(s) the reference requires of this unit have no counterpart on the branch:\n  include/strata/core/device.hpp type CudaError: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/device.hpp type DeviceArena: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/device.hpp type DeviceInfo: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/device.hpp func device_info: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/graph.hpp type CapturedGraph: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/graph.hpp type GraphRegistry: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/graph.hpp type LayerType: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/graph.hpp func to_string: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/hit_hook.hpp alias HitFn: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/hit_hook.hpp type HitPhase: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/layout.hpp type LayerView: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/layout.hpp type ModelGeometry: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/layout.hpp func check_all: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/layout.hpp func check_layer: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/layout.hpp func is_qsa_layer: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_dense.hpp type NativeDense: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_dense.hpp type WeightTable: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_head.hpp type NativeEmbed: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_head.hpp type NativeHead: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_head.hpp func native_embed: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/native_head.hpp func set_native_embed: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp type LoadStats: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp type PageBacking: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp type PinnedArena: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp type StreamStats: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp func fnv1a64: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp func load_experts: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp func load_experts_ranges: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/pinned.hpp func stream_bandwidth: no line in .einsteinOS/port/p00a7a246af.tsv\n  include/strata/core/session.hpp alias PoolFn: no line in .einsteinOS/port/p00a7a246af.tsv\n  … 25 more",
-      "base_ref": ""
-    },
     "p11b3c1e15c": {
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 1 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/plan/plan_main.cpp func main: no line in .einsteinOS/port/p11b3c1e15c.tsv",
@@ -1338,7 +1339,6 @@
     }
   ],
   "port_pass": {
-    "p00a7a246af": true,
     "p11b3c1e15c": true,
     "p17652417b0": true,
     "p1bc270de01": true,
