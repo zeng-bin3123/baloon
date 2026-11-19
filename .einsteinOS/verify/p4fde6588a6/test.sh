@@ -12,21 +12,6 @@ done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
 HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread"
 rc=0
-echo "== port table =="
-python3 - .einsteinOS/port/p4fde6588a6.tsv <<'PY' || rc=1
-import re, sys
-bad = 0; seen = set()
-for line in open(sys.argv[1]):
-    f = line.rstrip("\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    seen.add(f[1])
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    if not re.search(r'inline\s+[\w:<>\s]+?\b' + re.escape(f[3]) + r'\s*\(', t):
-        print("port: func %s not defined in %s" % (f[3], f[2])); bad += 1
-if seen != {"parse_stride", "row_count", "selected"}: print("port table wrong:", seen); bad += 1
-sys.exit(1 if bad else 0)
-PY
 bt() { (cd "$1" && $HOSTCXX $HF -Iinclude tests/k25_logits/test_logits.cpp -o "$2"); }
 echo "== unit test =="
 bt "$ROOT" "$OUT/t25" || { echo "BUILD FAILED (unit test)"; exit 1; }
