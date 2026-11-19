@@ -19,7 +19,7 @@ bool overlap(const void* a, size_t an, const void* b, size_t bn) {
 }
 __device__ __forceinline__ float warp_sum(float v) { return kgc::wave_sum(v); }
 
-__global__ void __launch_bounds__(64) native_gdn_step_kernel(float* __restrict__ state, const float* __restrict__ q, const float* __restrict__ k,
+__global__ void __launch_bounds__(64) step(float* __restrict__ state, const float* __restrict__ q, const float* __restrict__ k,
                                                              const float* __restrict__ v, const float* __restrict__ gate,
                                                              const float* __restrict__ beta, float* __restrict__ o, int h_k, int h_v) {
     const int h = blockIdx.x, lane = threadIdx.x, src = h % h_k;
@@ -61,7 +61,7 @@ cudaError_t native_gdn_step(float* state, const float* q, const float* k, const 
     const size_t ns[6] = {hq, hq, hv, hs, hs, hv};
     for (int i = 0; i < 6; ++i) if (overlap(state, st, ps[i], ns[i])) return cudaErrorInvalidValue;
     if (overlap(o, hv, v, hv)) return cudaErrorInvalidValue;
-    native_gdn_step_kernel<<<h_v, 64, 0, s>>>(state, q, k, v, gate, beta, o, h_k, h_v);
+    step<<<h_v, 64, 0, s>>>(state, q, k, v, gate, beta, o, h_k, h_v);
     return cudaGetLastError();
 }
 }  // namespace kg

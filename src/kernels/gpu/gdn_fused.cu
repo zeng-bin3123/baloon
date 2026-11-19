@@ -13,7 +13,7 @@ constexpr int S = 128;
 constexpr int RPG = S / 64;       // state values per lane along one axis
 constexpr int RG = 4;             // value heads (waves) per block
 
-__global__ void __launch_bounds__(128) ab_kernel(const float* __restrict__ a, const float* __restrict__ b, const float* __restrict__ a_log,
+__global__ void __launch_bounds__(128) gdn_ab_kernel(const float* __restrict__ a, const float* __restrict__ b, const float* __restrict__ a_log,
                                                  const float* __restrict__ dt_bias, float* __restrict__ beta, float* __restrict__ g, int n) {
     const int h = blockIdx.x * blockDim.x + threadIdx.x;
     if (h >= n) return;
@@ -22,7 +22,7 @@ __global__ void __launch_bounds__(128) ab_kernel(const float* __restrict__ a, co
 }
 
 // block = one wave = one head of q, k or v. cs: (C, dc-1) history, kW: (C, dc).
-__global__ void __launch_bounds__(64) conv_l2_kernel(float* __restrict__ cs, const float* __restrict__ x, const float* __restrict__ kW,
+__global__ void __launch_bounds__(64) gdn_conv_l2_kernel(float* __restrict__ cs, const float* __restrict__ x, const float* __restrict__ kW,
                                                      float* __restrict__ out, int h_k, int dc, float eps) {
     const int head = blockIdx.x, lane = threadIdx.x;
     float val[RPG];
@@ -52,7 +52,7 @@ __global__ void __launch_bounds__(64) conv_l2_kernel(float* __restrict__ cs, con
 }
 
 // grid.x = ceil(h_v / RG), block = RG waves; wave w of block b handles head h = b*RG + w. state (S, h_v, S), j fastest.
-__global__ void __launch_bounds__(256) step_norm_kernel(float* __restrict__ state, const float* __restrict__ q, const float* __restrict__ k,
+__global__ void __launch_bounds__(256) gdn_step_norm_kernel(float* __restrict__ state, const float* __restrict__ q, const float* __restrict__ k,
                                                         const float* __restrict__ v, const float* __restrict__ gate, const float* __restrict__ beta,
                                                         const float* __restrict__ z, const float* __restrict__ ssm_norm, float* __restrict__ y,
                                                         int h_k, int h_v, float eps) {
@@ -103,18 +103,18 @@ __global__ void __launch_bounds__(256) step_norm_kernel(float* __restrict__ stat
 
 cudaError_t fused_gdn_ab(const float* a, const float* b, const float* a_log, const float* dt_bias, float* beta, float* g, int n, cudaStream_t s) {
     if (n <= 0 || !a || !b || !a_log || !dt_bias || !beta || !g) return cudaErrorInvalidValue;
-    ab_kernel<<<(n + 127) / 128, 128, 0, s>>>(a, b, a_log, dt_bias, beta, g, n);
+    gdn_ab_kernel<<<(n + 127) / 128, 128, 0, s>>>(a, b, a_log, dt_bias, beta, g, n);
     return cudaGetLastError();
 }
 cudaError_t fused_gdn_conv_l2(float* conv_state, const float* x, const float* kW, float* out, int h_k, int h_v, int d_conv, float eps, cudaStream_t s) {
     if (h_k <= 0 || h_v <= 0 || d_conv < 2 || !conv_state || !x || !kW || !out) return cudaErrorInvalidValue;
-    conv_l2_kernel<<<2 * h_k + h_v, 64, 0, s>>>(conv_state, x, kW, out, h_k, d_conv, eps);
+    gdn_conv_l2_kernel<<<2 * h_k + h_v, 64, 0, s>>>(conv_state, x, kW, out, h_k, d_conv, eps);
     return cudaGetLastError();
 }
 cudaError_t fused_gdn_step_norm(float* state, const float* q, const float* k, const float* v, const float* gate, const float* beta,
                                 const float* z, const float* ssm_norm, float* y, int h_k, int h_v, float eps, cudaStream_t s) {
     if (h_k <= 0 || h_v <= 0 || !state || !q || !k || !v || !gate || !beta || !z || !ssm_norm || !y) return cudaErrorInvalidValue;
-    step_norm_kernel<<<(h_v + RG - 1) / RG, RG * 64, 0, s>>>(state, q, k, v, gate, beta, z, ssm_norm, y, h_k, h_v, eps);
+    gdn_step_norm_kernel<<<(h_v + RG - 1) / RG, RG * 64, 0, s>>>(state, q, k, v, gate, beta, z, ssm_norm, y, h_k, h_v, eps);
     return cudaGetLastError();
 }
 }  // namespace kg

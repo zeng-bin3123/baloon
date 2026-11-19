@@ -17,7 +17,7 @@ bool overlap(const void* a, size_t an, const void* b, size_t bn) {
 __device__ __forceinline__ float warp_max(float v) { return kgc::wave_max(v); }
 __device__ __forceinline__ float warp_sum(float v) { return kgc::wave_sum(v); }
 
-__global__ void __launch_bounds__(64) native_router_kernel(const float* __restrict__ logits, int n_expert, int k, int32_t* __restrict__ ids,
+__global__ void __launch_bounds__(64) route(const float* __restrict__ logits, int n_expert, int k, int32_t* __restrict__ ids,
                                                            float* __restrict__ weights) {
     __shared__ float s_ex[64 * RW_PER];
     __shared__ float s_sum;
@@ -72,7 +72,7 @@ cudaError_t native_router_top10(const float* logits, int n_tokens, int n_expert,
     const size_t lb = (size_t)n_tokens * n_expert * 4, ob = (size_t)n_tokens * k * 4;
     if (!valid(logits, lb) || !valid(ids, ob) || !valid(weights, ob)) return cudaErrorInvalidValue;
     if (overlap(ids, ob, weights, ob) || overlap(ids, ob, logits, lb) || overlap(weights, ob, logits, lb)) return cudaErrorInvalidValue;
-    native_router_kernel<<<n_tokens, 64, 0, s>>>(logits, n_expert, k, ids, weights);
+    route<<<n_tokens, 64, 0, s>>>(logits, n_expert, k, ids, weights);
     return cudaGetLastError();
 }
 }  // namespace kg

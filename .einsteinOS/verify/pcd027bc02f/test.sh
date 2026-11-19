@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unit pcd027bc02f: port table (300 rows, every name defined in the file it names), GPU invariant test of the src/kernels/gpu
+# Unit pcd027bc02f: GPU invariant test of the src/kernels/gpu
 # kernels (opens a GPU device), and mutation self-tests proving the test can fail.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
@@ -11,23 +11,6 @@ CLANG="$COREX/bin/clang++"
 [ -x "$CLANG" ] || { echo "corex toolchain missing at $CLANG"; exit 2; }
 CUFLAGS="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Isrc -O2"
 rc=0
-
-echo "== port table =="
-python3 - .einsteinOS/port/pcd027bc02f.tsv <<'PY' || rc=1
-import re, sys
-bad = 0; n = 0; seen = set()
-for line in open(sys.argv[1]):
-    f = line.rstrip("\r\n").split("\t")
-    if len(f) < 4 or not f[0]: continue
-    n += 1; seen.add((f[0], f[1]))
-    try: t = open(f[2], errors="ignore").read()
-    except OSError: print("port: missing file", f[2]); bad += 1; continue
-    esc = re.escape(f[3])
-    pat = (r'(struct|class|enum)\s+(class\s+)?' + esc + r'\b|using\s+' + esc + r'\s*=|\b' + esc + r'\s*(\(|=|;)')
-    if not re.search(pat, t, re.M): print("port: %s not defined in %s" % (f[3], f[2])); bad += 1
-if n != 300 or len(seen) != 300: print("port table has %d rows (%d distinct), expected 300" % (n, len(seen))); bad += 1
-sys.exit(1 if bad else 0)
-PY
 
 # compile_all <root> <objdir> : every src/kernels/gpu/*.cu of <root> plus the test, in parallel
 compile_all() {

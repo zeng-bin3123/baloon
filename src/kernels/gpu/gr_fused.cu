@@ -53,7 +53,7 @@ __device__ __forceinline__ void stream_inv(const float* __restrict__ R, float ep
     }
 }
 
-__global__ void __launch_bounds__(256) fused_down_kernel(const float* __restrict__ Rall, const uint16_t* __restrict__ down,
+__global__ void __launch_bounds__(256) gr_down_kernel(const float* __restrict__ Rall, const uint16_t* __restrict__ down,
                                                          float* __restrict__ lo_all, float eps) {
     __shared__ float sh[4], inv[HC];
     const float* R = Rall + (size_t)blockIdx.y * D;
@@ -77,17 +77,17 @@ __global__ void __launch_bounds__(256) fused_down_kernel(const float* __restrict
     }
 }
 
-template <int COLS>
-__global__ void __launch_bounds__(256) fused_up_kernel(const float* __restrict__ Rall, const uint16_t* __restrict__ up,
-                                                       const float* __restrict__ lo_all, float* __restrict__ xall, float eps) {
-    __shared__ float sh[4], inv[HC], hid[LR], g[HC * COLS];
+// single-token up: each block owns UP_COLS columns
+__global__ void __launch_bounds__(256) gr_up_kernel(const float* __restrict__ Rall, const uint16_t* __restrict__ up,
+                                                     const float* __restrict__ lo_all, float* __restrict__ xall, float eps) {
+    __shared__ float sh[4], inv[HC], hid[LR], g[HC * UP_COLS];
     const float* R = Rall + (size_t)blockIdx.y * D;
     stream_inv(R, eps, inv, sh);
     for (int k = threadIdx.x; k < LR; k += THREADS) hid[k] = kgc::bf16_to_f(kgc::f_to_bf16(lo_all[(size_t)blockIdx.y * LR + k]));
     __syncthreads();
     const int lane = threadIdx.x & 63, wave = threadIdx.x >> 6;
-    for (int r = wave; r < HC * COLS; r += 4) {
-        const int c = r / COLS, col = blockIdx.x * COLS + r % COLS;
+    for (int r = wave; r < HC * UP_COLS; r += 4) {
+        const int c = r / UP_COLS, col = blockIdx.x * UP_COLS + r % UP_COLS;
         const uint4* wv = (const uint4*)(up + (size_t)(c * N + col) * LR);
         float acc = 0.f;
         if (lane < LR / 8) acc = dot8(wv[lane], hid + lane * 8);
@@ -95,15 +95,66 @@ __global__ void __launch_bounds__(256) fused_up_kernel(const float* __restrict__
         if (lane == 0) g[r] = R[c * N + col] * inv[c] * sigmoidf_(acc);
     }
     __syncthreads();
-    if (threadIdx.x < COLS) {
+    if (threadIdx.x < UP_COLS) {
         float s = 0.f;
-        for (int c = 0; c < HC; ++c) s += g[c * COLS + threadIdx.x];
-        xall[(size_t)blockIdx.y * N + blockIdx.x * COLS + threadIdx.x] = s / (float)HC;
+        for (int c = 0; c < HC; ++c) s += g[c * UP_COLS + threadIdx.x];
+        xall[(size_t)blockIdx.y * N + blockIdx.x * UP_COLS + threadIdx.x] = s / (float)HC;
     }
 }
 
-__global__ void __launch_bounds__(256) fused_inject_kernel(const uint16_t* __restrict__ inj, const float* __restrict__ xall,
-                                                           float* __restrict__ wall) {
+// multi-token up: each block owns UPM_COLS columns, grid.y = T
+__global__ void __launch_bounds__(256) gr_up_multi_kernel(const float* __restrict__ Rall, const uint16_t* __restrict__ up,
+                                                           const float* __restrict__ lo_all, float* __restrict__ xall, float eps) {
+    __shared__ float sh[4], inv[HC], hid[LR], g[HC * UPM_COLS];
+    const float* R = Rall + (size_t)blockIdx.y * D;
+    stream_inv(R, eps, inv, sh);
+    for (int k = threadIdx.x; k < LR; k += THREADS) hid[k] = kgc::bf16_to_f(kgc::f_to_bf16(lo_all[(size_t)blockIdx.y * LR + k]));
+    __syncthreads();
+    const int lane = threadIdx.x & 63, wave = threadIdx.x >> 6;
+    for (int r = wave; r < HC * UPM_COLS; r += 4) {
+        const int c = r / UPM_COLS, col = blockIdx.x * UPM_COLS + r % UPM_COLS;
+        const uint4* wv = (const uint4*)(up + (size_t)(c * N + col) * LR);
+        float acc = 0.f;
+        if (lane < LR / 8) acc = dot8(wv[lane], hid + lane * 8);
+        acc = warp_sum(acc);
+        if (lane == 0) g[r] = R[c * N + col] * inv[c] * sigmoidf_(acc);
+    }
+    __syncthreads();
+    if (threadIdx.x < UPM_COLS) {
+        float s = 0.f;
+        for (int c = 0; c < HC; ++c) s += g[c * UPM_COLS + threadIdx.x];
+        xall[(size_t)blockIdx.y * N + blockIdx.x * UPM_COLS + threadIdx.x] = s / (float)HC;
+    }
+}
+
+// multi-token down kernel variant (same geometry as gr_down_kernel, exposed separately for the port map)
+__global__ void __launch_bounds__(256) gr_down_multi_kernel(const float* __restrict__ Rall, const uint16_t* __restrict__ down,
+                                                             float* __restrict__ lo_all, float eps) {
+    __shared__ float sh[4], inv[HC];
+    const float* R = Rall + (size_t)blockIdx.y * D;
+    stream_inv(R, eps, inv, sh);
+    const int lane = threadIdx.x & 63, wave = threadIdx.x >> 6;
+    for (int rr = wave; rr < WARPS; rr += 4) {
+        const int row = blockIdx.x * WARPS + rr;
+        const uint4* wv = (const uint4*)(down + (size_t)row * D);
+        float acc = 0.f;
+        for (int ch = lane; ch < D / 8; ch += 64) {
+            float x[8];
+#pragma unroll
+            for (int k = 0; k < 8; ++k) {
+                const int i = ch * 8 + k;
+                x[k] = kgc::bf16_to_f(kgc::f_to_bf16(R[i] * inv[i / N]));
+            }
+            acc += dot8(wv[ch], x);
+        }
+        acc = warp_sum(acc);
+        if (lane == 0) lo_all[(size_t)blockIdx.y * LR + row] = kgc::silu(acc);
+    }
+}
+
+// norm + inject: dot each stream channel with the output, accumulate into w_out (grid.x=HC, grid.y=T)
+__global__ void __launch_bounds__(256) gr_norm_multi_kernel(const uint16_t* __restrict__ inj, const float* __restrict__ xall,
+                                                             float* __restrict__ wall) {
     __shared__ float sh[4];
     const float* x = xall + (size_t)blockIdx.y * N;
     float acc = 0.f;
@@ -120,12 +171,14 @@ bool fused_gr_supported(int n, int hc, int lr) { return n == N && hc == HC && lr
 cudaError_t fused_gr_read_multi(const GrMulti& m, cudaStream_t s) {
     if (m.T < 1 || m.T > 32 || !m.R || !m.down || !m.up || !m.inject || !m.lo || !m.x_out || !m.w_out) return cudaErrorInvalidValue;
     if (((uintptr_t)m.down | (uintptr_t)m.up) & 15) return cudaErrorInvalidValue;
-    fused_down_kernel<<<dim3(DOWN_BLOCKS, m.T), THREADS, 0, s>>>(m.R, m.down, m.lo, m.eps);
-    if (m.T == 1)
-        fused_up_kernel<UP_COLS><<<dim3(UP_BLOCKS, 1), THREADS, 0, s>>>(m.R, m.up, m.lo, m.x_out, m.eps);
-    else
-        fused_up_kernel<UPM_COLS><<<dim3(UPM_BLOCKS, m.T), THREADS, 0, s>>>(m.R, m.up, m.lo, m.x_out, m.eps);
-    fused_inject_kernel<<<dim3(HC, m.T), THREADS, 0, s>>>(m.inject, m.x_out, m.w_out);
+    if (m.T == 1) {
+        gr_down_kernel<<<dim3(DOWN_BLOCKS, 1), THREADS, 0, s>>>(m.R, m.down, m.lo, m.eps);
+        gr_up_kernel<<<dim3(UP_BLOCKS, 1), THREADS, 0, s>>>(m.R, m.up, m.lo, m.x_out, m.eps);
+    } else {
+        gr_down_multi_kernel<<<dim3(DOWN_BLOCKS, m.T), THREADS, 0, s>>>(m.R, m.down, m.lo, m.eps);
+        gr_up_multi_kernel<<<dim3(UPM_BLOCKS, m.T), THREADS, 0, s>>>(m.R, m.up, m.lo, m.x_out, m.eps);
+    }
+    gr_norm_multi_kernel<<<dim3(HC, m.T), THREADS, 0, s>>>(m.inject, m.x_out, m.w_out);
     return cudaGetLastError();
 }
 cudaError_t fused_gr_read(const float* R, const uint16_t* down, const uint16_t* up, const uint16_t* inject, float* lo,

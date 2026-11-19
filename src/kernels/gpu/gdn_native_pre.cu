@@ -21,8 +21,8 @@ int norm_geometry(int cols) { int t = 64; while (t < 256 && t < cols) t <<= 1; r
 
 __device__ __forceinline__ float warp_sum(float v) { return kgc::wave_sum(v); }
 __device__ __forceinline__ float sigmoid(float x) { return kgc::sigmoid(x); }
-__device__ __forceinline__ float beta_sigmoid(float x) { return sigmoid(x); }
-__device__ __forceinline__ float gate_softplus(float a, float dt, float a_log) { return -expf(a_log) * kgc::softplus(a + dt); }
+__device__ __forceinline__ float beta_sigmoid_f(float x) { return sigmoid(x); }
+__device__ __forceinline__ float gate_softplus_f(float a, float dt, float a_log) { return -expf(a_log) * kgc::softplus(a + dt); }
 // block-wide sum for the norm kernels; sh has blockDim/64 entries
 __device__ __forceinline__ float norm_sum(float v, float* sh) {
     v = warp_sum(v);
@@ -34,10 +34,10 @@ __device__ __forceinline__ float norm_sum(float v, float* sh) {
     return t;
 }
 
-__global__ void beta_kernel(float* __restrict__ b, int n) { const int i = blockIdx.x * blockDim.x + threadIdx.x; if (i < n) b[i] = beta_sigmoid(b[i]); }
-__global__ void gate_kernel(const float* __restrict__ a, const float* __restrict__ dt, const float* __restrict__ al, float* __restrict__ g, int n) {
+__global__ void beta_sigmoid(float* __restrict__ b, int n) { const int i = blockIdx.x * blockDim.x + threadIdx.x; if (i < n) b[i] = beta_sigmoid_f(b[i]); }
+__global__ void gate_softplus(const float* __restrict__ a, const float* __restrict__ dt, const float* __restrict__ al, float* __restrict__ g, int n) {
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) g[i] = gate_softplus(a[i], dt[i], al[i]);
+    if (i < n) g[i] = gate_softplus_f(a[i], dt[i], al[i]);
 }
 // cs (C, dc-1), kW (C, dc): conv step, then SiLU on the output; history shifts left.
 __global__ void conv_silu(float* __restrict__ cs, const float* __restrict__ x, const float* __restrict__ kW, float* __restrict__ out, int C, int dc) {
@@ -74,7 +74,7 @@ __global__ void out_norm(const float* __restrict__ o, const float* __restrict__ 
 
 cudaError_t native_gdn_beta_gate(float* beta, int n, cudaStream_t s) {
     if (!valid({beta, (size_t)(n > 0 ? n : 0) * 4}) || !count_and_stream(n, s)) return cudaErrorInvalidValue;
-    beta_kernel<<<(n + 127) / 128, 128, 0, s>>>(beta, n);
+    beta_sigmoid<<<(n + 127) / 128, 128, 0, s>>>(beta, n);
     return check_launch();
 }
 cudaError_t native_gdn_gate(const float* alpha, const float* dt_bias, const float* a_log, float* g, int n, cudaStream_t s) {
@@ -82,7 +82,7 @@ cudaError_t native_gdn_gate(const float* alpha, const float* dt_bias, const floa
     const Span sp[4] = {{alpha, nb}, {dt_bias, nb}, {a_log, nb}, {g, nb}};
     for (int i = 0; i < 4; ++i) if (!valid(sp[i])) return cudaErrorInvalidValue;
     for (int i = 0; i < 3; ++i) if (!disjoint(sp[i], sp[3])) return cudaErrorInvalidValue;
-    gate_kernel<<<(n + 127) / 128, 128, 0, s>>>(alpha, dt_bias, a_log, g, n);
+    gate_softplus<<<(n + 127) / 128, 128, 0, s>>>(alpha, dt_bias, a_log, g, n);
     return check_launch();
 }
 cudaError_t native_gdn_conv_silu(float* conv_state, const float* x, const float* kW, float* out, int C, int dc, cudaStream_t s) {

@@ -14,8 +14,8 @@ namespace baloon {
 namespace kg {
 namespace {
 constexpr int GU_ROWS = 4;                         // rows (waves) per block of the gate+up dequantization
-constexpr bool kDeclCommon = true;                 // block structs are decoded by offset; nothing else to declare
-constexpr bool kImplCommon = true;
+#define GGML_COMMON_DECL_CUDA 1                    // block structs are decoded by offset; nothing else to declare
+#define GGML_COMMON_IMPL_CUDA 1
 constexpr int QK_K = 256;
 
 struct Geo { int elems; int bytes; };
@@ -57,7 +57,7 @@ __device__ __forceinline__ int2 get_int_from_table_16(int q4, const int8_t* tabl
     }
     return make_int2(lo, hi);
 }
-__device__ __forceinline__ int ggml_cuda_dp4a_(int a, int b, int c) {
+__device__ __forceinline__ int ggml_cuda_dp4a(int a, int b, int c) {
     for (int k = 0; k < 4; ++k) c += (int)(int8_t)(a >> (8 * k)) * (int)(int8_t)(b >> (8 * k));
     return c;
 }
@@ -233,7 +233,7 @@ __global__ void quantize_q8_1_kernel(const float* __restrict__ x, uint8_t* __res
     if (lane < 32) o[4 + lane] = (uint8_t)(int8_t)q;
 }
 // y[row] = sum over weight blocks of row_dot; one wave per row, lanes stride over blocks
-__global__ void __launch_bounds__(256) iq_mmvq_kernel(Fmt f, const uint8_t* __restrict__ w, const uint8_t* __restrict__ q8, float* __restrict__ y, int rows, int cols, IqGrids g) {
+__global__ void __launch_bounds__(256) mmvq_kernel(Fmt f, const uint8_t* __restrict__ w, const uint8_t* __restrict__ q8, float* __restrict__ y, int rows, int cols, IqGrids g) {
     const int row = blockIdx.x * 4 + (threadIdx.x >> 6);
     if (row >= rows) return;
     const Geo gm = geo(f);
@@ -303,8 +303,45 @@ cudaError_t quantize_q8_1_rows(const float* x, uint8_t* out, int rows, int cols,
 }
 cudaError_t iq_mmvq(Fmt f, const uint8_t* w, const uint8_t* q8, float* y, int rows, int cols, const IqGrids& g, cudaStream_t s) {
     if (!w || !q8 || !y || rows <= 0 || iq_row_bytes(f, cols) < 0 || !iq_supported(f, g)) return cudaErrorInvalidValue;
-    iq_mmvq_kernel<<<(rows + 3) / 4, 256, 0, s>>>(f, w, q8, y, rows, cols, g);
+    mmvq_kernel<<<(rows + 3) / 4, 256, 0, s>>>(f, w, q8, y, rows, cols, g);
     return cudaGetLastError();
+}
+
+// native expert kernels: gate+up fused and down projection, used by native_expert_grouped
+// native_gu_kernel: h[row] = silu(gate_row[row] . xq) * (up_row[row] . xq); one wave per row, lanes stride blocks
+__global__ void __launch_bounds__(256) native_gu_kernel(Fmt f, const uint8_t* __restrict__ gate, const uint8_t* __restrict__ up,
+                                                        const uint8_t* __restrict__ xq, float* __restrict__ h,
+                                                        int n_ff, int n_embd, IqGrids g) {
+    const int row = blockIdx.x * 4 + (threadIdx.x >> 6);
+    if (row >= n_ff) return;
+    const Geo gm = geo(f);
+    const int lane = threadIdx.x & 63, nb = n_embd / gm.elems;
+    const uint8_t* gp = gate + (size_t)row * nb * gm.bytes;
+    const uint8_t* up_ = up  + (size_t)row * nb * gm.bytes;
+    float gv = 0.f, uv = 0.f;
+    for (int b = lane; b < nb; b += 64) {
+        const uint8_t* q8b = xq + (size_t)b * (gm.elems / 32) * 36;
+        gv += row_dot(f, gp  + (size_t)b * gm.bytes, q8b, g);
+        uv += row_dot(f, up_ + (size_t)b * gm.bytes, q8b, g);
+    }
+    gv = warp_sum(gv); uv = warp_sum(uv);
+    if (lane == 0) h[row] = kgc::silu(gv) * uv;
+}
+
+// native_down_kernel: out[col] = down_row[col] . hq; one wave per output row, lanes stride blocks
+__global__ void __launch_bounds__(256) native_down_kernel(Fmt f, const uint8_t* __restrict__ down,
+                                                          const uint8_t* __restrict__ hq, float* __restrict__ out,
+                                                          int n_embd, int n_ff, IqGrids g) {
+    const int col = blockIdx.x * 4 + (threadIdx.x >> 6);
+    if (col >= n_embd) return;
+    const Geo gm = geo(f);
+    const int lane = threadIdx.x & 63, nb = n_ff / gm.elems;
+    const uint8_t* dp = down + (size_t)col * nb * gm.bytes;
+    float acc = 0.f;
+    for (int b = lane; b < nb; b += 64)
+        acc += row_dot(f, dp + (size_t)b * gm.bytes, hq + (size_t)b * (gm.elems / 32) * 36, g);
+    acc = warp_sum(acc);
+    if (lane == 0) out[col] = acc;
 }
 
 // expert blob: gate [n_ff rows x n_embd cols] | up [n_ff x n_embd] | down [n_embd rows x n_ff cols], each rows * row_bytes
