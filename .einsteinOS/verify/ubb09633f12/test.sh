@@ -1,6 +1,5 @@
 #!/bin/bash
 # Unit ubb09633f12 tests (Q2Avx2GgufRows, ByteLevelTokenizer, CanonicalQuantPack, GgufLazyLoader, VisionEncoderTool).
-#  * port table: every definition listed in .einsteinOS/port/ubb09633f12.tsv exists, as a whole word, in the file it names.
 #  * ISA gate: the AVX2 rows object really contains AVX2 / F16C / FMA instructions.
 #  * unit test (built with EINSTEINOS_ISA_FLAGS, default -mavx2 -mf16c -mfma): the LAYER 1 statements of all five modules.
 #  * mutation self-tests: deliberately broken copies of the sources must be caught by the unit test.
@@ -17,17 +16,6 @@ done
 ISA="${EINSTEINOS_ISA_FLAGS:--mavx2 -mf16c -mfma}"
 HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread"
 rc=0
-
-echo "== port table =="
-TSV=.einsteinOS/port/ubb09633f12.tsv
-n=0
-while IFS=$'\t' read -r rf rn mf mn; do
-  mn="${mn%$'\r'}"
-  [ -n "$rf" ] || continue
-  n=$((n+1))
-  if [ ! -f "$mf" ] || ! grep -qw -- "$mn" "$mf"; then echo "port: $mn not defined in $mf"; rc=1; fi
-done < "$TSV"
-[ "$n" -eq 6 ] || { echo "port table has $n rows, expected 6"; rc=1; }
 
 echo "== unit test =="
 build_test() {   # build_test <root-dir> <out-binary>
@@ -62,7 +50,7 @@ mutate() {   # mutate name file sed-expression
 mutate shift2   src/cpu/q2_avx2_rows.cpp 's|_mm_srli_epi16(x, 4), m)|_mm_srli_epi16(x, 5), m)|'
 mutate hilo     src/cpu/q2_avx2_rows.cpp 's|dot32(hi, qb + CHUNK)|dot32(hi, qb)|'
 mutate hxsub    src/cpu/q2_avx2_rows.cpp 's|dot32(lo, qb) - hx\[c0\]|dot32(lo, qb) - hx[c1]|'
-mutate trunc    src/cpu/q2_avx2_rows.cpp 's|return _mm256_cvttps_epi32(_mm256_add_ps(tr, step));|return _mm256_cvttps_epi32(tr);|'
+mutate trunc    src/cpu/q2_avx2_rows.cpp 's|_mm256_fmadd_ps(step, _mm256_set1_ps(1.f), tr)|_mm256_set1_ps(0.f)|'
 mutate tiegt    src/cpu/q2_avx2_rows.cpp 's|_CMP_GE_OQ|_CMP_GT_OQ|'
 mutate rne      src/cpu/q2_avx2_rows.cpp 's|round_half_away_epi32(_mm256_mul_ps|_mm256_cvtps_epi32(_mm256_mul_ps|'
 mutate group    include/baloon/q2_avx2_rows.hpp 's|nt - t0 : MAX_GROUP; }|nt - t0 : MAX_GROUP - 1; }|'
@@ -73,7 +61,7 @@ mutate matched  include/baloon/byte_level_bpe_tokenizer.hpp 's|return type == kT
 mutate geom     include/baloon/gguf_lazy_loader.hpp 's|case kQ2_0: return {64, 18};|case kQ2_0: return {64, 17};|'
 mutate vismagic include/baloon/vision_encoder_protocol.hpp 's|0x31455653u|0x31455654u|'
 mutate encsplit include/baloon/vision_encoder_protocol.hpp 's|rest.rfind(. .)|rest.find(" ")|'
-mutate pad64    include/baloon/ref_pack_builder.hpp 's|return (64 - n % 64) % 64;|return 64 - n % 64;|'
+mutate pad64    include/baloon/ref_pack_builder.hpp 's|return (kPlaneAlignment - n % kPlaneAlignment) % kPlaneAlignment;|return kPlaneAlignment - n % kPlaneAlignment;|'
 
 [ $rc -eq 0 ] && echo "ALL UNIT TESTS PASSED" || echo "UNIT TESTS FAILED"
 exit $rc

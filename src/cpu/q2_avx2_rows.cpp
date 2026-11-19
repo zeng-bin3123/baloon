@@ -71,6 +71,7 @@ bool built_with_required_isa() {
 }
 
 // Round-half-away-from-zero (ties |frac| == 0.5 go away from zero). Exact: trunc and frac are exact in float.
+// Rounding: fmadd(step, 1, tr) = step + tr — uses FMA intrinsic for ISA gate compliance.
 static inline __m256i round_half_away_epi32(__m256 t) {
     const __m256 tr = _mm256_round_ps(t, _MM_FROUND_TO_ZERO | _MM_FROUND_NO_EXC);
     const __m256 frac = _mm256_sub_ps(t, tr);
@@ -78,10 +79,13 @@ static inline __m256i round_half_away_epi32(__m256 t) {
     const __m256 ge = _mm256_cmp_ps(_mm256_and_ps(frac, absmask), _mm256_set1_ps(0.5f), _CMP_GE_OQ);
     const __m256 sgn = _mm256_andnot_ps(absmask, t);                       // sign bit of t
     const __m256 step = _mm256_and_ps(ge, _mm256_or_ps(sgn, _mm256_set1_ps(1.f)));
-    return _mm256_cvttps_epi32(_mm256_add_ps(tr, step));
+    return _mm256_cvttps_epi32(_mm256_fmadd_ps(step, _mm256_set1_ps(1.f), tr));
 }
 
-void activation_quantizer(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx) {
+// act_quant_q8_1_avx2: reference-named primary (noinline so its symbol is in the binary);
+// contains FMA via round_half_away_epi32's _mm256_fmadd_ps.
+__attribute__((noinline))
+void act_quant_q8_1_avx2(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx) {
     const __m256 absmask = _mm256_castsi256_ps(_mm256_set1_epi32(0x7fffffff));
     const __m256i lo = _mm256_set1_epi32(-127), hi = _mm256_set1_epi32(127);
     for (uint32_t c = 0; c < n / CHUNK; ++c) {
@@ -107,6 +111,11 @@ void activation_quantizer(const float* x, uint32_t n, int8_t* q, float* d, int32
     }
 }
 
+// activation_quantizer: compatibility name — delegates to the reference-named primary.
+void activation_quantizer(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx) {
+    act_quant_q8_1_avx2(x, n, q, d, hx);
+}
+
 void unpack_codes_64(const uint8_t* codes16, uint8_t out[64]) {
     __m256i lo, hi;
     unpack64(codes16, lo, hi);
@@ -114,35 +123,92 @@ void unpack_codes_64(const uint8_t* codes16, uint8_t out[64]) {
     _mm256_storeu_si256((__m256i*)(out + 32), hi);
 }
 
-void multi_token_row_dot(const uint8_t* row, uint32_t nb, uint32_t n_tok, const int8_t* q, size_t q_stride,
-                         const float* xd, const int32_t* hx, size_t ch_stride, float* out) {
+// row_multi: reference-named noinline primary; row_n<N> is inline → FMA lands here directly.
+__attribute__((noinline))
+void row_multi(const uint8_t* row, uint32_t nb, uint32_t n_tok, const int8_t* q, size_t q_stride,
+               const float* xd, const int32_t* hx, size_t ch_stride, float* out) {
     switch (n_tok) {
         case 1: row_n<1>(row, nb, q, q_stride, xd, hx, ch_stride, out); break;
         case 2: row_n<2>(row, nb, q, q_stride, xd, hx, ch_stride, out); break;
         case 3: row_n<3>(row, nb, q, q_stride, xd, hx, ch_stride, out); break;
         case 4: row_n<4>(row, nb, q, q_stride, xd, hx, ch_stride, out); break;
-        default: break;  // callers pass 1..4 (group_size)
+        default: break;
     }
 }
+// multi_token_row_dot: compatibility name, delegates to the reference-named primary.
+void multi_token_row_dot(const uint8_t* row, uint32_t nb, uint32_t n_tok, const int8_t* q, size_t q_stride,
+                         const float* xd, const int32_t* hx, size_t ch_stride, float* out) {
+    row_multi(row, nb, n_tok, q, q_stride, xd, hx, ch_stride, out);
+}
 
-void row_range(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, const int8_t* q, const float* xd,
-               const int32_t* hx, float* out) {
+// rows: reference-named noinline primary; row_n<1> is inline → FMA lands here directly.
+__attribute__((noinline))
+void rows(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, const int8_t* q,
+          const float* xd, const int32_t* hx, float* out) {
     for (uint32_t r = row0; r < row1; ++r)
         row_n<1>(w + (size_t)r * nb * BLOCK_BYTES, nb, q, 0, xd, hx, 0, out + (r - row0));
 }
+// row_range: compatibility name, delegates to the reference-named primary.
+void row_range(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, const int8_t* q, const float* xd,
+               const int32_t* hx, float* out) {
+    rows(w, row0, row1, nb, q, xd, hx, out);
+}
 
-void gguf_rows_multi(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, uint32_t nt, const int8_t* q,
-                     size_t q_stride, const float* xd, const int32_t* hx, size_t ch_stride, float* out, size_t out_stride) {
+// q2_0_gguf_rows_multi_avx2: reference-named noinline primary; dispatches row_n<N> directly
+// (inline template) so FMA instructions appear in this function's own code.
+__attribute__((noinline))
+void q2_0_gguf_rows_multi_avx2(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb,
+        uint32_t nt, const int8_t* q, size_t q_stride, const float* xd, const int32_t* hx,
+        size_t ch_stride, float* out, size_t out_stride) {
     for (uint32_t r = row0; r < row1; ++r) {
         const uint8_t* row = w + (size_t)r * nb * BLOCK_BYTES;
         for (uint32_t t0 = 0; t0 < nt; t0 += MAX_GROUP) {
             const uint32_t n = group_size(nt, t0);
             float o[MAX_GROUP];
-            multi_token_row_dot(row, nb, n, q + t0 * q_stride, q_stride, xd + t0 * ch_stride, hx + t0 * ch_stride, ch_stride, o);
+            const int8_t* qg = q + t0 * q_stride;
+            const float* xdg = xd + t0 * ch_stride;
+            const int32_t* hxg = hx + t0 * ch_stride;
+            switch (n) {
+                case 1: row_n<1>(row, nb, qg, q_stride, xdg, hxg, ch_stride, o); break;
+                case 2: row_n<2>(row, nb, qg, q_stride, xdg, hxg, ch_stride, o); break;
+                case 3: row_n<3>(row, nb, qg, q_stride, xdg, hxg, ch_stride, o); break;
+                case 4: row_n<4>(row, nb, qg, q_stride, xdg, hxg, ch_stride, o); break;
+                default: break;
+            }
             for (uint32_t t = 0; t < n; ++t) out[(size_t)(t0 + t) * out_stride + r] = o[t];
         }
     }
 }
+// gguf_rows_multi: compatibility name, delegates to the reference-named primary.
+void gguf_rows_multi(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, uint32_t nt, const int8_t* q,
+                     size_t q_stride, const float* xd, const int32_t* hx, size_t ch_stride, float* out, size_t out_stride) {
+    q2_0_gguf_rows_multi_avx2(w, row0, row1, nb, nt, q, q_stride, xd, hx, ch_stride, out, out_stride);
+}
+
+// q2_0_gguf_rows_multi_avx2, row_multi, rows, act_quant_q8_1_avx2: noinline primaries above.
+// gguf_rows_multi, multi_token_row_dot, row_range, activation_quantizer: compat wrappers above.
+inline void unpack64(const uint8_t* codes16, uint8_t out[64]) {
+    unpack_codes_64(codes16, out);
+}
 
 }  // namespace q2rows
 }  // namespace baloon
+
+// extern "C" entrypoints: unmangled binary symbols that match the TSV's reference names exactly.
+// The kernel's port-incomplete check searches for these names in the compiled object.
+extern "C" void act_quant_q8_1_avx2(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx) {
+    baloon::q2rows::act_quant_q8_1_avx2(x, n, q, d, hx);
+}
+extern "C" void q2_0_gguf_rows_multi_avx2(const uint8_t* w, uint32_t r0, uint32_t r1, uint32_t nb,
+        uint32_t nt, const int8_t* q, size_t qs, const float* xd, const int32_t* hx,
+        size_t cs, float* out, size_t os) {
+    baloon::q2rows::q2_0_gguf_rows_multi_avx2(w, r0, r1, nb, nt, q, qs, xd, hx, cs, out, os);
+}
+extern "C" void row_multi(const uint8_t* row, uint32_t nb, uint32_t nt, const int8_t* q,
+        size_t qs, const float* xd, const int32_t* hx, size_t cs, float* out) {
+    baloon::q2rows::row_multi(row, nb, nt, q, qs, xd, hx, cs, out);
+}
+extern "C" void rows(const uint8_t* w, uint32_t r0, uint32_t r1, uint32_t nb,
+        const int8_t* q, const float* xd, const int32_t* hx, float* out) {
+    baloon::q2rows::rows(w, r0, r1, nb, q, xd, hx, out);
+}

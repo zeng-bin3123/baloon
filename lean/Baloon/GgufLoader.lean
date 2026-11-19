@@ -62,4 +62,11 @@ def shardsComplete (found total : Nat) : Bool := (found == total)
 
 theorem shardsComplete_iff (found total : Nat) : shardsComplete found total = true ↔ found = total := by { simp [shardsComplete] }
 
+/-- A scale field is 2 bytes (fp16, read by h2f / _cvtsh_ss) at the block start. -/
+theorem q2_scale_offset : (0 : Nat) + 2 ≤ 18 := by { decide }
+
+/-- Row r of a 2-D tensor stays within the tensor when r < nrows. -/
+theorem row_read_safe (r nrows rb : Nat) (h : r < nrows) : r * rb + rb ≤ nrows * rb := by
+  exact row_in_tensor r nrows rb h
+
 end Baloon.GgufLoader

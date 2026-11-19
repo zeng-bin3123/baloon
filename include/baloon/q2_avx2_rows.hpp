@@ -27,21 +27,32 @@ constexpr uint32_t group_size(uint32_t nt, uint32_t t0) { return nt - t0 < MAX_G
 // True when the translation unit was built with AVX2 + F16C + FMA (the kernels below require them).
 bool built_with_required_isa();
 
-// Quantize n floats (n % 32 == 0): per 32-value chunk d = amax/127, q = clamp(rne(x/d), -127, 127), hx = sum of q.
+// Quantize n floats (n % 32 == 0): per 32-value chunk d = amax/127, q = clamp(half-away(x/d), -127, 127), hx = sum of q.
+// act_quant_q8_1_avx2 is the reference-named primary (uses _mm256_fmadd_ps); activation_quantizer is a compat alias.
+void act_quant_q8_1_avx2(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx);
 void activation_quantizer(const float* x, uint32_t n, int8_t* q, float* d, int32_t* hx);
 
 // Expand 16 code bytes to the 64 codes (0..3) in value order.
 void unpack_codes_64(const uint8_t* codes16, uint8_t out[64]);
 
 // Dot of one row (nb blocks) against n_tok (1..4) quantized activations; out[t] for t < n_tok.
+// row_multi is the reference-named primary (dispatches row_n<N> with FMA); multi_token_row_dot is a compat alias.
+void row_multi(const uint8_t* row, uint32_t nb, uint32_t n_tok, const int8_t* q, size_t q_stride,
+               const float* xd, const int32_t* hx, size_t ch_stride, float* out);
 void multi_token_row_dot(const uint8_t* row, uint32_t nb, uint32_t n_tok, const int8_t* q, size_t q_stride,
                          const float* xd, const int32_t* hx, size_t ch_stride, float* out);
 
 // Single token: out[r - row0] for rows [row0, row1) of a row-major matrix with nb blocks per row.
+// rows is the reference-named primary (loops row_n<1> with FMA); row_range is a compat alias.
+void rows(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, const int8_t* q, const float* xd,
+          const int32_t* hx, float* out);
 void row_range(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, const int8_t* q, const float* xd,
                const int32_t* hx, float* out);
 
 // Rows [row0, row1) against nt tokens (in groups of at most 4); out[t * out_stride + r].
+// q2_0_gguf_rows_multi_avx2 is the reference-named primary; gguf_rows_multi is a compat alias.
+void q2_0_gguf_rows_multi_avx2(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, uint32_t nt, const int8_t* q,
+                                size_t q_stride, const float* xd, const int32_t* hx, size_t ch_stride, float* out, size_t out_stride);
 void gguf_rows_multi(const uint8_t* w, uint32_t row0, uint32_t row1, uint32_t nb, uint32_t nt, const int8_t* q,
                      size_t q_stride, const float* xd, const int32_t* hx, size_t ch_stride, float* out, size_t out_stride);
 

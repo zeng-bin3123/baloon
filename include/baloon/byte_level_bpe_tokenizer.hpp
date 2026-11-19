@@ -24,6 +24,11 @@ constexpr int kTypeUserDefined = 4;
 
 // ---- byte <-> unicode ---------------------------------------------------------------------------
 // Bytes 33..126, 161..172 and 174..255 map to themselves; the other 68 map to 256 + n in byte order.
+// GPT-2 byte alphabet: 188 printable bytes map to themselves; 68 non-printable map to 256..323.
+constexpr unsigned kPrintableCount    = 188;
+constexpr unsigned kNonPrintableCount = 68;
+static_assert(kPrintableCount + kNonPrintableCount == 256, "byte alphabet covers all 256 bytes");
+
 constexpr bool printable(unsigned b) {
     return (b >= 33 && b <= 126) || (b >= 161 && b <= 172) || (b >= 174 && b <= 255);
 }

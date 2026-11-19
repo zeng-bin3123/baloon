@@ -20,6 +20,11 @@ enum GgmlType : uint32_t {
     kIQ4_NL = 20, kIQ4_XS = 23, kBF16 = 30,
     kQ2_0 = 42  // GGML type id 42: 64 elements / 18 bytes (fp16 scale + 64 two-bit codes)
 };
+// Q2_0 block layout constants (also used by q2_avx2_rows kernel).
+constexpr uint32_t kQ2_0ElPerBlock    = 64;
+constexpr uint32_t kQ2_0BytesPerBlock = 18;
+enum _GgmlTypePad { // pad to suppress missing-enumerator warnings; unused
+};
 
 struct BlockGeometry { uint64_t el = 0, by = 0; };  // el == 0 means unknown type
 

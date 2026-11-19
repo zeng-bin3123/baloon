@@ -53,6 +53,13 @@ def clampQ (v : Int) : Int := (max (-127) (min v 127))
 /-- Clamped codes fit an int8. -/
 theorem clampQ_int8 (v : Int) : -128 ≤ clampQ v ∧ clampQ v ≤ 127 := by { unfold clampQ; omega }
 
+/-- Half-away-from-zero rounding: (t2 + sign(t2)) / 2, negation-folded for the negative branch. -/
+def roundHalfAway (t2 : Int) : Int :=
+  if 0 ≤ t2 then (t2 + 1) / 2 else -((1 - t2) / 2)
+
+/-- Ties round away from zero: 2.5 -> 3 and -2.5 -> -3 (t2 = ±5). -/
+theorem round_ties_away : roundHalfAway 5 = 3 ∧ roundHalfAway (-5) = -3 := by { decide }
+
 /-- Chunk count of the quantizer for a width that is a multiple of 32. -/
 theorem nchunks_exact (n : Nat) (h : n % 32 = 0) : (n / 32) * 32 = n := by { omega }
 

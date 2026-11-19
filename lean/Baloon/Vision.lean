@@ -46,4 +46,10 @@ theorem native_xor_baseline (p : Bool) : ggmlNative p = !baselineFlags p := by {
 theorem portable_not_native : ggmlNative true = false := by { rfl }
 theorem default_native : ggmlNative false = true ∧ baselineFlags false = false := by { decide }
 
+/-- Vision runs on the GPU only if the CUDA option is on (double-negation form). -/
+def ggmlCuda (cuda : Bool) : Bool := !(!cuda)
+
+/-- The default (OFF) builds no CUDA backend. -/
+theorem cuda_default_off : ggmlCuda false = false := by simp [ggmlCuda]
+
 end Baloon.Vision

@@ -35,4 +35,89 @@ theorem q8_codebook (q : Int) (h1 : -128 ≤ q) (h2 : q ≤ 127) :
 
 theorem q3k_mask_bits : ∀ half : Nat, half < 2 → ∀ j : Nat, j < 4 → 4 * half + j < 8 := by { decide }
 
+/-- Q5_K masks u1 = 1 << 2j, u2 = 2 << 2j walk the eight distinct bits. -/
+theorem q5k_masks : ∀ j : Nat, j < 4 →
+    (1 <<< (2 * j)) = 2 ^ (2 * j) ∧ (2 <<< (2 * j)) = 2 ^ (2 * j + 1) := by { decide }
+
+/-- Q5_0 fifth-bit shift j+12 with mask 0x10 reads bit j+16 of qh. -/
+theorem q5_0_high_bit : ∀ j : Nat, j < 16 → ((1 <<< (j + 16)) >>> (j + 12)) &&& 16 = 16 := by { decide }
+
+/-- Block byte sizes equal the sum of their fields. -/
+theorem block_bytes_sum :
+    2 + 16 = 18 ∧ 2 + 4 + 16 = 22 ∧ 2 + 32 = 34 ∧ 32 + 64 + 12 + 2 = 110 ∧
+    2 + 2 + 12 + 128 = 144 ∧ 2 + 2 + 12 + 32 + 128 = 176 ∧ 128 + 64 + 16 + 2 = 210 ∧
+    2 + 2 + 4 + 128 = 136 := by { decide }
+
+/-- Group sizes divide block widths in every mapping. -/
+theorem group_divides_block :
+    64 % 64 = 0 ∧ 256 % 16 = 0 ∧ 32 % 32 = 0 ∧ 256 % 32 = 0 ∧ 1 % 1 = 0 := by { decide }
+
+/-- Scale counts per block. -/
+theorem group_counts : 256 / 16 = 16 ∧ 256 / 32 = 8 ∧ 64 / 64 = 1 := by { decide }
+
+/-- Padding before a 64-byte-aligned plane. -/
+def pad (len : Nat) : Nat := if len % 64 = 0 then 0 else 64 - len % 64
+
+/-- After padding the offset is a multiple of 64. -/
+theorem pad_aligns (len : Nat) : (len + pad len) % 64 = 0 := by
+  unfold pad; split_ifs with h
+  · omega
+  · have := Nat.mod_lt len (show 0 < 64 from by norm_num); omega
+
+/-- Padding is smaller than the alignment. -/
+theorem pad_lt (len : Nat) : pad len < 64 := by
+  unfold pad; split_ifs with h
+  · norm_num
+  · have := Nat.mod_lt len (show 0 < 64 from by norm_num); omega
+
+/-- An already aligned offset gets no padding. -/
+theorem pad_zero (len : Nat) (h : len % 64 = 0) : pad len = 0 := by unfold pad; simp [h]
+
+/-- Scale dtype: fp16 (2 bytes) or fp32 (4 bytes). -/
+def scaleBytes : Bool → Nat | true => 2 | false => 4
+
+/-- FP32 fallback costs at most twice the bytes. -/
+theorem scaleBytes_le (b : Bool) : 2 ≤ scaleBytes b ∧ scaleBytes b ≤ 4 := by
+  cases b <;> simp [scaleBytes] <;> omega
+
+-- ── MTP expert quantizer (Q2_0 on {-1,0,1,2}) ────────────────────────────────
+
+/-- Clip to the Q2_0 grid {-1, 0, 1, 2}. -/
+def clipQ (q : Int) : Int := if q < -1 then -1 else if q > 2 then 2 else q
+
+/-- Stored code is clipQ(q) + 1, always in 0..3. -/
+theorem mtp_code_range (q : Int) : 0 ≤ clipQ q + 1 ∧ clipQ q + 1 ≤ 3 := by
+  simp only [clipQ]; split_ifs <;> omega
+
+/-- Decoding the stored code returns the clipped value. -/
+theorem mtp_decode_encode (q : Int) : (clipQ q + 1) - 1 = clipQ q := by
+  simp only [clipQ]; split_ifs <;> omega
+
+/-- Scale search: 17 candidates, factor (16+k)/32 from 1/2 (k=0) to 1 (k=16). -/
+theorem mtp_scale_candidates : (16 + 0 : Nat) * 2 = 32 ∧ 16 + 16 = 32 ∧ 16 + 1 = 17 := by norm_num
+
+/-- MTP routed-expert bytes in Q2_0: gate_up [512,1280,2560] and down [512,2560,640]. -/
+theorem mtp_q2_expert_bytes :
+    512 * 1280 * (2560 / 64 * 18) = 471859200 ∧ 512 * 2560 * (640 / 64 * 18) = 235929600 ∧
+    471859200 + 235929600 = 707788800 := by norm_num
+
+/-- Inner dimensions are multiples of every supported block width. -/
+theorem mtp_inner_divisible : 2560 % 64 = 0 ∧ 640 % 64 = 0 ∧ 2560 % 32 = 0 ∧ 640 % 32 = 0 := by norm_num
+
+-- ── IQ4 non-linear codebook ───────────────────────────────────────────────────
+
+/-- kvalues_iq4nl: the non-affine 4-bit codebook. -/
+def kvIq4nl : List Int :=
+  [-127, -104, -83, -65, -49, -35, -22, -10] ++
+  [1, 13, 25, 38, 53, 69, 89, 113]
+
+/-- The codebook has 16 entries. -/
+theorem kvIq4nl_length : kvIq4nl.length = 16 := by { decide }
+
+/-- The codebook is strictly increasing. -/
+theorem kvIq4nl_sorted : kvIq4nl.Pairwise (· < ·) := by { decide }
+
+/-- The codebook is non-affine: second differences are not all zero. -/
+theorem kvIq4nl_nonaffine : (kvIq4nl[1]! - kvIq4nl[0]!) ≠ (kvIq4nl[2]! - kvIq4nl[1]!) := by { decide }
+
 end Baloon.Pack

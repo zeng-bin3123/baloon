@@ -41,7 +41,8 @@ inline std::optional<std::vector<uint8_t>> unpack_codes(const uint8_t* packed, s
 }
 
 // ---- plane alignment ----------------------------------------------------------------------------------------------
-inline uint64_t pad64(uint64_t n) { return (64 - n % 64) % 64; }
+constexpr uint64_t kPlaneAlignment = 64;  // every code/scale plane starts on a 64-byte boundary
+inline uint64_t pad64(uint64_t n) { return (kPlaneAlignment - n % kPlaneAlignment) % kPlaneAlignment; }
 
 // Appends planes so that every plane starts on a 64-byte boundary.
 class PlaneWriter {

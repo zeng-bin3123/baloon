@@ -89,5 +89,9 @@ inline bool validate_file(const std::vector<uint8_t>& b) {
     return b.size() == file_bytes((uint64_t)h.n_tokens, (uint64_t)h.n_embd);
 }
 
+// Build-config defaults: non-portable builds are native; CUDA is off unless REF_VISION_CUDA is set.
+constexpr bool kDefaultNative = true;
+constexpr bool kDefaultCuda   = false;
+
 }  // namespace vision_enc
 }  // namespace baloon
