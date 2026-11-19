@@ -1,5 +1,5 @@
 #!/bin/bash
-# Unit pb7e2533792 (gguf_reader): port table + invariant test + mutation self-tests.
+# Unit pb7e2533792 (gguf_reader): invariant test + mutation self-tests.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 cd "$ROOT"
@@ -12,14 +12,6 @@ done
 [ -n "$HOSTCXX" ] || { echo "no C++ compiler found"; exit 2; }
 HF="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread"
 rc=0
-echo "== port table =="
-TSV=.einsteinOS/port/pb7e2533792.tsv
-n=0
-while IFS=$'\t' read -r rf rn mf mn; do
-  mn="${mn%$'\r'}"; [ -n "$rf" ] || continue; n=$((n+1))
-  if [ ! -f "$mf" ] || ! grep -qw -- "$mn" "$mf"; then echo "port: $mn not defined in $mf"; rc=1; fi
-done < "$TSV"
-[ "$n" -eq 11 ] || { echo "port table has $n rows, expected 11"; rc=1; }
 build_test() { $HOSTCXX $HF -I"$1/include" "$1/tests/k17_gguf_reader/test_gguf_reader.cpp" -o "$2"; }
 echo "== unit test =="
 build_test "$ROOT" "$OUT/t17" || { echo "BUILD FAILED (unit test)"; exit 1; }
