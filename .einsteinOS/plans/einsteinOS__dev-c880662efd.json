@@ -1,9 +1,9 @@
 {
   "holder": {
-    "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
-    "pid": 29094,
-    "started": "2026-11-19T11:49:56.303530731Z",
-    "renewed": "2026-11-19T13:23:28.219461606Z"
+    "host": "cc-58e31738-7d16-4b93-aa09-745898b4ddee-0",
+    "pid": 25518,
+    "started": "2026-11-19T16:14:17.931214961Z",
+    "renewed": "2026-11-19T16:20:20.641103274Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -1024,6 +1024,13 @@
       "smoke": "pass"
     }
   },
+  "reopen": {
+    "u6561d2f27c": {
+      "kind": "ref_path_written",
+      "text": "ref_path_written: 1 file(s) the unit wrote are at the path of a reference file as it is shown here (include/ref/core/expert_cache.hpp src/core/expert_source.cpp) — the reference's files are the kernel's to read, not this repository's; the unit's counterparts are files of its own:\ninclude/ref/core/expert_cache.hpp",
+      "base_ref": ""
+    }
+  },
   "reopen_count": {
     "p00a7a246af": 1,
     "p11b3c1e15c": 1,
@@ -1053,6 +1060,7 @@
     "u316bd6b9ec": 1,
     "u32f71e85a9": 2,
     "u52d156705c": 1,
+    "u6561d2f27c": 1,
     "u7991572426": 2,
     "u89be81de0b": 2,
     "ub25e8eba7f": 1,
