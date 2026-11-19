@@ -3,7 +3,7 @@
     "host": "cc-58e31738-7d16-4b93-aa09-745898b4ddee-0",
     "pid": 25518,
     "started": "2026-11-19T16:14:17.931214961Z",
-    "renewed": "2026-11-19T16:20:20.641103274Z"
+    "renewed": "2026-11-19T16:22:56.327386457Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -578,7 +578,7 @@
     },
     "ExpertCache.lean": {
       "hash": "b5c930321ff3",
-      "pass": true,
+      "pass": false,
       "unit_id": "u6561d2f27c"
     },
     "ExpertPoolScheduling.lean": {
@@ -588,7 +588,7 @@
     },
     "ExpertSource.lean": {
       "hash": "11f19c5505c2",
-      "pass": true,
+      "pass": false,
       "unit_id": "u6561d2f27c"
     },
     "F16BitsRounding.lean#items: encodeTop, finite_overflow_is_inf, nan_stays_nan, inf_stays_inf, conflation_hazard": {
@@ -788,7 +788,8 @@
     "pd8e380f419": 1,
     "pe1ab8a4555": 1,
     "pe1f7ca5c00": 1,
-    "pfcccb31b26": 1
+    "pfcccb31b26": 1,
+    "u6561d2f27c": 1
   },
   "fail_history": {
     "p1bc270de01": [
@@ -1015,22 +1016,14 @@
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 33 definition(s) the reference requires of this unit have no counterpart on the branch:\n  chat.py func main: no line in .einsteinOS/port/pfcccb31b26.tsv\n  chat.py func stream: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func _cpuid_avx512_full: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func ask: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func build_engine: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func cmake_build: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func cpu_info: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func cuda_lib_dirs: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func done: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func download: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func driver_major: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func fail: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func find_nvcc: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func find_tool: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func find_vcvars: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func free_gb: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func get_llama_cpp: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func get_prebuilt: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func gpu_info: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func install_build_tools: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func installed_configs: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func main: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func mark: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func ok: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func out: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func pip_install: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func ram_gb: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func run: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func say: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func start: no line in .einsteinOS/port/pfcccb31b26.tsv\n  … 3 more",
       "base_ref": ""
-    }
-  },
-  "infra_fails": 0,
-  "review_pending": {
-    "pb0569948de": {
-      "compile": "pass",
-      "smoke": "pass"
-    }
-  },
-  "reopen": {
+    },
     "u6561d2f27c": {
       "kind": "ref_path_written",
       "text": "ref_path_written: 1 file(s) the unit wrote are at the path of a reference file as it is shown here (include/ref/core/expert_cache.hpp src/core/expert_source.cpp) — the reference's files are the kernel's to read, not this repository's; the unit's counterparts are files of its own:\ninclude/ref/core/expert_cache.hpp",
       "base_ref": ""
     }
   },
+  "infra_fails": 0,
   "reopen_count": {
     "p00a7a246af": 1,
     "p11b3c1e15c": 1,
