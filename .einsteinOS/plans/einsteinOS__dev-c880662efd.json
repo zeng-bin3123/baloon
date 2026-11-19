@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 22487,
     "started": "2026-11-18T15:14:51.726946148Z",
-    "renewed": "2026-11-18T23:47:11.211981829Z"
+    "renewed": "2026-11-19T01:36:59.939596202Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -319,7 +319,7 @@
         "VisionEncoderTool.lean"
       ],
       "reason": "added after theory changed",
-      "conv": "6e251217-b7fe-4f71-bb03-174726d5be37"
+      "conv": "a3940a17-f38c-491e-b230-aa590413498d"
     },
     {
       "id": "u7991572426",
@@ -902,6 +902,12 @@
     }
   },
   "infra_fails": 0,
+  "review_pending": {
+    "ubb09633f12": {
+      "compile": "pass",
+      "smoke": "pass"
+    }
+  },
   "reopen": {
     "p00a7a246af": {
       "kind": "port_incomplete",
