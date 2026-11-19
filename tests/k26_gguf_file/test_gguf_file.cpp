@@ -69,7 +69,7 @@ static bool bytes_eq(const gguf::Span& s, const std::vector<uint8_t>& all, size_
 static void test_bf16() {
     const uint16_t in[] = {0x3F80, 0xBF80, 0x0000, 0x8000, 0x7F80, 0xFF80, 0x7FC1, 0x0001, 0x4049};
     float out[9];
-    gguf_file::bf16_to_f32(in, 9, out);
+    gguf_file::_bf16_to_f32(in, 9, out);
     CHECK(out[0] == 1.0f && out[1] == -1.0f && out[2] == 0.0f && !std::signbit(out[2]));
     CHECK(out[3] == 0.0f && std::signbit(out[3]));
     CHECK(std::isinf(out[4]) && out[4] > 0 && std::isinf(out[5]) && out[5] < 0);
@@ -78,7 +78,7 @@ static void test_bf16() {
     CHECK(std::fabs(out[8] - 3.140625f) < 1e-7f);
     // exhaustive: widening then keeping the high half returns the input
     for (uint32_t v = 0; v < 65536; ++v) {
-        uint16_t h = (uint16_t)v; float f; gguf_file::bf16_to_f32(&h, 1, &f);
+        uint16_t h = (uint16_t)v; float f; gguf_file::_bf16_to_f32(&h, 1, &f);
         uint32_t u; std::memcpy(&u, &f, 4); CHECK((u >> 16) == v && (u & 0xFFFF) == 0);
     }
 }
@@ -87,31 +87,31 @@ static void test_dequant_flat() {
     // F32 / F16 / BF16 / Q8_0 against hand-computed values
     float f32[3] = {1.5f, -2.25f, 1e-3f}; uint8_t raw[12]; std::memcpy(raw, f32, 12);
     float o[64];
-    CHECK(gguf_file::dequant_flat(0, raw, 3, o) && o[0] == 1.5f && o[1] == -2.25f && o[2] == 1e-3f);
+    CHECK(gguf_file::_dequant_flat(0, raw, 3, o) && o[0] == 1.5f && o[1] == -2.25f && o[2] == 1e-3f);
     const uint8_t h16[] = {0x00, 0x3C, 0x00, 0xC0, 0x00, 0x38};  // 1.0, -2.0, 0.5
-    CHECK(gguf_file::dequant_flat(1, h16, 3, o) && o[0] == 1.0f && o[1] == -2.0f && o[2] == 0.5f);
+    CHECK(gguf_file::_dequant_flat(1, h16, 3, o) && o[0] == 1.0f && o[1] == -2.0f && o[2] == 0.5f);
     const uint8_t b16[] = {0x80, 0x3F, 0x00, 0xC0};  // 1.0, -2.0
-    CHECK(gguf_file::dequant_flat(30, b16, 2, o) && o[0] == 1.0f && o[1] == -2.0f);
+    CHECK(gguf_file::_dequant_flat(30, b16, 2, o) && o[0] == 1.0f && o[1] == -2.0f);
     uint8_t q8[34]; q8[0] = 0x00; q8[1] = 0x38;  // scale 0.5
     for (int i = 0; i < 32; ++i) q8[2 + i] = (uint8_t)(int8_t)(i - 16);
-    CHECK(gguf_file::dequant_flat(8, q8, 32, o));
+    CHECK(gguf_file::_dequant_flat(8, q8, 32, o));
     for (int i = 0; i < 32; ++i) CHECK(o[i] == 0.5f * (float)(i - 16));
     // two blocks: second block scale 2.0
     uint8_t q8b[68]; std::memcpy(q8b, q8, 34); q8b[34] = 0x00; q8b[35] = 0x40;
     for (int i = 0; i < 32; ++i) q8b[36 + i] = (uint8_t)(int8_t)(3);
     float o2[64];
-    CHECK(gguf_file::dequant_flat(8, q8b, 64, o2));
+    CHECK(gguf_file::_dequant_flat(8, q8b, 64, o2));
     CHECK(o2[0] == -8.0f && o2[32] == 6.0f && o2[63] == 6.0f);
     // partial blocks and unknown types are refused and write nothing
     float sentinel[64]; for (auto& s : sentinel) s = 123.f;
-    CHECK(!gguf_file::dequant_flat(8, q8b, 33, sentinel) && sentinel[0] == 123.f);
-    CHECK(!gguf_file::dequant_flat(42, q8b, 63, sentinel) && sentinel[0] == 123.f);
-    CHECK(!gguf_file::dequant_flat(99, q8b, 32, sentinel) && sentinel[0] == 123.f);
-    CHECK(!gguf_file::dequant_flat(0, nullptr, 1, sentinel));
+    CHECK(!gguf_file::_dequant_flat(8, q8b, 33, sentinel) && sentinel[0] == 123.f);
+    CHECK(!gguf_file::_dequant_flat(42, q8b, 63, sentinel) && sentinel[0] == 123.f);
+    CHECK(!gguf_file::_dequant_flat(99, q8b, 32, sentinel) && sentinel[0] == 123.f);
+    CHECK(!gguf_file::_dequant_flat(0, nullptr, 1, sentinel));
     // Q2_0 (id 42) is a known type: two blocks equal the per-block scalar dequantiser
     std::vector<uint8_t> q2 = pattern(36, 5); q2[0] = 0; q2[1] = 0x3C; q2[18] = 0; q2[19] = 0x38;
     float a[128], b[128];
-    CHECK(gguf_file::dequant_flat(42, q2.data(), 128, a));
+    CHECK(gguf_file::_dequant_flat(42, q2.data(), 128, a));
     artifact::dequantize_q2_0(q2.data(), b); artifact::dequantize_q2_0(q2.data() + 18, b + 64);
     CHECK(std::memcmp(a, b, sizeof a) == 0);
     // every quantised type: flat dequant equals block-by-block dequant
@@ -123,7 +123,7 @@ static void test_dequant_flat() {
         std::vector<uint8_t> d = pattern(q.by * 3, q.t);
         for (uint64_t blk = 0; blk < 3; ++blk) { d[blk * q.by] = 0; d[blk * q.by + 1] = 0x30; }  // finite small fp16 scale
         std::vector<float> flat(q.el * 3), ref(q.el * 3);
-        CHECK(gguf_file::dequant_flat(q.t, d.data(), q.el * 3, flat.data()));
+        CHECK(gguf_file::_dequant_flat(q.t, d.data(), q.el * 3, flat.data()));
         for (uint64_t blk = 0; blk < 3; ++blk) q.fn(d.data() + blk * q.by, ref.data() + blk * q.el);
         CHECK(std::memcmp(flat.data(), ref.data(), flat.size() * 4) == 0);
     }
@@ -146,25 +146,25 @@ static void test_files() {
     CHECK(write_gguf(p2, {emb, bf, odd}));
 
     // --- shard discovery: complete set found in index order, from either member, missing sibling rejected
-    auto s = gguf_file::discover_shards(p1);
+    auto s = gguf_file::_discover_shards(p1);
     CHECK(s && s->size() == 2 && (*s)[0] == p1 && (*s)[1] == p2);
-    auto s2 = gguf_file::discover_shards(p2);
+    auto s2 = gguf_file::_discover_shards(p2);
     CHECK(s2 && s2->size() == 2 && (*s2)[0] == p1);
-    CHECK(!gguf_file::discover_shards(dir + "/nothing-00001-of-00002.gguf"));
-    CHECK(!gguf_file::discover_shards(dir + "/missing.gguf"));        // plain file that does not exist
+    CHECK(!gguf_file::_discover_shards(dir + "/nothing-00001-of-00002.gguf"));
+    CHECK(!gguf_file::_discover_shards(dir + "/missing.gguf"));        // plain file that does not exist
     {
         const std::string q1 = dir + "/x-00001-of-00003.gguf", q3 = dir + "/x-00003-of-00003.gguf";
         CHECK(write_gguf(q1, {w}) && write_gguf(q3, {w}));
-        CHECK(!gguf_file::discover_shards(q1));                       // 00002 missing
+        CHECK(!gguf_file::_discover_shards(q1));                       // 00002 missing
         Gguf g; std::string err; CHECK(!g.open(q1, &err) && !err.empty());
         const std::string q2p = dir + "/x-00002-of-00003.gguf";
         T w2{"w2", {4, 3}, 0, pattern(48, 9)}; T w3{"w3", {4, 3}, 0, pattern(48, 8)};
         CHECK(write_gguf(q1, {w}) && write_gguf(q2p, {w2}) && write_gguf(q3, {w3}));
-        CHECK(gguf_file::discover_shards(q1) && gguf_file::discover_shards(q1)->size() == 3);
+        CHECK(gguf_file::_discover_shards(q1) && gguf_file::_discover_shards(q1)->size() == 3);
     }
     const std::string single = dir + "/single.gguf";
     CHECK(write_gguf(single, {w}));
-    auto s3 = gguf_file::discover_shards(single);
+    auto s3 = gguf_file::_discover_shards(single);
     CHECK(s3 && s3->size() == 1 && (*s3)[0] == single);
 
     // --- the reader
@@ -201,8 +201,8 @@ static void test_files() {
     CHECK(g.rows_f32("emb", {1, 2}, rf) && rf.size() == 320);
     {
         std::vector<float> ref(320);
-        CHECK(gguf_file::dequant_flat(20, emb.data.data() + 90, 160, ref.data()));
-        CHECK(gguf_file::dequant_flat(20, emb.data.data() + 180, 160, ref.data() + 160));
+        CHECK(gguf_file::_dequant_flat(20, emb.data.data() + 90, 160, ref.data()));
+        CHECK(gguf_file::_dequant_flat(20, emb.data.data() + 180, 160, ref.data() + 160));
         CHECK(std::memcmp(rf.data(), ref.data(), 320 * 4) == 0);
     }
     std::vector<float> bff;

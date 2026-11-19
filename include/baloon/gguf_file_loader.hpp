@@ -22,7 +22,7 @@ namespace baloon {
 namespace gguf_file {
 
 // ---- bf16 -> f32: the 16 stored bits become the high half of the f32 (exact, NaN payloads and -0 preserved) -----
-inline void bf16_to_f32(const uint16_t* src, uint64_t n, float* dst) {
+inline void _bf16_to_f32(const uint16_t* src, uint64_t n, float* dst) {
     for (uint64_t i = 0; i < n; ++i) {
         const uint32_t u = (uint32_t)src[i] << 16;
         std::memcpy(&dst[i], &u, 4);
@@ -31,7 +31,7 @@ inline void bf16_to_f32(const uint16_t* src, uint64_t n, float* dst) {
 
 // ---- shard discovery: the complete, index-ordered shard set of `path` (the path itself when it is not a shard) ----
 // A shard set with any missing sibling is rejected; a path whose file does not exist is rejected.
-inline std::optional<std::vector<std::string>> discover_shards(const std::string& path) {
+inline std::optional<std::vector<std::string>> _discover_shards(const std::string& path) {
     auto r = gguf::discover_shards(path);
     if (!r) return std::nullopt;  // never empty when present
     for (const auto& s : *r) {
@@ -43,7 +43,7 @@ inline std::optional<std::vector<std::string>> discover_shards(const std::string
 
 // ---- flat dequantisation of `elements` values of ggml type `type` stored at `src` -> f32 ----------------------
 // False for an unknown type or when `elements` is not a whole number of blocks (nothing is written then).
-inline bool dequant_flat(uint32_t type, const uint8_t* src, uint64_t elements, float* out) {
+inline bool _dequant_flat(uint32_t type, const uint8_t* src, uint64_t elements, float* out) {
     const gguf::BlockGeometry g = gguf::block_geometry(type);
     if (g.el == 0 || !src || !out || elements % g.el != 0) return false;
     switch (type) {
@@ -90,7 +90,7 @@ struct Gguf {
     // or malformed file, or a tensor name that appears in two shards.
     bool open(const std::string& path, std::string* err = nullptr) {
         close();
-        auto shards = discover_shards(path);
+        auto shards = _discover_shards(path);
         if (!shards) return fail(err, "incomplete or missing shard set: " + path);
         for (const auto& p : *shards) {
             const int fd = ::open(p.c_str(), O_RDONLY);
@@ -161,7 +161,7 @@ struct Gguf {
         const gguf::BlockGeometry g = gguf::block_geometry(t->type);
         const uint64_t n = sp->len / g.by * g.el;
         out.resize((size_t)n);
-        if (!dequant_flat(t->type, sp->ptr, n, out.data())) { out.clear(); return false; }
+        if (!_dequant_flat(t->type, sp->ptr, n, out.data())) { out.clear(); return false; }
         return true;
     }
     bool rows_f32(const std::string& name, const std::vector<uint64_t>& idx, std::vector<float>& out) const {
@@ -171,7 +171,7 @@ struct Gguf {
         if (!t || !rows(name, idx, raw)) return false;
         const uint64_t n = idx.size() * t->shape[0];
         out.resize((size_t)n);
-        if (!dequant_flat(t->type, raw.data(), n, out.data())) { out.clear(); return false; }
+        if (!_dequant_flat(t->type, raw.data(), n, out.data())) { out.clear(); return false; }
         return true;
     }
 
