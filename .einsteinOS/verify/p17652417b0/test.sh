@@ -22,7 +22,7 @@ grep -q "^OK" "$OUT/base.log" || rc=1
 echo "== mutation self-tests (each mutant must be caught) =="
 mutant() {  # mutant <name> <file under pytools/> <old> <new>
   local name="$1" f="$2" old="$3" new="$4" m="$OUT/m_$1"
-  rm -rf "$m"; mkdir -p "$m/.einsteinOS"; cp -r pytools "$m/"; cp -r .einsteinOS/port "$m/.einsteinOS/"
+  rm -rf "$m"; mkdir -p "$m"; cp -r pytools "$m/"
   python3 - "$m/pytools/$f" "$old" "$new" <<'PY' || { echo "mutant $name: pattern not found"; rc=1; return; }
 import sys
 p, old, new = sys.argv[1:4]

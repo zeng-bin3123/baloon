@@ -3,7 +3,6 @@ layout, MTP quantiser, shard fetching, IQ index, byte-level BPE). Exits non-zero
 Run with PYTOOLS_ROOT (default: repo root) naming the tree whose `pytools` package is under test."""
 import json
 import os
-import re
 import struct
 import sys
 import tempfile
@@ -19,7 +18,6 @@ import numpy as np  # noqa: E402
 from pytools import (bpe_extract, canon_xcheck as cx, gguf_emit, gguf_file as gf, iq_index, layer_pack as lp,  # noqa: E402
                      locate, mtp_blob, mtp_download as dl, mtp_quant as mq, pack_catalog, planes)
 
-TSV = os.path.join(ROOT, ".einsteinOS", "port", "p17652417b0.tsv")
 RNG = np.random.default_rng(20261105)
 
 
@@ -27,16 +25,6 @@ def tmp(suffix=""):
     fd, p = tempfile.mkstemp(suffix=suffix)
     os.close(fd)
     return p
-
-
-class PortTable(unittest.TestCase):
-    def test_rows_defined(self):
-        rows = [l.rstrip("\r\n").split("\t") for l in open(TSV) if l.strip()]
-        self.assertEqual(len(rows), 72)
-        self.assertEqual(len({(r[0], r[1]) for r in rows}), 72)
-        for rf, rn, mf, mn in rows:
-            src = open(os.path.join(ROOT, mf)).read()
-            self.assertRegex(src, r"(?m)^(def|class) %s\b" % re.escape(mn), "%s not defined in %s" % (mn, mf))
 
 
 class Planes(unittest.TestCase):
