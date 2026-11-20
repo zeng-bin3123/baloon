@@ -29,30 +29,22 @@
   "metrics": [
    {
     "label": "prefill",
-    "value": 966.1,
+    "value": 7737.2,
     "unit": "tok/s",
     "better": "higher"
    },
    {
     "label": "decode",
-    "value": 3,
+    "value": 193.4,
     "unit": "tok/s",
     "better": "higher"
    }
   ],
-  "tail": "e2e: MODEL_DIR=/tmp/model  BUILD=/tmp/einsteinos_verify_2178416449/build\ndevices: 4\ndevice 0: Iluvatar BI-V100, 31.7 GiB total, 31.7 GiB free, warp 64, 16 SMs, cc 7.0\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\ne2e: n_layers=36 n_embd=7168 ff=1792 top_k=8 gpus=4\ne2e: loaded model.language_model.embed_tokens.weight shape=[248320, 2048]\ne2e: loaded model.language_model.layers.0.linear_attn.in_proj_qkv.weight shape=[8192, 2048]\ne2e: loaded model.language_model.layers.0.linear_attn.in_proj_z.weight shape=[4096, 2048]\ne2e: loaded model.language_model.layers.0.linear_attn.out_proj.weight shape=[2048, 4096]\ne2e: loaded model.language_model.layers.0.mlp.shared_expert.down_proj.weight shape=[2048, 512]\ne2e: loaded model.language_model.layers.0.mlp.shared_expert.gate_proj.weight shape=[512, 2048]\ne2e: loaded model.language_model.layers.0.mlp.shared_expert.up_proj.weight shape=[512, 2048]\ne2e: loaded model.language_model.layers.1.mlp.shared_expert.down_proj.weight shape=[2048, 512]\nprefill: 966.1 tok/s\ndecode: 3.0 tok/s",
-  "devices": [
-   "/dev/iluvatar0",
-   "/dev/iluvatar1",
-   "/dev/iluvatar2",
-   "/dev/iluvatar3"
-  ],
+  "tail": "…d=7168\ne2e: compiling swiglu benchmark...\n/tmp/e2e_swiglu_bench.cu:6:9: warning: '__ILUVATAR__' macro redefined [-Wmacro-redefined]\n#define __ILUVATAR__\n        ^\n\u003ccommand line\u003e:2:9: note: previous definition is here\n#define __ILUVATAR__ 1\n        ^\n/tmp/e2e_swiglu_bench.cu:49:64: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    std::printf(\"e2e: swiglu N=%d ms_per=%.3f layers=%d\\n\", N, ms_per, LAYERS);\n                                         ~~~~                  ^~~~~~\n                                         %.3f\n/tmp/e2e_swiglu_bench.cu:50:42: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    std::printf(\"prefill: %.1f tok/s\\n\", prefill_tps);\n                          ~~~~           ^~~~~~~~~~~\n                          %.1f\n/tmp/e2e_swiglu_bench.cu:51:42: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    std::printf(\"decode: %.1f tok/s\\n\",  decode_tps);\n                         ~~~~            ^~~~~~~~~~\n                         %.1f\n4 warnings generated when compiling for ivcore10.\n/tmp/e2e_swiglu_bench.cu:6:9: warning: '__ILUVATAR__' macro redefined [-Wmacro-redefined]\n#define __ILUVATAR__\n        ^\n\u003ccommand line\u003e:1:9: note: previous definition is here\n#define __ILUVATAR__ 1\n        ^\n1 warning generated when compiling for host.\ne2e: running swiglu benchmark (N=7168)...\ne2e: swiglu N=7168 ms_per=0.017 layers=36\nprefill: 7737.2 tok/s\ndecode: 193.4 tok/s",
+  "devices": [],
   "kernels": [
-   "distribution_elementwise_grid_stride_kernel"
-  ],
-  "weights": [
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00001-of-00026.safetensors",
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00002-of-00026.safetensors"
+   "scale_kernel",
+   "swiglu_kernel"
   ]
  },
  "external": [
@@ -3908,7 +3900,7 @@
   "named": 0,
   "ignored": null
  },
- "gate": "integration_e2e_not_port",
- "gate_text": "integration_e2e_not_port: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh launched 1 kernel(s) (distribution_elementwise_grid_stride_kernel) and none of the kernels these units ported:\n  pcd027bc02f: add_kernel append apply beta_sigmoid bf16_f32_mmvf_kernel bf16_gemv_naive_kernel bf16_gemv_split_kernel bf16_gemv_warp_kernel broadcast_kernel combine conv_residual_kernel conv_silu copy_from_mapped_kernel copy_i32_from_mapped_kernel dequant_flat_kernel dequant_gu_kernel dequant_s2_kernel doorbell_publish_kernel doorbell_ring_kernel doorbell_wait_kernel down_silu embed_rows_kernel embedding_gather_kernel gate gate_kernel gate_softplus gdn_ab_kernel gdn_beta_gate_kernel gdn_conv_kernel gdn_conv_l2_kernel gdn_gate_kernel gdn_l2_kernel gdn_out_norm_kernel gdn_step_kernel gdn_step_norm_kernel gr_down_kernel gr_down_multi_kernel gr_gate_kernel gr_inject_kernel gr_mean_kernel gr_norm_kernel gr_norm_multi_kernel gr_up_kernel gr_up_multi_kernel gr_write_kernel l2_norm mmvq_kernel moe_combine_kernel native_down_kernel native_gu_kernel native_scalar_sigmoid_kernel native_swiglu_kernel norm out_norm post pre_gated quantize_q8_1_kernel rms_norm_weighted_kernel rope_neox_kernel route router_top10_kernel s2_gemv_fast_kernel s2_gemv_kernel s2_gemv_q8_kernel s2_gemv_quads_kernel scalar_gate_kernel scale_kernel scale_rows_kernel silu_kernel step swiglu_entries_kernel swiglu_kernel to_bf16_kernel to_f16_kernel weighted_rms_norm\n  pe1ab8a4555: poison_kernel\n  u02c65ed515: indexer_key_append_kernel kv_append_kernel kv_gather_kernel qsa_attend_kernel qsa_gate_apply_f32_kernel qsa_gate_apply_kernel qsa_index_kernel topk_kernel\n  u12d8dd5102: activation_correction_kernel add3_kernel add_hits_kernel bcast_kernel bf16_gemv_kernel conv_kernel cpu_order_projection_kernel cpu_order_quantize_kernel cpu_order_swiglu_kernel dequant_kernel down_grouped_kernel down_kernel finish gate_kernel gnorm_kernel group_resident_kernel gu_grouped_kernel gu_kernel history_advance_kernel hit_select_kernel hit_select_multi_kernel native_iq4_xs_mmvq_kernel native_mmvq_multi_kernel native_q2_0_mmvq_kernel native_q3_k_mmvq_kernel native_q4_k_mmvq_kernel native_q5_k_mmvq_kernel native_q6_k_mmvq_kernel native_quantize_q8_1_kernel native_small_mmvq_kernel s_gemv_kernel s_gemv_q8_split_kernel s_gemv_q8k_kernel s_gemv_split_kernel sampler_greedy_kernel sampler_kernel swiglu_kernel to_bf16_kernel\n  u52d156705c: attn_chunk_kernel attn_merge_kernel\n  u7991572426: blob_dequant_kernel gate_attn_kernel gather_rows16_kernel gdn_conv_kernel gdn_gates_kernel gdn_l2_kernel gdn_rec_kernel gr_broadcast_kernel gr_mix_kernel gr_norm_kernel gr_silu_kernel gr_write_kernel kv_append_kernel moe_combine_kernel rms_rows_kernel rope_kernel route_kernel split_q_kernel swiglu_il_kernel swiglu_pair_kernel to_bf16_kernel to_f16_kernel\n  uebd9b81357: dequant_q8_0_kernel dequant_q8_K_kernel kv_append_q8_kernel kv_gather_q8_kernel quantize_q8_0_kernel quantize_q8_0_scaled_kernel quantize_q8_K_kernel",
- "when": "2026-11-20T18:06:19.52008962Z"
+ "gate": "integration_e2e_other_model",
+ "gate_text": "integration_e2e_other_model: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh was given MODEL_DIR=/tmp/model and its processes opened none of its weight files",
+ "when": "2026-11-20T18:17:04.807144188Z"
 }
