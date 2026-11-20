@@ -1,9 +1,9 @@
 {
   "holder": {
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
-    "pid": 17850,
-    "started": "2026-11-19T19:05:09.883185142Z",
-    "renewed": "2026-11-20T00:33:58.959770129Z"
+    "pid": 11372,
+    "started": "2026-11-20T10:05:49.017028588Z",
+    "renewed": "2026-11-20T10:45:30.350543876Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -1019,6 +1019,14 @@
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 33 definition(s) the reference requires of this unit have no counterpart on the branch:\n  chat.py func main: no line in .einsteinOS/port/pfcccb31b26.tsv\n  chat.py func stream: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func _cpuid_avx512_full: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func ask: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func build_engine: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func cmake_build: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func cpu_info: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func cuda_lib_dirs: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func done: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func download: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func driver_major: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func fail: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func find_nvcc: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func find_tool: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func find_vcvars: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func free_gb: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func get_llama_cpp: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func get_prebuilt: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func gpu_info: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func install_build_tools: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func installed_configs: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func main: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func mark: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func ok: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func out: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func pip_install: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func ram_gb: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func run: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func say: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func start: no line in .einsteinOS/port/pfcccb31b26.tsv\n  … 3 more",
       "base_ref": ""
+    }
+  },
+  "in_progress": {
+    "uintegration01529aaa82b9": {
+      "kind": "kernel_unported",
+      "text": "",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-uintegration01529aaa82b9",
+      "base_sha": "5823c7b1d3da03f0d1dab55917304f6590a28e00"
     }
   },
   "infra_fails": 0,
