@@ -29,7 +29,7 @@
   "metrics": [
    {
     "label": "prefill",
-    "value": 5.5,
+    "value": 5.7,
     "unit": "tok/s",
     "better": "higher"
    },
@@ -40,7 +40,7 @@
     "better": "higher"
    }
   ],
-  "tail": "…checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrade transformers`. If this does not work, and the checkpoint is very new, then there may not be a release version that supports this model yet. In this case, you can get the most up-to-date code by installing Transformers from source with the command `pip install git+https://github.com/huggingface/tra\nvllm tp=1 ValueError: The checkpoint you are trying to load has model type `qwen3_5_moe` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrade transformers`. If this does not work, and the checkpoint is very new, then there may not be a release version that supports this model yet. In this case, you can get the most up-to-date code by installing Transformers from source with the command `pip install git+https://github.com/huggingface/tra\ntransformers fallback ValueError: The checkpoint you are trying to load has model type `qwen3_5_moe` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrad\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
+  "tail": "…checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrade transformers`. If this does not work, and the checkpoint is very new, then there may not be a release version that supports this model yet. In this case, you can get the most up-to-date code by installing Transformers from source with the command `pip install git+https://github.com/huggingface/tra\nvllm tp=1 ValueError: The checkpoint you are trying to load has model type `qwen3_5_moe` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrade transformers`. If this does not work, and the checkpoint is very new, then there may not be a release version that supports this model yet. In this case, you can get the most up-to-date code by installing Transformers from source with the command `pip install git+https://github.com/huggingface/tra\ntransformers fallback ValueError: The checkpoint you are trying to load has model type `qwen3_5_moe` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrad\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
   "devices": [
    "/dev/iluvatar0",
    "/dev/iluvatar1",
@@ -129,10 +129,10 @@
    "window_kernel"
   ],
   "programs": {
-   "build/gdn_parity": "0ccf01462fb43baaa22972b86391409ff0f058cc9e64d12d6aa667f2eaeab580",
-   "build/gr_parity": "a6354f26422e19490c3efb19807aa7565e129d3a2df8d0c953b03e744688dd5a",
-   "build/kv_q8_parity": "39d83822bdb5f9a507e8e8330612a0942d16bcc56b4de9ed0856cbef14e58239",
+   "build/gr_parity": "60dda1051c16ed85be944b2a79e42187bf9648a94d86cac235884524bd169fe7",
+   "build/kv_q8_parity": "1b08b179aca32552f4c6f059d224befa0bdd239821a0cc8cc285f41a7f3ae016",
    "build/qsa_parity": "2a4f7c3756792d71457124b9938285a0a89dfd83da3f51ada1ebad8e2f8bb9c6",
+   "build/shared_expert_parity": "fc9ea451a11e7907774bc3aac80ae1f6124378f25a854c655dfb8a33e12796b4",
    "build/verify_attn_gpu": "5c3eca1571d1dc734833ebed3fe1733e65a37ae23aa410501565a06bf1cd5bed"
   },
   "prompt_ids": [
@@ -143,7 +143,6 @@
    369
   ],
   "weights": [
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00001-of-00026.safetensors",
    "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00002-of-00026.safetensors"
   ]
  },
@@ -4001,6 +4000,6 @@
   "ignored": null
  },
  "gate": "integration_correctness_unmeasured",
- "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrade transformers`. If this does not work, and the checkpoint is very new, then there may not be a release version that supports this model yet. In this case, you can get the most up-to-date code by installing Transformers from source with the command `pip install git+https://github.com/huggingface/tra\nvllm tp=1 ValueError: The checkpoint you are trying to load has model type `qwen3_5_moe` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrade transformers`. If this does not work, and the checkpoint is very new, then there may not be a release version that supports this model yet. In this case, you can get the most up-to-date code by installing Transformers from source with the command `pip install git+https://github.com/huggingface/tra\ntransformers fallback ValueError: The checkpoint you are trying to load has model type `qwen3_5_moe` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrad\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
- "when": "2026-11-20T23:38:04.065321833Z"
+ "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrade transformers`. If this does not work, and the checkpoint is very new, then there may not be a release version that supports this model yet. In this case, you can get the most up-to-date code by installing Transformers from source with the command `pip install git+https://github.com/huggingface/tra\nvllm tp=1 ValueError: The checkpoint you are trying to load has model type `qwen3_5_moe` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrade transformers`. If this does not work, and the checkpoint is very new, then there may not be a release version that supports this model yet. In this case, you can get the most up-to-date code by installing Transformers from source with the command `pip install git+https://github.com/huggingface/tra\ntransformers fallback ValueError: The checkpoint you are trying to load has model type `qwen3_5_moe` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrad\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
+ "when": "2026-11-20T23:48:44.571522132Z"
 }
