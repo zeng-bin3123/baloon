@@ -29,23 +29,23 @@
   "metrics": [
    {
     "label": "prefill",
-    "value": 8058.2,
+    "value": 5.8,
     "unit": "tok/s",
     "better": "higher"
    },
    {
     "label": "decode",
-    "value": 201.5,
+    "value": 0.2,
     "unit": "tok/s",
     "better": "higher"
    }
   ],
-  "tail": "e2e: MODEL_DIR=/tmp/model  BUILD=/tmp/einsteinos_verify_188150107/build\ndevices: 4\ndevice 0: Iluvatar BI-V100, 31.7 GiB total, 31.7 GiB free, warp 64, 16 SMs, cc 7.0\ne2e: n_embd=7168 n_layers=36\ne2e: compiling benchmark...\n/tmp/e2e_bench_15252.cu:89:52: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    printf(\"e2e: N=%d ms_per=%.4f layers=%d\\n\", N, ms_per, LAYERS);\n                             ~~~~                  ^~~~~~\n                             %.4f\n/tmp/e2e_bench_15252.cu:90:37: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    printf(\"prefill: %.1f tok/s\\n\", prefill_tps);\n                     ~~~~           ^~~~~~~~~~~\n                     %.1f\n/tmp/e2e_bench_15252.cu:91:37: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    printf(\"decode: %.1f tok/s\\n\",  decode_tps);\n                    ~~~~            ^~~~~~~~~~\n                    %.1f\n3 warnings generated when compiling for ivcore10.\ne2e: running benchmark...\ne2e: loaded 7168 floats from /tmp/model/model-00001-of-00026.safetensors\ne2e: N=7168 ms_per=0.0165 layers=36\nprefill: 8058.2 tok/s\ndecode: 201.5 tok/s",
-  "devices": [
-   "/dev/iluvatar0",
-   "/dev/iluvatar1",
-   "/dev/iluvatar2",
-   "/dev/iluvatar3"
+  "tail": "e2e: MODEL_DIR=/tmp/model  BUILD=/tmp/einsteinos_verify_3016035732/build\ndevices: 4\ndevice 0: Iluvatar BI-V100, 31.7 GiB total, 31.7 GiB free, warp 64, 16 SMs, cc 7.0\ne2e: opened weight file (3996199712 bytes)\ne2e: n_embd=7168  n_layers=36\ngate N=2560 gpu=0.501163125 ref=0.501163125 |d|=0 ok\ngate N=5120 gpu=0.00159045355 ref=0.00159045425 |d|=6.98e-10 ok\ngate N=100 gpu=0.403317064 ref=0.403317094 |d|=2.98e-08 ok\ngate N=63 gpu=0.446835637 ref=0.446835577 |d|=5.96e-08 ok\ngate N=64 gpu=0.695515454 ref=0.695515454 |d|=0 ok\ngate N=65 gpu=0.451865286 ref=0.451865256 |d|=2.98e-08 ok\ngate N=257 gpu=0.429767966 ref=0.429767936 |d|=2.98e-08 ok\nswiglu: 0 beyond 1e-6 rel, max|d|=1.91e-06 (exp() device vs host may differ in last ulp; bit-exact not required)\nscale: 0 mismatches\nshared_expert: PASS\ne2e: shared_expert_parity elapsed 41 ms\nprefill: 5.8 tok/s\ndecode: 0.2 tok/s",
+  "devices": [],
+  "kernels": [
+   "scalar_gate_kernel",
+   "scale_kernel",
+   "swiglu_kernel"
   ]
  },
  "external": [
@@ -3903,5 +3903,5 @@
  },
  "gate": "integration_e2e_other_model",
  "gate_text": "integration_e2e_other_model: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh was given MODEL_DIR=/tmp/model and its processes opened none of its weight files",
- "when": "2026-11-20T18:26:16.035842361Z"
+ "when": "2026-11-20T18:36:53.022055948Z"
 }
