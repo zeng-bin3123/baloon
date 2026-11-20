@@ -25,9 +25,22 @@
    "Command": "",
    "Sources": null
   },
-  "exit": 1,
-  "metrics": null,
-  "tail": "e2e: MODEL_DIR=/tmp/model  BUILD=/tmp/einsteinos_verify_3329254831/build\ndevices: 4\ndevice 0: Iluvatar BI-V100, 31.7 GiB total, 31.7 GiB free, warp 64, 16 SMs, cc 7.0\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\ne2e: n_layers=36 n_embd=7168 ff=1792 experts=64 top_k=8 gpus=4\nTraceback (most recent call last):\n  File \"\u003cstdin\u003e\", line 49, in \u003cmodule\u003e\nRuntimeError: The size of tensor a (3584) must match the size of tensor b (1792) at non-singleton dimension 1",
+  "exit": 0,
+  "metrics": [
+   {
+    "label": "prefill",
+    "value": 2409.5,
+    "unit": "tok/s",
+    "better": "higher"
+   },
+   {
+    "label": "decode",
+    "value": 9.4,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  ],
+  "tail": "e2e: MODEL_DIR=/tmp/model  BUILD=/tmp/einsteinos_verify_3031527627/build\ndevices: 4\ndevice 0: Iluvatar BI-V100, 31.7 GiB total, 31.7 GiB free, warp 64, 16 SMs, cc 7.0\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\ne2e: n_layers=36 n_embd=7168 ff=1792 experts=64 top_k=8 gpus=4\nprefill: 2409.5 tok/s\ndecode: 9.4 tok/s",
   "devices": [
    "/dev/iluvatar0",
    "/dev/iluvatar1",
@@ -3892,7 +3905,7 @@
   "named": 0,
   "ignored": null
  },
- "gate": "integration_e2e_failed",
- "gate_text": "integration_e2e_failed: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh exited 1 running the model at /tmp/model; output: e2e: MODEL_DIR=/tmp/model  BUILD=/tmp/einsteinos_verify_3329254831/build\ndevices: 4\ndevice 0: Iluvatar BI-V100, 31.7 GiB total, 31.7 GiB free, warp 64, 16 SMs, cc 7.0\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\ne2e: n_layers=36 n_embd=7168 ff=1792 experts=64 top_k=8 gpus=4\nTraceback (most recent call last):\n  File \"\u003cstdin\u003e\", line 49, in \u003cmodule\u003e\nRuntimeError: The size of tensor a (3584) must match the size of tensor b (1792) at non-singleton dimension 1",
- "when": "2026-11-20T17:50:15.367154158Z"
+ "gate": "integration_e2e_other_model",
+ "gate_text": "integration_e2e_other_model: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh was given MODEL_DIR=/tmp/model and its processes opened none of its weight files",
+ "when": "2026-11-20T17:58:03.544527842Z"
 }
