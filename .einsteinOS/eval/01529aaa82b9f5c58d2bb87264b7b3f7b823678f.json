@@ -25,22 +25,9 @@
    "Command": "",
    "Sources": null
   },
-  "exit": 0,
-  "metrics": [
-   {
-    "label": "prefill",
-    "value": 5.7,
-    "unit": "tok/s",
-    "better": "higher"
-   },
-   {
-    "label": "decode",
-    "value": 0.2,
-    "unit": "tok/s",
-    "better": "higher"
-   }
-  ],
-  "tail": "e2e: MODEL_DIR=/tmp/model  real=/root/public-storage/models/Qwen/Qwen3.6-35B-A3B  BUILD=/tmp/einsteinos_verify_1104892887/build\ndevices: 4\ndevice 0: Iluvatar BI-V100, 31.7 GiB total, 31.7 GiB free, warp 64, 16 SMs, cc 7.0\ndevice 0 selftest: ok\ndevice 1 selftest: ok\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\ne2e: found 2 shards in /root/public-storage/models/Qwen/Qwen3.6-35B-A3B\ne2e: model-00001-of-00026.safetensors opened (22 tensors)\ne2e: model-00002-of-00026.safetensors tensor=model.language_model.layers.0.input_layernorm.weight shape=[2048] max=0.3301\ne2e: n_embd=7168  n_layers=36\ngate N=2560 gpu=0.501163125 ref=0.501163125 |d|=0 ok\ngate N=5120 gpu=0.00159045355 ref=0.00159045425 |d|=6.98e-10 ok\ne2e: kv_q8_parity ok\ne2e: qsa_parity ok\ne2e: gdn_parity ok\ne2e: gr_parity ok\ne2e: verify_attn_gpu ok (attn_chunk_kernel + attn_merge_kernel)\nVERIFY ATTN GPU TESTS PASSED\ne2e: all ported kernel tests complete; shared_expert elapsed 42 ms\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
+  "exit": 1,
+  "metrics": null,
+  "tail": "… 6511 314 9338 369\nTraceback (most recent call last):\n  File \"/usr/local/lib/python3.10/site-packages/transformers/models/auto/configuration_auto.py\", line 1131, in from_pretrained\n    config_class = CONFIG_MAPPING[config_dict[\"model_type\"]]\n  File \"/usr/local/lib/python3.10/site-packages/transformers/models/auto/configuration_auto.py\", line 833, in __getitem__\n    raise KeyError(key)\nKeyError: 'qwen3_5_moe'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"\u003cstdin\u003e\", line 13, in \u003cmodule\u003e\n  File \"/usr/local/lib/python3.10/site-packages/transformers/models/auto/auto_factory.py\", line 531, in from_pretrained\n    config, kwargs = AutoConfig.from_pretrained(\n  File \"/usr/local/lib/python3.10/site-packages/transformers/models/auto/configuration_auto.py\", line 1133, in from_pretrained\n    raise ValueError(\nValueError: The checkpoint you are trying to load has model type `qwen3_5_moe` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrade transformers`. If this does not work, and the checkpoint is very new, then there may not be a release version that supports this model yet. In this case, you can get the most up-to-date code by installing Transformers from source with the command `pip install git+https://github.com/huggingface/transformers.git`",
   "devices": [
    "/dev/iluvatar0",
    "/dev/iluvatar1",
@@ -129,11 +116,19 @@
    "window_kernel"
   ],
   "programs": {
-   "build/gr_parity": "e045de6c9dc96a3004d2fe4efa87be6f9f08c96b41f980d006070f642fdc0247",
-   "build/kv_q8_parity": "9cbd2d917bb2206c4838ba4fef0fabd704f7f89231b8057c79a2e9c66fbc1907",
+   "build/gdn_parity": "7852cf8051994d3e3905cd23cd390999315f8285c65a667132348dac9247d0a5",
+   "build/gr_parity": "b9974fe76c572f1a326eb99cbc5d5d626ae8fc823f7eacd590733368b679188e",
+   "build/kv_q8_parity": "57d39485da94276d43269da2b9de5c1c49840660ee3e97319dfdc5d4d65a6950",
    "build/qsa_parity": "2a4f7c3756792d71457124b9938285a0a89dfd83da3f51ada1ebad8e2f8bb9c6",
-   "build/verify_attn_gpu": "5c3eca1571d1dc734833ebed3fe1733e65a37ae23aa410501565a06bf1cd5bed"
+   "build/verify_attn_gpu": "18dafe1e41af431bcb243a7a4dbb882c739667be1ba635fd66ebadadce48eba2"
   },
+  "prompt_ids": [
+   760,
+   6511,
+   314,
+   9338,
+   369
+  ],
   "weights": [
    "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00002-of-00026.safetensors"
   ]
@@ -3991,7 +3986,7 @@
   "named": 0,
   "ignored": null
  },
- "gate": "integration_correctness_unmeasured",
- "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"prompt:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: e2e: MODEL_DIR=/tmp/model  real=/root/public-storage/models/Qwen/Qwen3.6-35B-A3B  BUILD=/tmp/einsteinos_verify_1104892887/build\ndevices: 4\ndevice 0: Iluvatar BI-V100, 31.7 GiB total, 31.7 GiB free, warp 64, 16 SMs, cc 7.0\ndevice 0 selftest: ok\ndevice 1 selftest: ok\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\ne2e: found 2 shards in /root/public-storage/models/Qwen/Qwen3.6-35B-A3B\ne2e: model-00001-of-00026.safetensors opened (22 tensors)\ne2e: model-00002-of-00026.safetensors tensor=model.language_model.layers.0.input_layernorm.weight shape=[2048] max=0.3301\ne2e: n_embd=7168  n_layers=36\ngate N=2560 gpu=0.501163125 ref=0.501163125 |d|=0 ok\ngate N=5120 gpu=0.00159045355 ref=0.00159045425 |d|=6.98e-10 ok\ne2e: kv_q8_parity ok\ne2e: qsa_parity ok\ne2e: gdn_parity ok\ne2e: gr_parity ok\ne2e: verify_attn_gpu ok (attn_chunk_kernel + attn_merge_kernel)\nVERIFY ATTN GPU TESTS PASSED\ne2e: all ported kernel tests complete; shared_expert elapsed 42 ms\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
- "when": "2026-11-20T20:07:53.883067944Z"
+ "gate": "integration_e2e_failed",
+ "gate_text": "integration_e2e_failed: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh exited 1 running the model at /tmp/model; output: … 6511 314 9338 369\nTraceback (most recent call last):\n  File \"/usr/local/lib/python3.10/site-packages/transformers/models/auto/configuration_auto.py\", line 1131, in from_pretrained\n    config_class = CONFIG_MAPPING[config_dict[\"model_type\"]]\n  File \"/usr/local/lib/python3.10/site-packages/transformers/models/auto/configuration_auto.py\", line 833, in __getitem__\n    raise KeyError(key)\nKeyError: 'qwen3_5_moe'\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"\u003cstdin\u003e\", line 13, in \u003cmodule\u003e\n  File \"/usr/local/lib/python3.10/site-packages/transformers/models/auto/auto_factory.py\", line 531, in from_pretrained\n    config, kwargs = AutoConfig.from_pretrained(\n  File \"/usr/local/lib/python3.10/site-packages/transformers/models/auto/configuration_auto.py\", line 1133, in from_pretrained\n    raise ValueError(\nValueError: The checkpoint you are trying to load has model type `qwen3_5_moe` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrade transformers`. If this does not work, and the checkpoint is very new, then there may not be a release version that supports this model yet. In this case, you can get the most up-to-date code by installing Transformers from source with the command `pip install git+https://github.com/huggingface/transformers.git`",
+ "when": "2026-11-20T20:30:56.199866563Z"
 }
