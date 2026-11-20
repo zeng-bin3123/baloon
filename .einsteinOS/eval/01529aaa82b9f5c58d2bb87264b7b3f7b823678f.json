@@ -40,7 +40,7 @@
     "better": "higher"
    }
   ],
-  "tail": "e2e: MODEL_DIR=/tmp/model  real=/root/public-storage/models/Qwen/Qwen3.6-35B-A3B  BUILD=/tmp/einsteinos_verify_2142469244/build\ndevices: 4\ndevice 0: Iluvatar BI-V100, 31.7 GiB total, 31.7 GiB free, warp 64, 16 SMs, cc 7.0\ndevice 0 selftest: ok\ndevice 1 selftest: ok\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\ne2e: found 2 shards in /root/public-storage/models/Qwen/Qwen3.6-35B-A3B\ne2e: model-00001-of-00026.safetensors opened (22 tensors)\ne2e: model-00002-of-00026.safetensors tensor=model.language_model.layers.0.input_layernorm.weight shape=[2048] max=0.3301\ne2e: n_embd=7168  n_layers=36\ngate N=2560 gpu=0.501163125 ref=0.501163125 |d|=0 ok\ngate N=5120 gpu=0.00159045355 ref=0.00159045425 |d|=6.98e-10 ok\ne2e: kv_q8_parity ok\ne2e: qsa_parity ok\ne2e: gdn_parity ok\ne2e: gr_parity ok\ne2e: compiling verify_attn GPU test for attn_chunk_kernel/attn_merge_kernel...\ne2e: verify_attn_gpu ok (attn_chunk_kernel + attn_merge_kernel)\nVERIFY ATTN GPU TESTS PASSED\ne2e: all ported kernel tests complete; shared_expert elapsed 42 ms\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
+  "tail": "e2e: MODEL_DIR=/tmp/model  real=/root/public-storage/models/Qwen/Qwen3.6-35B-A3B  BUILD=/tmp/einsteinos_verify_1104892887/build\ndevices: 4\ndevice 0: Iluvatar BI-V100, 31.7 GiB total, 31.7 GiB free, warp 64, 16 SMs, cc 7.0\ndevice 0 selftest: ok\ndevice 1 selftest: ok\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\ne2e: found 2 shards in /root/public-storage/models/Qwen/Qwen3.6-35B-A3B\ne2e: model-00001-of-00026.safetensors opened (22 tensors)\ne2e: model-00002-of-00026.safetensors tensor=model.language_model.layers.0.input_layernorm.weight shape=[2048] max=0.3301\ne2e: n_embd=7168  n_layers=36\ngate N=2560 gpu=0.501163125 ref=0.501163125 |d|=0 ok\ngate N=5120 gpu=0.00159045355 ref=0.00159045425 |d|=6.98e-10 ok\ne2e: kv_q8_parity ok\ne2e: qsa_parity ok\ne2e: gdn_parity ok\ne2e: gr_parity ok\ne2e: verify_attn_gpu ok (attn_chunk_kernel + attn_merge_kernel)\nVERIFY ATTN GPU TESTS PASSED\ne2e: all ported kernel tests complete; shared_expert elapsed 42 ms\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
   "devices": [
    "/dev/iluvatar0",
    "/dev/iluvatar1",
@@ -48,16 +48,27 @@
    "/dev/iluvatar3"
   ],
   "kernels": [
+   "ab_kernel",
+   "attn_chunk_kernel",
+   "attn_merge_kernel",
+   "bcast_kernel",
    "beta_sigmoid",
+   "blob_kernel",
    "block_score_kernel",
    "block_select_kernel",
    "chunk_merge",
    "chunk_partial",
+   "commit_kernel",
+   "conv_kernel",
    "conv_silu",
+   "copy_idx_kernel",
+   "dense_kernel",
    "dequant_q8_0_kernel",
    "dequant_q8_K_kernel",
    "down_silu",
    "elementwise_kernel",
+   "embed_kernel",
+   "flash_kernel",
    "gate_softplus",
    "gdn_ab_kernel",
    "gdn_beta_gate_kernel",
@@ -77,6 +88,7 @@
    "gr_up_kernel",
    "gr_up_multi_kernel",
    "gr_write_kernel",
+   "hits_kernel",
    "indexer_key_append_kernel",
    "k_dec",
    "k_enc",
@@ -84,7 +96,9 @@
    "kv_append_q8_kernel",
    "kv_gather_kernel",
    "kv_gather_q8_kernel",
+   "l2_kernel",
    "l2_norm",
+   "map_kernel",
    "mma_score_kernel",
    "out_norm",
    "poison_kernel",
@@ -99,22 +113,28 @@
    "quantize_q8_0_kernel",
    "quantize_q8_0_scaled_kernel",
    "quantize_q8_K_kernel",
+   "rebase_kernel",
    "reduce_kernel",
+   "rows16_kernel",
    "scalar_gate_kernel",
    "scale_kernel",
+   "select_kernel",
    "step",
+   "step_norm_kernel",
    "swiglu_kernel",
+   "top_prob_kernel",
    "topk_kernel",
-   "weighted_rms_norm"
+   "wait_kernel",
+   "weighted_rms_norm",
+   "window_kernel"
   ],
   "programs": {
-   "build/gdn_parity": "b217100fb0ae09939b800254330cda4ba74a641778d57d45011f57e881d49c58",
-   "build/gr_parity": "e851ae85001be17f52cd4237d79a6573f5d24d14bf2c2e0558e5f54e15e09137",
-   "build/kv_q8_parity": "6aff5757ed4fd4989e0e6566013be7470ae5af9365ac47642fe5f8c27d269568",
-   "build/qsa_parity": "2a4f7c3756792d71457124b9938285a0a89dfd83da3f51ada1ebad8e2f8bb9c6"
+   "build/gr_parity": "e045de6c9dc96a3004d2fe4efa87be6f9f08c96b41f980d006070f642fdc0247",
+   "build/kv_q8_parity": "9cbd2d917bb2206c4838ba4fef0fabd704f7f89231b8057c79a2e9c66fbc1907",
+   "build/qsa_parity": "2a4f7c3756792d71457124b9938285a0a89dfd83da3f51ada1ebad8e2f8bb9c6",
+   "build/verify_attn_gpu": "5c3eca1571d1dc734833ebed3fe1733e65a37ae23aa410501565a06bf1cd5bed"
   },
   "weights": [
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00001-of-00026.safetensors",
    "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00002-of-00026.safetensors"
   ]
  },
@@ -3971,7 +3991,7 @@
   "named": 0,
   "ignored": null
  },
- "gate": "integration_e2e_not_port",
- "gate_text": "integration_e2e_not_port: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh launched 58 kernel(s) (beta_sigmoid block_score_kernel block_select_kernel chunk_merge chunk_partial conv_silu dequant_q8_0_kernel dequant_q8_K_kernel down_silu elementwise_kernel gate_softplus gdn_ab_kernel gdn_beta_gate_kernel gdn_conv_kernel gdn_conv_l2_kernel gdn_l2_kernel gdn_out_norm_kernel gdn_step_kernel gdn_step_norm_kernel gr_down_kernel gr_down_multi_kernel gr_gate_kernel gr_inject_kernel gr_mean_kernel gr_norm_kernel gr_norm_multi_kernel gr_up_kernel gr_up_multi_kernel gr_write_kernel indexer_key_append_kernel k_dec k_enc kv_append_kernel kv_append_q8_kernel kv_gather_kernel kv_gather_q8_kernel l2_norm mma_score_kernel out_norm poison_kernel pool_append_kernel post pre_gated qsa_attend_kernel qsa_gate_apply_f32_kernel qsa_gate_apply_kernel qsa_index_kernel qsa_step_fill_kernel quantize_q8_0_kernel quantize_q8_0_scaled_kernel quantize_q8_K_kernel reduce_kernel scalar_gate_kernel scale_kernel step swiglu_kernel topk_kernel weighted_rms_norm) and none of the kernels these units ported:\n  u52d156705c: attn_chunk_kernel attn_merge_kernel",
- "when": "2026-11-20T19:41:39.167448702Z"
+ "gate": "integration_correctness_unmeasured",
+ "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"prompt:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: e2e: MODEL_DIR=/tmp/model  real=/root/public-storage/models/Qwen/Qwen3.6-35B-A3B  BUILD=/tmp/einsteinos_verify_1104892887/build\ndevices: 4\ndevice 0: Iluvatar BI-V100, 31.7 GiB total, 31.7 GiB free, warp 64, 16 SMs, cc 7.0\ndevice 0 selftest: ok\ndevice 1 selftest: ok\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\ne2e: found 2 shards in /root/public-storage/models/Qwen/Qwen3.6-35B-A3B\ne2e: model-00001-of-00026.safetensors opened (22 tensors)\ne2e: model-00002-of-00026.safetensors tensor=model.language_model.layers.0.input_layernorm.weight shape=[2048] max=0.3301\ne2e: n_embd=7168  n_layers=36\ngate N=2560 gpu=0.501163125 ref=0.501163125 |d|=0 ok\ngate N=5120 gpu=0.00159045355 ref=0.00159045425 |d|=6.98e-10 ok\ne2e: kv_q8_parity ok\ne2e: qsa_parity ok\ne2e: gdn_parity ok\ne2e: gr_parity ok\ne2e: verify_attn_gpu ok (attn_chunk_kernel + attn_merge_kernel)\nVERIFY ATTN GPU TESTS PASSED\ne2e: all ported kernel tests complete; shared_expert elapsed 42 ms\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
+ "when": "2026-11-20T20:07:53.883067944Z"
 }
