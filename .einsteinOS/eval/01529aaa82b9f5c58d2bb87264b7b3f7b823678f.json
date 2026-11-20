@@ -129,10 +129,10 @@
    "window_kernel"
   ],
   "programs": {
-   "build/gr_parity": "4349f422811a6ef4625570db5c14b60a653ea0404beda0187734ca024aa8f5aa",
-   "build/kv_q8_parity": "30385713303ef6673bcc0fd99e35395968ee28ad214b12fbce6eaf64d96b480d",
+   "build/gr_parity": "148aed829d932a32e884c7a3c3f0eb00d20c8136c62f05a5994d3cc6f376c4ed",
+   "build/kv_q8_parity": "152f983fc0d15d41253dd022bcb36e945f9d77f842a7c5ce30972fbe92387c2f",
    "build/qsa_parity": "2a4f7c3756792d71457124b9938285a0a89dfd83da3f51ada1ebad8e2f8bb9c6",
-   "build/verify_attn_gpu": "dda425ef9b31d0c11b1964999e42ed5592f27c9120929fbef94bbca140404cec"
+   "build/verify_attn_gpu": "96ddac577925c07178498e109e49ba1f88cd14ca0c522dd44be6075369fdf153"
   },
   "prompt_ids": [
    760,
@@ -4000,5 +4000,5 @@
  },
  "gate": "integration_correctness_unmeasured",
  "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …, 'JAISLMHeadModel', 'JambaForCausalLM', 'LlamaForCausalLM', 'LLaMAForCausalLM', 'MambaForCausalLM', 'MistralForCausalLM', 'MixtralForCausalLM', 'QuantMixtralForCausalLM', 'MptForCausalLM', 'MPTForCausalLM', 'MiniCPMForCausalLM', 'MiniCPM3ForCausalLM', 'NemotronForCausalLM', 'OlmoForCausalLM', 'OlmoeForCausalLM', 'OPTForCausalLM', 'OrionForCausalLM', 'PersimmonForCausalLM', 'PhiForCausalLM', 'Phi3ForCausalLM', 'Phi3SmallForCausalLM', 'PhiMoEForCausalLM', 'Qwen2ForCausalLM', 'Qwen2MoeForCausalLM', 'Qwen3ForCausalLM', 'Qwen3MoeForCausalLM', 'RWForCausalLM', 'StableLMEpochForCausalLM', 'StableLmForCausalLM', 'Starcoder2ForCausalLM', 'SolarForCausalLM', 'XverseForCausalLM', 'BartModel', 'BartForConditionalGeneration', 'MistralModel', 'Qwen2ForRewardModel', 'Gemma2Model', 'Blip2ForConditionalGeneration', 'ChameleonForConditionalGeneration', 'ChatGLMModel', 'ChatGLMForConditionalGeneration', 'FuyuForCausalLM', 'InternVLChatModel', 'LlavaForConditionalGeneration', 'LlavaNextForConditionalGeneration', 'LlavaNextVideoForConditionalGeneration', 'LlavaOnevisionForConditionalGeneration', 'MiniCPMV', 'MolmoForCausalLM', 'NVLM_D', 'PaliGemmaForConditionalGeneration', 'Phi3VForCausalLM', 'PixtralForConditionalGeneration', 'QWenLMHeadModel', 'Qwen2VLForConditionalGeneration', 'Qwen2_5_VLForConditionalGeneration', 'UltravoxModel', 'MllamaForConditionalGeneration', 'EAGLEModel', 'MedusaModel', 'MLPSpeculatorPreTrainedModel']\n\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
- "when": "2026-11-20T21:55:51.063826593Z"
+ "when": "2026-11-20T22:03:31.855654494Z"
 }
