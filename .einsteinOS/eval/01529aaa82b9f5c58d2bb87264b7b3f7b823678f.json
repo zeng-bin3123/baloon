@@ -1,0 +1,3898 @@
+{
+ "repo": "Niko1221/Strata",
+ "ref_sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+ "prev_sha": "e5509707730d31f9e6d29ea3ac5f3c98f9d34b54",
+ "reference": {
+  "repo": "Niko1221/Strata",
+  "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+  "build_exit": 0,
+  "build_tail": "…al_2124013920/src/build/_deps/strata_llamacpp-src/ggml/src/ggml-cpu/ops.cpp:5250:18: warning: variable 'rs' set but not used [-Wunused-but-set-variable]\n 5250 |     const size_t rs = ggml_row_size(src0-\u003etype, nc);\n      |                  ^~\n/tmp/einsteinos_eval_2124013920/src/build/_deps/strata_llamacpp-src/ggml/src/ggml-cpu/ops.cpp: In instantiation of 'void ggml_compute_forward_set_rows_impl(const ggml_compute_params*, ggml_tensor*) [with src_t = float; idx_t = int]':\n/tmp/einsteinos_eval_2124013920/src/build/_deps/strata_llamacpp-src/ggml/src/ggml-cpu/ops.cpp:5304:83:   required from here\n/tmp/einsteinos_eval_2124013920/src/build/_deps/strata_llamacpp-src/ggml/src/ggml-cpu/ops.cpp:5250:18: warning: variable 'rs' set but not used [-Wunused-but-set-variable]\n[ 83%] Linking CXX static library libggml-cpu.a\n[ 83%] Built target ggml-cpu\n[ 85%] Building CXX object CMakeFiles/strata_kernels_cpu.dir/src/kernels/cpu/expert.cpp.o\n[ 88%] Building CXX object CMakeFiles/strata_kernels_cpu.dir/src/kernels/cpu/pool.cpp.o\n[ 92%] Building CXX object CMakeFiles/strata_kernels_cpu.dir/src/kernels/cpu/expert_layout.cpp.o\n[ 95%] Building CXX object CMakeFiles/strata_kernels_cpu.dir/src/kernels/cpu/q2_avx2.cpp.o\n[ 97%] Building CXX object CMakeFiles/strata_kernels_cpu.dir/src/kernels/cpu/native_expert.cpp.o\n[ 97%] Building CXX object CMakeFiles/strata_kernels_cpu.dir/src/kernels/cpu/iq_avx512.cpp.o\n[100%] Linking CXX static library libstrata_kernels_cpu.a\n[100%] Built target strata_kernels_cpu",
+  "benches": null,
+  "err": "no benchmark the repository ships at 01529aaa82b9 can run here: 20 target(s) its CMakeLists declare whose sources are not in the tree (graph_registry_test (bench/micro/graph_registry_test.cu), hit_cpu_order_parity (bench/micro/hit_cpu_order_parity.cu), native_bf16_parity (bench/micro/native_bf16_parity.cpp), native_flash_attn_parity (bench/micro/native_flash_attn_parity.cpp), native_gdn_parity (bench/micro/native_gdn_parity.cpp), … 15 more); 6 result file(s) in its benchmark directories without code that produced them (bench/results/2026-09-24-final/estimates.json, bench/results/2026-09-24-final/estimates.md, bench/results/2026-09-24-final/matrix.json, bench/results/2026-09-24-final/matrix.md, bench/results/2026-09-24-vision/vision.json, … 1 more)"
+ },
+ "dev": {
+  "repo": "(port)",
+  "sha": "",
+  "build_exit": 0,
+  "build_tail": "",
+  "benches": null
+ },
+ "e2e": {
+  "bench": {
+   "File": ".einsteinOS/verify/uintegration01529aaa82b9/e2e.sh",
+   "Kind": "e2e",
+   "Name": "e2e.sh",
+   "Command": "",
+   "Sources": null
+  },
+  "exit": 1,
+  "metrics": null,
+  "tail": "e2e: MODEL_DIR=/tmp/model  BUILD=/tmp/einsteinos_verify_3329254831/build\ndevices: 4\ndevice 0: Iluvatar BI-V100, 31.7 GiB total, 31.7 GiB free, warp 64, 16 SMs, cc 7.0\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\ne2e: n_layers=36 n_embd=7168 ff=1792 experts=64 top_k=8 gpus=4\nTraceback (most recent call last):\n  File \"\u003cstdin\u003e\", line 49, in \u003cmodule\u003e\nRuntimeError: The size of tensor a (3584) must match the size of tensor b (1792) at non-singleton dimension 1",
+  "devices": [
+   "/dev/iluvatar0",
+   "/dev/iluvatar1",
+   "/dev/iluvatar2",
+   "/dev/iluvatar3"
+  ],
+  "kernels": [
+   "distribution_elementwise_grid_stride_kernel",
+   "elementwise_kernel"
+  ]
+ },
+ "external": [
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "build_exit": 0,
+   "build_tail": "…6%] Building CXX object tools/server/CMakeFiles/llama-server-impl.dir/server-models.cpp.o\n[ 96%] Building CXX object tools/server/CMakeFiles/llama-server-impl.dir/server-models-sched.cpp.o\n[ 96%] Linking CXX executable ../bin/test-jinja\n[ 96%] Built target test-jinja\n[ 97%] Linking CXX executable ../bin/test-server-component\n[ 97%] Built target test-server-component\n[ 97%] Linking CXX shared library ../../bin/libllama-server-impl.so\n[ 97%] Built target llama-server-impl\n[ 97%] Building CXX object tools/cli/CMakeFiles/llama-cli-impl.dir/cli.cpp.o\n[ 97%] Building CXX object tools/cli/CMakeFiles/llama-cli-impl.dir/cli-client.cpp.o\n[ 97%] Building CXX object tools/server/CMakeFiles/llama-server.dir/main.cpp.o\n[ 98%] Building CXX object tools/cli/CMakeFiles/llama-cli-impl.dir/cli-context.cpp.o\n[ 99%] Linking CXX executable ../../bin/llama-server\n[ 99%] Built target llama-server\n[ 99%] Linking CXX shared library ../../bin/libllama-cli-impl.so\n[ 99%] Built target llama-cli-impl\n[ 99%] Building CXX object tools/cli/CMakeFiles/llama-cli.dir/main.cpp.o\n[ 99%] Building CXX object app/CMakeFiles/llama-app.dir/llama.cpp.o\n[100%] Building CXX object app/CMakeFiles/llama-app.dir/__/license.cpp.o\n[100%] Building CXX object app/CMakeFiles/llama-app.dir/download.cpp.o\n[100%] Linking CXX executable ../../bin/llama-cli\n[100%] Built target llama-cli\n[100%] Linking CXX executable ../bin/llama\n[100%] Built target llama-app\n[100%] Linking CXX executable ../bin/test-chat\n[100%] Built target test-chat",
+   "benches": [
+    {
+     "bench": {
+      "File": "tools/server/bench/bench.py",
+      "Kind": "script",
+      "Name": "bench.py",
+      "Command": "",
+      "Sources": null
+     },
+     "exit": 2,
+     "metrics": null,
+     "tail": "usage: bench.py [-h] --name NAME --runner-label RUNNER_LABEL [--branch BRANCH]\n                [--commit COMMIT] [--host HOST] [--port PORT]\n                [--model-path-prefix MODEL_PATH_PREFIX] --n-prompts N_PROMPTS\n                --max-prompt-tokens MAX_PROMPT_TOKENS --max-tokens MAX_TOKENS\n                --hf-repo HF_REPO --hf-file HF_FILE [--offline] -ngl\n                N_GPU_LAYERS --ctx-size CTX_SIZE --parallel PARALLEL\n                --batch-size BATCH_SIZE --ubatch-size UBATCH_SIZE --scenario\n                SCENARIO --duration DURATION\nbench.py: error: the following arguments are required: --name, --runner-label, --n-prompts, --max-prompt-tokens, --max-tokens, --hf-repo, --hf-file, -ngl/--n-gpu-layers, --ctx-size, --parallel, --batch-size, --ubatch-size, --scenario, --duration",
+     "devices": []
+    },
+    {
+     "bench": {
+      "File": "tools/server/bench/speed-bench/speed_bench_compare.py",
+      "Kind": "script",
+      "Name": "speed_bench_compare.py",
+      "Command": "",
+      "Sources": null
+     },
+     "exit": 2,
+     "metrics": null,
+     "tail": "usage: speed_bench_compare.py [-h] --baseline BASELINE --speculative\n                              SPECULATIVE\nspeed_bench_compare.py: error: the following arguments are required: --baseline, --speculative",
+     "devices": []
+    }
+   ]
+  }
+ ],
+ "clues": [
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **q2_0** 1k",
+    "value": 389,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **q2_0** 4k",
+    "value": 539,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **q2_0** 32k",
+    "value": 571,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **q2_0** 64k",
+    "value": 561,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **q2_0** 128k",
+    "value": 543,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **q2_0** 262k",
+    "value": 496,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **iq2_xs** 1k",
+    "value": 332,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **iq2_xs** 4k",
+    "value": 463,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **iq2_xs** 32k",
+    "value": 495,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **iq2_xs** 64k",
+    "value": 486,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **iq2_xs** 128k",
+    "value": 472,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **iq2_xs** 262k",
+    "value": 437,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **iq3_xxs** 1k",
+    "value": 285,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **iq3_xxs** 4k",
+    "value": 410,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **iq3_xxs** 32k",
+    "value": 435,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **iq3_xxs** 64k",
+    "value": 427,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "prompt processing **iq3_xxs** 128k",
+    "value": 414,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **q2_0** 1k",
+    "value": 88.7,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **q2_0** 4k",
+    "value": 94.6,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **q2_0** 32k",
+    "value": 87.5,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **q2_0** 64k",
+    "value": 76.4,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **q2_0** 128k",
+    "value": 65.1,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **q2_0** 262k",
+    "value": 56.3,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **iq2_xs** 1k",
+    "value": 82,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **iq2_xs** 4k",
+    "value": 78,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **iq2_xs** 32k",
+    "value": 65.3,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **iq2_xs** 64k",
+    "value": 63.7,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **iq2_xs** 128k",
+    "value": 52,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **iq2_xs** 262k",
+    "value": 48,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **iq3_xxs** 1k",
+    "value": 64.6,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **iq3_xxs** 4k",
+    "value": 65.6,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **iq3_xxs** 32k",
+    "value": 57.3,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **iq3_xxs** 64k",
+    "value": 54.4,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "README.md",
+   "metric": {
+    "label": "output **iq3_xxs** 128k",
+    "value": 44.8,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing q2_0 1k",
+    "value": 389,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing q2_0 4k",
+    "value": 539,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing q2_0 32k",
+    "value": 571,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing q2_0 64k",
+    "value": 561,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing q2_0 128k",
+    "value": 543,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing q2_0 262k",
+    "value": 496,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq2_xs 1k",
+    "value": 332,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq2_xs 4k",
+    "value": 463,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq2_xs 32k",
+    "value": 495,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq2_xs 64k",
+    "value": 486,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq2_xs 128k",
+    "value": 472,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq2_xs 262k",
+    "value": 437,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq3_xxs 1k",
+    "value": 285,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq3_xxs 4k",
+    "value": 410,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq3_xxs 32k",
+    "value": 435,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq3_xxs 64k",
+    "value": 427,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "prompt processing iq3_xxs 128k",
+    "value": 414,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output q2_0 1k",
+    "value": 88.7,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output q2_0 4k",
+    "value": 94.6,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output q2_0 32k",
+    "value": 87.5,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output q2_0 64k",
+    "value": 76.4,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output q2_0 128k",
+    "value": 65.1,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output q2_0 262k",
+    "value": 56.3,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq2_xs 1k",
+    "value": 82,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq2_xs 4k",
+    "value": 78,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq2_xs 32k",
+    "value": 65.3,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq2_xs 64k",
+    "value": 63.7,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq2_xs 128k",
+    "value": 52,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq2_xs 262k",
+    "value": 48,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq3_xxs 1k",
+    "value": 64.6,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq3_xxs 4k",
+    "value": 65.6,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq3_xxs 32k",
+    "value": 57.3,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq3_xxs 64k",
+    "value": 54.4,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "Niko1221/Strata",
+   "sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f",
+   "file": "bench/results/2026-09-24-final/matrix.md",
+   "metric": {
+    "label": "output iq3_xxs 128k",
+    "value": 44.8,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048",
+    "value": 4505.82,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32",
+    "value": 83.43,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d4096",
+    "value": 4158.34,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d4096",
+    "value": 79.22,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d8192",
+    "value": 3993.81,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d8192",
+    "value": 75.22,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d16384",
+    "value": 3449.98,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d16384",
+    "value": 70.36,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d32768",
+    "value": 2689.42,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d32768",
+    "value": 61.65,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048",
+    "value": 2443.91,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32",
+    "value": 58.72,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d4096",
+    "value": 2309.84,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d4096",
+    "value": 55.67,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d8192",
+    "value": 2216.68,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d8192",
+    "value": 52.87,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d16384",
+    "value": 1956.31,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d16384",
+    "value": 49.45,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d32768",
+    "value": 1567.08,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d32768",
+    "value": 42.76,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048",
+    "value": 2986.97,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32",
+    "value": 61.06,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d4096",
+    "value": 2633.45,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d4096",
+    "value": 54.77,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d8192",
+    "value": 2354.14,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d8192",
+    "value": 48.02,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d16384",
+    "value": 1908.86,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d16384",
+    "value": 40.23,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d32768",
+    "value": 1348.17,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d32768",
+    "value": 30.21,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048",
+    "value": 2250.28,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32",
+    "value": 29.43,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d4096",
+    "value": 2100.19,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d4096",
+    "value": 28.61,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d8192",
+    "value": 2007.56,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d8192",
+    "value": 27.38,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d16384",
+    "value": 1779.11,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d16384",
+    "value": 25.72,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d32768",
+    "value": 1471.23,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d32768",
+    "value": 22.51,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048",
+    "value": 5948.74,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32",
+    "value": 81.05,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d4096",
+    "value": 5652.69,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d4096",
+    "value": 76.37,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d8192",
+    "value": 5509.57,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d8192",
+    "value": 71.61,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d16384",
+    "value": 5340.86,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d16384",
+    "value": 70.89,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 pp2048 @ d32768",
+    "value": 5023.3,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b cuda ngl=99 n_ubatch=2048 fa=1 mmap=0 dio=1 tg32 @ d32768",
+    "value": 62.28,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b cuda ngl=99 n_ubatch=2048 fa=1 dio=1 pp2048",
+    "value": 2364.18,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b cuda ngl=99 n_ubatch=2048 fa=1 dio=1 tg32",
+    "value": 48.68,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b cuda ngl=99 n_ubatch=2048 fa=1 dio=1 pp2048 @ d4096",
+    "value": 1684.13,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b cuda ngl=99 n_ubatch=2048 fa=1 dio=1 tg32 @ d4096",
+    "value": 44.62,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b cuda ngl=99 n_ubatch=2048 fa=1 dio=1 pp2048 @ d8192",
+    "value": 1314.68,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b cuda ngl=99 n_ubatch=2048 fa=1 dio=1 tg32 @ d8192",
+    "value": 42.59,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b cuda ngl=99 n_ubatch=2048 fa=1 dio=1 pp2048 @ d16384",
+    "value": 914.05,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b cuda ngl=99 n_ubatch=2048 fa=1 dio=1 tg32 @ d16384",
+    "value": 38.72,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b cuda ngl=99 n_ubatch=2048 fa=1 dio=1 pp2048 @ d32768",
+    "value": 567.2,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/dgx-spark/dgx-spark.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b cuda ngl=99 n_ubatch=2048 fa=1 dio=1 tg32 @ d32768",
+    "value": 32.65,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048",
+    "value": 2713.4,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32",
+    "value": 129.97,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d4096",
+    "value": 2324.59,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d4096",
+    "value": 123.38,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d8192",
+    "value": 1989.82,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d8192",
+    "value": 117.39,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d16384",
+    "value": 1556.54,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d16384",
+    "value": 109.75,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d32768",
+    "value": 1122.63,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 20b mxfp4 moe size=11.27 gib params=20.91 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d32768",
+    "value": 98.25,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048",
+    "value": 1648.69,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32",
+    "value": 85.6,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d4096",
+    "value": 1429.86,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d4096",
+    "value": 82.03,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d8192",
+    "value": 1257.9,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d8192",
+    "value": 78.23,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d16384",
+    "value": 1013.49,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d16384",
+    "value": 73.2,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d32768",
+    "value": 721.11,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gpt-oss 120b mxfp4 moe size=59.02 gib params=116.83 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d32768",
+    "value": 65.52,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048",
+    "value": 2453.11,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32",
+    "value": 78.97,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d4096",
+    "value": 1569.46,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d4096",
+    "value": 71.18,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d8192",
+    "value": 1145.51,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d8192",
+    "value": 65.11,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d16384",
+    "value": 741.04,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d16384",
+    "value": 56.87,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d32768",
+    "value": 431.31,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q8_0 size=30.25 gib params=30.53 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d32768",
+    "value": 45.26,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048",
+    "value": 1565.91,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32",
+    "value": 79.68,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d4096",
+    "value": 1317.41,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d4096",
+    "value": 74.7,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d8192",
+    "value": 1134.65,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d8192",
+    "value": 71.31,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d16384",
+    "value": 886.46,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d16384",
+    "value": 65.93,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d32768",
+    "value": 612.21,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "qwen2 7b q8_0 size=7.54 gib params=7.62 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d32768",
+    "value": 56.83,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048",
+    "value": 2923.59,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32",
+    "value": 134.28,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d4096",
+    "value": 2748.21,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d4096",
+    "value": 133.11,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d8192",
+    "value": 2641.45,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d8192",
+    "value": 125.85,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d16384",
+    "value": 2446.2,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d16384",
+    "value": 125,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d32768",
+    "value": 2129.18,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "gemma3 4b q4_0 size=2.35 gib params=3.88 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d32768",
+    "value": 113.14,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048",
+    "value": 1629.33,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32",
+    "value": 59.58,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d4096",
+    "value": 732.67,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d4096",
+    "value": 47.44,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d8192",
+    "value": 474.33,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d8192",
+    "value": 40.2,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d16384",
+    "value": 277.46,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d16384",
+    "value": 31.5,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b mtl,blas threads=16 n_ubatch=2048 fa=1 pp2048 @ d32768",
+    "value": 151.44,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/mac-m2-ultra/mac-m2-ultra.md",
+   "metric": {
+    "label": "deepseek2 30b.a3b q8_0 size=29.65 gib params=29.94 b mtl,blas threads=16 n_ubatch=2048 fa=1 tg32 @ d32768",
+    "value": 21.81,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 120b.a12b q4_k size=65.10 gib params=120.67 b cuda n_ubatch=2048 fa=1 pp2048",
+    "value": 768.84,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 120b.a12b q4_k size=65.10 gib params=120.67 b cuda n_ubatch=2048 fa=1 tg32",
+    "value": 19.94,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 120b.a12b q4_k size=65.10 gib params=120.67 b cuda n_ubatch=2048 fa=1 pp2048 @ d4096",
+    "value": 764.51,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 120b.a12b q4_k size=65.10 gib params=120.67 b cuda n_ubatch=2048 fa=1 tg32 @ d4096",
+    "value": 19.95,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 120b.a12b q4_k size=65.10 gib params=120.67 b cuda n_ubatch=2048 fa=1 pp2048 @ d8192",
+    "value": 759.53,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 120b.a12b q4_k size=65.10 gib params=120.67 b cuda n_ubatch=2048 fa=1 tg32 @ d8192",
+    "value": 19.83,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 120b.a12b q4_k size=65.10 gib params=120.67 b cuda n_ubatch=2048 fa=1 pp2048 @ d16384",
+    "value": 747.98,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 120b.a12b q4_k size=65.10 gib params=120.67 b cuda n_ubatch=2048 fa=1 tg32 @ d16384",
+    "value": 19.84,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 120b.a12b q4_k size=65.10 gib params=120.67 b cuda n_ubatch=2048 fa=1 pp2048 @ d32768",
+    "value": 724.4,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 120b.a12b q4_k size=65.10 gib params=120.67 b cuda n_ubatch=2048 fa=1 tg32 @ d32768",
+    "value": 19.45,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 4b q8_0 size=3.94 gib params=3.97 b cuda n_ubatch=2048 fa=1 pp2048",
+    "value": 2761.9,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 4b q8_0 size=3.94 gib params=3.97 b cuda n_ubatch=2048 fa=1 tg32",
+    "value": 52.85,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 4b q8_0 size=3.94 gib params=3.97 b cuda n_ubatch=2048 fa=1 pp2048 @ d4096",
+    "value": 2687.07,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 4b q8_0 size=3.94 gib params=3.97 b cuda n_ubatch=2048 fa=1 tg32 @ d4096",
+    "value": 52.32,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 4b q8_0 size=3.94 gib params=3.97 b cuda n_ubatch=2048 fa=1 pp2048 @ d8192",
+    "value": 2564.52,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 4b q8_0 size=3.94 gib params=3.97 b cuda n_ubatch=2048 fa=1 tg32 @ d8192",
+    "value": 51.27,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 4b q8_0 size=3.94 gib params=3.97 b cuda n_ubatch=2048 fa=1 pp2048 @ d16384",
+    "value": 2334.02,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 4b q8_0 size=3.94 gib params=3.97 b cuda n_ubatch=2048 fa=1 tg32 @ d16384",
+    "value": 49.71,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 4b q8_0 size=3.94 gib params=3.97 b cuda n_ubatch=2048 fa=1 pp2048 @ d32768",
+    "value": 2041.46,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "benches/nemotron/nemotron-dgx-spark.md",
+   "metric": {
+    "label": "nemotron 4b q8_0 size=3.94 gib params=3.97 b cuda n_ubatch=2048 fa=1 tg32 @ d32768",
+    "value": 46.71,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/backend/VirtGPU/development.md",
+   "metric": {
+    "label": "llama 3b q4_k - medium size=1.87 gib params=3.21 b ggml-virtgpu ngl=99 pp512",
+    "value": 991.3,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/backend/VirtGPU/development.md",
+   "metric": {
+    "label": "llama 3b q4_k - medium size=1.87 gib params=3.21 b ggml-virtgpu ngl=99 tg128",
+    "value": 85.71,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/backend/snapdragon/README.md",
+   "metric": {
+    "label": "prompt eval time",
+    "value": 320,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/backend/snapdragon/README.md",
+   "metric": {
+    "label": "eval time",
+    "value": 2100,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/backend/snapdragon/README.md",
+   "metric": {
+    "label": "sampling time",
+    "value": 30.08,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/backend/snapdragon/README.md",
+   "metric": {
+    "label": "load time",
+    "value": 617.94,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/backend/snapdragon/README.md",
+   "metric": {
+    "label": "total time",
+    "value": 9454.92,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/backend/snapdragon/README.md",
+   "metric": {
+    "label": "llama 1b q4_0 size=729.75 mib params=1.24 b htp ngl=99 threads=4 n_batch=128 mmap=0 pp128",
+    "value": 169.42,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/backend/snapdragon/README.md",
+   "metric": {
+    "label": "llama 1b q4_0 size=729.75 mib params=1.24 b htp ngl=99 threads=4 n_batch=128 mmap=0 tg64",
+    "value": 51.54,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/build-riscv64-spacemit.md",
+   "metric": {
+    "label": "qwen35 2b q4_1 size=1.19 gib params=1.88 b cpu threads=4 n_ubatch=128 fa=1 mmap=0 pp128",
+    "value": 10.32,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/build-riscv64-spacemit.md",
+   "metric": {
+    "label": "qwen35 2b q4_1 size=1.19 gib params=1.88 b cpu threads=4 n_ubatch=128 fa=1 mmap=0 tg128",
+    "value": 3.07,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/build-riscv64-spacemit.md",
+   "metric": {
+    "label": "qwen3 0.6b q4_0 size=358.78 mib params=596.05 m cpu threads=4 n_ubatch=128 fa=1 mmap=0 pp128",
+    "value": 49.15,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/build-riscv64-spacemit.md",
+   "metric": {
+    "label": "qwen3 0.6b q4_0 size=358.78 mib params=596.05 m cpu threads=4 n_ubatch=128 fa=1 mmap=0 tg128",
+    "value": 11.73,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/build-riscv64-spacemit.md",
+   "metric": {
+    "label": "qwen3 0.6b q4_0 size=358.78 mib params=596.05 m cpu threads=8 n_ubatch=128 fa=1 mmap=0 pp128",
+    "value": 565.83,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/build-riscv64-spacemit.md",
+   "metric": {
+    "label": "qwen3 0.6b q4_0 size=358.78 mib params=596.05 m cpu threads=8 n_ubatch=128 fa=1 mmap=0 tg128",
+    "value": 55.77,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/build-riscv64-spacemit.md",
+   "metric": {
+    "label": "qwen3 4b q4_0 size=2.21 gib params=4.02 b cpu threads=8 n_ubatch=128 fa=1 mmap=0 pp128",
+    "value": 79.74,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/build-riscv64-spacemit.md",
+   "metric": {
+    "label": "qwen3 4b q4_0 size=2.21 gib params=4.02 b cpu threads=8 n_ubatch=128 fa=1 mmap=0 tg128",
+    "value": 11.29,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/build-riscv64-spacemit.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q4_0 size=16.18 gib params=30.53 b cpu threads=8 n_ubatch=128 fa=1 mmap=0 pp128",
+    "value": 57.88,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/build-riscv64-spacemit.md",
+   "metric": {
+    "label": "qwen3moe 30b.a3b q4_0 size=16.18 gib params=30.53 b cpu threads=8 n_ubatch=128 fa=1 mmap=0 tg128",
+    "value": 12.79,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/build-riscv64-spacemit.md",
+   "metric": {
+    "label": "qwen35 2b q4_1 size=1.19 gib params=1.88 b cpu threads=8 n_ubatch=128 fa=1 mmap=0 pp128",
+    "value": 115.23,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/build-riscv64-spacemit.md",
+   "metric": {
+    "label": "qwen35 2b q4_1 size=1.19 gib params=1.88 b cpu threads=8 n_ubatch=128 fa=1 mmap=0 tg128",
+    "value": 16.49,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/build-riscv64-spacemit.md",
+   "metric": {
+    "label": "gemma4 e4b q4_k - medium size=4.76 gib params=7.52 b cpu threads=8 n_ubatch=128 fa=1 mmap=0 pp128",
+    "value": 21.13,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/build-riscv64-spacemit.md",
+   "metric": {
+    "label": "gemma4 e4b q4_k - medium size=4.76 gib params=7.52 b cpu threads=8 n_ubatch=128 fa=1 mmap=0 tg128",
+    "value": 5.66,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/multimodal/MobileVLM.md",
+   "metric": {
+    "label": "load time",
+    "value": 23574.72,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/multimodal/MobileVLM.md",
+   "metric": {
+    "label": "sample time",
+    "value": 1.24,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/multimodal/MobileVLM.md",
+   "metric": {
+    "label": "prompt eval time",
+    "value": 12460.15,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/multimodal/MobileVLM.md",
+   "metric": {
+    "label": "eval time",
+    "value": 424.86,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "docs/multimodal/MobileVLM.md",
+   "metric": {
+    "label": "total time",
+    "value": 34731.93,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "examples/batched/README.md",
+   "metric": {
+    "label": "speed",
+    "value": 30.26,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "examples/batched/README.md",
+   "metric": {
+    "label": "load time",
+    "value": 587,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "examples/batched/README.md",
+   "metric": {
+    "label": "sample time",
+    "value": 2.56,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "examples/batched/README.md",
+   "metric": {
+    "label": "prompt eval time",
+    "value": 4089.11,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "examples/batched/README.md",
+   "metric": {
+    "label": "eval time",
+    "value": 0,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "examples/batched/README.md",
+   "metric": {
+    "label": "total time",
+    "value": 4156.04,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "examples/simple/README.md",
+   "metric": {
+    "label": "speed",
+    "value": 11.68,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "examples/simple/README.md",
+   "metric": {
+    "label": "load time",
+    "value": 579.15,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "examples/simple/README.md",
+   "metric": {
+    "label": "sample time",
+    "value": 0.72,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "examples/simple/README.md",
+   "metric": {
+    "label": "prompt eval time",
+    "value": 655.63,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "examples/simple/README.md",
+   "metric": {
+    "label": "eval time",
+    "value": 2180.97,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "examples/simple/README.md",
+   "metric": {
+    "label": "total time",
+    "value": 2891.13,
+    "unit": "ms",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda -1 tg 128",
+    "value": 132.19,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda -1 tg 256",
+    "value": 129.37,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda -1 tg 512",
+    "value": 123.83,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 13b mostly q4_0 size=6.86 gib params=13.02 b cuda -1 tg 128",
+    "value": 82.17,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 13b mostly q4_0 size=6.86 gib params=13.02 b cuda -1 tg 256",
+    "value": 80.74,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 13b mostly q4_0 size=6.86 gib params=13.02 b cuda -1 tg 512",
+    "value": 78.08,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda -1 n_batch=128 pp 1024",
+    "value": 1436.51,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda -1 n_batch=256 pp 1024",
+    "value": 1932.43,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda -1 n_batch=512 pp 1024",
+    "value": 2254.45,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda -1 n_batch=1024 pp 1024",
+    "value": 2498.61,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cpu threads=1 pp 64",
+    "value": 6.17,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cpu threads=1 tg 16",
+    "value": 4.05,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cpu threads=2 pp 64",
+    "value": 12.31,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cpu threads=2 tg 16",
+    "value": 7.8,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cpu threads=4 pp 64",
+    "value": 23.18,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cpu threads=4 tg 16",
+    "value": 12.22,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cpu threads=8 pp 64",
+    "value": 32.29,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cpu threads=8 tg 16",
+    "value": 16.71,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cpu threads=16 pp 64",
+    "value": 33.52,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cpu threads=16 tg 16",
+    "value": 15.32,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cpu threads=32 pp 64",
+    "value": 59,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cpu threads=32 tg 16",
+    "value": 16.41,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=10 pp 512",
+    "value": 373.36,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=10 tg 128",
+    "value": 13.45,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=20 pp 512",
+    "value": 472.65,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=20 tg 128",
+    "value": 21.36,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=30 pp 512",
+    "value": 631.87,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=30 tg 128",
+    "value": 40.04,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=31 pp 512",
+    "value": 657.89,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=31 tg 128",
+    "value": 48.19,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=32 pp 512",
+    "value": 688.26,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=32 tg 128",
+    "value": 54.78,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=33 pp 512",
+    "value": 704.27,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=33 tg 128",
+    "value": 60.62,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=34 pp 512",
+    "value": 881.34,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=34 tg 128",
+    "value": 71.76,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=35 pp 512",
+    "value": 2400.01,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda ngl=35 tg 128",
+    "value": 131.66,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "qwen2 7b q4_k - medium size=4.36 gib params=7.62 b cuda -1 pp512",
+    "value": 7340.2,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "qwen2 7b q4_k - medium size=4.36 gib params=7.62 b cuda -1 tg128",
+    "value": 120.6,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "qwen2 7b q4_k - medium size=4.36 gib params=7.62 b cuda -1 pp512 @ d512",
+    "value": 6425.91,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "qwen2 7b q4_k - medium size=4.36 gib params=7.62 b cuda -1 tg128 @ d512",
+    "value": 116.71,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/llama-bench/README.md",
+   "metric": {
+    "label": "llama 7b mostly q4_0 size=3.56 gib params=6.74 b cuda -1 pp 512",
+    "value": 2368.8,
+    "unit": "tok/s",
+    "better": "higher"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "f16 none model size [gib]=14.97 δppl=0.001524 ± 0.000755 kld=0.000551 ± 0.000002 mean δp=0.001 ± 0.002 % rms δp=0.787 ± 0.004 %",
+    "value": 6.23316,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q8_0 none model size [gib]=7.96 δppl=0.002650 ± 0.001006 kld=0.001355 ± 0.000006 -0.019 ± 0.003 % rms δp=1.198 ± 0.007 %",
+    "value": 6.234284,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q6_k none model size [gib]=6.14 δppl=0.021748 ± 0.001852 kld=0.005452 ± 0.000035 -0.007 ± 0.006 % rms δp=2.295 ± 0.019 %",
+    "value": 6.253382,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q5_k_m none model size [gib]=5.33 δppl=0.056974 ± 0.002598 kld=0.010762 ± 0.000079 -0.114 ± 0.008 % rms δp=3.160 ± 0.031 %",
+    "value": 6.288607,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q5_k_s none model size [gib]=5.21 δppl=0.104964 ± 0.003331 kld=0.016595 ± 0.000122 -0.223 ± 0.010 % rms δp=3.918 ± 0.036 %",
+    "value": 6.336598,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q5_1 none model size [gib]=5.65 δppl=0.106223 ± 0.003476 kld=0.018045 ± 0.000139 -0.287 ± 0.011 % rms δp=4.123 ± 0.039 %",
+    "value": 6.337857,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q5_0 none model size [gib]=5.21 δppl=0.131591 ± 0.003894 kld=0.022239 ± 0.000166 -0.416 ± 0.012 % rms δp=4.634 ± 0.043 %",
+    "value": 6.363224,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q4_k_m wt 10m model size [gib]=4.58 δppl=0.151303 ± 0.004429 kld=0.028152 ± 0.000240 -0.389 ± 0.014 % rms δp=5.251 ± 0.049 %",
+    "value": 6.382937,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q4_k_m none model size [gib]=4.58 δppl=0.175482 ± 0.004620 kld=0.031273 ± 0.000238 -0.596 ± 0.014 % rms δp=5.519 ± 0.050 %",
+    "value": 6.407115,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q4_k_s wt 10m model size [gib]=4.37 δppl=0.178064 ± 0.004744 kld=0.031951 ± 0.000259 -0.531 ± 0.015 % rms δp=5.645 ± 0.051 %",
+    "value": 6.409697,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq4_nl wt 10m model size [gib]=4.35 δppl=0.223959 ± 0.005201 kld=0.035742 ± 0.000288 -0.590 ± 0.016 % rms δp=5.998 ± 0.054 %",
+    "value": 6.455593,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq4_xs wt 10m model size [gib]=4.14 δppl=0.228071 ± 0.005207 kld=0.036334 ± 0.000284 -0.668 ± 0.016 % rms δp=6.044 ± 0.054 %",
+    "value": 6.459705,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q4_k_s none model size [gib]=4.37 δppl=0.268895 ± 0.005638 kld=0.043136 ± 0.000314 -0.927 ± 0.017 % rms δp=6.562 ± 0.055 %",
+    "value": 6.500529,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q4_1 none model size [gib]=4.78 δppl=0.451103 ± 0.008030 kld=0.071683 ± 0.000505 -0.927 ± 0.017 % rms δp=8.512 ± 0.063 %",
+    "value": 6.682737,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q4_0 none model size [gib]=4.34 δppl=0.468514 ± 0.007951 kld=0.071940 ± 0.000491 -1.588 ± 0.022 % rms δp=8.434 ± 0.061 %",
+    "value": 6.700147,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q3_k_l wt 10m model size [gib]=4.03 δppl=0.439590 ± 0.008154 kld=0.073077 ± 0.000529 -0.940 ± 0.023 % rms δp=8.662 ± 0.064 %",
+    "value": 6.671223,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q3_k_m wt 10m model size [gib]=3.74 δppl=0.502622 ± 0.008901 kld=0.084358 ± 0.000588 -1.198 ± 0.024 % rms δp=9.292 ± 0.065 %",
+    "value": 6.734255,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q3_k_l none model size [gib]=4.03 δppl=0.556242 ± 0.009171 kld=0.087176 ± 0.000614 -1.532 ± 0.025 % rms δp=9.432 ± 0.067 %",
+    "value": 6.787876,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q3_k_m none model size [gib]=3.74 δppl=0.656864 ± 0.010071 kld=0.101913 ± 0.000677 -1.990 ± 0.026 % rms δp=10.203 ± 0.068 %",
+    "value": 6.888498,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq3_m wt 10m model size [gib]=3.53 δppl=0.666694 ± 0.009449 kld=0.102534 ± 0.000663 -3.178 ± 0.026 % rms δp=10.513 ± 0.066 %",
+    "value": 6.898327,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq3_s wt 10m model size [gib]=3.42 δppl=0.733867 ± 0.010245 kld=0.111278 ± 0.000710 -3.066 ± 0.027 % rms δp=10.845 ± 0.068 %",
+    "value": 6.965501,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq3_xs wt 10m model size [gib]=3.28 δppl=0.931409 ± 0.012084 kld=0.138693 ± 0.000857 -3.667 ± 0.031 % rms δp=12.148 ± 0.070 %",
+    "value": 7.163043,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq3_xxs wt 10m model size [gib]=3.05 δppl=1.226803 ± 0.015234 kld=0.183625 ± 0.001042 -3.918 ± 0.035 % rms δp=13.836 ± 0.074 %",
+    "value": 7.458436,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q3_k_s wt 10m model size [gib]=3.41 δppl=1.371244 ± 0.015688 kld=0.199821 ± 0.001008 -5.046 ± 0.037 % rms δp=14.980 ± 0.070 %",
+    "value": 7.602878,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q3_k_s none model size [gib]=3.41 δppl=1.632152 ± 0.017733 kld=0.228217 ± 0.001079 -5.604 ± 0.038 % rms δp=15.541 ± 0.070 %",
+    "value": 7.863786,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq2_m wt 10m model size [gib]=2.74 δppl=2.369166 ± 0.025244 kld=0.325989 ± 0.00160 -6.463 ± 0.046 % rms δp=18.519 ± 0.080 %",
+    "value": 8.600799,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q2_k wt 10k model size [gib]=2.96 δppl=2.420657 ± 0.025587 kld=0.331393 ± 0.001562 -6.606 ± 0.046 % rms δp=18.790 ± 0.078 %",
+    "value": 8.65229,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q2_k wt 100k model size [gib]=2.96 δppl=2.410359 ± 0.025495 kld=0.331672 ± 0.001569 -6.628 ± 0.047 % rms δp=18.856 ± 0.078 %",
+    "value": 8.641993,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q2_k wt 10m model size [gib]=2.96 δppl=2.416191 ± 0.025683 kld=0.332223 ± 0.001572 -6.500 ± 0.047 % rms δp=18.881 ± 0.078 %",
+    "value": 8.647825,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q2_k wt 1m model size [gib]=2.96 δppl=2.442732 ± 0.025843 kld=0.335308 ± 0.001576 -6.634 ± 0.047 % rms δp=19.009 ± 0.079 %",
+    "value": 8.674365,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q2_k wt 1k model size [gib]=2.96 δppl=2.450972 ± 0.026069 kld=0.337093 ± 0.001596 -6.596 ± 0.047 % rms δp=18.977 ± 0.079 %",
+    "value": 8.682605,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q2_k_s wt 10m model size [gib]=2.96 δppl=3.092145 ± 0.031914 kld=0.403360 ± 0.001787 -7.131 ± 0.049 % rms δp=20.050 ± 0.081 %",
+    "value": 9.323778,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q2_k_s wt 1m model size [gib]=2.96 δppl=3.097688 ± 0.031816 kld=0.403590 ± 0.001797 -7.289 ± 0.049 % rms δp=20.123 ± 0.081 %",
+    "value": 9.329321,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q2_k_s wt 100k model size [gib]=2.96 δppl=3.131339 ± 0.032169 kld=0.408367 ± 0.001802 -7.198 ± 0.050 % rms δp=20.132 ± 0.081 %",
+    "value": 9.362973,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q2_k_s wt 10k model size [gib]=2.96 δppl=3.144846 ± 0.032464 kld=0.408662 ± 0.001819 -7.141 ± 0.050 % rms δp=20.120 ± 0.081 %",
+    "value": 9.376479,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q2_k_s wt 1k model size [gib]=2.96 δppl=3.183567 ± 0.032993 kld=0.415865 ± 0.001846 -7.153 ± 0.050 % rms δp=20.311 ± 0.082 %",
+    "value": 9.4152,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq2_s wt 10m model size [gib]=2.56 δppl=3.419148 ± 0.034017 kld=0.439197 ± 0.001976 -8.319 ± 0.052 % rms δp=21.491 ± 0.083 %",
+    "value": 9.650781,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "q2_k none model size [gib]=2.96 δppl=3.519934 ± 0.033863 kld=0.445132 ± 0.001835 -9.123 ± 0.051 % rms δp=21.421 ± 0.079 %",
+    "value": 9.751568,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq2_xs wt 10m model size [gib]=2.43 δppl=4.529791 ± 0.042229 kld=0.546290 ± 0.002133 -10.576 ± 0.056 % rms δp=23.872 ± 0.082 %",
+    "value": 10.761424,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq2_xxs wt 10m model size [gib]=2.24 δppl=7.860148 ± 0.070752 kld=0.812022 ± 0.002741 -14.363 ± 0.065 % rms δp=28.576 ± 0.084 %",
+    "value": 14.091782,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq1_m wt 10m model size [gib]=2.01 δppl=19.262089 ± 0.152396 kld=1.393084 ± 0.003529 -24.672 ± 0.077 % rms δp=38.287 ± 0.084 %",
+    "value": 25.493722,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq1_s wt 1m model size [gib]=1.88 δppl=51.866126 ± 0.416604 kld=2.211278 ± 0.004688 -32.471 ± 0.087 % rms δp=46.418 ± 0.085 %",
+    "value": 58.09776,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq1_s wt 1k model size [gib]=1.88 δppl=52.036218 ± 0.424373 kld=2.214858 ± 0.004778 -31.880 ± 0.089 % rms δp=46.330 ± 0.086 %",
+    "value": 58.267851,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq1_s wt 100k model size [gib]=1.88 δppl=52.349864 ± 0.431360 kld=2.220834 ± 0.004818 -32.261 ± 0.089 % rms δp=46.002 ± 0.086 %",
+    "value": 58.581498,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq1_s wt 10m model size [gib]=1.88 δppl=54.462959 ± 0.449644 kld=2.254554 ± 0.004868 -31.973 ± 0.088 % rms δp=46.271 ± 0.086 %",
+    "value": 60.694593,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  },
+  {
+   "repo": "ggerganov/llama.cpp",
+   "sha": "4783b1145c7073bb809f4c282ff4853cbfe42954",
+   "file": "tools/perplexity/README.md",
+   "metric": {
+    "label": "iq1_s wt 10k model size [gib]=1.88 δppl=56.989691 ± 0.471423 kld=2.293527 ± 0.004885 -32.261 ± 0.089 % rms δp=46.562 ± 0.086 %",
+    "value": 63.221324,
+    "unit": "ppl",
+    "better": "lower"
+   }
+  }
+ ],
+ "compared": null,
+ "conditions": {
+  "model_dir": "/tmp/model",
+  "model_name": "Qwen3.6-35B-A3B",
+  "model": {
+   "architectures": [
+    "Qwen3_5MoeForCausalLM"
+   ],
+   "hidden_size": 2048,
+   "max_position_embeddings": 262144,
+   "model_type": "qwen3_5_moe",
+   "moe_intermediate_size": 512,
+   "num_attention_heads": 16,
+   "num_experts": 256,
+   "num_experts_per_tok": 8,
+   "num_hidden_layers": 40,
+   "num_key_value_heads": 2,
+   "vocab_size": 248320
+  },
+  "model_bytes": 71903776776,
+  "gpus": [
+   {
+    "index": 0,
+    "name": "Iluvatar BI-V100",
+    "memory_mib": 32768
+   },
+   {
+    "index": 1,
+    "name": "Iluvatar BI-V100",
+    "memory_mib": 32768
+   },
+   {
+    "index": 2,
+    "name": "Iluvatar BI-V100",
+    "memory_mib": 32768
+   },
+   {
+    "index": 3,
+    "name": "Iluvatar BI-V100",
+    "memory_mib": 32768
+   }
+  ],
+  "host_mem_kib": 527921044,
+  "ref_repo": "Niko1221/Strata",
+  "ref_sha": "01529aaa82b9f5c58d2bb87264b7b3f7b823678f"
+ },
+ "discover": {
+  "asked": 3,
+  "named": [
+   "QwenLM/Qwen3",
+   "vllm-project/vllm",
+   "sgl-project/sglang",
+   "`QwenLM/Qwen3`**",
+   "`vllm-project/vllm`**",
+   "`sgl-project/sglang`**",
+   "`docs/QWEN36.md`",
+   "ggerganov/llama.cpp",
+   "`ggerganov/llama.cpp`",
+   "`vllm-project/vllm`",
+   "`sgl-project/sglang`",
+   "ggerganov/llama.cpp",
+   "turboderp/exllamav2",
+   "`ggerganov/llama.cpp`**",
+   "`turboderp/exllamav2`**",
+   "`casper-hansen/AutoAWQ`",
+   "`mobiusml/hqq`",
+   "casper-hansen/AutoAWQ",
+   "mobiusml/hqq",
+   "`PanQiWei/AutoGPTQ`",
+   "`ollama/ollama`",
+   "PanQiWei/AutoGPTQ",
+   "ollama/ollama"
+  ],
+  "taken": [
+   "ggerganov/llama.cpp: 1 runnable benchmark(s): script:speed_bench_compare.py"
+  ],
+  "not_taken": [
+   "QwenLM/Qwen3: no benchmark the kernel can run (no bench/perf/perplexity CMake target or test, no runnable script under a benchmark directory)",
+   "vllm-project/vllm: does not clone (killed after 2m0s: Cloning into bare repository '/tmp/eval_vllm-project_vllm.git'...)",
+   "sgl-project/sglang: does not clone (killed after 2m0s: Cloning into bare repository '/tmp/eval_sgl-project_sglang.git'...)",
+   "`QwenLM/Qwen3`**: does not clone (exit status 128: Cloning into bare repository '/tmp/eval_`QwenLM_Qwen3`**.git'...\nfatal: unable to access 'https://github.com/`QwenLM/Qwen3`**.git/': The requested URL returned error: 400)",
+   "`vllm-project/vllm`**: does not clone (killed after 2m0s: Cloning into bare repository '/tmp/eval_`vllm-project_vllm`**.git'...)",
+   "`sgl-project/sglang`**: does not clone (killed after 2m0s: Cloning into bare repository '/tmp/eval_`sgl-project_sglang`**.git'...)",
+   "`docs/QWEN36.md`: does not clone (exit status 128: Cloning into bare repository '/tmp/eval_`docs_QWEN36.md`.git'...\nfatal: unable to access 'https://github.com/`docs/QWEN36.md`.git/': The requested URL returned error: 400)",
+   "`ggerganov/llama.cpp`: does not clone (exit status 128: Cloning into bare repository '/tmp/eval_`ggerganov_llama.cpp`.git'...\nfatal: unable to access 'https://github.com/`ggerganov/llama.cpp`.git/': The requested URL returned error: 400)",
+   "`vllm-project/vllm`: does not clone (exit status 128: Cloning into bare repository '/tmp/eval_`vllm-project_vllm`.git'...\nfatal: unable to access 'https://github.com/`vllm-project/vllm`.git/': The requested URL returned error: 400)",
+   "`sgl-project/sglang`: does not clone (exit status 128: Cloning into bare repository '/tmp/eval_`sgl-project_sglang`.git'...\nfatal: unable to access 'https://github.com/`sgl-project/sglang`.git/': The requested URL returned error: 400)",
+   "ggerganov/llama.cpp: named before in this search",
+   "turboderp/exllamav2: no benchmark the kernel can run (no bench/perf/perplexity CMake target or test, no runnable script under a benchmark directory)",
+   "`ggerganov/llama.cpp`**: does not clone (killed after 2m0s: Cloning into bare repository '/tmp/eval_`ggerganov_llama.cpp`**.git'...)",
+   "`turboderp/exllamav2`**: does not clone (exit status 128: Cloning into bare repository '/tmp/eval_`turboderp_exllamav2`**.git'...\nfatal: unable to access 'https://github.com/`turboderp/exllamav2`**.git/': The requested URL returned error: 400)",
+   "`casper-hansen/AutoAWQ`: does not clone (killed after 2m0s: Cloning into bare repository '/tmp/eval_`casper-hansen_AutoAWQ`.git'...)",
+   "`mobiusml/hqq`: does not clone (exit status 128: Cloning into bare repository '/tmp/eval_`mobiusml_hqq`.git'...\nfatal: unable to access 'https://github.com/`mobiusml/hqq`.git/': The requested URL returned error: 400)",
+   "casper-hansen/AutoAWQ: no benchmark the kernel can run (no bench/perf/perplexity CMake target or test, no runnable script under a benchmark directory)",
+   "mobiusml/hqq: does not clone (killed after 2m0s: Cloning into bare repository '/tmp/eval_mobiusml_hqq.git'...)",
+   "`PanQiWei/AutoGPTQ`: does not clone (exit status 128: Cloning into bare repository '/tmp/eval_`PanQiWei_AutoGPTQ`.git'...\nfatal: unable to access 'https://github.com/`PanQiWei/AutoGPTQ`.git/': The requested URL returned error: 400)",
+   "`ollama/ollama`: does not clone (exit status 128: Cloning into bare repository '/tmp/eval_`ollama_ollama`.git'...\nfatal: unable to access 'https://github.com/`ollama/ollama`.git/': The requested URL returned error: 400)",
+   "PanQiWei/AutoGPTQ: 2 runnable benchmark(s) (script:generation_speed.py script:perplexity.py) but no published number in tok/s, the unit of the port's end-to-end run",
+   "ollama/ollama: does not clone (killed after 2m0s: Cloning into bare repository '/tmp/eval_ollama_ollama.git'...)"
+  ]
+ },
+ "compare": {
+  "published": 0,
+  "port_rates": 0,
+  "asked": false,
+  "named": 0,
+  "ignored": null
+ },
+ "gate": "integration_e2e_failed",
+ "gate_text": "integration_e2e_failed: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh exited 1 running the model at /tmp/model; output: e2e: MODEL_DIR=/tmp/model  BUILD=/tmp/einsteinos_verify_3329254831/build\ndevices: 4\ndevice 0: Iluvatar BI-V100, 31.7 GiB total, 31.7 GiB free, warp 64, 16 SMs, cc 7.0\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\ne2e: n_layers=36 n_embd=7168 ff=1792 experts=64 top_k=8 gpus=4\nTraceback (most recent call last):\n  File \"\u003cstdin\u003e\", line 49, in \u003cmodule\u003e\nRuntimeError: The size of tensor a (3584) must match the size of tensor b (1792) at non-singleton dimension 1",
+ "when": "2026-11-20T17:50:15.367154158Z"
+}
