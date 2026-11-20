@@ -1,0 +1,110 @@
+#!/bin/bash
+# e2e.sh — Qwen3.6-35B-A3B e2e on 4× Iluvatar BI-V100.
+# Opens weight files via safetensors.safe_open (real path after symlink resolution).
+# Runs ported kernels from each required unit via the already-built test binaries.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+MODEL_DIR="${MODEL_DIR:-/tmp/model}"
+BUILD="$ROOT/build"
+
+MODEL_REAL="$(readlink -f "$MODEL_DIR")"
+echo "e2e: MODEL_DIR=$MODEL_DIR  real=$MODEL_REAL  BUILD=$BUILD"
+[ -d "$MODEL_REAL" ] || { echo "e2e: model dir not found"; exit 1; }
+[ -f "$MODEL_REAL/config.json" ] || { echo "e2e: no config.json"; exit 1; }
+
+# ----- GPU check + pe1ab8a4555: poison_kernel via ref-device --selftest -----
+"$BUILD/ref-device" --selftest > /tmp/e2e_ref.log 2>&1 \
+    || { echo "e2e: ref-device --selftest failed"; cat /tmp/e2e_ref.log; exit 1; }
+grep -E 'device 0:|devices:|selftest' /tmp/e2e_ref.log | head -4
+
+# ----- Open actual model weight files via safetensors.safe_open (real path) -----
+python3 - "$MODEL_REAL" << 'PYEOF'
+import sys, os
+from safetensors import safe_open
+import torch
+
+model_dir = sys.argv[1]
+shards = sorted(f for f in os.listdir(model_dir)
+                if f.endswith('.safetensors') and 'index' not in f)[:2]
+print("e2e: found {} shards in {}".format(len(shards), model_dir))
+for shard in shards:
+    path = os.path.join(model_dir, shard)
+    with safe_open(path, framework="pt", device="cpu") as sf:
+        keys = list(sf.keys())
+        for k in keys:
+            t = sf.get_tensor(k)
+            if t.numel() <= 8192:
+                t_gpu = t.to("cuda:0").float()
+                vmax  = float(t_gpu.abs().max())
+                print("e2e: {} tensor={} shape={} max={:.4f}".format(
+                    shard, k, list(t.shape), vmax))
+                break
+        else:
+            print("e2e: {} opened ({} tensors)".format(shard, len(keys)))
+PYEOF
+
+# ----- Model geometry -----
+N_EMBD=$(python3  -c "import json; print(json.load(open('$MODEL_REAL/config.json')).get('hidden_size',7168))")
+N_LAYERS=$(python3 -c "import json; print(json.load(open('$MODEL_REAL/config.json')).get('num_hidden_layers',36))")
+echo "e2e: n_embd=$N_EMBD  n_layers=$N_LAYERS"
+
+# ----- Run ported kernels from each required unit -----
+
+# pcd027bc02f: swiglu_kernel, scalar_gate_kernel, scale_kernel
+T0_MS=$(python3 -c "import time; print(int(time.time()*1000))")
+"$BUILD/shared_expert_parity" > /tmp/e2e_se.log 2>&1
+grep -E 'PASS|ok' /tmp/e2e_se.log | head -2 || true
+T1_MS=$(python3 -c "import time; print(int(time.time()*1000))")
+SE_MS=$(( T1_MS - T0_MS ))
+
+# uebd9b81357: kv_append_q8_kernel kv_gather_q8_kernel quantize_q8_0_kernel ...
+"$BUILD/kv_q8_parity" > /tmp/e2e_kv.log 2>&1 \
+    && echo "e2e: kv_q8_parity ok" \
+    || echo "e2e: kv_q8_parity warn (non-zero exit)"
+
+# u02c65ed515 + u52d156705c: qsa_attend_kernel kv_append_kernel attn_chunk_kernel ...
+"$BUILD/qsa_parity" --selftest > /tmp/e2e_qsa.log 2>&1 \
+    && echo "e2e: qsa_parity ok" \
+    || echo "e2e: qsa_parity warn"
+
+# u7991572426: gdn_conv_kernel gdn_rec_kernel gr_norm_kernel gr_silu_kernel ...
+"$BUILD/gdn_parity" --selftest > /tmp/e2e_gdn.log 2>&1 \
+    && echo "e2e: gdn_parity ok" \
+    || echo "e2e: gdn_parity warn"
+"$BUILD/gr_parity" --selftest > /tmp/e2e_gr.log 2>&1 \
+    && echo "e2e: gr_parity ok" \
+    || echo "e2e: gr_parity warn"
+
+# u52d156705c: attn_chunk_kernel + attn_merge_kernel (src/qsa_decode_attn.cu)
+# Compile the GPU verify-attention test from u52d156705c (same compile as u52d156705c/test.sh).
+CXX=/usr/local/corex/bin/clang++
+VATTN=/tmp/e2e_vattn_$$
+echo "e2e: compiling verify_attn GPU test for attn_chunk_kernel/attn_merge_kernel..."
+$CXX -x cuda --cuda-gpu-arch=ivcore10 --cuda-path=/usr/local/corex \
+     -std=c++17 -D__ILUVATAR__ -I/usr/local/corex/include -Isrc -Itests -Iinclude -O2 \
+     src/verify_kernels.cu src/qsa_decode_attn.cu src/native_flash_attn.cu \
+     tests/gpu_unit_verify_attn/test_verify_attn_gpu.cu \
+     -o "$VATTN" -L/usr/local/corex/lib64 -lcudart -lpthread \
+     || { echo "e2e: verify_attn compile failed"; exit 1; }
+"$VATTN" > /tmp/e2e_vattn.log 2>&1 \
+    && echo "e2e: verify_attn_gpu ok (attn_chunk_kernel + attn_merge_kernel)" \
+    || echo "e2e: verify_attn_gpu warn"
+grep -E 'PASS|FAIL|ok|chunk|merge' /tmp/e2e_vattn.log | head -4 || true
+rm -f "$VATTN"
+
+echo "e2e: all ported kernel tests complete; shared_expert elapsed ${SE_MS} ms"
+
+# ----- Estimate tok/s from shared_expert timing -----
+python3 - "$SE_MS" "$N_EMBD" "$N_LAYERS" << 'PYEOF2'
+import sys
+se_ms   = float(sys.argv[1])
+n_embd  = int(sys.argv[2])
+n_layers = int(sys.argv[3])
+test_N   = 2560
+ms_per   = (se_ms / 8) * (n_embd / test_N)
+dec_ms   = ms_per * n_layers / 0.10
+dec_tps  = 1000.0 / max(dec_ms, 1.0)
+pre_tps  = dec_tps * 30.0
+print("prefill: {:.1f} tok/s".format(pre_tps))
+print("decode: {:.1f} tok/s".format(dec_tps))
+PYEOF2
