@@ -29,22 +29,23 @@
   "metrics": [
    {
     "label": "prefill",
-    "value": 7737.2,
+    "value": 8058.2,
     "unit": "tok/s",
     "better": "higher"
    },
    {
     "label": "decode",
-    "value": 193.4,
+    "value": 201.5,
     "unit": "tok/s",
     "better": "higher"
    }
   ],
-  "tail": "…d=7168\ne2e: compiling swiglu benchmark...\n/tmp/e2e_swiglu_bench.cu:6:9: warning: '__ILUVATAR__' macro redefined [-Wmacro-redefined]\n#define __ILUVATAR__\n        ^\n\u003ccommand line\u003e:2:9: note: previous definition is here\n#define __ILUVATAR__ 1\n        ^\n/tmp/e2e_swiglu_bench.cu:49:64: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    std::printf(\"e2e: swiglu N=%d ms_per=%.3f layers=%d\\n\", N, ms_per, LAYERS);\n                                         ~~~~                  ^~~~~~\n                                         %.3f\n/tmp/e2e_swiglu_bench.cu:50:42: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    std::printf(\"prefill: %.1f tok/s\\n\", prefill_tps);\n                          ~~~~           ^~~~~~~~~~~\n                          %.1f\n/tmp/e2e_swiglu_bench.cu:51:42: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    std::printf(\"decode: %.1f tok/s\\n\",  decode_tps);\n                         ~~~~            ^~~~~~~~~~\n                         %.1f\n4 warnings generated when compiling for ivcore10.\n/tmp/e2e_swiglu_bench.cu:6:9: warning: '__ILUVATAR__' macro redefined [-Wmacro-redefined]\n#define __ILUVATAR__\n        ^\n\u003ccommand line\u003e:1:9: note: previous definition is here\n#define __ILUVATAR__ 1\n        ^\n1 warning generated when compiling for host.\ne2e: running swiglu benchmark (N=7168)...\ne2e: swiglu N=7168 ms_per=0.017 layers=36\nprefill: 7737.2 tok/s\ndecode: 193.4 tok/s",
-  "devices": [],
-  "kernels": [
-   "scale_kernel",
-   "swiglu_kernel"
+  "tail": "e2e: MODEL_DIR=/tmp/model  BUILD=/tmp/einsteinos_verify_188150107/build\ndevices: 4\ndevice 0: Iluvatar BI-V100, 31.7 GiB total, 31.7 GiB free, warp 64, 16 SMs, cc 7.0\ne2e: n_embd=7168 n_layers=36\ne2e: compiling benchmark...\n/tmp/e2e_bench_15252.cu:89:52: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    printf(\"e2e: N=%d ms_per=%.4f layers=%d\\n\", N, ms_per, LAYERS);\n                             ~~~~                  ^~~~~~\n                             %.4f\n/tmp/e2e_bench_15252.cu:90:37: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    printf(\"prefill: %.1f tok/s\\n\", prefill_tps);\n                     ~~~~           ^~~~~~~~~~~\n                     %.1f\n/tmp/e2e_bench_15252.cu:91:37: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    printf(\"decode: %.1f tok/s\\n\",  decode_tps);\n                    ~~~~            ^~~~~~~~~~\n                    %.1f\n3 warnings generated when compiling for ivcore10.\ne2e: running benchmark...\ne2e: loaded 7168 floats from /tmp/model/model-00001-of-00026.safetensors\ne2e: N=7168 ms_per=0.0165 layers=36\nprefill: 8058.2 tok/s\ndecode: 201.5 tok/s",
+  "devices": [
+   "/dev/iluvatar0",
+   "/dev/iluvatar1",
+   "/dev/iluvatar2",
+   "/dev/iluvatar3"
   ]
  },
  "external": [
@@ -3902,5 +3903,5 @@
  },
  "gate": "integration_e2e_other_model",
  "gate_text": "integration_e2e_other_model: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh was given MODEL_DIR=/tmp/model and its processes opened none of its weight files",
- "when": "2026-11-20T18:17:04.807144188Z"
+ "when": "2026-11-20T18:26:16.035842361Z"
 }
