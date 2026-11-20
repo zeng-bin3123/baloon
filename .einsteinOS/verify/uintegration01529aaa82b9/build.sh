@@ -69,6 +69,15 @@ link "$OUT/kv_q8_parity" "$OBJ/kv_q8_parity.o" $ILU
 cuobj tests/test_shared_expert.cu "$OBJ/shared_expert_parity.o"
 link "$OUT/shared_expert_parity" "$OBJ/shared_expert_parity.o"
 
+# ---- verify_attn_gpu: attn_chunk_kernel + attn_merge_kernel (u52d156705c) -----------------------------------------------
+# src/qsa_decode_attn.cu contains attn_chunk_kernel<Q8> and attn_merge_kernel; must land in build/ for the kernel tracker.
+cuobj src/verify_kernels.cu "$OBJ/verify_kernels.o"
+cuobj src/qsa_decode_attn.cu "$OBJ/qsa_decode_attn.o"
+cuobj src/native_flash_attn.cu "$OBJ/native_flash_attn.o"
+cuobj tests/gpu_unit_verify_attn/test_verify_attn_gpu.cu "$OBJ/test_verify_attn_gpu.o"
+link "$OUT/verify_attn_gpu" "$OBJ/verify_kernels.o" "$OBJ/qsa_decode_attn.o" \
+     "$OBJ/native_flash_attn.o" "$OBJ/test_verify_attn_gpu.o"
+
 # ---- device runtime (src/rt) ------------------------------------------------------------------------------------------------------
 RT=""
 for f in src/rt/device.cu src/rt/pinned.cu src/rt/kernels.cu; do o="$OBJ/rt__$(basename "$f").o"; cuobj "$f" "$o"; RT="$RT $o"; done
