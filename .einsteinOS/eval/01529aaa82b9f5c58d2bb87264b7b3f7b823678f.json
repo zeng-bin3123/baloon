@@ -40,7 +40,7 @@
     "better": "higher"
    }
   ],
-  "tail": "…s\ne2e: running correctness inference on Qwen3.6-35B-A3B...\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nTraceback (most recent call last):\n  File \"\u003cstdin\u003e\", line 7, in \u003cmodule\u003e\n  File \"/usr/local/lib/python3.10/site-packages/transformers/__init__.py\", line 26, in \u003cmodule\u003e\n    from . import dependency_versions_check\n  File \"/usr/local/lib/python3.10/site-packages/transformers/dependency_versions_check.py\", line 57, in \u003cmodule\u003e\n    require_version_core(deps[pkg])\n  File \"/usr/local/lib/python3.10/site-packages/transformers/utils/versions.py\", line 117, in require_version_core\n    return require_version(requirement, hint)\n  File \"/usr/local/lib/python3.10/site-packages/transformers/utils/versions.py\", line 111, in require_version\n    _compare_versions(op, got_ver, want_ver, requirement, pkg, hint)\n  File \"/usr/local/lib/python3.10/site-packages/transformers/utils/versions.py\", line 44, in _compare_versions\n    raise ImportError(\nImportError: tokenizers\u003e=0.21,\u003c0.22 is required for a normal functioning of this module, but found tokenizers==0.23.3.\nTry: `pip install transformers -U` or `pip install -e '.[dev]'` if you're working with git main\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
+  "tail": "…ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\ne2e: found 2 shards in /root/public-storage/models/Qwen/Qwen3.6-35B-A3B\ne2e: model-00001-of-00026.safetensors opened (22 tensors)\ne2e: model-00002-of-00026.safetensors tensor=model.language_model.layers.0.input_layernorm.weight shape=[2048] max=0.3301\ne2e: n_embd=7168  n_layers=36\ngate N=2560 gpu=0.501163125 ref=0.501163125 |d|=0 ok\ngate N=5120 gpu=0.00159045355 ref=0.00159045425 |d|=6.98e-10 ok\ne2e: kv_q8_parity ok\ne2e: qsa_parity ok\ne2e: gdn_parity ok\ne2e: gr_parity ok\ne2e: verify_attn_gpu ok (attn_chunk_kernel + attn_merge_kernel)\nVERIFY ATTN GPU TESTS PASSED\ne2e: all ported kernel tests complete; shared_expert elapsed 43 ms\ne2e: running correctness inference on Qwen3.6-35B-A3B...\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nprompt: 760 6511 314 9338 369\nvllm: tokenizers\u003e=0.21,\u003c0.22 is required for a normal functioning of this module, but found tokenizers==0.23.3.\nTry: `pip install transformers -U` or `pip install -e '.[dev]'` if you're working with git main\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
   "devices": [
    "/dev/iluvatar0",
    "/dev/iluvatar1",
@@ -129,13 +129,19 @@
    "window_kernel"
   ],
   "programs": {
-   "build/gdn_parity": "8100cff07bd7e5e72ebd69987c0bedcf453a1d828abed9a2990ac4a372187628",
-   "build/gr_parity": "edbf11b4b4efbb616f957718aed875ecdc921f23c23a2f340b27a74d88e6c813",
-   "build/kv_q8_parity": "f72a2c112ac325e7cf3fa76886fad72e8bf506a06785169a08a72515b5a78118",
+   "build/gdn_parity": "704308322996c59df9f9fa65603a280f55e20c2a3871668b8c278696aae09f64",
+   "build/gr_parity": "7501a6af9d1a71d4756e324cb7ae4af25827f4f893f6f876a7b5e9ffdf6ffe9b",
+   "build/kv_q8_parity": "0a0209f2aae0c1299cb58ae23eac86b0bd8030af6a6bd45afd8466cd49836e0c",
    "build/qsa_parity": "2a4f7c3756792d71457124b9938285a0a89dfd83da3f51ada1ebad8e2f8bb9c6",
-   "build/shared_expert_parity": "4b7d51ada64d11634b271ff6f814e5a971e50bec9c45c24905812638149d6e53",
-   "build/verify_attn_gpu": "5c3eca1571d1dc734833ebed3fe1733e65a37ae23aa410501565a06bf1cd5bed"
+   "build/verify_attn_gpu": "06ead6a1d18039730a329c6cc4a06c757e13249b55c3d3dd5867c05905fbf52b"
   },
+  "prompt_ids": [
+   760,
+   6511,
+   314,
+   9338,
+   369
+  ],
   "weights": [
    "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00002-of-00026.safetensors"
   ]
@@ -3994,6 +4000,6 @@
   "ignored": null
  },
  "gate": "integration_correctness_unmeasured",
- "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"prompt:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …s\ne2e: running correctness inference on Qwen3.6-35B-A3B...\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nTraceback (most recent call last):\n  File \"\u003cstdin\u003e\", line 7, in \u003cmodule\u003e\n  File \"/usr/local/lib/python3.10/site-packages/transformers/__init__.py\", line 26, in \u003cmodule\u003e\n    from . import dependency_versions_check\n  File \"/usr/local/lib/python3.10/site-packages/transformers/dependency_versions_check.py\", line 57, in \u003cmodule\u003e\n    require_version_core(deps[pkg])\n  File \"/usr/local/lib/python3.10/site-packages/transformers/utils/versions.py\", line 117, in require_version_core\n    return require_version(requirement, hint)\n  File \"/usr/local/lib/python3.10/site-packages/transformers/utils/versions.py\", line 111, in require_version\n    _compare_versions(op, got_ver, want_ver, requirement, pkg, hint)\n  File \"/usr/local/lib/python3.10/site-packages/transformers/utils/versions.py\", line 44, in _compare_versions\n    raise ImportError(\nImportError: tokenizers\u003e=0.21,\u003c0.22 is required for a normal functioning of this module, but found tokenizers==0.23.3.\nTry: `pip install transformers -U` or `pip install -e '.[dev]'` if you're working with git main\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
- "when": "2026-11-20T21:04:27.860404006Z"
+ "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\ne2e: found 2 shards in /root/public-storage/models/Qwen/Qwen3.6-35B-A3B\ne2e: model-00001-of-00026.safetensors opened (22 tensors)\ne2e: model-00002-of-00026.safetensors tensor=model.language_model.layers.0.input_layernorm.weight shape=[2048] max=0.3301\ne2e: n_embd=7168  n_layers=36\ngate N=2560 gpu=0.501163125 ref=0.501163125 |d|=0 ok\ngate N=5120 gpu=0.00159045355 ref=0.00159045425 |d|=6.98e-10 ok\ne2e: kv_q8_parity ok\ne2e: qsa_parity ok\ne2e: gdn_parity ok\ne2e: gr_parity ok\ne2e: verify_attn_gpu ok (attn_chunk_kernel + attn_merge_kernel)\nVERIFY ATTN GPU TESTS PASSED\ne2e: all ported kernel tests complete; shared_expert elapsed 43 ms\ne2e: running correctness inference on Qwen3.6-35B-A3B...\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nprompt: 760 6511 314 9338 369\nvllm: tokenizers\u003e=0.21,\u003c0.22 is required for a normal functioning of this module, but found tokenizers==0.23.3.\nTry: `pip install transformers -U` or `pip install -e '.[dev]'` if you're working with git main\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
+ "when": "2026-11-20T21:13:04.791808997Z"
 }
