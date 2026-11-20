@@ -29,7 +29,7 @@
   "metrics": [
    {
     "label": "prefill",
-    "value": 5.5,
+    "value": 5.7,
     "unit": "tok/s",
     "better": "higher"
    },
@@ -40,7 +40,7 @@
     "better": "higher"
    }
   ],
-  "tail": "…26-11-20 21:29:00.449100: I tensorflow/core/util/port.cc:110] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.\n2026-11-20 21:29:00.498916: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.\nTo enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 AVX512F AVX512_VNNI AVX512_BF16 AVX_VNNI AMX_TILE AMX_INT8 AMX_BF16 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.\nWARNING:tensorflow:Deprecation warnings have been disabled. Set TF_ENABLE_DEPRECATION_WARNINGS=1 to re-enable them.\nvllm: The checkpoint you are trying to load has model type `qwen3_5_moe` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrade transformers`. If this does not work, and the checkpoint is very new, then there may not be a release version that supports this model yet. In this case, you can get the most up-to-date code by installing Transformers from source with the command `pip install git+https://github.com/huggingface/transformers.git`\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
+  "tail": "…Y ATTN GPU TESTS PASSED\ne2e: all ported kernel tests complete; shared_expert elapsed 42 ms\ne2e: running correctness inference on Qwen3.6-35B-A3B...\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nprompt: 760 6511 314 9338 369\nINFO 11-20 21:39:59 importing.py:10] Triton not installed; certain GPU-related functions will not be available.\n2026-11-20 21:40:00.856715: I tensorflow/core/util/port.cc:110] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.\n2026-11-20 21:40:00.906626: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.\nTo enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 AVX512F AVX512_VNNI AVX512_BF16 AVX_VNNI AMX_TILE AMX_INT8 AMX_BF16 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.\nWARNING:tensorflow:Deprecation warnings have been disabled. Set TF_ENABLE_DEPRECATION_WARNINGS=1 to re-enable them.\nvllm: \ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
   "devices": [
    "/dev/iluvatar0",
    "/dev/iluvatar1",
@@ -129,11 +129,11 @@
    "window_kernel"
   ],
   "programs": {
-   "build/gdn_parity": "5586e37d0df012f3328d54130e2539e86df4ec7af820a45269f747ad9046ec7c",
-   "build/gr_parity": "486bb667c57c79cdbc720a52f1218492509a698d86d880b458ffd91badb1c2e2",
-   "build/kv_q8_parity": "164e3b1bd6ee8e2df97f391a81a5ff90fa56fad0642a228e898e9f9657ee447e",
-   "build/qsa_parity": "2a4f7c3756792d71457124b9938285a0a89dfd83da3f51ada1ebad8e2f8bb9c6",
-   "build/verify_attn_gpu": "5c3eca1571d1dc734833ebed3fe1733e65a37ae23aa410501565a06bf1cd5bed"
+   "build/gdn_parity": "3be5222c61c81582bbc96feaf34d568f0efd04619a2c5e23046b1c4970efb28d",
+   "build/gr_parity": "5918a13193e641378e4fd3235e86bab6b1b0333fbcaaea22b1e48a524b696466",
+   "build/kv_q8_parity": "43224418f85cb91423d2e17ee096267a403831ddfedfecb3ef9030f76285d289",
+   "build/qsa_parity": "1582c30679ddf1160aff5e087372003c74a85eb0884254bdee55274342112d36",
+   "build/verify_attn_gpu": "df9b78251198178b9229ac8c685360be4da4e95cd362c0ebd41ffdd26ba7bf85"
   },
   "prompt_ids": [
    760,
@@ -143,7 +143,6 @@
    369
   ],
   "weights": [
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00001-of-00026.safetensors",
    "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00002-of-00026.safetensors"
   ]
  },
@@ -4001,6 +4000,6 @@
   "ignored": null
  },
  "gate": "integration_correctness_unmeasured",
- "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …26-11-20 21:29:00.449100: I tensorflow/core/util/port.cc:110] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.\n2026-11-20 21:29:00.498916: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.\nTo enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 AVX512F AVX512_VNNI AVX512_BF16 AVX_VNNI AMX_TILE AMX_INT8 AMX_BF16 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.\nWARNING:tensorflow:Deprecation warnings have been disabled. Set TF_ENABLE_DEPRECATION_WARNINGS=1 to re-enable them.\nvllm: The checkpoint you are trying to load has model type `qwen3_5_moe` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrade transformers`. If this does not work, and the checkpoint is very new, then there may not be a release version that supports this model yet. In this case, you can get the most up-to-date code by installing Transformers from source with the command `pip install git+https://github.com/huggingface/transformers.git`\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
- "when": "2026-11-20T21:28:44.837329945Z"
+ "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …Y ATTN GPU TESTS PASSED\ne2e: all ported kernel tests complete; shared_expert elapsed 42 ms\ne2e: running correctness inference on Qwen3.6-35B-A3B...\n/usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nprompt: 760 6511 314 9338 369\nINFO 11-20 21:39:59 importing.py:10] Triton not installed; certain GPU-related functions will not be available.\n2026-11-20 21:40:00.856715: I tensorflow/core/util/port.cc:110] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.\n2026-11-20 21:40:00.906626: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.\nTo enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 AVX512F AVX512_VNNI AVX512_BF16 AVX_VNNI AMX_TILE AMX_INT8 AMX_BF16 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.\nWARNING:tensorflow:Deprecation warnings have been disabled. Set TF_ENABLE_DEPRECATION_WARNINGS=1 to re-enable them.\nvllm: \ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
+ "when": "2026-11-20T21:39:45.730960689Z"
 }
