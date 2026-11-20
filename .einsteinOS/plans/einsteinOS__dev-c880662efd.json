@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 11372,
     "started": "2026-11-20T10:05:49.017028588Z",
-    "renewed": "2026-11-20T19:35:35.367835639Z"
+    "renewed": "2026-11-20T19:42:15.782604798Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -788,7 +788,8 @@
     "pd8e380f419": 1,
     "pe1ab8a4555": 1,
     "pe1f7ca5c00": 1,
-    "pfcccb31b26": 1
+    "pfcccb31b26": 1,
+    "uintegration01529aaa82b9": 1
   },
   "fail_history": {
     "p17652417b0": [
@@ -910,6 +911,9 @@
       "port_incomplete",
       "compile_fail",
       "smoke_fail"
+    ],
+    "uintegration01529aaa82b9": [
+      "integration_e2e_not_port"
     ]
   },
   "last_failure": {
@@ -1019,14 +1023,12 @@
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 33 definition(s) the reference requires of this unit have no counterpart on the branch:\n  chat.py func main: no line in .einsteinOS/port/pfcccb31b26.tsv\n  chat.py func stream: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func _cpuid_avx512_full: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func ask: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func build_engine: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func cmake_build: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func cpu_info: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func cuda_lib_dirs: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func done: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func download: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func driver_major: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func fail: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func find_nvcc: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func find_tool: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func find_vcvars: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func free_gb: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func get_llama_cpp: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func get_prebuilt: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func gpu_info: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func install_build_tools: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func installed_configs: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func main: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func mark: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func ok: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func out: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func pip_install: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func ram_gb: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func run: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func say: no line in .einsteinOS/port/pfcccb31b26.tsv\n  setup.py func start: no line in .einsteinOS/port/pfcccb31b26.tsv\n  … 3 more",
       "base_ref": ""
-    }
-  },
-  "in_progress": {
+    },
     "uintegration01529aaa82b9": {
       "kind": "integration_e2e_not_port",
-      "text": "",
+      "text": "integration_e2e_not_port: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh launched 58 kernel(s) (beta_sigmoid block_score_kernel block_select_kernel chunk_merge chunk_partial conv_silu dequant_q8_0_kernel dequant_q8_K_kernel down_silu elementwise_kernel gate_softplus gdn_ab_kernel gdn_beta_gate_kernel gdn_conv_kernel gdn_conv_l2_kernel gdn_l2_kernel gdn_out_norm_kernel gdn_step_kernel gdn_step_norm_kernel gr_down_kernel gr_down_multi_kernel gr_gate_kernel gr_inject_kernel gr_mean_kernel gr_norm_kernel gr_norm_multi_kernel gr_up_kernel gr_up_multi_kernel gr_write_kernel indexer_key_append_kernel k_dec k_enc kv_append_kernel kv_append_q8_kernel kv_gather_kernel kv_gather_q8_kernel l2_norm mma_score_kernel out_norm poison_kernel pool_append_kernel post pre_gated qsa_attend_kernel qsa_gate_apply_f32_kernel qsa_gate_apply_kernel qsa_index_kernel qsa_step_fill_kernel quantize_q8_0_kernel quantize_q8_0_scaled_kernel quantize_q8_K_kernel reduce_kernel scalar_gate_kernel scale_kernel step swiglu_kernel topk_kernel weighted_rms_norm) and none of the kernels these units ported:\n  u52d156705c: attn_chunk_kernel attn_merge_kernel",
       "base_ref": "einsteinOS/dev-c880662efd-wip-uintegration01529aaa82b9",
-      "base_sha": "bb9fa0d798997296446807c88535dab9a87badfa"
+      "base_sha": "df250dfb1deac595ecca8dbdf7df18ff2b8907c3"
     }
   },
   "infra_fails": 0,
