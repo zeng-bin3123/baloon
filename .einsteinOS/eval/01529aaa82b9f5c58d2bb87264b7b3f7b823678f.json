@@ -29,7 +29,7 @@
   "metrics": [
    {
     "label": "prefill",
-    "value": 5.5,
+    "value": 5.7,
     "unit": "tok/s",
     "better": "higher"
    },
@@ -40,7 +40,7 @@
     "better": "higher"
    }
   ],
-  "tail": "…M', 'PhiForCausalLM', 'Phi3ForCausalLM', 'Phi3SmallForCausalLM', 'PhiMoEForCausalLM', 'Qwen2ForCausalLM', 'Qwen2MoeForCausalLM', 'Qwen3ForCausalLM', 'Qwen3MoeForCausalLM', 'Qwen3_5MoeForCausalLM', 'RWForCausalLM', 'StableLMEpochForCausalLM', 'StableLmForCausalLM', 'Starcoder2ForCausalLM', 'SolarForCausalLM', 'XverseForCausalLM', 'BartModel', 'BartForConditionalGeneration', 'MistralModel', 'Qwen2ForRewardModel', 'Gemma2Model', 'Blip2ForConditionalGeneration', 'ChameleonForConditionalGeneration', 'ChatGLMModel', 'ChatGLMForConditionalGeneration', 'FuyuForCausalLM', 'InternVLChatModel', 'LlavaForConditionalGeneration', 'LlavaNextForConditionalGeneration', 'LlavaNextVideoForConditionalGeneration', 'LlavaOnevisionForConditionalGeneration', 'MiniCPMV', 'MolmoForCausalLM', 'NVLM_D', 'PaliGemmaForConditionalGeneration', 'Phi3VForCausalLM', 'PixtralForConditionalGeneration', 'QWenLMHeadModel', 'Qwen2VLForConditionalGeneration', 'Qwen2_5_VLForConditionalGeneration', 'UltravoxModel', 'MllamaForConditionalGeneration', 'EAGLEModel', 'MedusaModel', 'MLPSpeculatorPreTrainedModel']\n\ntransformers fallback RuntimeError: Failed to import transformers.models.qwen3_moe.modeling_qwen3_moe because of the following error (look up to see its traceback):\ncannot import name 'apply_rotary_emb' from 'flash_attn.layers.rotary' (/usr/local/corex/lib64/python3/dist-packages/flash_attn/layers/rotary.py)\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
+  "tail": "…M', 'PhiForCausalLM', 'Phi3ForCausalLM', 'Phi3SmallForCausalLM', 'PhiMoEForCausalLM', 'Qwen2ForCausalLM', 'Qwen2MoeForCausalLM', 'Qwen3ForCausalLM', 'Qwen3MoeForCausalLM', 'Qwen3_5MoeForCausalLM', 'RWForCausalLM', 'StableLMEpochForCausalLM', 'StableLmForCausalLM', 'Starcoder2ForCausalLM', 'SolarForCausalLM', 'XverseForCausalLM', 'BartModel', 'BartForConditionalGeneration', 'MistralModel', 'Qwen2ForRewardModel', 'Gemma2Model', 'Blip2ForConditionalGeneration', 'ChameleonForConditionalGeneration', 'ChatGLMModel', 'ChatGLMForConditionalGeneration', 'FuyuForCausalLM', 'InternVLChatModel', 'LlavaForConditionalGeneration', 'LlavaNextForConditionalGeneration', 'LlavaNextVideoForConditionalGeneration', 'LlavaOnevisionForConditionalGeneration', 'MiniCPMV', 'MolmoForCausalLM', 'NVLM_D', 'PaliGemmaForConditionalGeneration', 'Phi3VForCausalLM', 'PixtralForConditionalGeneration', 'QWenLMHeadModel', 'Qwen2VLForConditionalGeneration', 'Qwen2_5_VLForConditionalGeneration', 'UltravoxModel', 'MllamaForConditionalGeneration', 'EAGLEModel', 'MedusaModel', 'MLPSpeculatorPreTrainedModel']\n\ntransformers fallback RuntimeError: Failed to import transformers.models.qwen3_moe.modeling_qwen3_moe because of the following error (look up to see its traceback):\ncannot import name 'apply_rotary_emb' from 'flash_attn.layers.rotary' (/usr/local/corex/lib64/python3/dist-packages/flash_attn/layers/rotary.py)\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
   "devices": [
    "/dev/iluvatar0",
    "/dev/iluvatar1",
@@ -129,8 +129,9 @@
    "window_kernel"
   ],
   "programs": {
-   "build/gr_parity": "425b7543f1b6731437905bd69cba89605c702fb172248197903ecc1cb9b40c61",
-   "build/kv_q8_parity": "9bc5d6b1cea935d348ca4a2421f6070f42f5716a2567c731a078d7c5696a8e99",
+   "build/gdn_parity": "712484219870c805af200a46103da53c792b2a9fab37004b5a87930a23848871",
+   "build/gr_parity": "94895528f08a531cbdd6c22ea34c74887fd34310579277e198c0f30fe2c3a686",
+   "build/kv_q8_parity": "101576b8650230e0d5a4d84f53fcd14fb5af603b348fbfec90bf92bbb5ff24e5",
    "build/qsa_parity": "2a4f7c3756792d71457124b9938285a0a89dfd83da3f51ada1ebad8e2f8bb9c6",
    "build/verify_attn_gpu": "5c3eca1571d1dc734833ebed3fe1733e65a37ae23aa410501565a06bf1cd5bed"
   },
@@ -3999,6 +4000,6 @@
   "ignored": null
  },
  "gate": "integration_correctness_unmeasured",
- "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …M', 'PhiForCausalLM', 'Phi3ForCausalLM', 'Phi3SmallForCausalLM', 'PhiMoEForCausalLM', 'Qwen2ForCausalLM', 'Qwen2MoeForCausalLM', 'Qwen3ForCausalLM', 'Qwen3MoeForCausalLM', 'Qwen3_5MoeForCausalLM', 'RWForCausalLM', 'StableLMEpochForCausalLM', 'StableLmForCausalLM', 'Starcoder2ForCausalLM', 'SolarForCausalLM', 'XverseForCausalLM', 'BartModel', 'BartForConditionalGeneration', 'MistralModel', 'Qwen2ForRewardModel', 'Gemma2Model', 'Blip2ForConditionalGeneration', 'ChameleonForConditionalGeneration', 'ChatGLMModel', 'ChatGLMForConditionalGeneration', 'FuyuForCausalLM', 'InternVLChatModel', 'LlavaForConditionalGeneration', 'LlavaNextForConditionalGeneration', 'LlavaNextVideoForConditionalGeneration', 'LlavaOnevisionForConditionalGeneration', 'MiniCPMV', 'MolmoForCausalLM', 'NVLM_D', 'PaliGemmaForConditionalGeneration', 'Phi3VForCausalLM', 'PixtralForConditionalGeneration', 'QWenLMHeadModel', 'Qwen2VLForConditionalGeneration', 'Qwen2_5_VLForConditionalGeneration', 'UltravoxModel', 'MllamaForConditionalGeneration', 'EAGLEModel', 'MedusaModel', 'MLPSpeculatorPreTrainedModel']\n\ntransformers fallback RuntimeError: Failed to import transformers.models.qwen3_moe.modeling_qwen3_moe because of the following error (look up to see its traceback):\ncannot import name 'apply_rotary_emb' from 'flash_attn.layers.rotary' (/usr/local/corex/lib64/python3/dist-packages/flash_attn/layers/rotary.py)\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
- "when": "2026-11-21T00:33:50.841276992Z"
+ "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …M', 'PhiForCausalLM', 'Phi3ForCausalLM', 'Phi3SmallForCausalLM', 'PhiMoEForCausalLM', 'Qwen2ForCausalLM', 'Qwen2MoeForCausalLM', 'Qwen3ForCausalLM', 'Qwen3MoeForCausalLM', 'Qwen3_5MoeForCausalLM', 'RWForCausalLM', 'StableLMEpochForCausalLM', 'StableLmForCausalLM', 'Starcoder2ForCausalLM', 'SolarForCausalLM', 'XverseForCausalLM', 'BartModel', 'BartForConditionalGeneration', 'MistralModel', 'Qwen2ForRewardModel', 'Gemma2Model', 'Blip2ForConditionalGeneration', 'ChameleonForConditionalGeneration', 'ChatGLMModel', 'ChatGLMForConditionalGeneration', 'FuyuForCausalLM', 'InternVLChatModel', 'LlavaForConditionalGeneration', 'LlavaNextForConditionalGeneration', 'LlavaNextVideoForConditionalGeneration', 'LlavaOnevisionForConditionalGeneration', 'MiniCPMV', 'MolmoForCausalLM', 'NVLM_D', 'PaliGemmaForConditionalGeneration', 'Phi3VForCausalLM', 'PixtralForConditionalGeneration', 'QWenLMHeadModel', 'Qwen2VLForConditionalGeneration', 'Qwen2_5_VLForConditionalGeneration', 'UltravoxModel', 'MllamaForConditionalGeneration', 'EAGLEModel', 'MedusaModel', 'MLPSpeculatorPreTrainedModel']\n\ntransformers fallback RuntimeError: Failed to import transformers.models.qwen3_moe.modeling_qwen3_moe because of the following error (look up to see its traceback):\ncannot import name 'apply_rotary_emb' from 'flash_attn.layers.rotary' (/usr/local/corex/lib64/python3/dist-packages/flash_attn/layers/rotary.py)\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
+ "when": "2026-11-21T00:44:14.839973528Z"
 }
