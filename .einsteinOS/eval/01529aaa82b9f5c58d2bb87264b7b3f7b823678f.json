@@ -29,7 +29,7 @@
   "metrics": [
    {
     "label": "prefill",
-    "value": 5.5,
+    "value": 5.7,
     "unit": "tok/s",
     "better": "higher"
    },
@@ -40,7 +40,7 @@
     "better": "higher"
    }
   ],
-  "tail": "…'LlavaNextVideoForConditionalGeneration', 'LlavaOnevisionForConditionalGeneration', 'MiniCPMV', 'MolmoForCausalLM', 'NVLM_D', 'PaliGemmaForConditionalGeneration', 'Phi3VForCausalLM', 'PixtralForConditionalGeneration', 'QWenLMHeadModel', 'Qwen2VLForConditionalGeneration', 'Qwen2_5_VLForConditionalGeneration', 'UltravoxModel', 'MllamaForConditionalGeneration', 'EAGLEModel', 'MedusaModel', 'MLPSpeculatorPreTrainedModel']\n\n[2026-11-21 01:03:20,113] [INFO] [real_accelerator.py:158:get_accelerator] Setting ds_accelerator to cuda (auto detect)\n/usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:373: UserWarning: Valid config keys have changed in V2:\n* 'allow_population_by_field_name' has been renamed to 'validate_by_name'\n* 'validate_all' has been renamed to 'validate_default'\n  warnings.warn(message, UserWarning)\n/usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:373: UserWarning: Valid config keys have changed in V2:\n* 'validate_all' has been renamed to 'validate_default'\n  warnings.warn(message, UserWarning)\ntransformers fallback RuntimeError: Failed to import transformers.models.qwen3_moe.modeling_qwen3_moe because of the following error (look up to see its traceback):\nIf you use `@root_validator` with pre=False (the default) you MUST specify `skip_on_failure=True`. Note that `@root_validator` is deprecated and should be replaced with `@\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
+  "tail": "…nalGeneration', 'EAGLEModel', 'MedusaModel', 'MLPSpeculatorPreTrainedModel']\n\n[2026-11-21 01:12:33,311] [INFO] [real_accelerator.py:158:get_accelerator] Setting ds_accelerator to cuda (auto detect)\n/usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:373: UserWarning: Valid config keys have changed in V2:\n* 'allow_population_by_field_name' has been renamed to 'validate_by_name'\n* 'validate_all' has been renamed to 'validate_default'\n  warnings.warn(message, UserWarning)\n/usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:373: UserWarning: Valid config keys have changed in V2:\n* 'validate_all' has been renamed to 'validate_default'\n  warnings.warn(message, UserWarning)\n\u003cstdin\u003e:98: PydanticDeprecatedSince20: Pydantic V1 style `@root_validator` validators are deprecated. You should migrate to Pydantic V2 style `@model_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/\ntransformers fallback RuntimeError: Failed to import transformers.models.qwen3_moe.modeling_qwen3_moe because of the following error (look up to see its traceback):\nA non-annotated attribute was detected: `enabled = True`. All model fields require a type annotation; if `enabled` is not meant to be a field, you may be able to resolve t\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
   "devices": [
    "/dev/iluvatar0",
    "/dev/iluvatar1",
@@ -129,11 +129,10 @@
    "window_kernel"
   ],
   "programs": {
-   "build/gdn_parity": "796498b7ff6c611ee2c8b45f9df09fa3009e4b02fb374bbe38c4c1bb56f7c210",
-   "build/gr_parity": "02919abd07509a13e00e1e9a2c6bdc2f6b1f32cc32c978ca25dc554e6407663a",
-   "build/kv_q8_parity": "9d22e06ccf1bad3d048459ffc11cefad31e9665f925c02951f0c6e0ae9be6eb6",
+   "build/gr_parity": "a3e6e0cc63b9a5cc3c20e0f3f3dc01e58a3d18e0f284aeac9077ab6e9a5b395b",
+   "build/kv_q8_parity": "5a8d1221cc7f88268845618779075a672a20b30dc7e55f11a0652fd9745fc44f",
    "build/qsa_parity": "2a4f7c3756792d71457124b9938285a0a89dfd83da3f51ada1ebad8e2f8bb9c6",
-   "build/verify_attn_gpu": "5c3eca1571d1dc734833ebed3fe1733e65a37ae23aa410501565a06bf1cd5bed"
+   "build/verify_attn_gpu": "55c98e25f7f41d7bef6fd8f4fa35f7b360fc4c635f5dc4e83248a60f757a53df"
   },
   "prompt_ids": [
    760,
@@ -4000,6 +3999,6 @@
   "ignored": null
  },
  "gate": "integration_correctness_unmeasured",
- "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …'LlavaNextVideoForConditionalGeneration', 'LlavaOnevisionForConditionalGeneration', 'MiniCPMV', 'MolmoForCausalLM', 'NVLM_D', 'PaliGemmaForConditionalGeneration', 'Phi3VForCausalLM', 'PixtralForConditionalGeneration', 'QWenLMHeadModel', 'Qwen2VLForConditionalGeneration', 'Qwen2_5_VLForConditionalGeneration', 'UltravoxModel', 'MllamaForConditionalGeneration', 'EAGLEModel', 'MedusaModel', 'MLPSpeculatorPreTrainedModel']\n\n[2026-11-21 01:03:20,113] [INFO] [real_accelerator.py:158:get_accelerator] Setting ds_accelerator to cuda (auto detect)\n/usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:373: UserWarning: Valid config keys have changed in V2:\n* 'allow_population_by_field_name' has been renamed to 'validate_by_name'\n* 'validate_all' has been renamed to 'validate_default'\n  warnings.warn(message, UserWarning)\n/usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:373: UserWarning: Valid config keys have changed in V2:\n* 'validate_all' has been renamed to 'validate_default'\n  warnings.warn(message, UserWarning)\ntransformers fallback RuntimeError: Failed to import transformers.models.qwen3_moe.modeling_qwen3_moe because of the following error (look up to see its traceback):\nIf you use `@root_validator` with pre=False (the default) you MUST specify `skip_on_failure=True`. Note that `@root_validator` is deprecated and should be replaced with `@\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
- "when": "2026-11-21T01:02:55.454850575Z"
+ "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …nalGeneration', 'EAGLEModel', 'MedusaModel', 'MLPSpeculatorPreTrainedModel']\n\n[2026-11-21 01:12:33,311] [INFO] [real_accelerator.py:158:get_accelerator] Setting ds_accelerator to cuda (auto detect)\n/usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:373: UserWarning: Valid config keys have changed in V2:\n* 'allow_population_by_field_name' has been renamed to 'validate_by_name'\n* 'validate_all' has been renamed to 'validate_default'\n  warnings.warn(message, UserWarning)\n/usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:373: UserWarning: Valid config keys have changed in V2:\n* 'validate_all' has been renamed to 'validate_default'\n  warnings.warn(message, UserWarning)\n\u003cstdin\u003e:98: PydanticDeprecatedSince20: Pydantic V1 style `@root_validator` validators are deprecated. You should migrate to Pydantic V2 style `@model_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/\ntransformers fallback RuntimeError: Failed to import transformers.models.qwen3_moe.modeling_qwen3_moe because of the following error (look up to see its traceback):\nA non-annotated attribute was detected: `enabled = True`. All model fields require a type annotation; if `enabled` is not meant to be a field, you may be able to resolve t\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
+ "when": "2026-11-21T01:12:08.736851927Z"
 }
