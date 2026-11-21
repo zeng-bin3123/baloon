@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 5293,
     "started": "2026-11-21T10:15:54.364161285Z",
-    "renewed": "2026-11-21T14:21:08.248789723Z"
+    "renewed": "2026-11-21T14:21:36.06703569Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -888,9 +888,99 @@
   },
   "infra_fails": 0,
   "reopen": {
+    "p11b3c1e15c": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/p11b3c1e15c/test.sh read the port map — the kernel checks .einsteinOS/port/p11b3c1e15c.tsv against the 1 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "p150f8257d5": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/p150f8257d5/test.sh read the port map — the kernel checks .einsteinOS/port/p150f8257d5.tsv against the 34 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "p17652417b0": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/p17652417b0/test.sh read the port map — the kernel checks .einsteinOS/port/p17652417b0.tsv against the 88 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "p29442642b2": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/p29442642b2/build.sh, .einsteinOS/verify/p29442642b2/test.sh read the port map — the kernel checks .einsteinOS/port/p29442642b2.tsv against the 12 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "p3798e66f3c": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/p3798e66f3c/test.sh read the port map — the kernel checks .einsteinOS/port/p3798e66f3c.tsv against the 4 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "p3ff4aef2d0": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/p3ff4aef2d0/test.sh read the port map — the kernel checks .einsteinOS/port/p3ff4aef2d0.tsv against the 30 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "p42b0ab780a": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/p42b0ab780a/test.sh read the port map — the kernel checks .einsteinOS/port/p42b0ab780a.tsv against the 46 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "p42de699ebc": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/p42de699ebc/test.sh read the port map — the kernel checks .einsteinOS/port/p42de699ebc.tsv against the 7 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "p45808a8a9c": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/p45808a8a9c/test.sh read the port map — the kernel checks .einsteinOS/port/p45808a8a9c.tsv against the 1 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "p4fde6588a6": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/p4fde6588a6/test.sh read the port map — the kernel checks .einsteinOS/port/p4fde6588a6.tsv against the 3 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "p5a693eb464": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/p5a693eb464/build.sh, .einsteinOS/verify/p5a693eb464/test.sh read the port map — the kernel checks .einsteinOS/port/p5a693eb464.tsv against the 181 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
     "p67ab651d04": {
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 2 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/kernels/cuda/native_flash_attn.cu kernel attend: no line in .einsteinOS/port/p67ab651d04.tsv\n  src/kernels/cuda/native_router.cu kernel route: no line in .einsteinOS/port/p67ab651d04.tsv",
+      "base_ref": ""
+    },
+    "p74b6dab221": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/p74b6dab221/test.sh read the port map — the kernel checks .einsteinOS/port/p74b6dab221.tsv against the 8 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "p8ce7113562": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/p8ce7113562/test.sh read the port map — the kernel checks .einsteinOS/port/p8ce7113562.tsv against the 38 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "p984d0d954f": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/p984d0d954f/test.sh read the port map — the kernel checks .einsteinOS/port/p984d0d954f.tsv against the 4 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "pd8e380f419": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/pd8e380f419/test.sh read the port map — the kernel checks .einsteinOS/port/pd8e380f419.tsv against the 6 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "pf7b804cf95": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/pf7b804cf95/test.sh read the port map — the kernel checks .einsteinOS/port/pf7b804cf95.tsv against the 25 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "pfcccb31b26": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/pfcccb31b26/test.sh read the port map — the kernel checks .einsteinOS/port/pfcccb31b26.tsv against the 33 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "pfd5ae1e7e0": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/pfd5ae1e7e0/test.sh read the port map — the kernel checks .einsteinOS/port/pfd5ae1e7e0.tsv against the 4 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
       "base_ref": ""
     },
     "u0d41014a5a": {
@@ -913,6 +1003,11 @@
       "text": "port_incomplete: measured again when the run restarted, 5 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/kernels/cuda/native_qsa_score.cu kernel score_kernel: no line in .einsteinOS/port/u293ad55355.tsv\n  src/kernels/cuda/qsa_decode_attn.cu kernel attn_chunk_kernel: no line in .einsteinOS/port/u293ad55355.tsv\n  src/kernels/cuda/qsa_decode_attn.cu kernel attn_merge_kernel: no line in .einsteinOS/port/u293ad55355.tsv\n  src/kernels/cuda/qsa_select.cu kernel block_scores_kernel: no line in .einsteinOS/port/u293ad55355.tsv\n  src/kernels/cuda/qsa_select.cu kernel block_topk_kernel: no line in .einsteinOS/port/u293ad55355.tsv",
       "base_ref": ""
     },
+    "u2e9aa362e3": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/u2e9aa362e3/build.sh, .einsteinOS/verify/u2e9aa362e3/test.sh read the port map — the kernel checks .einsteinOS/port/u2e9aa362e3.tsv against the 64 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
     "u41e2bf114f": {
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 1 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/prefill/kernels.cu kernel gdn_rec_kernel: no line in .einsteinOS/port/u41e2bf114f.tsv",
@@ -922,16 +1017,65 @@
       "kind": "port_incomplete",
       "text": "port_incomplete: measured again when the run restarted, 9 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/kernels/cuda/fused_gdn.cu kernel gdn_ab_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/fused_gdn.cu kernel gdn_conv_l2_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/fused_gdn.cu kernel gdn_step_norm_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/fused_gr.cu kernel gr_down_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/fused_gr.cu kernel gr_down_multi_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/fused_gr.cu kernel gr_norm_multi_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/fused_gr.cu kernel gr_up_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/fused_gr.cu kernel gr_up_multi_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/native_gdn.cu kernel step: no line in .einsteinOS/port/u4decb4e657.tsv",
       "base_ref": ""
+    },
+    "u5e0736f9b8": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/u5e0736f9b8/build.sh, .einsteinOS/verify/u5e0736f9b8/test.sh read the port map — the kernel checks .einsteinOS/port/u5e0736f9b8.tsv against the 17 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "u649794726a": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/u649794726a/build.sh, .einsteinOS/verify/u649794726a/test.sh read the port map — the kernel checks .einsteinOS/port/u649794726a.tsv against the 250 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "u8d6745405d": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/u8d6745405d/build.sh, .einsteinOS/verify/u8d6745405d/test.sh read the port map — the kernel checks .einsteinOS/port/u8d6745405d.tsv against the 3 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "ucbadf2af54": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/ucbadf2af54/build.sh, .einsteinOS/verify/ucbadf2af54/test.sh read the port map — the kernel checks .einsteinOS/port/ucbadf2af54.tsv against the 19 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
+    },
+    "ud77a0d7726": {
+      "kind": "port_count_in_script",
+      "text": "port_count_in_script: .einsteinOS/verify/ud77a0d7726/build.sh, .einsteinOS/verify/ud77a0d7726/test.sh read the port map — the kernel checks .einsteinOS/port/ud77a0d7726.tsv against the 131 definitions it measured from the reference, and a count a script checks is the conversation's own number (remove the port check from the scripts; they test the code)",
+      "base_ref": ""
     }
   },
   "reopen_count": {
+    "p11b3c1e15c": 1,
+    "p150f8257d5": 1,
+    "p17652417b0": 1,
+    "p29442642b2": 1,
+    "p3798e66f3c": 1,
+    "p3ff4aef2d0": 1,
+    "p42b0ab780a": 1,
+    "p42de699ebc": 1,
+    "p45808a8a9c": 1,
+    "p4fde6588a6": 1,
+    "p5a693eb464": 1,
     "p67ab651d04": 1,
+    "p74b6dab221": 1,
+    "p8ce7113562": 1,
+    "p984d0d954f": 1,
+    "pd8e380f419": 1,
+    "pf7b804cf95": 1,
+    "pfcccb31b26": 1,
+    "pfd5ae1e7e0": 1,
     "u0d41014a5a": 1,
     "u1de28c5d58": 1,
     "u25c78c49e6": 1,
     "u293ad55355": 1,
+    "u2e9aa362e3": 1,
     "u41e2bf114f": 1,
-    "u4decb4e657": 1
+    "u4decb4e657": 1,
+    "u5e0736f9b8": 1,
+    "u649794726a": 1,
+    "u8d6745405d": 1,
+    "ucbadf2af54": 1,
+    "ud77a0d7726": 1
   },
   "deferred": {
     "pf7b804cf95": {
