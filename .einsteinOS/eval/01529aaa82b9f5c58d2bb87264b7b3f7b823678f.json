@@ -29,7 +29,7 @@
   "metrics": [
    {
     "label": "prefill",
-    "value": 5.4,
+    "value": 5.5,
     "unit": "tok/s",
     "better": "higher"
    },
@@ -40,7 +40,7 @@
     "better": "higher"
    }
   ],
-  "tail": "…import]\ne2e: registered qwen3_5_moe in AutoConfig\nprompt: 760 6511 314 9338 369\nINFO 11-21 00:05:25 importing.py:10] Triton not installed; certain GPU-related functions will not be available.\n2026-11-21 00:05:26.807354: I tensorflow/core/util/port.cc:110] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.\n2026-11-21 00:05:26.859520: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.\nTo enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 AVX512F AVX512_VNNI AVX512_BF16 AVX_VNNI AMX_TILE AMX_INT8 AMX_BF16 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.\nWARNING:tensorflow:Deprecation warnings have been disabled. Set TF_ENABLE_DEPRECATION_WARNINGS=1 to re-enable them.\nvllm tp=4 AssertionError: \nvllm tp=1 AssertionError: \ntransformers fallback ValueError: Unrecognized configuration class \u003cclass '__main__._Qwen35MoeConf'\u003e for this kind of AutoModel: AutoModelForCausalLM.\nModel type should be one of AriaTextConfig, BambaConfig, BartConfig, BertConfig, BertGenerationConfig, BigBirdConfig, BigBirdPegasusConfig, BioGptConfig, BlenderbotConfig, BlenderbotS\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.4 tok/s\ndecode: 0.2 tok/s",
+  "tail": "…t]\nprompt: 760 6511 314 9338 369\ne2e: temp model dir with model_type=qwen3_moe: /tmp/baloon_e2e_tbfwoxlr\nINFO 11-21 00:16:28 importing.py:10] Triton not installed; certain GPU-related functions will not be available.\n2026-11-21 00:16:30.523371: I tensorflow/core/util/port.cc:110] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.\n2026-11-21 00:16:30.573108: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.\nTo enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 AVX512F AVX512_VNNI AVX512_BF16 AVX_VNNI AMX_TILE AMX_INT8 AMX_BF16 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.\nWARNING:tensorflow:Deprecation warnings have been disabled. Set TF_ENABLE_DEPRECATION_WARNINGS=1 to re-enable them.\nvllm tp=4 AssertionError: \nvllm tp=1 AssertionError: \ntransformers fallback RuntimeError: Failed to import transformers.models.qwen3_moe.modeling_qwen3_moe because of the following error (look up to see its traceback):\ncannot import name 'apply_rotary_emb' from 'flash_attn.layers.rotary' (/usr/local/corex/lib64/python3/dist-packages/flash_attn/layers/rotary.py)\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
   "devices": [
    "/dev/iluvatar0",
    "/dev/iluvatar1",
@@ -129,11 +129,11 @@
    "window_kernel"
   ],
   "programs": {
-   "build/gr_parity": "9b199c51d081580d20a576724e633078f5062312172e0c127b8e0e14e393e84c",
-   "build/kv_q8_parity": "0f18c47fc643f625f68cbd6f1581d2d49b6ef2df69ba953c03d0c88d28e6599a",
+   "build/gr_parity": "055f94c0b30dd2c43b3ffce52398a3014a01512779aa0ebf0bea630193226b77",
+   "build/kv_q8_parity": "c0047b25fc228a50f62d8e5e2038bd348ea56890b976fa5b928135cdb42f201a",
    "build/qsa_parity": "2a4f7c3756792d71457124b9938285a0a89dfd83da3f51ada1ebad8e2f8bb9c6",
    "build/shared_expert_parity": "4df1c95b4f7c6734a3a6ae91e60e76bd8534a574c1c3da2474f7bad670afcce5",
-   "build/verify_attn_gpu": "5c3eca1571d1dc734833ebed3fe1733e65a37ae23aa410501565a06bf1cd5bed"
+   "build/verify_attn_gpu": "9cc82da36ed24279c9d2df4bcde29ac2a1737043cd02dea38aa7ddff971a392c"
   },
   "prompt_ids": [
    760,
@@ -143,7 +143,6 @@
    369
   ],
   "weights": [
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00001-of-00026.safetensors",
    "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00002-of-00026.safetensors"
   ]
  },
@@ -4001,6 +4000,6 @@
   "ignored": null
  },
  "gate": "integration_correctness_unmeasured",
- "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …import]\ne2e: registered qwen3_5_moe in AutoConfig\nprompt: 760 6511 314 9338 369\nINFO 11-21 00:05:25 importing.py:10] Triton not installed; certain GPU-related functions will not be available.\n2026-11-21 00:05:26.807354: I tensorflow/core/util/port.cc:110] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.\n2026-11-21 00:05:26.859520: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.\nTo enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 AVX512F AVX512_VNNI AVX512_BF16 AVX_VNNI AMX_TILE AMX_INT8 AMX_BF16 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.\nWARNING:tensorflow:Deprecation warnings have been disabled. Set TF_ENABLE_DEPRECATION_WARNINGS=1 to re-enable them.\nvllm tp=4 AssertionError: \nvllm tp=1 AssertionError: \ntransformers fallback ValueError: Unrecognized configuration class \u003cclass '__main__._Qwen35MoeConf'\u003e for this kind of AutoModel: AutoModelForCausalLM.\nModel type should be one of AriaTextConfig, BambaConfig, BartConfig, BertConfig, BertGenerationConfig, BigBirdConfig, BigBirdPegasusConfig, BioGptConfig, BlenderbotConfig, BlenderbotS\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.4 tok/s\ndecode: 0.2 tok/s",
- "when": "2026-11-21T00:05:09.322175991Z"
+ "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …t]\nprompt: 760 6511 314 9338 369\ne2e: temp model dir with model_type=qwen3_moe: /tmp/baloon_e2e_tbfwoxlr\nINFO 11-21 00:16:28 importing.py:10] Triton not installed; certain GPU-related functions will not be available.\n2026-11-21 00:16:30.523371: I tensorflow/core/util/port.cc:110] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.\n2026-11-21 00:16:30.573108: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.\nTo enable the following instructions: SSE3 SSE4.1 SSE4.2 AVX AVX2 AVX512F AVX512_VNNI AVX512_BF16 AVX_VNNI AMX_TILE AMX_INT8 AMX_BF16 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.\nWARNING:tensorflow:Deprecation warnings have been disabled. Set TF_ENABLE_DEPRECATION_WARNINGS=1 to re-enable them.\nvllm tp=4 AssertionError: \nvllm tp=1 AssertionError: \ntransformers fallback RuntimeError: Failed to import transformers.models.qwen3_moe.modeling_qwen3_moe because of the following error (look up to see its traceback):\ncannot import name 'apply_rotary_emb' from 'flash_attn.layers.rotary' (/usr/local/corex/lib64/python3/dist-packages/flash_attn/layers/rotary.py)\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
+ "when": "2026-11-21T00:16:12.99789004Z"
 }
