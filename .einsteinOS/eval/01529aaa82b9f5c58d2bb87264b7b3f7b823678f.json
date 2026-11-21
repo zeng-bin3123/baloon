@@ -29,7 +29,7 @@
   "metrics": [
    {
     "label": "prefill",
-    "value": 5.7,
+    "value": 5.5,
     "unit": "tok/s",
     "better": "higher"
    },
@@ -40,7 +40,7 @@
     "better": "higher"
    }
   ],
-  "tail": "…nalGeneration', 'EAGLEModel', 'MedusaModel', 'MLPSpeculatorPreTrainedModel']\n\n[2026-11-21 01:12:33,311] [INFO] [real_accelerator.py:158:get_accelerator] Setting ds_accelerator to cuda (auto detect)\n/usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:373: UserWarning: Valid config keys have changed in V2:\n* 'allow_population_by_field_name' has been renamed to 'validate_by_name'\n* 'validate_all' has been renamed to 'validate_default'\n  warnings.warn(message, UserWarning)\n/usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:373: UserWarning: Valid config keys have changed in V2:\n* 'validate_all' has been renamed to 'validate_default'\n  warnings.warn(message, UserWarning)\n\u003cstdin\u003e:98: PydanticDeprecatedSince20: Pydantic V1 style `@root_validator` validators are deprecated. You should migrate to Pydantic V2 style `@model_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/\ntransformers fallback RuntimeError: Failed to import transformers.models.qwen3_moe.modeling_qwen3_moe because of the following error (look up to see its traceback):\nA non-annotated attribute was detected: `enabled = True`. All model fields require a type annotation; if `enabled` is not meant to be a field, you may be able to resolve t\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
+  "tail": "….weight', 'model.layers.9.post_attention_layernorm.weight', 'model.layers.9.self_attn.k_norm.weight', 'model.layers.9.self_attn.k_proj.weight', 'model.layers.9.self_attn.o_proj.weight', 'model.layers.9.self_attn.q_norm.weight', 'model.layers.9.self_attn.q_proj.weight', 'model.layers.9.self_attn.v_proj.weight', 'model.norm.weight']\nYou should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.\n/usr/local/lib/python3.10/site-packages/transformers/generation/configuration_utils.py:636: UserWarning: `do_sample` is set to `False`. However, `top_p` is set to `0.95` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_p`.\n  warnings.warn(\n/usr/local/lib/python3.10/site-packages/transformers/generation/configuration_utils.py:653: UserWarning: `do_sample` is set to `False`. However, `top_k` is set to `20` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_k`.\n  warnings.warn(\nThe attention mask is not set and cannot be inferred from input because pad token is same as eos token. As a consequence, you may observe unexpected behavior. Please pass your input's `attention_mask` to obtain reliable results.\ntransformers fallback RuntimeError: The size of tensor a (256) must match the size of tensor b (64) at non-singleton dimension 3\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
   "devices": [
    "/dev/iluvatar0",
    "/dev/iluvatar1",
@@ -48,6 +48,9 @@
    "/dev/iluvatar3"
   ],
   "kernels": [
+   "CatArrayBatchedCopy",
+   "DeviceScanInitKernel",
+   "DeviceScanKernel",
    "ab_kernel",
    "attn_chunk_kernel",
    "attn_merge_kernel",
@@ -67,6 +70,7 @@
    "dequant_q8_K_kernel",
    "down_silu",
    "elementwise_kernel",
+   "elementwise_kernel_with_index",
    "embed_kernel",
    "flash_kernel",
    "gate_softplus",
@@ -89,6 +93,7 @@
    "gr_up_multi_kernel",
    "gr_write_kernel",
    "hits_kernel",
+   "indexSelectSmallIndex",
    "indexer_key_append_kernel",
    "k_dec",
    "k_enc",
@@ -129,10 +134,11 @@
    "window_kernel"
   ],
   "programs": {
-   "build/gr_parity": "a3e6e0cc63b9a5cc3c20e0f3f3dc01e58a3d18e0f284aeac9077ab6e9a5b395b",
-   "build/kv_q8_parity": "5a8d1221cc7f88268845618779075a672a20b30dc7e55f11a0652fd9745fc44f",
+   "build/gr_parity": "d20162376ff39bb226541b0740ec49687b13d6c09650b498efafff79e035ecc1",
+   "build/kv_q8_parity": "8d9b9784e3f9ed2f2e3914f1d840a641a1f0122493b660953e8b7bba1a9d333f",
    "build/qsa_parity": "2a4f7c3756792d71457124b9938285a0a89dfd83da3f51ada1ebad8e2f8bb9c6",
-   "build/verify_attn_gpu": "55c98e25f7f41d7bef6fd8f4fa35f7b360fc4c635f5dc4e83248a60f757a53df"
+   "build/shared_expert_parity": "4df1c95b4f7c6734a3a6ae91e60e76bd8534a574c1c3da2474f7bad670afcce5",
+   "build/verify_attn_gpu": "5c3eca1571d1dc734833ebed3fe1733e65a37ae23aa410501565a06bf1cd5bed"
   },
   "prompt_ids": [
    760,
@@ -142,7 +148,15 @@
    369
   ],
   "weights": [
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00002-of-00026.safetensors"
+   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00002-of-00026.safetensors",
+   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00003-of-00026.safetensors",
+   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00005-of-00026.safetensors",
+   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00009-of-00026.safetensors",
+   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00013-of-00026.safetensors",
+   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00017-of-00026.safetensors",
+   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00021-of-00026.safetensors",
+   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00024-of-00026.safetensors",
+   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00026-of-00026.safetensors"
   ]
  },
  "external": [
@@ -3999,6 +4013,6 @@
   "ignored": null
  },
  "gate": "integration_correctness_unmeasured",
- "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …nalGeneration', 'EAGLEModel', 'MedusaModel', 'MLPSpeculatorPreTrainedModel']\n\n[2026-11-21 01:12:33,311] [INFO] [real_accelerator.py:158:get_accelerator] Setting ds_accelerator to cuda (auto detect)\n/usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:373: UserWarning: Valid config keys have changed in V2:\n* 'allow_population_by_field_name' has been renamed to 'validate_by_name'\n* 'validate_all' has been renamed to 'validate_default'\n  warnings.warn(message, UserWarning)\n/usr/local/lib/python3.10/site-packages/pydantic/_internal/_config.py:373: UserWarning: Valid config keys have changed in V2:\n* 'validate_all' has been renamed to 'validate_default'\n  warnings.warn(message, UserWarning)\n\u003cstdin\u003e:98: PydanticDeprecatedSince20: Pydantic V1 style `@root_validator` validators are deprecated. You should migrate to Pydantic V2 style `@model_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/\ntransformers fallback RuntimeError: Failed to import transformers.models.qwen3_moe.modeling_qwen3_moe because of the following error (look up to see its traceback):\nA non-annotated attribute was detected: `enabled = True`. All model fields require a type annotation; if `enabled` is not meant to be a field, you may be able to resolve t\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
- "when": "2026-11-21T01:12:08.736851927Z"
+ "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: ….weight', 'model.layers.9.post_attention_layernorm.weight', 'model.layers.9.self_attn.k_norm.weight', 'model.layers.9.self_attn.k_proj.weight', 'model.layers.9.self_attn.o_proj.weight', 'model.layers.9.self_attn.q_norm.weight', 'model.layers.9.self_attn.q_proj.weight', 'model.layers.9.self_attn.v_proj.weight', 'model.norm.weight']\nYou should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.\n/usr/local/lib/python3.10/site-packages/transformers/generation/configuration_utils.py:636: UserWarning: `do_sample` is set to `False`. However, `top_p` is set to `0.95` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_p`.\n  warnings.warn(\n/usr/local/lib/python3.10/site-packages/transformers/generation/configuration_utils.py:653: UserWarning: `do_sample` is set to `False`. However, `top_k` is set to `20` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_k`.\n  warnings.warn(\nThe attention mask is not set and cannot be inferred from input because pad token is same as eos token. As a consequence, you may observe unexpected behavior. Please pass your input's `attention_mask` to obtain reliable results.\ntransformers fallback RuntimeError: The size of tensor a (256) must match the size of tensor b (64) at non-singleton dimension 3\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
+ "when": "2026-11-21T01:22:49.624700724Z"
 }
