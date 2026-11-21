@@ -29,7 +29,7 @@
   "metrics": [
    {
     "label": "prefill",
-    "value": 5.4,
+    "value": 5.7,
     "unit": "tok/s",
     "better": "higher"
    },
@@ -40,7 +40,7 @@
     "better": "higher"
    }
   ],
-  "tail": "…lib64/python3/dist-packages/vllm/engine/arg_utils.py\", line 902, in create_engine_config\n    model_config = self.create_model_config()\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/engine/arg_utils.py\", line 839, in create_model_config\n    return ModelConfig(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/config.py\", line 194, in __init__\n    self.multimodal_config = self._init_multimodal_config(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/config.py\", line 213, in _init_multimodal_config\n    if ModelRegistry.is_multimodal_model(architectures):\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/registry.py\", line 389, in is_multimodal_model\n    return self.inspect_model_cls(architectures).supports_multimodal\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/registry.py\", line 358, in inspect_model_cls\ne2e: vllm qwen3_moe: Qwen3MoeForCausalLM=\u003cclass 'vllm.model_executor.models.qwen3_moe.Qwen3MoeForCausalLM'\u003e names=['Qwen3MoeAttention', 'Qwen3MoeDecoderLayer', 'Qwen3MoeForCausalLM', 'Qwen3MoeMLP', 'Qwen3MoeModel', 'Qwen3MoeSparseMoeBlock']\ne2e: registered qwen3_5_moe in _extra_content\n[2026-11-21 02:30:44,961] [INFO] [real_accelerator.py:158:get_accelerator] Setting ds_accelerator to cuda (auto detect)\ntransformers fallback AttributeError: 'dict' object has no attribute 'to_dict'\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.4 tok/s\ndecode: 0.2 tok/s",
+  "tail": "…ate\n    engine_config = engine_args.create_engine_config()\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/engine/arg_utils.py\", line 902, in create_engine_config\n    model_config = self.create_model_config()\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/engine/arg_utils.py\", line 839, in create_model_config\n    return ModelConfig(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/config.py\", line 200, in __init__\n    self.has_inner_state = self._init_has_inner_state()\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/config.py\", line 228, in _init_has_inner_state\n    return ModelRegistry.model_has_inner_state(architectures)\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/registry.py\", line 399, in model_has_inner_state\n    return self.inspect_model_cls(architectures).has_inner_state\n  File \"\u003cstdin\u003e\", line 157, in __getattr__\ne2e: vllm qwen3_moe: Qwen3MoeForCausalLM=\u003cclass 'vllm.model_executor.models.qwen3_moe.Qwen3MoeForCausalLM'\u003e names=['Qwen3MoeAttention', 'Qwen3MoeDecoderLayer', 'Qwen3MoeForCausalLM', 'Qwen3MoeMLP', 'Qwen3MoeModel', 'Qwen3MoeSparseMoeBlock']\ne2e: registered qwen3_5_moe in _extra_content\n[2026-11-21 02:39:24,201] [INFO] [real_accelerator.py:158:get_accelerator] Setting ds_accelerator to cuda (auto detect)\ntransformers fallback AttributeError: 'dict' object has no attribute 'to_dict'\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
   "devices": [
    "/dev/iluvatar0",
    "/dev/iluvatar1",
@@ -129,11 +129,9 @@
    "window_kernel"
   ],
   "programs": {
-   "build/gdn_parity": "d15b666d3435dcaf45cbe456917f7ca529a5cfebfb35a5e2b19dd1d1e1db6e36",
-   "build/gr_parity": "4df4aef799d669acdf386a15867919da7542d292b28696ab18239089c0b98ce3",
-   "build/kv_q8_parity": "f4e37f25b285672d583bd742aff19414c8038b1dc5c628f74944676f2574a89e",
-   "build/qsa_parity": "4dfd5992994a07e9db8c8a4e3eab7f3d2614461089fdc11aa2dae9f6f1d0a064",
-   "build/shared_expert_parity": "4df1c95b4f7c6734a3a6ae91e60e76bd8534a574c1c3da2474f7bad670afcce5",
+   "build/gr_parity": "886dfa46dd1f8527c535875945379c30d88d713c0c57ff2450d259be7d252281",
+   "build/kv_q8_parity": "4aa54c8836b91970004b56b0e38bedc940114b9aa52815e9b01314256f6fc04a",
+   "build/qsa_parity": "2a4f7c3756792d71457124b9938285a0a89dfd83da3f51ada1ebad8e2f8bb9c6",
    "build/verify_attn_gpu": "5c3eca1571d1dc734833ebed3fe1733e65a37ae23aa410501565a06bf1cd5bed"
   },
   "prompt_ids": [
@@ -144,7 +142,6 @@
    369
   ],
   "weights": [
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00001-of-00026.safetensors",
    "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00002-of-00026.safetensors"
   ]
  },
@@ -4002,6 +3999,6 @@
   "ignored": null
  },
  "gate": "integration_correctness_unmeasured",
- "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …lib64/python3/dist-packages/vllm/engine/arg_utils.py\", line 902, in create_engine_config\n    model_config = self.create_model_config()\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/engine/arg_utils.py\", line 839, in create_model_config\n    return ModelConfig(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/config.py\", line 194, in __init__\n    self.multimodal_config = self._init_multimodal_config(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/config.py\", line 213, in _init_multimodal_config\n    if ModelRegistry.is_multimodal_model(architectures):\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/registry.py\", line 389, in is_multimodal_model\n    return self.inspect_model_cls(architectures).supports_multimodal\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/registry.py\", line 358, in inspect_model_cls\ne2e: vllm qwen3_moe: Qwen3MoeForCausalLM=\u003cclass 'vllm.model_executor.models.qwen3_moe.Qwen3MoeForCausalLM'\u003e names=['Qwen3MoeAttention', 'Qwen3MoeDecoderLayer', 'Qwen3MoeForCausalLM', 'Qwen3MoeMLP', 'Qwen3MoeModel', 'Qwen3MoeSparseMoeBlock']\ne2e: registered qwen3_5_moe in _extra_content\n[2026-11-21 02:30:44,961] [INFO] [real_accelerator.py:158:get_accelerator] Setting ds_accelerator to cuda (auto detect)\ntransformers fallback AttributeError: 'dict' object has no attribute 'to_dict'\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.4 tok/s\ndecode: 0.2 tok/s",
- "when": "2026-11-21T02:30:19.890853369Z"
+ "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …ate\n    engine_config = engine_args.create_engine_config()\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/engine/arg_utils.py\", line 902, in create_engine_config\n    model_config = self.create_model_config()\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/engine/arg_utils.py\", line 839, in create_model_config\n    return ModelConfig(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/config.py\", line 200, in __init__\n    self.has_inner_state = self._init_has_inner_state()\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/config.py\", line 228, in _init_has_inner_state\n    return ModelRegistry.model_has_inner_state(architectures)\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/registry.py\", line 399, in model_has_inner_state\n    return self.inspect_model_cls(architectures).has_inner_state\n  File \"\u003cstdin\u003e\", line 157, in __getattr__\ne2e: vllm qwen3_moe: Qwen3MoeForCausalLM=\u003cclass 'vllm.model_executor.models.qwen3_moe.Qwen3MoeForCausalLM'\u003e names=['Qwen3MoeAttention', 'Qwen3MoeDecoderLayer', 'Qwen3MoeForCausalLM', 'Qwen3MoeMLP', 'Qwen3MoeModel', 'Qwen3MoeSparseMoeBlock']\ne2e: registered qwen3_5_moe in _extra_content\n[2026-11-21 02:39:24,201] [INFO] [real_accelerator.py:158:get_accelerator] Setting ds_accelerator to cuda (auto detect)\ntransformers fallback AttributeError: 'dict' object has no attribute 'to_dict'\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
+ "when": "2026-11-21T02:38:59.05189866Z"
 }
