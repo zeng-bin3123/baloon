@@ -1,9 +1,9 @@
 {
   "holder": {
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
-    "pid": 11372,
-    "started": "2026-11-20T10:05:49.017028588Z",
-    "renewed": "2026-11-21T03:01:46.628100711Z"
+    "pid": 5293,
+    "started": "2026-11-21T10:15:54.364161285Z",
+    "renewed": "2026-11-21T14:15:13.597231187Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -789,7 +789,7 @@
     "pe1ab8a4555": 1,
     "pe1f7ca5c00": 1,
     "pfcccb31b26": 1,
-    "uintegration01529aaa82b9": 3
+    "uintegration01529aaa82b9": 4
   },
   "fail_history": {
     "p17652417b0": [
@@ -915,7 +915,8 @@
     "uintegration01529aaa82b9": [
       "integration_e2e_not_port",
       "integration_correctness_unmeasured",
-      "integration_correctness_unmeasured"
+      "integration_correctness_unmeasured",
+      "compile_fail"
     ]
   },
   "last_failure": {
@@ -1027,10 +1028,10 @@
       "base_ref": ""
     },
     "uintegration01529aaa82b9": {
-      "kind": "integration_correctness_unmeasured",
-      "text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …model\n    return loader.load_model(model_config=model_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 398, in load_model\n    model = _initialize_model(model_config, self.load_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 175, in _initialize_model\n    return build_model(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 160, in build_model\n    return model_class(config=hf_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/qwen3_moe.py\", line 391, in __init__\n    self.model = Qwen3MoeModel(config=config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/qwen3_moe.py\", line 328, in __init__\n    self.start_layer, self.end_layer, self.layers = make_layers(\ne2e: vllm qwen3_moe: Qwen3MoeForCausalLM=\u003cclass 'vllm.model_executor.models.qwen3_moe.Qwen3MoeForCausalLM'\u003e names=['Qwen3MoeAttention', 'Qwen3MoeDecoderLayer', 'Qwen3MoeForCausalLM', 'Qwen3MoeMLP', 'Qwen3MoeModel', 'Qwen3MoeSparseMoeBlock']\ne2e: registered qwen3_5_moe in _extra_content\n[2026-11-21 03:01:22,610] [INFO] [real_accelerator.py:158:get_accelerator] Setting ds_accelerator to cuda (auto detect)\ntransformers fallback AttributeError: 'dict' object has no attribute 'to_dict'\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
+      "kind": "compile_fail",
+      "text": "build.sh exit=1: …uble' [-Wformat]\n    printf(\"swiglu: %d beyond 1e-6 rel, max|d|=%.3g (exp() device vs host may differ in last ulp; bit-exact not required)\\n\", sb, sm); bad += sb;\n                                               ~~~~                                                                               ^~\n                                               %.3f\n2 warnings generated when compiling for ivcore10.\n[link] /tmp/einsteinos_verify_287155716/build/shared_expert_parity\n[cuda] src/verify_kernels.cu\n[cuda] src/qsa_decode_attn.cu\n[cuda] src/native_flash_attn.cu\n[cuda] tests/gpu_unit_verify_attn/test_verify_attn_gpu.cu\n[link] /tmp/einsteinos_verify_287155716/build/verify_attn_gpu\n[cuda] src/rt/device.cu\n[cuda] src/rt/pinned.cu\n[cuda] src/rt/kernels.cu\n[cuda] src/rt/graph.cpp\n[cuda] src/rt/layout_check.cpp\n[cuda] src/rt/dense_bank.cpp\n[cuda] src/rt/embed_head.cpp\n[cuda] src/rt/device_main.cpp\nsrc/rt/device_main.cpp:18:61: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    char buf[48]; std::snprintf(buf, sizeof buf, \"%.1f %s\", v, unit[u]);\n                                                  ~~~~      ^\n                                                  %.1f\n1 warning generated when compiling for ivcore10.\n[cuda] src/rt/device_main.cpp\nsrc/rt/device_main.cpp:18:61: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    char buf[48]; std::snprintf(buf, sizeof buf, \"%.1f %s\", v, unit[u]);\n                                                  ~~~~      ^\n                                                  %.1f\n1 warning generated when compiling for ivcore10.\n[cuda] src/core/weights.cpp\n[link] /tmp/einsteinos_verify_287155716/build/ref-device\n[cuda] tests/k39_integration/pinned_capture.cu\n[link] /tmp/einsteinos_verify_287155716/build/pinned_capture\n[cuda] tests/test_shared_expert.cu\ntests/test_shared_expert.cu:26:72: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n        printf(\"gate N=%d gpu=%.9g ref=%.9g |d|=%.3g %s\\n\", N, g, ref, d, b ? \"FAIL\" : \"ok\");\n                                                ~~~~                   ^\n                                                %.3f\ntests/test_shared_expert.cu:39:131: warning: format specifies type 'float' but the argument has type 'double' [-Wformat]\n    printf(\"swiglu: %d beyond 1e-6 rel, max|d|=%.3g (exp() device vs host may differ in last ulp; bit-exact not required)\\n\", sb, sm); bad += sb;\n                                               ~~~~                                                                               ^~\n                                               %.3f\n2 warnings generated when compiling for ivcore10.\n[cuda] tests/k14gpu_misc/test_misc.cu\n[cuda] tests/gpu_unit_verify_attn/test_verify_attn_gpu.cu\n[cuda] tests/k39_integration/e2e_all_check.cu\n[link] /tmp/einsteinos_verify_287155716/build/e2e_all_check\nclang-16: error: no such file or directory: '/tmp/einsteinos_verify_287155716/build/.obj/e2e_kv.o'",
       "base_ref": "einsteinOS/dev-c880662efd-wip-uintegration01529aaa82b9",
-      "base_sha": "cbb5dc631af4863b2bf2217e98596b7091aa7494"
+      "base_sha": "2ac0d91996ed9800b1ed869ad1d224c8827c0578"
     }
   },
   "infra_fails": 0,
@@ -1430,7 +1431,8 @@
     "u77baf5bde3": true,
     "u89be81de0b": true,
     "ubb09633f12": true,
-    "uc81136f4d9": true
+    "uc81136f4d9": true,
+    "uintegration01529aaa82b9": true
   },
   "gates": "build+test+gpu+isa+port+integration",
   "integration_unit": {
