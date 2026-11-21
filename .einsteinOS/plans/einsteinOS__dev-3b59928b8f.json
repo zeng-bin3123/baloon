@@ -1,4 +1,10 @@
 {
+  "holder": {
+    "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
+    "pid": 5293,
+    "started": "2026-11-21T10:15:54.364161285Z",
+    "renewed": "2026-11-21T14:21:08.248789723Z"
+  },
   "version": 1,
   "ref": "Niko1221/Strata",
   "ref_sha": "6801c77ff6f7a1e08fe78820d3043f469f6f3f6f",
@@ -881,6 +887,52 @@
     }
   },
   "infra_fails": 0,
+  "reopen": {
+    "p67ab651d04": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 2 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/kernels/cuda/native_flash_attn.cu kernel attend: no line in .einsteinOS/port/p67ab651d04.tsv\n  src/kernels/cuda/native_router.cu kernel route: no line in .einsteinOS/port/p67ab651d04.tsv",
+      "base_ref": ""
+    },
+    "u0d41014a5a": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 9 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/kernels/cuda/native_mmvq.cu kernel native_iq4_xs_mmvq_kernel: no line in .einsteinOS/port/u0d41014a5a.tsv\n  src/kernels/cuda/native_mmvq.cu kernel native_mmvq_multi_kernel: no line in .einsteinOS/port/u0d41014a5a.tsv\n  src/kernels/cuda/native_mmvq.cu kernel native_q2_0_mmvq_kernel: no line in .einsteinOS/port/u0d41014a5a.tsv\n  src/kernels/cuda/native_mmvq.cu kernel native_q3_k_mmvq_kernel: no line in .einsteinOS/port/u0d41014a5a.tsv\n  src/kernels/cuda/native_mmvq.cu kernel native_q4_k_mmvq_kernel: no line in .einsteinOS/port/u0d41014a5a.tsv\n  src/kernels/cuda/native_mmvq.cu kernel native_q5_k_mmvq_kernel: no line in .einsteinOS/port/u0d41014a5a.tsv\n  src/kernels/cuda/native_mmvq.cu kernel native_q6_k_mmvq_kernel: no line in .einsteinOS/port/u0d41014a5a.tsv\n  src/kernels/cuda/native_mmvq.cu kernel native_quantize_q8_1_kernel: no line in .einsteinOS/port/u0d41014a5a.tsv\n  src/kernels/cuda/native_mmvq.cu kernel native_small_mmvq_kernel: no line in .einsteinOS/port/u0d41014a5a.tsv",
+      "base_ref": ""
+    },
+    "u1de28c5d58": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 2 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/kernels/cuda/s2_expert_grouped.cu kernel down_grouped_kernel: no line in .einsteinOS/port/u1de28c5d58.tsv\n  src/kernels/cuda/s2_expert_grouped.cu kernel gu_grouped_kernel: no line in .einsteinOS/port/u1de28c5d58.tsv",
+      "base_ref": ""
+    },
+    "u25c78c49e6": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 3 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/kernels/cuda/verify_kernels.cu kernel gdn_ab_multi_kernel: no line in .einsteinOS/port/u25c78c49e6.tsv\n  src/kernels/cuda/verify_kernels.cu kernel gdn_conv_l2_multi_kernel: no line in .einsteinOS/port/u25c78c49e6.tsv\n  src/kernels/cuda/verify_kernels.cu kernel gdn_step_norm_multi_kernel: no line in .einsteinOS/port/u25c78c49e6.tsv",
+      "base_ref": ""
+    },
+    "u293ad55355": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 5 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/kernels/cuda/native_qsa_score.cu kernel score_kernel: no line in .einsteinOS/port/u293ad55355.tsv\n  src/kernels/cuda/qsa_decode_attn.cu kernel attn_chunk_kernel: no line in .einsteinOS/port/u293ad55355.tsv\n  src/kernels/cuda/qsa_decode_attn.cu kernel attn_merge_kernel: no line in .einsteinOS/port/u293ad55355.tsv\n  src/kernels/cuda/qsa_select.cu kernel block_scores_kernel: no line in .einsteinOS/port/u293ad55355.tsv\n  src/kernels/cuda/qsa_select.cu kernel block_topk_kernel: no line in .einsteinOS/port/u293ad55355.tsv",
+      "base_ref": ""
+    },
+    "u41e2bf114f": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 1 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/prefill/kernels.cu kernel gdn_rec_kernel: no line in .einsteinOS/port/u41e2bf114f.tsv",
+      "base_ref": ""
+    },
+    "u4decb4e657": {
+      "kind": "port_incomplete",
+      "text": "port_incomplete: measured again when the run restarted, 9 definition(s) the reference requires of this unit have no counterpart on the branch:\n  src/kernels/cuda/fused_gdn.cu kernel gdn_ab_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/fused_gdn.cu kernel gdn_conv_l2_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/fused_gdn.cu kernel gdn_step_norm_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/fused_gr.cu kernel gr_down_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/fused_gr.cu kernel gr_down_multi_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/fused_gr.cu kernel gr_norm_multi_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/fused_gr.cu kernel gr_up_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/fused_gr.cu kernel gr_up_multi_kernel: no line in .einsteinOS/port/u4decb4e657.tsv\n  src/kernels/cuda/native_gdn.cu kernel step: no line in .einsteinOS/port/u4decb4e657.tsv",
+      "base_ref": ""
+    }
+  },
+  "reopen_count": {
+    "p67ab651d04": 1,
+    "u0d41014a5a": 1,
+    "u1de28c5d58": 1,
+    "u25c78c49e6": 1,
+    "u293ad55355": 1,
+    "u41e2bf114f": 1,
+    "u4decb4e657": 1
+  },
   "deferred": {
     "pf7b804cf95": {
       "kind": "review_fail",
