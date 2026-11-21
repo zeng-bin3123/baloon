@@ -27,7 +27,7 @@
   },
   "exit": 0,
   "metrics": null,
-  "tail": "…kenizer = get_tokenizer(self.tokenizer_id, **tokenizer_config)\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/transformers_utils/tokenizer.py\", line 172, in get_tokenizer\n    tokenizer = get_cached_tokenizer(tokenizer)\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/transformers_utils/tokenizer.py\", line 35, in get_cached_tokenizer\n    tokenizer.all_special_tokens_extended)\n  File \"/usr/local/lib/python3.10/site-packages/transformers/tokenization_utils_base.py\", line 1317, in __getattr__\n    raise AttributeError(f\"{self.__class__.__name__} has no attribute {key}\")\nAttributeError: Qwen2Tokenizer has no attribute all_special_tokens_extended. Did you mean: 'num_special_tokens_to_add'?\n\ne2e: vllm qwen3_moe: Qwen3MoeForCausalLM=\u003cclass 'vllm.model_executor.models.qwen3_moe.Qwen3MoeForCausalLM'\u003e names=['Qwen3MoeAttention', 'Qwen3MoeDecoderLayer', 'Qwen3MoeForCausalLM', 'Qwen3MoeMLP', 'Qwen3MoeModel', 'Qwen3MoeSparseMoeBlock']\ne2e: registered qwen3_5_moe in _extra_content\ne2e: patched Qwen3MoeConfig.__init__ for dict text_config\ntransformers fallback ImportError: \nAutoModelForCausalLM requires the PyTorch library but it was not found in your environment. Check out the instructions on the\ninstallation page: https://pytorch.org/get-started/locally/ and follow the ones that match your environment.\nPlease note that you may need to restart your runtime after inst\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
+  "tail": "…kenizer = get_tokenizer(self.tokenizer_id, **tokenizer_config)\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/transformers_utils/tokenizer.py\", line 172, in get_tokenizer\n    tokenizer = get_cached_tokenizer(tokenizer)\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/transformers_utils/tokenizer.py\", line 35, in get_cached_tokenizer\n    tokenizer.all_special_tokens_extended)\n  File \"/usr/local/lib/python3.10/site-packages/transformers/tokenization_utils_base.py\", line 1317, in __getattr__\n    raise AttributeError(f\"{self.__class__.__name__} has no attribute {key}\")\nAttributeError: Qwen2Tokenizer has no attribute all_special_tokens_extended. Did you mean: 'num_special_tokens_to_add'?\n\ne2e: vllm qwen3_moe: Qwen3MoeForCausalLM=\u003cclass 'vllm.model_executor.models.qwen3_moe.Qwen3MoeForCausalLM'\u003e names=['Qwen3MoeAttention', 'Qwen3MoeDecoderLayer', 'Qwen3MoeForCausalLM', 'Qwen3MoeMLP', 'Qwen3MoeModel', 'Qwen3MoeSparseMoeBlock']\ne2e: registered qwen3_5_moe in _extra_content\ne2e: patched Qwen3MoeConfig.__init__ for dict text_config\ntransformers fallback ImportError: \nAutoModelForCausalLM requires the PyTorch library but it was not found in your environment. Check out the instructions on the\ninstallation page: https://pytorch.org/get-started/locally/ and follow the ones that match your environment.\nPlease note that you may need to restart your runtime after inst\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.8 tok/s\ndecode: 0.2 tok/s",
   "devices": [
    "/dev/iluvatar0",
    "/dev/iluvatar1",
@@ -103,6 +103,7 @@
    "rebase_kernel",
    "reduce_kernel",
    "rows16_kernel",
+   "s_gemv_kernel",
    "scalar_gate_kernel",
    "scale_kernel",
    "select_kernel",
@@ -116,11 +117,9 @@
    "window_kernel"
   ],
   "programs": {
-   "build/gdn_parity": "633352e971bc77848f5974583176763cc252f7f476e1ef5f0c8e264d5aadd52b",
-   "build/gr_parity": "1d7d998be56f24766551006ab837a708551210febb34862964044562e37c6848",
-   "build/kv_q8_parity": "f4e29cb1064fa135aeaf9fae6bbe5900f81e4c24c0c976703f47c9240703ff46",
+   "build/gr_parity": "119e3033174fc5bb50a1a63d14f7dd35017cd8f796b42cead46c3dc2bced33a2",
+   "build/kv_q8_parity": "fb0c1134b91022b823b0d7ac779c50d40fc462865b9da0387782ed4c73ebccfd",
    "build/qsa_parity": "2a4f7c3756792d71457124b9938285a0a89dfd83da3f51ada1ebad8e2f8bb9c6",
-   "build/shared_expert_parity": "733869607f7fbf05dcc70151033fbaa8321d3540053a26a4132b6ec5cf37726f",
    "build/verify_attn_gpu": "5c3eca1571d1dc734833ebed3fe1733e65a37ae23aa410501565a06bf1cd5bed"
   },
   "prompt_ids": [
@@ -131,30 +130,28 @@
    369
   ],
   "weights": [
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00001-of-00026.safetensors",
    "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00002-of-00026.safetensors"
   ],
   "loaders": [
    {
-    "pid": 42290,
+    "pid": 53005,
     "exe": "/usr/local/bin/python3.10",
     "port": false,
-    "weights": 2,
+    "weights": 1,
     "weight_files": [
-     "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00001-of-00026.safetensors",
      "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00002-of-00026.safetensors"
     ],
     "port_kernels": [
      "elementwise_kernel",
      "reduce_kernel"
     ],
-    "seconds": 1.647784602
+    "seconds": 1.6480850120000001
    }
   ],
   "printed": [
    {
     "label": "prefill",
-    "value": 5.5,
+    "value": 5.8,
     "unit": "tok/s",
     "better": "higher"
    },
@@ -978,6 +975,6 @@
   "ignored": null
  },
  "gate": "integration_e2e_loader_not_port",
- "gate_text": "integration_e2e_loader_not_port: in .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh no process that loaded the model's weights is the port's program launching the kernels the units ported — a process that loaded them must be an executable of the workspace, or map a library the workspace built, and launch itself a ported kernel of every unit; the processes that loaded weights:\n  pid 42290 /usr/local/bin/python3.10: 2 weight file(s), the workspace's program: false, kernels it launched itself: elementwise_kernel reduce_kernel\n  units none of whose kernels the port's loading process launched:\n  pcd027bc02f: add_kernel append apply beta_sigmoid bf16_f32_mmvf_kernel bf16_gemv_naive_kernel bf16_gemv_split_kernel bf16_gemv_warp_kernel broadcast_kernel combine conv_residual_kernel conv_silu copy_from_mapped_kernel copy_i32_from_mapped_kernel dequant_flat_kernel dequant_gu_kernel dequant_s2_kernel doorbell_publish_kernel doorbell_ring_kernel doorbell_wait_kernel down_silu embed_rows_kernel embedding_gather_kernel gate gate_kernel gate_softplus gdn_ab_kernel gdn_beta_gate_kernel gdn_conv_kernel gdn_conv_l2_kernel gdn_gate_kernel gdn_l2_kernel gdn_out_norm_kernel gdn_step_kernel gdn_step_norm_kernel gr_down_kernel gr_down_multi_kernel gr_gate_kernel gr_inject_kernel gr_mean_kernel gr_norm_kernel gr_norm_multi_kernel gr_up_kernel gr_up_multi_kernel gr_write_kernel l2_norm mmvq_kernel moe_combine_kernel native_down_kernel native_gu_kernel native_scalar_sigmoid_kernel native_swiglu_kernel norm out_norm post pre_gated quantize_q8_1_kernel rms_norm_weighted_kernel rope_neox_kernel route router_top10_kernel s2_gemv_fast_kernel s2_gemv_kernel s2_gemv_q8_kernel s2_gemv_quads_kernel scalar_gate_kernel scale_kernel scale_rows_kernel silu_kernel step swiglu_entries_kernel swiglu_kernel to_bf16_kernel to_f16_kernel weighted_rms_norm\n  pe1ab8a4555: poison_kernel\n  u02c65ed515: indexer_key_append_kernel kv_append_kernel kv_gather_kernel qsa_attend_kernel qsa_gate_apply_f32_kernel qsa_gate_apply_kernel qsa_index_kernel topk_kernel\n  u12d8dd5102: activation_correction_kernel add3_kernel add_hits_kernel bcast_kernel bf16_gemv_kernel conv_kernel cpu_order_projection_kernel cpu_order_quantize_kernel cpu_order_swiglu_kernel dequant_kernel down_grouped_kernel down_kernel finish gate_kernel gnorm_kernel group_resident_kernel gu_grouped_kernel gu_kernel history_advance_kernel hit_select_kernel hit_select_multi_kernel native_iq4_xs_mmvq_kernel native_mmvq_multi_kernel native_q2_0_mmvq_kernel native_q3_k_mmvq_kernel native_q4_k_mmvq_kernel native_q5_k_mmvq_kernel native_q6_k_mmvq_kernel native_quantize_q8_1_kernel native_small_mmvq_kernel s_gemv_kernel s_gemv_q8_split_kernel s_gemv_q8k_kernel s_gemv_split_kernel sampler_greedy_kernel sampler_kernel swiglu_kernel to_bf16_kernel\n  u52d156705c: attn_chunk_kernel attn_merge_kernel\n  u7991572426: blob_dequant_kernel gate_attn_kernel gather_rows16_kernel gdn_conv_kernel gdn_gates_kernel gdn_l2_kernel gdn_rec_kernel gr_broadcast_kernel gr_mix_kernel gr_norm_kernel gr_silu_kernel gr_write_kernel kv_append_kernel moe_combine_kernel rms_rows_kernel rope_kernel route_kernel split_q_kernel swiglu_il_kernel swiglu_pair_kernel to_bf16_kernel to_f16_kernel\n  uebd9b81357: dequant_q8_0_kernel dequant_q8_K_kernel kv_append_q8_kernel kv_gather_q8_kernel quantize_q8_0_kernel quantize_q8_0_scaled_kernel quantize_q8_K_kernel",
- "when": "2026-11-21T08:46:10.992801733Z"
+ "gate_text": "integration_e2e_loader_not_port: in .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh no process that loaded the model's weights is the port's program launching the kernels the units ported — a process that loaded them must be an executable of the workspace, or map a library the workspace built, and launch itself a ported kernel of every unit; the processes that loaded weights:\n  pid 53005 /usr/local/bin/python3.10: 1 weight file(s), the workspace's program: false, kernels it launched itself: elementwise_kernel reduce_kernel\n  units none of whose kernels the port's loading process launched:\n  pcd027bc02f: add_kernel append apply beta_sigmoid bf16_f32_mmvf_kernel bf16_gemv_naive_kernel bf16_gemv_split_kernel bf16_gemv_warp_kernel broadcast_kernel combine conv_residual_kernel conv_silu copy_from_mapped_kernel copy_i32_from_mapped_kernel dequant_flat_kernel dequant_gu_kernel dequant_s2_kernel doorbell_publish_kernel doorbell_ring_kernel doorbell_wait_kernel down_silu embed_rows_kernel embedding_gather_kernel gate gate_kernel gate_softplus gdn_ab_kernel gdn_beta_gate_kernel gdn_conv_kernel gdn_conv_l2_kernel gdn_gate_kernel gdn_l2_kernel gdn_out_norm_kernel gdn_step_kernel gdn_step_norm_kernel gr_down_kernel gr_down_multi_kernel gr_gate_kernel gr_inject_kernel gr_mean_kernel gr_norm_kernel gr_norm_multi_kernel gr_up_kernel gr_up_multi_kernel gr_write_kernel l2_norm mmvq_kernel moe_combine_kernel native_down_kernel native_gu_kernel native_scalar_sigmoid_kernel native_swiglu_kernel norm out_norm post pre_gated quantize_q8_1_kernel rms_norm_weighted_kernel rope_neox_kernel route router_top10_kernel s2_gemv_fast_kernel s2_gemv_kernel s2_gemv_q8_kernel s2_gemv_quads_kernel scalar_gate_kernel scale_kernel scale_rows_kernel silu_kernel step swiglu_entries_kernel swiglu_kernel to_bf16_kernel to_f16_kernel weighted_rms_norm\n  pe1ab8a4555: poison_kernel\n  u02c65ed515: indexer_key_append_kernel kv_append_kernel kv_gather_kernel qsa_attend_kernel qsa_gate_apply_f32_kernel qsa_gate_apply_kernel qsa_index_kernel topk_kernel\n  u12d8dd5102: activation_correction_kernel add3_kernel add_hits_kernel bcast_kernel bf16_gemv_kernel conv_kernel cpu_order_projection_kernel cpu_order_quantize_kernel cpu_order_swiglu_kernel dequant_kernel down_grouped_kernel down_kernel finish gate_kernel gnorm_kernel group_resident_kernel gu_grouped_kernel gu_kernel history_advance_kernel hit_select_kernel hit_select_multi_kernel native_iq4_xs_mmvq_kernel native_mmvq_multi_kernel native_q2_0_mmvq_kernel native_q3_k_mmvq_kernel native_q4_k_mmvq_kernel native_q5_k_mmvq_kernel native_q6_k_mmvq_kernel native_quantize_q8_1_kernel native_small_mmvq_kernel s_gemv_kernel s_gemv_q8_split_kernel s_gemv_q8k_kernel s_gemv_split_kernel sampler_greedy_kernel sampler_kernel swiglu_kernel to_bf16_kernel\n  u52d156705c: attn_chunk_kernel attn_merge_kernel\n  u7991572426: blob_dequant_kernel gate_attn_kernel gather_rows16_kernel gdn_conv_kernel gdn_gates_kernel gdn_l2_kernel gdn_rec_kernel gr_broadcast_kernel gr_mix_kernel gr_norm_kernel gr_silu_kernel gr_write_kernel kv_append_kernel moe_combine_kernel rms_rows_kernel rope_kernel route_kernel split_q_kernel swiglu_il_kernel swiglu_pair_kernel to_bf16_kernel to_f16_kernel\n  uebd9b81357: dequant_q8_0_kernel dequant_q8_K_kernel kv_append_q8_kernel kv_gather_q8_kernel quantize_q8_0_kernel quantize_q8_0_scaled_kernel quantize_q8_K_kernel",
+ "when": "2026-11-21T09:23:50.263118127Z"
 }
