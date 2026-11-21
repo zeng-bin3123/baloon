@@ -29,7 +29,7 @@
   "metrics": [
    {
     "label": "prefill",
-    "value": 5.5,
+    "value": 5.7,
     "unit": "tok/s",
     "better": "higher"
    },
@@ -40,7 +40,7 @@
     "better": "higher"
    }
   ],
-  "tail": "….weight', 'model.layers.9.post_attention_layernorm.weight', 'model.layers.9.self_attn.k_norm.weight', 'model.layers.9.self_attn.k_proj.weight', 'model.layers.9.self_attn.o_proj.weight', 'model.layers.9.self_attn.q_norm.weight', 'model.layers.9.self_attn.q_proj.weight', 'model.layers.9.self_attn.v_proj.weight', 'model.norm.weight']\nYou should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.\n/usr/local/lib/python3.10/site-packages/transformers/generation/configuration_utils.py:636: UserWarning: `do_sample` is set to `False`. However, `top_p` is set to `0.95` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_p`.\n  warnings.warn(\n/usr/local/lib/python3.10/site-packages/transformers/generation/configuration_utils.py:653: UserWarning: `do_sample` is set to `False`. However, `top_k` is set to `20` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_k`.\n  warnings.warn(\nThe attention mask is not set and cannot be inferred from input because pad token is same as eos token. As a consequence, you may observe unexpected behavior. Please pass your input's `attention_mask` to obtain reliable results.\ntransformers fallback RuntimeError: The size of tensor a (256) must match the size of tensor b (64) at non-singleton dimension 3\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
+  "tail": "…ages/vllm/entrypoints/llm.py\", line 177, in __init__\n    self.llm_engine = LLMEngine.from_engine_args(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/engine/llm_engine.py\", line 571, in from_engine_args\n    engine_config = engine_args.create_engine_config()\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/engine/arg_utils.py\", line 902, in create_engine_config\nINFO 11-21 01:50:37 config.py:1670] Downcasting torch.float32 to torch.bfloat16.\nvllm tp=1 ValueError: Model architectures ['Qwen3MoeForCausalLM'] are not supported for now.\n  File \"\u003cstdin\u003e\", line 116, in \u003cmodule\u003e\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/entrypoints/llm.py\", line 177, in __init__\n    self.llm_engine = LLMEngine.from_engine_args(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/engine/llm_engine.py\", line 571, in from_engine_args\n    engine_config = engine_args.create_engine_config()\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/engine/arg_utils.py\", line 902, in create_engine_config\ne2e: vllm qwen3_moe module: OK\ntransformers fallback ValueError: The checkpoint you are trying to load has model type `qwen3_5_moe` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrad\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
   "devices": [
    "/dev/iluvatar0",
    "/dev/iluvatar1",
@@ -48,9 +48,6 @@
    "/dev/iluvatar3"
   ],
   "kernels": [
-   "CatArrayBatchedCopy",
-   "DeviceScanInitKernel",
-   "DeviceScanKernel",
    "ab_kernel",
    "attn_chunk_kernel",
    "attn_merge_kernel",
@@ -70,7 +67,6 @@
    "dequant_q8_K_kernel",
    "down_silu",
    "elementwise_kernel",
-   "elementwise_kernel_with_index",
    "embed_kernel",
    "flash_kernel",
    "gate_softplus",
@@ -93,7 +89,6 @@
    "gr_up_multi_kernel",
    "gr_write_kernel",
    "hits_kernel",
-   "indexSelectSmallIndex",
    "indexer_key_append_kernel",
    "k_dec",
    "k_enc",
@@ -134,10 +129,10 @@
    "window_kernel"
   ],
   "programs": {
-   "build/gr_parity": "d20162376ff39bb226541b0740ec49687b13d6c09650b498efafff79e035ecc1",
-   "build/kv_q8_parity": "8d9b9784e3f9ed2f2e3914f1d840a641a1f0122493b660953e8b7bba1a9d333f",
+   "build/gdn_parity": "dddcb56a4b8c7fec95fd42a6dbc289c239d54c07c89beacbf2652101656b9465",
+   "build/gr_parity": "ed38fbd5e34df9e0ec008bbc489431789c00c9cfd12cffa277d0b31c24e12c00",
+   "build/kv_q8_parity": "ddb62e816d784f6f88cb06b19dc33035e381391c69cc5a8b62652547892c0356",
    "build/qsa_parity": "2a4f7c3756792d71457124b9938285a0a89dfd83da3f51ada1ebad8e2f8bb9c6",
-   "build/shared_expert_parity": "4df1c95b4f7c6734a3a6ae91e60e76bd8534a574c1c3da2474f7bad670afcce5",
    "build/verify_attn_gpu": "5c3eca1571d1dc734833ebed3fe1733e65a37ae23aa410501565a06bf1cd5bed"
   },
   "prompt_ids": [
@@ -148,15 +143,7 @@
    369
   ],
   "weights": [
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00002-of-00026.safetensors",
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00003-of-00026.safetensors",
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00005-of-00026.safetensors",
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00009-of-00026.safetensors",
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00013-of-00026.safetensors",
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00017-of-00026.safetensors",
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00021-of-00026.safetensors",
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00024-of-00026.safetensors",
-   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00026-of-00026.safetensors"
+   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00002-of-00026.safetensors"
   ]
  },
  "external": [
@@ -4013,6 +4000,6 @@
   "ignored": null
  },
  "gate": "integration_correctness_unmeasured",
- "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: ….weight', 'model.layers.9.post_attention_layernorm.weight', 'model.layers.9.self_attn.k_norm.weight', 'model.layers.9.self_attn.k_proj.weight', 'model.layers.9.self_attn.o_proj.weight', 'model.layers.9.self_attn.q_norm.weight', 'model.layers.9.self_attn.q_proj.weight', 'model.layers.9.self_attn.v_proj.weight', 'model.norm.weight']\nYou should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.\n/usr/local/lib/python3.10/site-packages/transformers/generation/configuration_utils.py:636: UserWarning: `do_sample` is set to `False`. However, `top_p` is set to `0.95` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_p`.\n  warnings.warn(\n/usr/local/lib/python3.10/site-packages/transformers/generation/configuration_utils.py:653: UserWarning: `do_sample` is set to `False`. However, `top_k` is set to `20` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_k`.\n  warnings.warn(\nThe attention mask is not set and cannot be inferred from input because pad token is same as eos token. As a consequence, you may observe unexpected behavior. Please pass your input's `attention_mask` to obtain reliable results.\ntransformers fallback RuntimeError: The size of tensor a (256) must match the size of tensor b (64) at non-singleton dimension 3\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s",
- "when": "2026-11-21T01:22:49.624700724Z"
+ "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …ages/vllm/entrypoints/llm.py\", line 177, in __init__\n    self.llm_engine = LLMEngine.from_engine_args(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/engine/llm_engine.py\", line 571, in from_engine_args\n    engine_config = engine_args.create_engine_config()\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/engine/arg_utils.py\", line 902, in create_engine_config\nINFO 11-21 01:50:37 config.py:1670] Downcasting torch.float32 to torch.bfloat16.\nvllm tp=1 ValueError: Model architectures ['Qwen3MoeForCausalLM'] are not supported for now.\n  File \"\u003cstdin\u003e\", line 116, in \u003cmodule\u003e\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/entrypoints/llm.py\", line 177, in __init__\n    self.llm_engine = LLMEngine.from_engine_args(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/engine/llm_engine.py\", line 571, in from_engine_args\n    engine_config = engine_args.create_engine_config()\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/engine/arg_utils.py\", line 902, in create_engine_config\ne2e: vllm qwen3_moe module: OK\ntransformers fallback ValueError: The checkpoint you are trying to load has model type `qwen3_5_moe` but Transformers does not recognize this architecture. This could be because of an issue with the checkpoint, or because your version of Transformers is out of date.\n\nYou can update Transformers with the command `pip install --upgrad\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
+ "when": "2026-11-21T01:50:13.642322251Z"
 }
