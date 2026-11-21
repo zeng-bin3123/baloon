@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 11372,
     "started": "2026-11-20T10:05:49.017028588Z",
-    "renewed": "2026-11-20T23:07:07.933451648Z"
+    "renewed": "2026-11-21T03:01:46.628100711Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -789,7 +789,7 @@
     "pe1ab8a4555": 1,
     "pe1f7ca5c00": 1,
     "pfcccb31b26": 1,
-    "uintegration01529aaa82b9": 2
+    "uintegration01529aaa82b9": 3
   },
   "fail_history": {
     "p17652417b0": [
@@ -914,6 +914,7 @@
     ],
     "uintegration01529aaa82b9": [
       "integration_e2e_not_port",
+      "integration_correctness_unmeasured",
       "integration_correctness_unmeasured"
     ]
   },
@@ -1027,9 +1028,9 @@
     },
     "uintegration01529aaa82b9": {
       "kind": "integration_correctness_unmeasured",
-      "text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …baForCausalLM', 'LlamaForCausalLM', 'LLaMAForCausalLM', 'MambaForCausalLM', 'MistralForCausalLM', 'MixtralForCausalLM', 'QuantMixtralForCausalLM', 'MptForCausalLM', 'MPTForCausalLM', 'MiniCPMForCausalLM', 'MiniCPM3ForCausalLM', 'NemotronForCausalLM', 'OlmoForCausalLM', 'OlmoeForCausalLM', 'OPTForCausalLM', 'OrionForCausalLM', 'PersimmonForCausalLM', 'PhiForCausalLM', 'Phi3ForCausalLM', 'Phi3SmallForCausalLM', 'PhiMoEForCausalLM', 'Qwen2ForCausalLM', 'Qwen2MoeForCausalLM', 'Qwen3ForCausalLM', 'Qwen3MoeForCausalLM', 'Qwen3_5MoeForCausalLM', 'RWForCausalLM', 'StableLMEpochForCausalLM', 'StableLmForCausalLM', 'Starcoder2ForCausalLM', 'SolarForCausalLM', 'XverseForCausalLM', 'BartModel', 'BartForConditionalGeneration', 'MistralModel', 'Qwen2ForRewardModel', 'Gemma2Model', 'Blip2ForConditionalGeneration', 'ChameleonForConditionalGeneration', 'ChatGLMModel', 'ChatGLMForConditionalGeneration', 'FuyuForCausalLM', 'InternVLChatModel', 'LlavaForConditionalGeneration', 'LlavaNextForConditionalGeneration', 'LlavaNextVideoForConditionalGeneration', 'LlavaOnevisionForConditionalGeneration', 'MiniCPMV', 'MolmoForCausalLM', 'NVLM_D', 'PaliGemmaForConditionalGeneration', 'Phi3VForCausalLM', 'PixtralForConditionalGeneration', 'QWenLMHeadModel', 'Qwen2VLForConditionalGeneration', 'Qwen2_5_VLForConditionalGeneration', 'UltravoxModel', 'MllamaForConditionalGeneration', 'EAGLEModel', 'MedusaModel', 'MLPSpeculatorPreTrainedModel']\n\ne2e: correctness inference done\nprefill: 5.4 tok/s\ndecode: 0.2 tok/s",
+      "text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …model\n    return loader.load_model(model_config=model_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 398, in load_model\n    model = _initialize_model(model_config, self.load_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 175, in _initialize_model\n    return build_model(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 160, in build_model\n    return model_class(config=hf_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/qwen3_moe.py\", line 391, in __init__\n    self.model = Qwen3MoeModel(config=config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/qwen3_moe.py\", line 328, in __init__\n    self.start_layer, self.end_layer, self.layers = make_layers(\ne2e: vllm qwen3_moe: Qwen3MoeForCausalLM=\u003cclass 'vllm.model_executor.models.qwen3_moe.Qwen3MoeForCausalLM'\u003e names=['Qwen3MoeAttention', 'Qwen3MoeDecoderLayer', 'Qwen3MoeForCausalLM', 'Qwen3MoeMLP', 'Qwen3MoeModel', 'Qwen3MoeSparseMoeBlock']\ne2e: registered qwen3_5_moe in _extra_content\n[2026-11-21 03:01:22,610] [INFO] [real_accelerator.py:158:get_accelerator] Setting ds_accelerator to cuda (auto detect)\ntransformers fallback AttributeError: 'dict' object has no attribute 'to_dict'\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
       "base_ref": "einsteinOS/dev-c880662efd-wip-uintegration01529aaa82b9",
-      "base_sha": "cb0950d56d9a6f8f5c72fd960f32411e80ebf52e"
+      "base_sha": "cbb5dc631af4863b2bf2217e98596b7091aa7494"
     }
   },
   "infra_fails": 0,
