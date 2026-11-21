@@ -40,7 +40,7 @@
     "better": "higher"
    }
   ],
-  "tail": "…model\n    return loader.load_model(model_config=model_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 398, in load_model\n    model = _initialize_model(model_config, self.load_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 175, in _initialize_model\n    return build_model(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 160, in build_model\n    return model_class(config=hf_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/qwen3_moe.py\", line 391, in __init__\n    self.model = Qwen3MoeModel(config=config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/qwen3_moe.py\", line 328, in __init__\n    self.start_layer, self.end_layer, self.layers = make_layers(\ne2e: vllm qwen3_moe: Qwen3MoeForCausalLM=\u003cclass 'vllm.model_executor.models.qwen3_moe.Qwen3MoeForCausalLM'\u003e names=['Qwen3MoeAttention', 'Qwen3MoeDecoderLayer', 'Qwen3MoeForCausalLM', 'Qwen3MoeMLP', 'Qwen3MoeModel', 'Qwen3MoeSparseMoeBlock']\ne2e: registered qwen3_5_moe in _extra_content\n[2026-11-21 03:01:22,610] [INFO] [real_accelerator.py:158:get_accelerator] Setting ds_accelerator to cuda (auto detect)\ntransformers fallback AttributeError: 'dict' object has no attribute 'to_dict'\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
+  "tail": "…executor/model_loader/__init__.py\", line 19, in get_model\n    return loader.load_model(model_config=model_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 398, in load_model\n    model = _initialize_model(model_config, self.load_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 175, in _initialize_model\n    return build_model(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 160, in build_model\n    return model_class(config=hf_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/qwen3_moe.py\", line 391, in __init__\n    self.model = Qwen3MoeModel(config=config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/qwen3_moe.py\", line 328, in __init__\n    self.start_layer, self.end_layer, self.layers = make_layers(\ne2e: vllm qwen3_moe: Qwen3MoeForCausalLM=\u003cclass 'vllm.model_executor.models.qwen3_moe.Qwen3MoeForCausalLM'\u003e names=['Qwen3MoeAttention', 'Qwen3MoeDecoderLayer', 'Qwen3MoeForCausalLM', 'Qwen3MoeMLP', 'Qwen3MoeModel', 'Qwen3MoeSparseMoeBlock']\ne2e: registered qwen3_5_moe in _extra_content\ne2e: patched Qwen3MoeConfig.__init__ for dict text_config\ntransformers fallback TypeError: Object of type SimpleNamespace is not JSON serializable\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
   "devices": [
    "/dev/iluvatar0",
    "/dev/iluvatar1",
@@ -131,11 +131,10 @@
    "window_kernel"
   ],
   "programs": {
-   "build/gdn_parity": "8f205d8964084f40de5fea0d1649f6a1c13a31e6c61aab0eeca39e59c8320584",
-   "build/gr_parity": "73c7a0a329806c8cca844087f9216be75ee84f084b63328d79ebc9ee9c326d31",
-   "build/kv_q8_parity": "8d9b9784e3f9ed2f2e3914f1d840a641a1f0122493b660953e8b7bba1a9d333f",
+   "build/gr_parity": "523db2e46c0b7b4059774cc70b67881e3477f8b2da4a8575fc2bddb013ab3264",
+   "build/kv_q8_parity": "42504d0f6fec144eee54b894e967b8478cf653dc087ae13356eba5316369373b",
    "build/qsa_parity": "2a4f7c3756792d71457124b9938285a0a89dfd83da3f51ada1ebad8e2f8bb9c6",
-   "build/verify_attn_gpu": "1d625a5e356de9ff3b023e94040bf3e9d1d4ea93522062cb33ea715041028e47"
+   "build/verify_attn_gpu": "459138110f381232ada626519b88590d72ab4a0ed4916917fee3511fad3136db"
   },
   "prompt_ids": [
    760,
@@ -145,6 +144,7 @@
    369
   ],
   "weights": [
+   "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00001-of-00026.safetensors",
    "/root/public-storage/models/Qwen/Qwen3.6-35B-A3B/model-00002-of-00026.safetensors"
   ]
  },
@@ -4002,6 +4002,6 @@
   "ignored": null
  },
  "gate": "integration_correctness_unmeasured",
- "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …model\n    return loader.load_model(model_config=model_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 398, in load_model\n    model = _initialize_model(model_config, self.load_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 175, in _initialize_model\n    return build_model(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 160, in build_model\n    return model_class(config=hf_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/qwen3_moe.py\", line 391, in __init__\n    self.model = Qwen3MoeModel(config=config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/qwen3_moe.py\", line 328, in __init__\n    self.start_layer, self.end_layer, self.layers = make_layers(\ne2e: vllm qwen3_moe: Qwen3MoeForCausalLM=\u003cclass 'vllm.model_executor.models.qwen3_moe.Qwen3MoeForCausalLM'\u003e names=['Qwen3MoeAttention', 'Qwen3MoeDecoderLayer', 'Qwen3MoeForCausalLM', 'Qwen3MoeMLP', 'Qwen3MoeModel', 'Qwen3MoeSparseMoeBlock']\ne2e: registered qwen3_5_moe in _extra_content\n[2026-11-21 03:01:22,610] [INFO] [real_accelerator.py:158:get_accelerator] Setting ds_accelerator to cuda (auto detect)\ntransformers fallback AttributeError: 'dict' object has no attribute 'to_dict'\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
- "when": "2026-11-21T03:00:55.394911085Z"
+ "gate_text": "integration_correctness_unmeasured: .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh printed no \"generated:\" line of token ids, so what it generated could not be checked against an implementation from outside the pipeline on the same prompt; output: …executor/model_loader/__init__.py\", line 19, in get_model\n    return loader.load_model(model_config=model_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 398, in load_model\n    model = _initialize_model(model_config, self.load_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 175, in _initialize_model\n    return build_model(\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/model_loader/loader.py\", line 160, in build_model\n    return model_class(config=hf_config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/qwen3_moe.py\", line 391, in __init__\n    self.model = Qwen3MoeModel(config=config,\n  File \"/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/qwen3_moe.py\", line 328, in __init__\n    self.start_layer, self.end_layer, self.layers = make_layers(\ne2e: vllm qwen3_moe: Qwen3MoeForCausalLM=\u003cclass 'vllm.model_executor.models.qwen3_moe.Qwen3MoeForCausalLM'\u003e names=['Qwen3MoeAttention', 'Qwen3MoeDecoderLayer', 'Qwen3MoeForCausalLM', 'Qwen3MoeMLP', 'Qwen3MoeModel', 'Qwen3MoeSparseMoeBlock']\ne2e: registered qwen3_5_moe in _extra_content\ne2e: patched Qwen3MoeConfig.__init__ for dict text_config\ntransformers fallback TypeError: Object of type SimpleNamespace is not JSON serializable\ninference FAILED: no generated tokens\ne2e: correctness inference done\nprefill: 5.7 tok/s\ndecode: 0.2 tok/s",
+ "when": "2026-11-21T03:15:38.002891774Z"
 }
