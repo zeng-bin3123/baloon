@@ -16,8 +16,8 @@
     "python3.10 pytools/e2e_weights.py [port]": {
       "key": "python3.10 pytools/e2e_weights.py [port]",
       "first_at": "2026-11-22T05:11:46.61305033Z",
-      "last_at": "2026-11-22T05:52:52.70364573Z",
-      "verifications": 4,
+      "last_at": "2026-11-22T06:23:19.589279682Z",
+      "verifications": 5,
       "last_gate": "integration_e2e_unmeasured",
       "budget": 6,
       "best_took_permille": 1000,
