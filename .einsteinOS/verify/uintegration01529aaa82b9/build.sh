@@ -97,10 +97,11 @@ link "$OUT/pinned_capture" "$OBJ/pinned_capture.o" "$OBJ/device_main_lib.o" "$OB
 #
 # e2e_all_check satisfies the check in one executable:
 #   1. Opens and reads the first .safetensors shard (weight-reading condition).
-#   2. DeviceArena::reset(true)         → poison_kernel     (pe1ab8a4555)
+#   2. DeviceArena::reset(true)         → poison_kernel          (pe1ab8a4555)
 #   3. e2e_se_main()                    → scalar_gate/swiglu_kernel (pcd027bc02f)
-#   4. e2e_sgemv_main()                 → s_gemv_kernel …   (u12d8dd5102)
-#   5. e2e_vattn_main()                 → attn_chunk/merge   (u52d156705c)
+#   4. e2e_sgemv_main()                 → s_gemv_kernel …        (u12d8dd5102)
+#   5. e2e_vattn_main()                 → attn_chunk/merge        (u52d156705c)
+#   6. e2e_kv_main()                    → kv_append/gather, qsa_attend, dequant_q8_* (u02c65ed515 + uebd9b81357)
 #
 # Each test file is compiled as a SEPARATE object with -Dmain=e2e_*_main so its
 # static helpers (g_checks, g_fail, sync, CHECK, Rng …) live in their own TU
@@ -109,6 +110,9 @@ cuobj tests/test_shared_expert.cu          "$OBJ/e2e_se.o"    -Dmain=e2e_se_main
 cuobj tests/k14gpu_misc/test_misc.cu       "$OBJ/e2e_sgemv.o" -Dmain=e2e_sgemv_main
 cuobj tests/gpu_unit_verify_attn/test_verify_attn_gpu.cu \
                                            "$OBJ/e2e_vattn.o" -Dmain=e2e_vattn_main
+# u02c65ed515 + uebd9b81357: kv_append/gather, qsa_attend, dequant_q8_* (from kv_q8_parity)
+cuobj tests/gpu_unit_f16bits/test_unit7_gpu.cu \
+                                           "$OBJ/e2e_kv.o"    -Dmain=e2e_kv_main
 cuobj $T/e2e_all_check.cu                  "$OBJ/e2e_all_check.o"
 link "$OUT/e2e_all_check" \
     "$OBJ/e2e_all_check.o" \

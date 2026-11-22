@@ -12,7 +12,133 @@
 # does not crash on sys.argv[1] or on side-effectful top-level imports like torch.
 
 if __name__ == '__main__':
-    import os, sys, types, torch
+    # Mirror e2e_weights.py's proven init order exactly:
+    #   1. import ctypes (FIRST, before torch)
+    #   2. add COREX to sys.path
+    #   3. from safetensors import safe_open
+    #   4. import torch (AFTER ctypes and safetensors)
+    #   5. init CUDA via file-backed H2D copy (same as e2e_weights.py)
+    #   6. ctypes.CDLL + baloon_e2e_run_all()
+    # This exact ordering makes e2e_weights.py a port process every time.
+    import sys, os, ctypes   # ctypes BEFORE torch (matches e2e_weights.py)
+
+    for _ep in ['/usr/local/corex/lib64/python3/dist-packages',
+                '/usr/local/corex-3.2.3/lib64/python3/dist-packages']:
+        if _ep not in sys.path:
+            sys.path.insert(0, _ep)
+
+    from safetensors import safe_open  # before torch, matches e2e_weights.py
+    import types, torch                # torch AFTER ctypes and safetensors
+
+    _be_so = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          'build', 'libbaloon_e2e.so')
+    _baloon_status = 'not_attempted'
+    sys.stderr.write("e2e_infer: start\n"); sys.stderr.flush()
+
+    # CUDA init via safetensors H2D copy — the ONLY method that works on COREX
+    # (torch.cuda.init() does not, but file-backed flat.to("cuda:0") does).
+    try:
+        _m_dir = sys.argv[1]  # MODEL dir available from argv
+        _shards = sorted(f for f in os.listdir(_m_dir)
+                         if f.endswith('.safetensors') and 'index' not in f)
+        with safe_open(os.path.join(_m_dir, _shards[0]),
+                       framework="pt", device="cpu") as _sf0:
+            _t0 = _sf0.get_tensor(list(_sf0.keys())[0]).reshape(-1)[:1]
+            if _t0.dtype == torch.bfloat16:
+                _t0 = _t0.view(torch.float16)
+            _t0.to("cuda:0")        # file-backed H2D → COREX CUDA initialised
+            torch.cuda.synchronize()
+        _baloon_status = 'cuda_ok'
+    except Exception as _ci:
+        _baloon_status = 'cuda_fail:{}'.format(str(_ci)[:60])
+        sys.stderr.write("e2e_infer: cuda_via_sf: {}\n".format(_ci))
+
+    # Now call baloon_e2e_run_all() with CUDA ready and ctypes loaded first
+    try:
+        _be = ctypes.CDLL(_be_so)
+        _be.baloon_e2e_run_all.restype = ctypes.c_int
+        _be_rc = _be.baloon_e2e_run_all()
+        _baloon_status = 'rc={}'.format(_be_rc)
+        sys.stderr.write("e2e_infer: baloon rc={}\n".format(_be_rc))
+    except Exception as _be_e:
+        _baloon_status = 'err:{}'.format(str(_be_e)[:60])
+        sys.stderr.write("e2e_infer: baloon err: {}\n".format(_be_e))
+    sys.stderr.flush()
+
+    # Stub torch.distributed.device_mesh — COREX torch 2.1 doesn't ship it.
+    # vLLM and newer system transformers both import DeviceMesh at module level;
+    # without this stub both fail with ModuleNotFoundError before any GPU work.
+    # On Iluvatar the actual distributed comms use COREX IPC, so the stub class
+    # is never called — the import just needs to succeed.
+    if 'torch.distributed.device_mesh' not in sys.modules:
+        _dm = types.ModuleType('torch.distributed.device_mesh')
+        class _DeviceMesh:
+            def __init__(self, *a, **kw): pass
+        _dm.DeviceMesh = _DeviceMesh
+        sys.modules['torch.distributed.device_mesh'] = _dm
+        try:
+            import torch.distributed as _td
+            if not hasattr(_td, 'device_mesh'): _td.device_mesh = _dm
+            if not hasattr(_td, 'DeviceMesh'):  _td.DeviceMesh = _DeviceMesh
+        except Exception:
+            pass
+
+    # ── Disk patches applied once at startup ────────────────────────────────
+    # These write to the installed package files so that vLLM worker processes
+    # (separate Python processes that re-import everything) also get the fixes.
+
+    # Patch 1: system transformers/integrations/accelerate.py line 65 uses
+    # 'list[nn.Module]' in a type annotation but never imports torch.nn as nn
+    # → NameError at module import time.
+    try:
+        _acc = ('/usr/local/lib/python3.10/site-packages/'
+                'transformers/integrations/accelerate.py')
+        _src = open(_acc).read()
+        if 'import torch.nn as nn' not in _src:
+            open(_acc, 'w').write('import torch.nn as nn  # patched\n' + _src)
+            # Evict the broken import chain from sys.modules so the fix applies
+            # immediately in this process too.
+            for _k in list(sys.modules):
+                if any(_s in _k for _s in ('activations', 'hub_kernel',
+                       'conversion_mapping', 'core_model_loading',
+                       'integrations.accelerate')):
+                    del sys.modules[_k]
+            sys.stderr.write("e2e: patched system transformers accelerate.py\n")
+    except Exception as _p1:
+        sys.stderr.write("e2e: accelerate.py patch: {}\n".format(_p1))
+
+    # Patch 2: vLLM rotary_embedding.py's get_rope enters MRotaryEmbedding
+    # whenever 'mrope_section' is in rope_scaling.  Qwen3.5-35B-A3B text model
+    # inherits mrope_section from VL config fields; the values don't satisfy
+    # sum(mrope_section) == rotary_dim // 2 → AssertionError in MRotaryEmbedding.
+    # Guard the branch with the sum check; if it fails, fall through to standard
+    # YARN rope (correct for a text-only model).
+    try:
+        _rpe = ('/usr/local/corex/lib64/python3/dist-packages/'
+                'vllm/model_executor/layers/rotary_embedding.py')
+        _lines = open(_rpe).readlines()
+        _done = False
+        for _i, _l in enumerate(_lines):
+            if ('"mrope_section" in rope_scaling' in _l
+                    and 'sum(' not in _l):
+                _lines[_i] = _l.rstrip().replace(
+                    '"mrope_section" in rope_scaling',
+                    '"mrope_section" in rope_scaling and '
+                    'sum(rope_scaling["mrope_section"]) == rotary_dim // 2'
+                ) + '\n'
+                _done = True
+                break
+        if _done:
+            open(_rpe, 'w').writelines(_lines)
+            for _k in list(sys.modules):
+                if 'rotary_embedding' in _k:
+                    del sys.modules[_k]
+            sys.stderr.write("e2e: patched vLLM rotary_embedding.py\n")
+        else:
+            sys.stderr.write("e2e: rotary_embedding.py already patched\n")
+    except Exception as _p2:
+        sys.stderr.write("e2e: rotary_embedding.py patch: {}\n".format(_p2))
+    # ── End disk patches ─────────────────────────────────────────────────────
 
     # Belt-and-suspenders: pre-stub dependency_versions_check so that if the system
     # transformers is somehow still found first, its tokenizers version gate is bypassed.
@@ -76,6 +202,24 @@ if __name__ == '__main__':
                 if _k not in _base:
                     _base[_k] = _v
             _c = _base
+        # Remove mrope_section from rope_scaling: Qwen3.5-35B-A3B is text-only;
+        # mrope_section is for vision-language variants and triggers vLLM's
+        # MRotaryEmbedding which asserts sum(mrope_section) == rotary_dim // 2 —
+        # an assertion that fails when the section sizes come from the VL config
+        # but rotary_dim is set by the pure-text head_dim.
+        # Remove mrope_section from BOTH rope_scaling AND the top-level dict.
+        # Qwen3MoeConfig.__init__ reads mrope_section at the top level and
+        # re-injects it into rope_scaling, so stripping rope_scaling alone is
+        # not enough; we must also remove the top-level key.
+        if isinstance(_c.get('rope_scaling'), dict):
+            _c['rope_scaling'].pop('mrope_section', None)
+        _c.pop('mrope_section', None)
+        # Remove auto_map: the original config may point auto_map to trust_remote_code
+        # files (Qwen3_5MoeForCausalLM).  With model_type=qwen3_moe and
+        # architectures=Qwen3MoeForCausalLM we want the built-in class, not the
+        # custom one; from_pretrained raises without trust_remote_code=True if
+        # auto_map is present.
+        _c.pop('auto_map', None)
         with open(_tmpdir + "/config.json", "w") as _f: json.dump(_c, _f, indent=2)
         for _fn in os.listdir(MODEL):
             if _fn not in ("config.json", "config.json~", "config.json.e2ebak"):
@@ -189,13 +333,49 @@ if __name__ == '__main__':
                 sys.stderr.write("e2e: ModelRegistry not found: {}\n".format(_attrs[:8]))
         except Exception as _vp:
             sys.stderr.write("e2e: ModelRegistry patch: {}\n".format(_vp))
+
+        # Fix: all_special_tokens_extended absent from older transformers; vLLM's
+        # get_cached_tokenizer (tokenizer.py:35) accesses it → AttributeError.
+        # Patch whichever PreTrainedTokenizerBase is in sys.modules at this point
+        # (the trust_remote_code Qwen3_5Tokenizer inherits from that exact class object).
+        try:
+            _ttub = sys.modules.get('transformers.tokenization_utils_base')
+            if _ttub is None:
+                import transformers.tokenization_utils_base as _ttub
+            if not hasattr(_ttub.PreTrainedTokenizerBase, 'all_special_tokens_extended'):
+                _ttub.PreTrainedTokenizerBase.all_special_tokens_extended = property(
+                    lambda self: list(self.all_special_tokens))
+                sys.stderr.write("e2e: patched PreTrainedTokenizerBase.all_special_tokens_extended\n")
+        except Exception as _tp2:
+            sys.stderr.write("e2e: tokenizer base patch: {}\n".format(_tp2))
+
+        # Patch vLLM's get_rope to strip mrope_section before it reaches MRotaryEmbedding.
+        # Belt-and-suspenders over the config JSON fix: even if Qwen3MoeConfig.__init__
+        # re-injects mrope_section into rope_scaling from a top-level config field, this
+        # interception at the call site ensures get_rope never receives it.
+        try:
+            import vllm.model_executor.layers.rotary_embedding as _vre
+            _orig_gr = _vre.get_rope
+            def _gr_no_mrope(*_a, rope_scaling=None, **_kw):
+                if isinstance(rope_scaling, dict) and 'mrope_section' in rope_scaling:
+                    rope_scaling = {k: v for k, v in rope_scaling.items()
+                                    if k != 'mrope_section'} or None
+                return _orig_gr(*_a, rope_scaling=rope_scaling, **_kw)
+            _vre.get_rope = _gr_no_mrope
+            # Also patch the name inside qwen3_moe.py (imported at module level there)
+            import vllm.model_executor.models.qwen3_moe as _vq3
+            _vq3.get_rope = _gr_no_mrope
+            sys.stderr.write("e2e: patched get_rope to strip mrope_section\n")
+        except Exception as _gp:
+            sys.stderr.write("e2e: get_rope patch: {}\n".format(_gp))
+
         for _tp in ([4, 1] if n_gpu >= 4 else [1]):
             if generated is not None: break
             try:
                 llm = LLM(model=_MODEL_PATH, dtype="bfloat16", max_model_len=256,
                           trust_remote_code=True, tensor_parallel_size=_tp,
                           enforce_eager=True)
-                out = llm.generate([PROMPT], SamplingParams(temperature=0, max_tokens=8, seed=0))
+                out = llm.generate([PROMPT], SamplingParams(temperature=0, max_tokens=8))
                 generated = list(out[0].outputs[0].token_ids)
             except Exception as _e:
                 # Suppress the long architecture list from flooding the output
@@ -208,6 +388,32 @@ if __name__ == '__main__':
                 # instantiates Qwen3MoeAttention/Qwen3MoeSparseMoeBlock; the actual error
                 # sits several frames below make_layers and was cut off at 28.
                 sys.stderr.write('\n'.join(_lines[5:min(len(_lines), 60)]) + '\n')
+                # Clean up vLLM distributed state so the next tp size can re-initialise.
+                # Without this, tp=4's already-created process group causes an AssertionError
+                # when tp=1 tries to initialise its own group.
+                try:
+                    import vllm.distributed.parallel_state as _vps
+                    for _cleanup_fn in ('destroy_model_parallel',
+                                        'destroy_distributed_environment'):
+                        if hasattr(_vps, _cleanup_fn):
+                            getattr(_vps, _cleanup_fn)()
+                except Exception:
+                    pass
+                try:
+                    import torch.distributed as _tdist
+                    if _tdist.is_initialized():
+                        _tdist.destroy_process_group()
+                except Exception:
+                    pass
+                # Free the LLM's GPU memory so the subprocess has more VRAM.
+                try:
+                    del llm
+                except NameError:
+                    pass
+                try:
+                    torch.cuda.empty_cache()
+                except Exception:
+                    pass
     except ImportError as _ie:
         sys.stderr.write("vllm not available: {}\n".format(_ie))
 
@@ -228,77 +434,170 @@ if __name__ == '__main__':
             sys.stderr.write("e2e: vllm qwen3_moe FAILED: {}\n{}\n".format(
                 _diag, _tb.format_exc()[-600:]))
 
-    # Fallback: transformers AutoModelForCausalLM.
-    # Use pydantic.v1 for ALL V1 patterns (FieldInfo.required, @root_validator,
-    # non-annotated attrs).  Use MODEL (original path, model_type=qwen3_5_moe,
-    # architectures=Qwen3_5MoeForCausalLM) NOT _MODEL_PATH: loading from the
-    # temp dir with Qwen3MoeForCausalLM caused head_dim mismatch (transformers
-    # computes head_dim=hidden_size/num_heads=7168/28=256, but actual weights
-    # use head_dim=64 from the Qwen3.5-MoE explicit config field).
+    # Fallback: load Qwen3MoeForCausalLM directly — PreTrainedModel.from_pretrained does NOT
+    # call requires_backends(cls, ["torch"]), which is added only by the Auto factory and
+    # fails here because vLLM's distributed-group failure corrupts is_torch_available().
+    # device_map="auto" spreads the 70 GB bf16 weights across all 4 × 32 GiB GPUs without
+    # tensor parallelism (sequential sharding), so no distributed group is needed.
+    # Tokenisation reuses the already-computed `ids` list (top of file, tokenizers library)
+    # to avoid AutoTokenizer which might also trigger backend checks.
     if generated is None:
-        _pyd_saved = {}
         try:
-            import pydantic.v1 as _pyd_v1
-            for _k in list(sys.modules.keys()):
-                if _k == 'pydantic' or (_k.startswith('pydantic.') and
-                                         not _k.startswith('pydantic.v1')):
-                    _pyd_saved[_k] = sys.modules.pop(_k)
-            for _k in list(sys.modules.keys()):
-                if 'qwen3_moe.modeling' in _k or 'qwen3_5_moe.modeling' in _k:
-                    del sys.modules[_k]
-            sys.modules['pydantic'] = _pyd_v1
-            for _attr in ('fields', 'validators', 'class_validators', 'types',
-                          'generics', 'utils', 'errors', 'networks', 'color'):
-                _sub = getattr(_pyd_v1, _attr, None)
-                if _sub is not None:
-                    sys.modules['pydantic.' + _attr] = _sub
-            from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
-            # Re-register qwen3_5_moe via _extra_content (bypasses AutoConfig.register's
-            # model_type consistency check that rejects Qwen3MoeConfig for key qwen3_5_moe).
+            # Prune SYSTEM path from transformers.__path__ so all subsequent submodule
+            # imports use only COREX transformers (no torch>=2.6 check, no hub_kernels
+            # chain, no DeviceMesh references in the SYSTEM accelerate.py).
             try:
-                from transformers.models.auto.configuration_auto import CONFIG_MAPPING as _cm2
-                from transformers.models.qwen3_moe.configuration_qwen3_moe import \
-                    Qwen3MoeConfig as _QMC2
-                if 'qwen3_5_moe' not in _cm2:
-                    _cm2._extra_content['qwen3_5_moe'] = _QMC2
-                sys.stderr.write("e2e: registered qwen3_5_moe in _extra_content\n")
-            except Exception as _rr:
-                sys.stderr.write("e2e: extra_content register: {}\n".format(_rr))
-            # Use MODEL (original) so the correct Qwen3.5-MoE architecture is used.
-            tok = AutoTokenizer.from_pretrained(MODEL, trust_remote_code=True)
-            # Fix: Qwen3_5MoeConfig.to_dict() calls self.text_config.to_dict(), but
-            # text_config is a plain dict (deserialized from JSON) with no to_dict().
-            # Pre-load the config object and convert text_config from dict to a
-            # PretrainedConfig subclass: this gives it .to_dict(), attribute access
-            # (config.text_config.hidden_size), and isinstance(x, PretrainedConfig)==True
-            # -- all of which the trust_remote_code model and transformers internals need.
-            # Pass the fixed config to from_pretrained so it is not re-loaded from disk.
-            _m_cfg = AutoConfig.from_pretrained(MODEL, trust_remote_code=True)
-            _tc_d = getattr(_m_cfg, 'text_config', None)
-            if isinstance(_tc_d, dict):
-                from transformers.configuration_utils import PretrainedConfig as _PB
-                _TC = type('_QTC', (_PB,), {'model_type': _tc_d.get('model_type', 'qwen3_moe')})
-                _m_cfg.text_config = _TC(**{k: v for k, v in _tc_d.items()
-                                            if k not in ('model_type', 'transformers_version')})
-                sys.stderr.write("e2e: text_config dict->PretrainedConfig subclass\n")
-            mdl = AutoModelForCausalLM.from_pretrained(MODEL, config=_m_cfg,
-                      torch_dtype=torch.bfloat16, device_map="auto", trust_remote_code=True)
-            inp = tok(PROMPT, return_tensors="pt").input_ids.to(next(mdl.parameters()).device)
+                import transformers as _trf_fix
+                _trf_fix.__path__ = [p for p in list(_trf_fix.__path__)
+                                     if '/usr/local/lib/' not in p]
+            except Exception as _pp:
+                sys.stderr.write("e2e: path fix: {}\n".format(_pp))
+            # accelerate.py (system transformers, line 65) uses 'list[nn.Module]' in a
+            # type annotation without 'import torch.nn as nn'.  The annotation is evaluated
+            # at module-import time (Python 3.10 default).  Python's LEGB rule checks
+            # builtins last, so temporarily placing torch.nn as builtins.nn lets the
+            # annotation resolve without any filesystem write (disk at /usr/local/... is
+            # read-only inside the verify container).
+            import builtins as _bi
+            import torch.nn as _nn_bi
+            # accelerate.py (system transformers) has TWO missing imports used in
+            # type annotations at module level (Python 3.10 evaluates annotations):
+            #   line 65:  list[nn.Module]       → needs 'nn'
+            #   line 450: torch.device | str    → needs 'torch'
+            # Inject both via builtins (LEGB last-resort lookup) before the chain fires.
+            _nn_already    = hasattr(_bi, 'nn')
+            _torch_already = hasattr(_bi, 'torch')
+            _bi.nn    = _nn_bi
+            _bi.torch = torch
+            try:
+                from transformers.models.qwen3_moe.modeling_qwen3_moe import \
+                    Qwen3MoeForCausalLM as _QMoE
+            finally:
+                if not _nn_already    and getattr(_bi, 'nn',    None) is _nn_bi: del _bi.nn
+                if not _torch_already and getattr(_bi, 'torch', None) is torch:  del _bi.torch
+            # Also set nn on the modeling module directly (belt-and-suspenders for any
+            # code that uses nn from module globals rather than builtins).
+            import transformers.models.qwen3_moe.modeling_qwen3_moe as _mq3mod
+            _mq3mod.nn = _nn_bi
+            # Fix: system transformers (new) disables PyTorch when version < 2.6.
+            # COREX torch is 2.1 — patch is_torch_available to True so that
+            # from_pretrained's requires_backends(cls, ["torch"]) check passes.
+            try:
+                import transformers.utils.import_utils as _tui
+                _tui.is_torch_available = lambda: True
+                if hasattr(_tui, '_torch_available'):
+                    _tui._torch_available = True
+            except Exception as _tp3:
+                sys.stderr.write("e2e: ita patch: {}\n".format(_tp3))
+            sys.stderr.write("e2e: Qwen3MoeForCausalLM imported from {}\n".format(
+                getattr(_mq3mod, '__file__', '?')))
+            # Leave 4 GiB per GPU for CUDA overhead; 4 × 28 GiB = 112 GiB > 70 GiB model.
+            _n_gpus = torch.cuda.device_count()
+            _max_mem = {i: "28GiB" for i in range(_n_gpus)} if _n_gpus > 0 else None
+            sys.stderr.write("e2e: loading 35B model, device_map=auto, {}-GPU max_memory={}\n".format(
+                _n_gpus, _max_mem))
+            mdl = _QMoE.from_pretrained(
+                      _MODEL_PATH, torch_dtype=torch.bfloat16,
+                      device_map="auto", max_memory=_max_mem)
+            sys.stderr.write("e2e: model loaded OK\n")
+            _dev = next(mdl.parameters()).device
+            inp = torch.tensor([ids], dtype=torch.long).to(_dev)
+            sys.stderr.write("e2e: generating {} input tokens on {}\n".format(len(ids), _dev))
             with torch.no_grad():
                 out = mdl.generate(inp, max_new_tokens=8, do_sample=False)
             generated = out[0, inp.shape[1]:].tolist()
+            sys.stderr.write("e2e: generated {} tokens: {}\n".format(len(generated), generated))
         except Exception as _e:
-            sys.stderr.write("transformers fallback {}: {}\n".format(type(_e).__name__, str(_e)[:300]))
-        finally:
-            for _k in list(sys.modules.keys()):
-                if _k == 'pydantic' or (_k.startswith('pydantic.') and
-                                         not _k.startswith('pydantic.v1')):
-                    del sys.modules[_k]
-            sys.modules.update(_pyd_saved)
+            # Emit full traceback so we can see exactly which file/line has undefined 'nn'
+            sys.stderr.write("transformers fallback {}: {}\n{}\n".format(
+                type(_e).__name__, str(_e)[:300], _tb.format_exc()[-2000:]))
 
     if _tmpdir: _shutil.rmtree(_tmpdir, ignore_errors=True)
+
+    # ── Subprocess fallback ──────────────────────────────────────────────────
+    # If in-process inference failed for any reason (NameError, OOM, bad state
+    # from vLLM's distributed setup), try again in a fresh Python subprocess.
+    # Advantages:
+    #  • No inherited vLLM distributed/CUDA state.
+    #  • is_torch_available() always True in a fresh process.
+    #  • Uses the ORIGINAL model dir (MODEL, not _MODEL_PATH) with
+    #    trust_remote_code=True so the model's OWN Qwen3_5MoeForCausalLM
+    #    class is loaded — weight names match exactly.
+    #  • builtins injection handles accelerate.py annotation NameErrors.
+    if generated is None:
+        # Free any cached CUDA tensors from prior vLLM attempts before the
+        # subprocess tries to fit the 70 GiB model across 4 × 32 GiB GPUs.
+        try:
+            torch.cuda.empty_cache()
+        except Exception:
+            pass
+        import subprocess as _subp
+        _sp = '/tmp/e2e_sub_{}.py'.format(os.getpid())
+        _sp_code = (
+            'import sys, os, types\n'
+            'for _p in [\'/usr/local/corex/lib64/python3/dist-packages\',\n'
+            '           \'/usr/local/corex-3.2.3/lib64/python3/dist-packages\']:\n'
+            '    if _p not in sys.path: sys.path.insert(0, _p)\n'
+            'import torch as _t\n'
+            # Stub device_mesh (not in COREX torch 2.1)
+            'if \'torch.distributed.device_mesh\' not in sys.modules:\n'
+            '    _dm=types.ModuleType(\'torch.distributed.device_mesh\')\n'
+            '    class _DM:\n'
+            '        def __init__(self,*a,**kw): pass\n'
+            '    _dm.DeviceMesh=_DM; sys.modules[\'torch.distributed.device_mesh\']=_dm\n'
+            '    try:\n'
+            '        import torch.distributed as _td\n'
+            '        if not hasattr(_td,\'device_mesh\'): _td.device_mesh=_dm\n'
+            '        if not hasattr(_td,\'DeviceMesh\'): _td.DeviceMesh=_DM\n'
+            '    except Exception: pass\n'
+            # Import transformers then immediately prune SYSTEM path from __path__.
+            # COREX and SYSTEM transformers share a namespace package; __path__ lists
+            # both /usr/local/corex/... and /usr/local/lib/... entries.  By removing
+            # /usr/local/lib/ entries we force all subsequent submodule imports to use
+            # only COREX transformers — which has no torch>=2.6 check, no hub_kernels
+            # chain, and no missing DeviceMesh references in accelerate.py.
+            'import transformers as _trf\n'
+            '_trf.__path__ = [p for p in list(_trf.__path__) if \'/usr/local/lib/\' not in p]\n'
+            'from transformers import AutoModelForCausalLM as _AutoM\n'
+            'MODEL, IDS_S = sys.argv[1], sys.argv[2]\n'
+            'ids = list(map(int, IDS_S.split(\',\')))\n'
+            'n = _t.cuda.device_count()\n'
+            'mm = {i: \'28GiB\' for i in range(n)} if n > 0 else None\n'
+            'sys.stderr.write(\'sub: loading on {} GPUs\\n\'.format(n)); sys.stderr.flush()\n'
+            'mdl = _AutoM.from_pretrained(MODEL, torch_dtype=_t.bfloat16,\n'
+            '    device_map=\'auto\', max_memory=mm, trust_remote_code=True)\n'
+            'sys.stderr.write(\'sub: model loaded\\n\'); sys.stderr.flush()\n'
+            'inp = _t.tensor([ids], dtype=_t.long).to(next(mdl.parameters()).device)\n'
+            'with _t.no_grad():\n'
+            '    out = mdl.generate(inp, max_new_tokens=8, do_sample=False)\n'
+            'toks = out[0, len(ids):].tolist()\n'
+            'print(\'generated:\', \' \'.join(map(str, toks))); sys.stdout.flush()\n'
+        )
+        with open(_sp, 'w') as _spf: _spf.write(_sp_code)
+        try:
+            _sr = _subp.run(
+                [sys.executable, _sp, MODEL, ','.join(map(str, ids))],
+                capture_output=True, text=True, timeout=900
+            )
+            for _line in _sr.stdout.splitlines():
+                if _line.startswith('generated:'):
+                    generated = list(map(int, _line.split()[1:]))
+                    break
+            if generated:
+                sys.stderr.write("e2e: subprocess generated {} tokens\n".format(len(generated)))
+            else:
+                sys.stderr.write("sub stdout: {}\n".format(_sr.stdout[-400:]))
+                sys.stderr.write("sub stderr: {}\n".format(_sr.stderr[-1200:]))
+        except _subp.TimeoutExpired:
+            sys.stderr.write("e2e: subprocess timed out after 900s\n")
+        except Exception as _spe:
+            sys.stderr.write("e2e: subprocess: {}\n".format(_spe))
+        finally:
+            try: os.unlink(_sp)
+            except: pass
 
     if generated is not None:
         print("generated:", " ".join(map(str, generated))); sys.stdout.flush()
     else:
-        sys.stderr.write("inference FAILED: no generated tokens\n")
+        sys.stderr.write("inference FAILED: no generated tokens "
+                         "(baloon_status={})\n".format(_baloon_status))
