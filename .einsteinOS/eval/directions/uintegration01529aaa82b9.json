@@ -88,8 +88,8 @@
     "python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_port_check.py [port]": {
       "key": "python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_port_check.py [port]",
       "first_at": "2026-11-22T18:56:37.886198478Z",
-      "last_at": "2026-11-22T18:56:37.886198478Z",
-      "verifications": 1,
+      "last_at": "2026-11-22T19:14:11.976117923Z",
+      "verifications": 2,
       "last_gate": "integration_reference_impl_missing",
       "budget": 3,
       "best_took_permille": 1000,
