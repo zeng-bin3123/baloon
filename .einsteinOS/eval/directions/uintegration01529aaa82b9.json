@@ -85,6 +85,18 @@
       "best_tokens": 0,
       "closed_at": "2026-11-22T18:11:37.749587843Z"
     },
+    "python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_port_check.py [port]": {
+      "key": "python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_port_check.py [port]",
+      "first_at": "2026-11-22T18:56:37.886198478Z",
+      "last_at": "2026-11-22T18:56:37.886198478Z",
+      "verifications": 1,
+      "last_gate": "integration_reference_impl_missing",
+      "budget": 3,
+      "best_took_permille": 1000,
+      "best_units": 7,
+      "best_tokens": 0,
+      "closed_at": "0001-01-01T00:00:00Z"
+    },
     "python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_sub.py [port] + python3.10 pytools/e2e_weights.py [port]": {
       "key": "python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_sub.py [port] + python3.10 pytools/e2e_weights.py [port]",
       "first_at": "2026-11-22T10:19:57.225821247Z",
