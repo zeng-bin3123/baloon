@@ -4,8 +4,8 @@
     "build/e2e_all_check [port] + python3.10 pytools/e2e_weights.py [port]": {
       "key": "build/e2e_all_check [port] + python3.10 pytools/e2e_weights.py [port]",
       "first_at": "2026-11-22T06:03:38.516571001Z",
-      "last_at": "2026-11-22T06:03:38.516571001Z",
-      "verifications": 1,
+      "last_at": "2026-11-22T07:12:51.058152357Z",
+      "verifications": 2,
       "last_gate": "integration_e2e_unmeasured",
       "budget": 3,
       "best_took_permille": 1000,
