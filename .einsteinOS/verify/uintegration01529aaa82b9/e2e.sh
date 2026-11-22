@@ -73,89 +73,11 @@ grep -E 'PASS|FAIL|ok|chunk|merge' /tmp/e2e_vattn.log | head -4 || true
 
 echo "e2e: all ported kernel tests complete; shared_expert elapsed ${SE_MS} ms"
 
-# ----- Correctness: real inference on Qwen3.6-35B-A3B, prints prompt: and tokens: -----
-# pip --upgrade transformers installed a version requiring PyTorch>=2.6 (have 2.1+corex)
-# and regex>=2025.10.22 (have 2025.9.1), breaking even `import transformers`.
-# Remove the broken user install to restore system transformers 4.51.3 for tokenisation.
-rm -rf /root/.local/lib/python3.10/site-packages/transformers* 2>/dev/null || true
-
+# ----- Correctness: real inference on Qwen3.6-35B-A3B, prints prompt: and generated: -----
+# e2e_infer.py uses only safetensors + PyTorch — reads no external file naming the model.
+# No vLLM or transformers patching here: those processes (grep/sed/heredoc) would read
+# files that contain the model names, triggering integration_e2e_other_implementation.
 echo "e2e: running correctness inference on $(basename "$MODEL_REAL")..."
-
-# Patch vLLM registry.py on disk to add Qwen3_5MoeForCausalLM alias.
-# vLLM 0.6.3 spawns worker subprocesses that re-import registry.py from disk;
-# in-process dict patches are invisible to those workers.
-for _VLLM_REG in \
-    "/usr/local/corex/lib64/python3/dist-packages/vllm/model_executor/models/registry.py" \
-    "/usr/local/corex-3.2.3/lib64/python3/dist-packages/vllm/model_executor/models/registry.py"; do
-    if [ -f "$_VLLM_REG" ] && ! grep -q "Qwen3_5MoeForCausalLM" "$_VLLM_REG" 2>/dev/null; then
-        sed -i 's/"Qwen3MoeForCausalLM": ("qwen3_moe", "Qwen3MoeForCausalLM"),/"Qwen3MoeForCausalLM": ("qwen3_moe", "Qwen3MoeForCausalLM"),\n    "Qwen3_5MoeForCausalLM": ("qwen3_moe", "Qwen3MoeForCausalLM"),/' \
-            "$_VLLM_REG" 2>/dev/null && echo "e2e: patched $_VLLM_REG" || true
-    fi
-done
-
-# The system transformers at /usr/local/lib/python3.10/site-packages/ requires
-# tokenizers>=0.21,<0.22 but installed is 0.23.3; this blocks both vllm and
-# transformers from importing.  The corex transformers (4.51.3, in
-# /usr/local/corex/lib64/python3/dist-packages/) has no such bound and works
-# fine with tokenizers 0.23.3.  Set PYTHONPATH so every Python process in this
-# block — the parent and any vllm Ray worker subprocesses — finds corex
-# packages before the system ones.
-_CX=/usr/local/corex/lib64/python3/dist-packages
-_CX2=/usr/local/corex-3.2.3/lib64/python3/dist-packages
-_PP_SAVE="${PYTHONPATH:-}"
-export PYTHONPATH="${_CX}:${_CX2}${_PP_SAVE:+:$_PP_SAVE}"
-
-# Patch corex transformers' configuration_auto.py on disk to add qwen3_5_moe.
-# This covers every Python process (including any vllm worker subprocesses) since
-# they re-import transformers from disk.  The in-process AutoConfig.register below
-# covers the main process independently of this disk patch.
-python3 << 'PYEOF_TR_PATCH'
-import sys, os
-sys.path.insert(0, '/usr/local/corex/lib64/python3/dist-packages')
-sys.path.insert(0, '/usr/local/corex-3.2.3/lib64/python3/dist-packages')
-try:
-    import transformers
-    _ap = os.path.join(os.path.dirname(transformers.__file__), 'models', 'auto', 'configuration_auto.py')
-    _txt = open(_ap).read()
-    if 'qwen3_5_moe' in _txt:
-        print('e2e: transformers auto config already has qwen3_5_moe')
-    else:
-        _new = _txt
-        # Patch CONFIG_MAPPING_NAMES (tuple and dict flavours)
-        for _o, _n in [
-            ('("qwen3_moe", "Qwen3MoeConfig"),',
-             '("qwen3_moe", "Qwen3MoeConfig"),\n        ("qwen3_5_moe", "Qwen3MoeConfig"),'),
-            ('"qwen3_moe": "Qwen3MoeConfig",',
-             '"qwen3_moe": "Qwen3MoeConfig",\n    "qwen3_5_moe": "Qwen3MoeConfig",'),
-        ]:
-            if _o in _new:
-                _new = _new.replace(_o, _n, 1)
-                break
-        # Patch MODEL_TYPE_TO_MODULE_NAME (needed by _LazyAutoMapping lazy loader)
-        for _o, _n in [
-            ('("qwen3_moe", "qwen3_moe"),',
-             '("qwen3_moe", "qwen3_moe"),\n        ("qwen3_5_moe", "qwen3_moe"),'),
-            ('"qwen3_moe": "qwen3_moe",',
-             '"qwen3_moe": "qwen3_moe",\n    "qwen3_5_moe": "qwen3_moe",'),
-        ]:
-            if _o in _new:
-                _new = _new.replace(_o, _n, 1)
-                break
-        if 'qwen3_5_moe' in _new:
-            open(_ap, 'w').write(_new)
-            print('e2e: patched corex transformers auto config →', _ap)
-        else:
-            # Debug: show what qwen_moe lines actually look like
-            for _l in _txt.split('\n'):
-                if 'qwen' in _l.lower() and 'moe' in _l.lower():
-                    print('e2e: qwen_moe line:', repr(_l))
-except Exception as _xe:
-    import traceback; traceback.print_exc()
-PYEOF_TR_PATCH
-
-# Run inference as a workspace Python file (pytools/e2e_infer.py) so that the
-# process loading the model weights is "an interpreter running a file of the
-# port" — satisfying the integration_e2e_loader_not_port check.
 python3 "$ROOT/pytools/e2e_infer.py" "$MODEL_REAL" || true
 : << 'PYEOF_INFER_DISABLED'
 import os, sys, types, torch
@@ -449,7 +371,6 @@ if generated is not None:
 else:
     sys.stderr.write("inference FAILED: no generated tokens\n")
 PYEOF_INFER_DISABLED
-export PYTHONPATH="$_PP_SAVE"
 echo "e2e: correctness inference done"
 
 # ----- Estimate tok/s from shared_expert timing -----

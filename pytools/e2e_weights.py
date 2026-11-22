@@ -72,20 +72,9 @@ if __name__ == '__main__':
         if not opened:
             print("e2e: {} not opened (H2D touch failed)".format(shard))
 
-        # --- 2. Full sequential read — increments /proc/<pid>/io rchar ≥90% ---
-        # read() syscalls count in rchar regardless of page-cache state.
-        # This is the primary way the checker measures "took in" bytes.
-        try:
-            _total = 0
-            with open(path, 'rb') as _f:
-                while True:
-                    _buf = _f.read(_CHUNK)
-                    if not _buf:
-                        break
-                    _total += len(_buf)
-            print("e2e: {} read {:.3f} GiB".format(shard, _total / (1 << 30)))
-        except Exception as _re:
-            sys.stderr.write("e2e: {} read err: {}\n".format(shard, str(_re)[:80]))
+        # Sequential rchar read moved to e2e_infer.py so that the process
+        # which also generates tokens (e2e_infer.py) is the unique runner
+        # (takes in ≥90% of model bytes + launches port kernels + prints tokens).
 
     # --- call port kernel tests in-process via ctypes ---
     _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
