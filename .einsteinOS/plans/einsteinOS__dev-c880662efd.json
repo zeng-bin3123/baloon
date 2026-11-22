@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 61239,
     "started": "2026-11-22T23:22:38.503335077Z",
-    "renewed": "2026-11-22T23:28:50.497812847Z"
+    "renewed": "2026-11-22T23:57:12.50046895Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -1036,6 +1036,14 @@
       "text": "integration_reference_impl_missing: Qwen3_5MoeForCausalLM, the implementation /tmp/model/config.json names, could not be run on it here, so what the port generated could not be checked: python3: /usr/local/corex/lib64/python3/dist-packages/torch/cuda/__init__.py:51: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\n[transformers] Disabling PyTorch because PyTorch \u003e= 2.6 is required but found 2.1.0+corex.3.2.3\n[transformers] PyTorch was not found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.\nunavailable: ImportError: \nQwen3_5MoeForCausalLM requires the PyTorch library but it was not found in your environment. Check out the instructions on the\ninstallation page: https://pytorch.org/get-started/locally/ and follow the ones that match your environment.\nPlease note that you may need to restart your runtime after installation. (exit status 3); the judge environment: through socks5h://127.0.0.1:1080: https://pypi.org/pypi/transformers/json: HTTP 200 context deadline exceeded\nthe directions this unit's end-to-end runs have taken (measured; each: verifications used of its budget, the most of the model's 66.97 GiB its runner took in, units whose kernels that runner launched itself, tokens agreeing with the model's own implementation):\n  python3.10 pytools/e2e_weights.py [port] — 6/6, 100%, 7 unit(s), 0 token(s), closed at 11/22 06:37\n  build/e2e_all_check [port] + python3.10 pytools/e2e_weights.py [port] — 3/3, 100%, 7 unit(s), 0 token(s), closed at 11/22 07:55\n  build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)\n  python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port] — 3/3, 100%, 7 unit(s), 0 token(s), closed at 11/22 15:54\n  python3.10 /tmp/e2e_sub_62354.py [other] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)\n  python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_sub.py [port] + python3.10 pytools/e2e_weights.py [port] — 3/3, 100%, 7 unit(s), 0 token(s), closed at 11/22 10:58\n  build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_sub.py [port] + python3.10 pytools/e2e_weights.py [port] — 2/3, 100%, 7 unit(s), 0 token(s)\n  python3.10 pytools/e2e_infer.py [other] + python3.10 pytools/e2e_weights.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)\n  build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)\n  python3.10 pytools/e2e_infer.py [port] — 3/3, 100%, 7 unit(s), 0 token(s), closed at 11/22 18:11\n  python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_port_check.py [port] — 2/3, 100%, 7 unit(s), 0 token(s)",
       "base_ref": "einsteinOS/dev-c880662efd-wip-uintegration01529aaa82b9",
       "base_sha": "59b2b112addae8082d6a5f35d673717fe9f38abb"
+    }
+  },
+  "in_progress": {
+    "uintegration01529aaa82b9": {
+      "kind": "verify_modifies_machine",
+      "text": "",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-uintegration01529aaa82b9-cont",
+      "base_sha": "9ea6624129877963552f75eaf6b690414e4eac7c"
     }
   },
   "infra_fails": 0,
