@@ -1,9 +1,9 @@
 {
   "holder": {
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
-    "pid": 8936,
-    "started": "2026-11-22T13:57:37.815167284Z",
-    "renewed": "2026-11-22T15:55:17.260691989Z"
+    "pid": 32959,
+    "started": "2026-11-22T16:08:21.803980122Z",
+    "renewed": "2026-11-22T17:11:36.106751308Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -789,7 +789,7 @@
     "pe1ab8a4555": 1,
     "pe1f7ca5c00": 1,
     "pfcccb31b26": 1,
-    "uintegration01529aaa82b9": 6
+    "uintegration01529aaa82b9": 7
   },
   "fail_history": {
     "p17652417b0": [
@@ -918,7 +918,8 @@
       "integration_correctness_unmeasured",
       "compile_fail",
       "integration_e2e_unmeasured",
-      "integration_e2e_partial_model"
+      "integration_e2e_partial_model",
+      "integration_direction_closed"
     ]
   },
   "last_failure": {
@@ -1030,10 +1031,10 @@
       "base_ref": ""
     },
     "uintegration01529aaa82b9": {
-      "kind": "integration_e2e_partial_model",
-      "text": "integration_e2e_partial_model: the port's processes in .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh opened 25 of the 26 weight files the model at /tmp/model is made of (its index's weight_map); not opened: model-00015-of-00026.safetensors\nthe directions this unit's end-to-end runs have taken (measured; each: verifications used of its budget, the most of the model's 66.97 GiB its runner took in, units whose kernels that runner launched itself, tokens agreeing with the model's own implementation):\n  python3.10 pytools/e2e_weights.py [port] — 6/6, 100%, 7 unit(s), 0 token(s), closed at 11/22 06:37\n  build/e2e_all_check [port] + python3.10 pytools/e2e_weights.py [port] — 3/3, 100%, 7 unit(s), 0 token(s), closed at 11/22 07:55\n  build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)\n  python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port] — 3/3, 100%, 7 unit(s), 0 token(s), closed at 11/22 15:54\n  python3.10 /tmp/e2e_sub_62354.py [other] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)\n  python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_sub.py [port] + python3.10 pytools/e2e_weights.py [port] — 3/3, 100%, 7 unit(s), 0 token(s), closed at 11/22 10:58\n  build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_sub.py [port] + python3.10 pytools/e2e_weights.py [port] — 2/3, 100%, 7 unit(s), 0 token(s)\n  python3.10 pytools/e2e_infer.py [other] + python3.10 pytools/e2e_weights.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)\n  build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)",
+      "kind": "integration_direction_closed",
+      "text": "integration_direction_closed: the processes of .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh are the direction python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port], closed at 11/22 15:54 after 3 verification(s) with no meaningful progress — at most 100% of the model taken in by its runner, kernels of at most 7 unit(s) launched by it, 0 token(s) agreeing; a run in it is not evaluated again\nthe directions this unit's end-to-end runs have taken (measured; each: verifications used of its budget, the most of the model's 66.97 GiB its runner took in, units whose kernels that runner launched itself, tokens agreeing with the model's own implementation):\n  python3.10 pytools/e2e_weights.py [port] — 6/6, 100%, 7 unit(s), 0 token(s), closed at 11/22 06:37\n  build/e2e_all_check [port] + python3.10 pytools/e2e_weights.py [port] — 3/3, 100%, 7 unit(s), 0 token(s), closed at 11/22 07:55\n  build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)\n  python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port] — 3/3, 100%, 7 unit(s), 0 token(s), closed at 11/22 15:54\n  python3.10 /tmp/e2e_sub_62354.py [other] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)\n  python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_sub.py [port] + python3.10 pytools/e2e_weights.py [port] — 3/3, 100%, 7 unit(s), 0 token(s), closed at 11/22 10:58\n  build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_sub.py [port] + python3.10 pytools/e2e_weights.py [port] — 2/3, 100%, 7 unit(s), 0 token(s)\n  python3.10 pytools/e2e_infer.py [other] + python3.10 pytools/e2e_weights.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)\n  build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)\n  python3.10 pytools/e2e_infer.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)",
       "base_ref": "einsteinOS/dev-c880662efd-wip-uintegration01529aaa82b9",
-      "base_sha": "2a3cec01ced2d0c53cdee8963ef76acfce86b79d"
+      "base_sha": "034acaa35592dab2f2503099cb1072c51997a8b1"
     }
   },
   "infra_fails": 0,
