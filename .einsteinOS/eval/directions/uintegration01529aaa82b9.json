@@ -16,14 +16,14 @@
     "python3.10 pytools/e2e_weights.py [port]": {
       "key": "python3.10 pytools/e2e_weights.py [port]",
       "first_at": "2026-11-22T05:11:46.61305033Z",
-      "last_at": "2026-11-22T06:23:19.589279682Z",
-      "verifications": 5,
+      "last_at": "2026-11-22T06:37:42.840675582Z",
+      "verifications": 6,
       "last_gate": "integration_e2e_unmeasured",
       "budget": 6,
       "best_took_permille": 1000,
       "best_units": 7,
       "best_tokens": 0,
-      "closed_at": "0001-01-01T00:00:00Z"
+      "closed_at": "2026-11-22T06:37:42.840675582Z"
     }
   }
 }
