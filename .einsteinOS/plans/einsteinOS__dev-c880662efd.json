@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 8936,
     "started": "2026-11-22T13:57:37.815167284Z",
-    "renewed": "2026-11-22T15:07:16.431260381Z"
+    "renewed": "2026-11-22T15:55:17.260691989Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -789,7 +789,7 @@
     "pe1ab8a4555": 1,
     "pe1f7ca5c00": 1,
     "pfcccb31b26": 1,
-    "uintegration01529aaa82b9": 5
+    "uintegration01529aaa82b9": 6
   },
   "fail_history": {
     "p17652417b0": [
@@ -917,7 +917,8 @@
       "integration_correctness_unmeasured",
       "integration_correctness_unmeasured",
       "compile_fail",
-      "integration_e2e_unmeasured"
+      "integration_e2e_unmeasured",
+      "integration_e2e_partial_model"
     ]
   },
   "last_failure": {
@@ -1029,18 +1030,10 @@
       "base_ref": ""
     },
     "uintegration01529aaa82b9": {
-      "kind": "integration_e2e_unmeasured",
-      "text": "integration_e2e_unmeasured: the kernel measured no rate of .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh: it printed no generated token ids (\"generated: …\"); output: … that match your environment.\nPlease note that you may need to restart your runtime after installation.\n\n\ninference FAILED: no generated tokens (baloon_status=rc=0)\ngate N=2560 gpu=0.501163125 ref=0.501163125 |d|=0 ok\ngate N=5120 gpu=0.00159045355 ref=0.00159045425 |d|=6.98e-10 ok\ngate N=100 gpu=0.403317064 ref=0.403317094 |d|=2.98e-08 ok\ngate N=63 gpu=0.446835637 ref=0.446835577 |d|=5.96e-08 ok\ngate N=64 gpu=0.695515454 ref=0.695515454 |d|=0 ok\ngate N=65 gpu=0.451865286 ref=0.451865256 |d|=2.98e-08 ok\ngate N=257 gpu=0.429767966 ref=0.429767936 |d|=2.98e-08 ok\nswiglu: 0 beyond 1e-6 rel, max|d|=1.91e-06 (exp() device vs host may differ in last ulp; bit-exact not required)\nscale: 0 mismatches\nshared_expert: PASS\ndequant done (checks 90, fail 0)\nquantize done (checks 98, fail 0)\ns_gemv done (checks 2130, fail 0)\n  flat counts 295 314 294 297, top5 distinct 5\nsampler done (checks 3991, fail 0)\ns2 done (checks 4019, fail 0)\nple done (checks 4049, fail 0)\nchecks: 4049, failures: 0\nMISC GPU TESTS PASSED\nchecks: 576068, failures: 0\nVERIFY ATTN GPU TESTS PASSED\n[done] device conversions   fail=0\n[done] activation quantize  fail=0\n[done] kv q8                fail=0\n[done] step state           fail=0\n[done] fp16 kv              fail=0\n[done] indexer              fail=0\n[done] topk                 fail=0\n[done] attend               fail=0\n[done] gate                 fail=0\nchecks=841577 failures=0\nUNIT7 GPU TESTS PASSED\ne2e: correctness inference done\nprefill: 5.5 tok/s\ndecode: 0.2 tok/s\nthe directions this unit's end-to-end runs have taken (measured; each: verifications used of its budget, the most of the model's 66.97 GiB its runner took in, units whose kernels that runner launched itself, tokens agreeing with the model's own implementation):\n  python3.10 pytools/e2e_weights.py [port] — 6/6, 100%, 7 unit(s), 0 token(s), closed at 11/22 06:37\n  build/e2e_all_check [port] + python3.10 pytools/e2e_weights.py [port] — 3/3, 100%, 7 unit(s), 0 token(s), closed at 11/22 07:55\n  build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)\n  python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)",
+      "kind": "integration_e2e_partial_model",
+      "text": "integration_e2e_partial_model: the port's processes in .einsteinOS/verify/uintegration01529aaa82b9/e2e.sh opened 25 of the 26 weight files the model at /tmp/model is made of (its index's weight_map); not opened: model-00015-of-00026.safetensors\nthe directions this unit's end-to-end runs have taken (measured; each: verifications used of its budget, the most of the model's 66.97 GiB its runner took in, units whose kernels that runner launched itself, tokens agreeing with the model's own implementation):\n  python3.10 pytools/e2e_weights.py [port] — 6/6, 100%, 7 unit(s), 0 token(s), closed at 11/22 06:37\n  build/e2e_all_check [port] + python3.10 pytools/e2e_weights.py [port] — 3/3, 100%, 7 unit(s), 0 token(s), closed at 11/22 07:55\n  build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)\n  python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port] — 3/3, 100%, 7 unit(s), 0 token(s), closed at 11/22 15:54\n  python3.10 /tmp/e2e_sub_62354.py [other] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)\n  python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_sub.py [port] + python3.10 pytools/e2e_weights.py [port] — 3/3, 100%, 7 unit(s), 0 token(s), closed at 11/22 10:58\n  build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_sub.py [port] + python3.10 pytools/e2e_weights.py [port] — 2/3, 100%, 7 unit(s), 0 token(s)\n  python3.10 pytools/e2e_infer.py [other] + python3.10 pytools/e2e_weights.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)\n  build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] — 1/3, 100%, 7 unit(s), 0 token(s)",
       "base_ref": "einsteinOS/dev-c880662efd-wip-uintegration01529aaa82b9",
-      "base_sha": "d877840b692f5ae0cf600333424283de8716c30c"
-    }
-  },
-  "in_progress": {
-    "uintegration01529aaa82b9": {
-      "kind": "integration_e2e_unmeasured",
-      "text": "",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-uintegration01529aaa82b9",
-      "base_sha": "424e5e440df221ea009f4f419c1685e527671588"
+      "base_sha": "2a3cec01ced2d0c53cdee8963ef76acfce86b79d"
     }
   },
   "infra_fails": 0,
