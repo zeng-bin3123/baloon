@@ -1,6 +1,18 @@
 {
   "unit": "uintegration01529aaa82b9",
   "dirs": {
+    "build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port]": {
+      "key": "build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_weights.py [port]",
+      "first_at": "2026-11-22T09:26:03.793246506Z",
+      "last_at": "2026-11-22T09:26:03.793246506Z",
+      "verifications": 1,
+      "last_gate": "integration_e2e_unmeasured",
+      "budget": 3,
+      "best_took_permille": 1000,
+      "best_units": 7,
+      "best_tokens": 0,
+      "closed_at": "0001-01-01T00:00:00Z"
+    },
     "build/e2e_all_check [port] + python3.10 pytools/e2e_weights.py [port]": {
       "key": "build/e2e_all_check [port] + python3.10 pytools/e2e_weights.py [port]",
       "first_at": "2026-11-22T06:03:38.516571001Z",
