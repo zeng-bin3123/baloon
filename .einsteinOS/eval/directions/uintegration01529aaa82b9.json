@@ -76,9 +76,9 @@
     "python3.10 pytools/e2e_infer.py [port]": {
       "key": "python3.10 pytools/e2e_infer.py [port]",
       "first_at": "2026-11-22T16:58:29.977264126Z",
-      "last_at": "2026-11-22T16:58:29.977264126Z",
-      "verifications": 1,
-      "last_gate": "integration_reference_impl_missing",
+      "last_at": "2026-11-22T17:56:24.417572352Z",
+      "verifications": 2,
+      "last_gate": "integration_e2e_partial_model",
       "budget": 3,
       "best_took_permille": 1000,
       "best_units": 7,
