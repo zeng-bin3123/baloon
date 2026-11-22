@@ -4,8 +4,8 @@
     "build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_sub.py [port] + python3.10 pytools/e2e_weights.py [port]": {
       "key": "build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port] + python3.10 pytools/e2e_sub.py [port] + python3.10 pytools/e2e_weights.py [port]",
       "first_at": "2026-11-22T11:36:42.477951459Z",
-      "last_at": "2026-11-22T11:36:42.477951459Z",
-      "verifications": 1,
+      "last_at": "2026-11-22T12:47:58.480646853Z",
+      "verifications": 2,
       "last_gate": "integration_e2e_unmeasured",
       "budget": 3,
       "best_took_permille": 1000,
