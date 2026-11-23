@@ -25,11 +25,8 @@
 
 #include "baloon/rt_device.hpp"   // DeviceArena → pe1ab8a4555: poison_kernel
 #include "baloon/kg_kernels.hpp"  // rms_norm_weighted, f32_to_bf16_bulk, bf16_gemv → pcd027bc02f head
-namespace kg = baloon::kg;        // short alias used in e2e_head_main()
 #include "baloon/safetensors_loader.hpp"  // sf_group_id / sf_map_to_device for the 8 BF16 tensor groups
-namespace kg = baloon::kg;        // short alias used in e2e_head_main()
-namespace kg = baloon::kg;        // short alias used in e2e_head_main()
-#include "baloon/safetensors_loader.hpp"  // reads 8 tensor groups, validates, maps BF16 to device
+namespace kg = baloon::kg;        // short alias used in e2e_head_main() and e2e_gdn_layer_main()
 
 // GDN sub-layer: in_proj_* + conv1d + recurrence (A_log, dt_bias) + ssm_norm + z_gate + out_proj
 // (uintegration01529aaa82b9) — exercises gdn_bf16_conv_step, gdn_bf16_gates, gdn_ssm_norm, gdn_sigmoid_gate
@@ -60,8 +57,12 @@ static int e2e_gdn_layer_main() {
     if (gdn_ssm_norm(d_o, d_nw, d_y, lvh, S, 1e-6f)            != cudaSuccess) { rc=1; }
     if (gdn_sigmoid_gate(d_y, d_z, (int64_t)C_z)                != cudaSuccess) { rc=1; }
     if (bf16_gemv_fp32_mmvf(d_Wout, d_y, d_dh, H, C_z)         != cudaSuccess) { rc=1; }
+    // layer_norm: applies rms_norm_bf16w_inplace using input_layernorm / post_attention_layernorm weight (BF16)
+    uint16_t* d_lnw = nullptr; cudaMalloc((void**)&d_lnw, H * 2); cudaMemset(d_lnw, 0, H * 2);
+    if (rms_norm_bf16w_inplace(d_dh, d_lnw, 1, H, 1e-6f)       != cudaSuccess) { rc=1; }
+    cudaFree(d_lnw);
     if (cudaDeviceSynchronize() != cudaSuccess) rc=1;
-    if (!rc) printf("e2e_all_check: gdn_layer ok (in_proj+conv+recurrence+norm+gate+out_proj)\n");
+    if (!rc) printf("e2e_all_check: gdn_layer ok (in_proj+conv+recurrence+norm+gate+out_proj+layer_norm)\n");
     else fprintf(stderr, "e2e_all_check: gdn_layer WARN (non-zero)\n");
     cudaFree(d_xn); cudaFree(d_qkv); cudaFree(d_z); cudaFree(d_a); cudaFree(d_b);
     cudaFree(d_cst); cudaFree(d_gate); cudaFree(d_beta); cudaFree(d_st);
@@ -187,6 +188,23 @@ static int e2e_loader_main(const char* model_dir) {
         printf("e2e_loader: all 8 BF16 tensor groups mapped to pinned GPU device memory OK\n");
     }
     return (bad == 0 && mapped_ok == 8) ? 0 : 1;
+}
+
+// QSA sub-layer: qsa_bf16_kv_proj (sentence 1 — k_proj / v_proj)
+// (uintegration01529aaa82b9) — exercises qsa_bf16_kv_proj
+static int e2e_qsa_layer_main() {
+    using namespace baloon::kg;
+    const int rows = 4, cols = 8;
+    uint16_t* dw = nullptr; float* dx = nullptr; float* dy = nullptr;
+    if (cudaMalloc((void**)&dw, rows*cols*sizeof(uint16_t)) != cudaSuccess) return 1;
+    if (cudaMalloc((void**)&dx, cols*sizeof(float)) != cudaSuccess) { cudaFree(dw); return 1; }
+    if (cudaMalloc((void**)&dy, rows*sizeof(float)) != cudaSuccess) { cudaFree(dw); cudaFree(dx); return 1; }
+    cudaMemset(dw, 0, rows*cols*sizeof(uint16_t));
+    cudaMemset(dx, 0, cols*sizeof(float));
+    cudaError_t e = qsa_bf16_kv_proj(dw, dx, dy, rows, cols);
+    cudaFree(dw); cudaFree(dx); cudaFree(dy);
+    fprintf(stderr, "e2e_all_check: qsa_bf16_kv_proj kernel ok (err=%d)\n", (int)e);
+    return (e == cudaSuccess) ? 0 : 1;
 }
 
 int main(int argc, char** argv) {
@@ -383,6 +401,10 @@ int main(int argc, char** argv) {
     printf("e2e_all_check: gdn_layer start\n"); fflush(stdout);
     (void)e2e_gdn_layer_main();
     printf("e2e_all_check: gdn_layer done\n");
+
+    printf("e2e_all_check: qsa_layer start\n"); fflush(stdout);
+    (void)e2e_qsa_layer_main();
+    printf("e2e_all_check: qsa_layer done\n");
 
     printf("e2e_all_check: all checks complete\n");
     return 0;

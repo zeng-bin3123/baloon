@@ -77,7 +77,7 @@ theorem window_tail (plen hist : Nat) :
 
 /-- Top-p cut adjustment: widen to min_keep when the top-p cut is too small. -/
 def cutAdj (cut minKeep nKeep : Nat) : Nat :=
-  if cut < minKeep then (if minKeep < nKeep then minKeep else nKeep) else cut
+  if minKeep ≤ cut then cut else if minKeep ≤ nKeep then minKeep else nKeep
 
 /-- The adjusted cut keeps at least one survivor and never exceeds the survivors. -/
 theorem cutAdj_bounds (cut minKeep nKeep : Nat) (h1 : 1 ≤ cut) (h2 : cut ≤ nKeep)

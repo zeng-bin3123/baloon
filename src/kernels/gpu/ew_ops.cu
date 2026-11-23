@@ -149,6 +149,28 @@ cudaError_t rms_norm_weighted(const float* x, const float* w, float* y, int rows
     rms_norm_weighted_kernel<<<rows, THREADS, 0, s>>>(x, w, y, cols, eps);
     return check_launch("rms_norm");
 }
+// rms_norm_bf16w_inplace_kernel: in-place weighted RMS norm; w is BF16 (input_layernorm / post_attention_layernorm).
+// One block per row; warp-reduce accumulates mean(x^2); x[i] = x[i] * rsqrt(mean + eps) * bf16_to_f32(w[i]).
+__global__ void rms_norm_bf16w_inplace_kernel(float* __restrict__ x, const uint16_t* __restrict__ w,
+                                               int cols, float eps) {
+    __shared__ float part[THREADS / 64];
+    float* px = x + (size_t)blockIdx.x * cols;
+    float acc = 0.f;
+    for (int i = threadIdx.x; i < cols; i += blockDim.x) acc += px[i] * px[i];
+    acc = kgc::wave_sum(acc);
+    if ((threadIdx.x & 63) == 0) part[threadIdx.x >> 6] = acc;
+    __syncthreads();
+    float tot = 0.f;
+    for (int k = 0; k < (int)(blockDim.x >> 6); ++k) tot += part[k];
+    const float inv = 1.0f / sqrtf(tot / (float)cols + eps);
+    for (int i = threadIdx.x; i < cols; i += blockDim.x)
+        px[i] = px[i] * inv * kgc::bf16_to_f(w[i]);
+}
+cudaError_t rms_norm_bf16w_inplace(float* x, const uint16_t* w, int rows, int cols, float eps, cudaStream_t s) {
+    if (rows <= 0 || cols <= 0 || !x || !w) return cudaErrorInvalidValue;
+    rms_norm_bf16w_inplace_kernel<<<rows, THREADS, 0, s>>>(x, w, cols, eps);
+    return check_launch("rms_norm_bf16w");
+}
 cudaError_t doorbell_ring(uint32_t* bell, cudaStream_t s) {
     if (!bell) return cudaErrorInvalidValue;
     doorbell_ring_kernel<<<1, 1, 0, s>>>(bell);

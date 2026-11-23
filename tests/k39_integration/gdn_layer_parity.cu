@@ -48,12 +48,15 @@ static void test_gdn_bf16_conv_step() {
     std::vector<float> x(C);
     for (int c = 0; c < C; ++c) x[c] = 0.5f * (c + 1);
 
-    // host reference: out[c] = w[c*dc+0]*x[c] + w[c*dc+1]*state[c*2+1] + w[c*dc+2]*state[c*2+0]
+    // host reference matching PyTorch F.conv1d convention:
+    // w[c*dc+k] is the tap for the k-th oldest input (k=0: oldest, k=dc-1: current).
+    // state[c*(dc-1)+i] holds the i-th oldest value (i=0: oldest = x[T-(dc-1)]).
+    // out[c] = w[c*dc+0]*state[0] + w[c*dc+1]*state[1] + ... + w[c*dc+dc-1]*x[c]
     std::vector<float> ref(C);
     for (int c = 0; c < C; ++c) {
-        ref[c] = bf16_to_f32(w[c*dc+0]) * x[c]
-               + bf16_to_f32(w[c*dc+1]) * state[c*(dc-1)+1]
-               + bf16_to_f32(w[c*dc+2]) * state[c*(dc-1)+0];
+        ref[c] = bf16_to_f32(w[c*dc+dc-1]) * x[c];
+        for (int i = 0; i < dc-1; ++i)
+            ref[c] += bf16_to_f32(w[c*dc+i]) * state[c*(dc-1)+i];
     }
 
     uint16_t* dw = dev_alloc<uint16_t>(C*dc);
@@ -142,6 +145,38 @@ static void test_gdn_sigmoid_gate() {
     printf("gdn_layer_parity: gdn_sigmoid_gate done\n");
 }
 
+static void test_rms_norm_bf16w_inplace() {
+    // 2 rows, 8 cols — exercises in-place weighted RMS norm with BF16 weights.
+    // Mimics input_layernorm.weight / post_attention_layernorm.weight usage.
+    const int rows = 2, cols = 8;
+    std::vector<float> x(rows * cols);
+    std::vector<uint16_t> w(cols);
+    for (int i = 0; i < rows * cols; ++i) x[i] = (float)(i + 1) * 0.3f - 0.5f;
+    for (int i = 0; i < cols; ++i) w[i] = f32_to_bf16(1.0f + 0.1f * i);
+    // host reference: for each row r, x[r,i] = x[r,i] * rsqrt(mean(x[r]^2) + eps) * bf16_to_f32(w[i])
+    const float eps = 1e-6f;
+    std::vector<float> ref(rows * cols);
+    for (int r = 0; r < rows; ++r) {
+        float ss = 0.f;
+        for (int i = 0; i < cols; ++i) ss += x[r * cols + i] * x[r * cols + i];
+        float inv = 1.0f / sqrtf(ss / (float)cols + eps);
+        for (int i = 0; i < cols; ++i)
+            ref[r * cols + i] = x[r * cols + i] * inv * bf16_to_f32(w[i]);
+    }
+    float* dx = dev_alloc<float>(rows * cols);
+    uint16_t* dw = dev_alloc<uint16_t>(cols);
+    dev_put(dx, x); dev_put(dw, w);
+    GDN_CK(baloon::kg::rms_norm_bf16w_inplace(dx, dw, rows, cols, eps));
+    auto got = dev_get(dx, rows * cols);
+    for (int i = 0; i < rows * cols; ++i)
+        GDN_T(fabsf(got[i] - ref[i]) < 1e-3f);
+    // bad-arg guards
+    GDN_T(baloon::kg::rms_norm_bf16w_inplace(nullptr, dw, rows, cols, eps) == cudaErrorInvalidValue);
+    GDN_T(baloon::kg::rms_norm_bf16w_inplace(dx, nullptr, rows, cols, eps) == cudaErrorInvalidValue);
+    cudaFree(dx); cudaFree(dw);
+    printf("gdn_layer_parity: rms_norm_bf16w_inplace done\n");
+}
+
 int main(int argc, char** argv) {
     (void)argc; (void)argv;
     int ndev = 0;
@@ -153,6 +188,7 @@ int main(int argc, char** argv) {
     test_gdn_bf16_gates();
     test_gdn_ssm_norm();
     test_gdn_sigmoid_gate();
+    test_rms_norm_bf16w_inplace();
     printf("gdn_layer_parity: pass=%d fail=%d\n", g_pass, g_fail);
     if (g_fail) { printf("gdn_layer_parity FAILED\n"); return 1; }
     printf("gdn_layer_parity selftest: ok\n"); return 0;

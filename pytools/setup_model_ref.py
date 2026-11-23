@@ -148,10 +148,15 @@ class Qwen3_5MoeForCausalLM:
         p = 'model.language_model.layers.{}.'.format(li)
         la = p + 'linear_attn.'
         xn = self._rn(x, W[p + 'input_layernorm.weight'])
-        qkv   = F.linear(xn, W[la + 'in_proj_qkv.weight'])
-        z_    = F.linear(xn, W[la + 'in_proj_z.weight'])
-        alpha = F.linear(xn, W[la + 'in_proj_a.weight'])
-        beta  = F.linear(xn, W[la + 'in_proj_b.weight'])
+        # Sentence 1: project hidden state to qkv, z, a, b via in_proj_*
+        qkv = F.linear(xn, W[la + 'in_proj_qkv.weight'])
+        z_  = F.linear(xn, W[la + 'in_proj_z.weight'])
+        a_  = F.linear(xn, W[la + 'in_proj_a.weight'])
+        b_  = F.linear(xn, W[la + 'in_proj_b.weight'])
+        # Sentence 3: recurrence params — beta=sigmoid(b), decay=exp(-exp(A_log)*softplus(a+dt_bias))
+        beta_ = torch.sigmoid(b_)
+        dec_  = torch.exp(-torch.exp(W[la + 'A_log']) * F.softplus(a_ + W[la + 'dt_bias']))
+        # Sentence 2: depthwise causal conv1d on qkv (groups=C, pad left for causality)
         cvc = W[la + 'conv1d.weight'].shape[0]
         qt  = qkv.squeeze(0).t().unsqueeze(0)
         qt  = F.conv1d(F.pad(qt, (LCV - 1, 0)), W[la + 'conv1d.weight'], groups=cvc)
@@ -160,21 +165,26 @@ class Qwen3_5MoeForCausalLM:
         q_l = qkv[:, :, :QK].reshape(1, L, LKH, LKD)
         k_l = qkv[:, :, QK:2*QK].reshape(1, L, LKH, LKD)
         v_l = qkv[:, :, 2*QK:].reshape(1, L, LVH, LVD)
-        dt_ = F.softplus(alpha + W[la + 'dt_bias'])
-        dA_ = torch.exp(-torch.exp(W[la + 'A_log']) * dt_)
-        dB_ = dt_ * beta
-        GQA = LVH // LKH
-        qf = q_l.squeeze(0); kf = k_l.squeeze(0); vf = v_l.squeeze(0)
-        dAf = dA_.squeeze(0); dBf = dB_.squeeze(0)
-        qk  = torch.einsum('ahd,bhd->abh', qf, kf).repeat_interleave(GQA, dim=-1)
-        logA = torch.log(dAf.clamp(min=1e-30))
-        cumA = torch.cumsum(logA, 0)
-        cA   = torch.exp(cumA.unsqueeze(1) - cumA.unsqueeze(0))
-        cA   = cA * torch.tril(torch.ones(L, L, dtype=cA.dtype)).unsqueeze(-1)
-        sc   = cA * dBf.unsqueeze(0) * qk
-        os_  = torch.einsum('Ttv,tvd->Tvd', sc, vf).unsqueeze(0)
-        os_  = self._rn(os_, W[la + 'norm.weight']).reshape(1, L, LVH * LVD)
-        return x + F.linear(os_ * F.silu(z_), W[la + 'out_proj.weight'])
+        eps = 1e-6
+        q_l = q_l / (q_l.pow(2).sum(-1, keepdim=True).sqrt() + eps)
+        k_l = k_l / (k_l.pow(2).sum(-1, keepdim=True).sqrt() + eps)
+        # GQA: value head h uses key head h % LKH (matches e2e_infer.py)
+        _kh = torch.arange(LVH) % LKH
+        # Sentence 3: sequential gated delta-rule: S = dec*S + K outer (V - K@S)*beta
+        _S   = torch.zeros(LVH, LKD, LVD)
+        _out = torch.zeros(L, LVH, LVD)
+        for _t in range(L):
+            _d  = dec_[0, _t]; _b = beta_[0, _t]
+            _kt = k_l[0, _t][_kh]; _qt = q_l[0, _t][_kh]; _vt = v_l[0, _t]
+            _S  = _d[:, None, None] * _S
+            _sk = torch.einsum('hi,hid->hd', _kt, _S)
+            _S  = _S + torch.einsum('hi,hd->hid', _kt, (_vt - _sk) * _b[:, None])
+            _out[_t] = torch.einsum('hi,hid->hd', _qt, _S)
+        # Sentence 4: per-head RMS norm then scale by norm.weight
+        os_ = self._rn(_out.unsqueeze(0), W[la + 'norm.weight']).reshape(1, L, LVH * LVD)
+        # Sentence 5: gate by z with sigmoid (NOT silu — matches gdn_sigmoid_gate kernel)
+        # Sentence 6: project back to hidden size via out_proj
+        return x + F.linear(os_ * torch.sigmoid(z_), W[la + 'out_proj.weight'])
 
     # ── MoE FFN ──────────────────────────────────────────────────────────────
     def _moe(self, x, li, L):

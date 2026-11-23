@@ -177,33 +177,6 @@ bool NativeLayerNorm::apply_inplace(float* d_x, cudaStream_t s) const {
     return rms_norm_one(d_x, static_cast<const float*>(dev_.get()), d_x, n_, 1e-6f, s);
 }
 
-NativeLayerNorm::~NativeLayerNorm() { if (dev_) { DevScope sc(ord_); dev_.reset(); } }
-
-bool NativeLayerNorm::load(const uint16_t* host_w, int64_t n, int ordinal, std::string* err) {
-    if (dev_) { DevScope sc(ord_); dev_.reset(); }
-    n_ = 0;
-    if (!host_w || n <= 0) return set_err(err, "bad layer norm weight");
-    std::vector<float> host_f32((size_t)n);
-    for (int64_t i = 0; i < n; ++i) {
-        uint32_t u = (uint32_t)host_w[(size_t)i] << 16;
-        float f; std::memcpy(&f, &u, 4);
-        host_f32[(size_t)i] = f;
-    }
-    DevScope sc(ordinal);
-    if (!sc.ok) return set_err(err, "cannot select device");
-    if (!upload(dev_, host_f32.data(), (uint64_t)n * 4, err)) return false;
-    n_ = n; ord_ = ordinal;
-    return true;
-}
-
-bool NativeLayerNorm::apply_inplace(float* d_x, cudaStream_t s) const {
-    if (!dev_ || !d_x) return false;
-    // In-place: pass d_x as both x and y.  rms_norm_one_kernel first accumulates
-    // sum(x^2) over all threads into shared memory, then writes y[i] = x[i]*inv*w[i].
-    // Since each thread owns a disjoint index set, x==y is safe (no aliasing hazard).
-    return rms_norm_one(d_x, static_cast<const float*>(dev_.get()), d_x, n_, 1e-6f, s);
-}
-
 // embedding gather kernel lives here (embed_head.cpp is compiled as CUDA): keeps kernels.cu free of __global__ definitions.
 __global__ void embed_gather_kernel(const float* table, int64_t vocab, int64_t n, const int32_t* tokens, int64_t count, float* out) {
     const int64_t row = blockIdx.x;

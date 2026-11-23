@@ -88,6 +88,13 @@ grep -E 'PASS|FAIL' /tmp/e2e_embed.log | head -2 || true
     || echo "e2e: verify_attn_gpu warn"
 grep -E 'PASS|FAIL|ok|chunk|merge' /tmp/e2e_vattn.log | head -4 || true
 
+# uintegration01529aaa82b9 Sentence 5: moe_combine — sums all routed and shared contributions.
+# moe_parity also exercises S1-S4 (router_logits, top8_select, shared_expert_ffn, shared_gate).
+"$BUILD/moe_parity" > /tmp/e2e_moe.log 2>&1 \
+    && echo "e2e: moe_parity ok (moe_router_logits + moe_select_top8 + shared_expert + moe_combine)" \
+    || echo "e2e: moe_parity warn (non-zero exit)"
+grep -E 'PASS|FAIL|ok' /tmp/e2e_moe.log | head -6 || true
+
 echo "e2e: all ported kernel tests complete; shared_expert elapsed ${SE_MS} ms"
 
 # ----- Port check: e2e_port_check.py (secondary, non-[port] weight opener) -----

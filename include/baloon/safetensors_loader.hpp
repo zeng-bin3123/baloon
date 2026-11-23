@@ -26,8 +26,8 @@ struct SfTensorInfo {
     char     dtype[8]    = {};  // e.g. "BF16"
 };
 
-// Returns the group id (0-7) for a named tensor group, or -1 if not one of the 8.
-// The 8 groups correspond to the kernel units' BF16 weight tensors:
+// Returns the group id (0-9) for a named tensor group, or -1 if not one of the 10.
+// The 10 groups correspond to the kernel units' BF16 weight tensors:
 //   0: lm_head.weight                                   (pcd027bc02f bf16_gemv_warp_kernel)
 //   1: model.language_model.layers.*.mlp.experts.down_proj  (u12d8dd5102 down_grouped_kernel)
 //   2: model.language_model.layers.*.mlp.experts.gate_up_proj (u12d8dd5102 gu_grouped_kernel)
@@ -36,6 +36,8 @@ struct SfTensorInfo {
 //   5: mtp.layers.*.mlp.experts.down_proj               (u12d8dd5102 down_grouped_kernel)
 //   6: mtp.layers.*.mlp.experts.gate_up_proj            (u12d8dd5102 gu_grouped_kernel)
 //   7: mtp.layers.*.self_attn.q_proj.weight             (pcd027bc02f bf16_gemv_warp_kernel)
+//   8: model.language_model.layers.*.input_layernorm.weight  (uintegration01529aaa82b9 rms_norm_bf16w_inplace)
+//   9: model.language_model.layers.*.post_attention_layernorm.weight (uintegration01529aaa82b9 rms_norm_bf16w_inplace)
 inline int sf_group_id(const char* name) {
     if (!name) return -1;
     if (std::strcmp(name, "lm_head.weight") == 0)                        return 0;
@@ -46,6 +48,8 @@ inline int sf_group_id(const char* name) {
     if (std::strstr(name, "mtp.layers.") && std::strstr(name, ".mlp.experts.down_proj"))    return 5;
     if (std::strstr(name, "mtp.layers.") && std::strstr(name, ".mlp.experts.gate_up_proj")) return 6;
     if (std::strstr(name, "mtp.layers.") && std::strstr(name, ".self_attn.q_proj.weight"))  return 7;
+    if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".input_layernorm.weight"))       return 8;
+    if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".post_attention_layernorm.weight")) return 9;
     return -1;
 }
 
@@ -131,6 +135,45 @@ inline uint64_t sf_parse_header(const uint8_t* buf, size_t buf_size,
     return 8 + json_len;
 }
 
+// Validates that a tensor entry has dtype BF16 and the byte count matches the expected
+// shape from the model config for one of the 8 named groups.
+// group expected shapes (from model config tensor list):
+//   0 lm_head.weight               [248320, 2048]        → 248320*2048*2 bytes
+//   1 *.mlp.experts.down_proj       [256, 2048, 512]      → 256*2048*512*2 bytes
+//   2 *.mlp.experts.gate_up_proj    [256, 1024, 2048]     → 256*1024*2048*2 bytes
+//   3 *.self_attn.q_proj.weight     [8192, 2048]          → 8192*2048*2 bytes
+//   4 model.language_model.norm.weight [2048]             → 2048*2 bytes
+//   5 mtp.*.mlp.experts.down_proj   [256, 2048, 512]      → 256*2048*512*2 bytes
+//   6 mtp.*.mlp.experts.gate_up_proj [256, 1024, 2048]    → 256*1024*2048*2 bytes
+//   7 mtp.*.self_attn.q_proj.weight  [8192, 2048]         → 8192*2048*2 bytes
+inline bool sf_validate_bf16_shape(const std::string& name, const SfTensorInfo& ti,
+                                    int gid, std::string* err) {
+    if (std::strcmp(ti.dtype, "BF16") != 0) {
+        if (err) *err = name + ": dtype " + std::string(ti.dtype) + " != BF16";
+        return false;
+    }
+    static const uint64_t kExpected[8] = {
+        248320ULL * 2048 * 2,         // 0: lm_head.weight
+        256ULL * 2048 * 512 * 2,      // 1: mlp.experts.down_proj
+        256ULL * 1024 * 2048 * 2,     // 2: mlp.experts.gate_up_proj
+        8192ULL * 2048 * 2,           // 3: self_attn.q_proj.weight
+        2048ULL * 2,                  // 4: norm.weight
+        256ULL * 2048 * 512 * 2,      // 5: mtp experts down_proj
+        256ULL * 1024 * 2048 * 2,     // 6: mtp experts gate_up_proj
+        8192ULL * 2048 * 2,           // 7: mtp self_attn.q_proj.weight
+    };
+    if (gid < 0 || gid > 7) { if (err) *err = name + ": gid out of range"; return false; }
+    if (ti.nbytes != kExpected[gid]) {
+        char buf[128];
+        std::snprintf(buf, sizeof(buf),
+            ": nbytes %llu != expected %llu for group %d",
+            (unsigned long long)ti.nbytes, (unsigned long long)kExpected[gid], gid);
+        if (err) *err = name + buf;
+        return false;
+    }
+    return true;
+}
+
 // Scan all .safetensors shards in model_dir and collect entries for the 8 tensor groups.
 // Returns true if at least one shard was opened; populates found with the named tensors.
 inline bool sf_scan_shards(const char* model_dir,
@@ -167,6 +210,67 @@ inline bool sf_scan_shards(const char* model_dir,
     closedir(d);
     return any;
 }
+
+// Maps copy_bytes bytes of one BF16 tensor from a safetensors shard into device memory.
+// Opens shard_path with mmap, reads the 8-byte JSON-length prefix to locate the tensor's
+// binary data at file offset (8 + json_len + ti.data_offset), cudaMalloc's a device buffer,
+// and copies the data H2D via cudaMemcpy — the same operation as tensor.to("cuda:0").
+// On success *dev_out is a live cudaMalloc'd pointer (caller must cudaFree); returns true.
+// Only compiled when nvcc/clang++ is processing a .cu translation unit.
+#ifdef __CUDACC__
+#include <cuda_runtime.h>
+inline bool sf_map_to_device(const char* shard_path, const SfTensorInfo& ti,
+                              size_t copy_bytes, void** dev_out, std::string* err) {
+    if (!shard_path || !dev_out) { if (err) *err = "null argument"; return false; }
+    int fd = open(shard_path, O_RDONLY);
+    if (fd < 0) { if (err) *err = std::string("open: ") + shard_path; return false; }
+    struct stat st;
+    if (fstat(fd, &st) != 0 || st.st_size < 8) {
+        close(fd);
+        if (err) *err = "fstat/too small";
+        return false;
+    }
+    // Read the 8-byte little-endian JSON-length prefix to locate data section.
+    uint8_t lenbuf[8] = {};
+    if (pread(fd, lenbuf, 8, 0) != 8) {
+        close(fd);
+        if (err) *err = "pread header";
+        return false;
+    }
+    uint64_t json_len = 0;
+    for (int i = 0; i < 8; ++i) json_len |= (uint64_t)lenbuf[i] << (8 * i);
+    // Tensor binary data starts at byte (8 + json_len); ti.data_offset is relative to that.
+    size_t tensor_file_off = (size_t)(8 + json_len) + (size_t)ti.data_offset;
+    size_t actual = copy_bytes < (size_t)ti.nbytes ? copy_bytes : (size_t)ti.nbytes;
+    if (actual == 0 || tensor_file_off + actual > (size_t)st.st_size) {
+        close(fd);
+        if (err) *err = "tensor offset exceeds shard size";
+        return false;
+    }
+    // mmap the entire shard so the H2D copy runs from file-backed pages.
+    void* m = mmap(nullptr, (size_t)st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+    close(fd);
+    if (m == MAP_FAILED) { if (err) *err = "mmap failed"; return false; }
+    // cudaMalloc + cudaMemcpy H2D — file-backed pages → device memory.
+    void* dev = nullptr;
+    cudaError_t ce = cudaMalloc(&dev, actual);
+    if (ce != cudaSuccess) {
+        munmap(m, (size_t)st.st_size);
+        if (err) *err = "cudaMalloc failed";
+        return false;
+    }
+    ce = cudaMemcpy(dev, static_cast<const char*>(m) + tensor_file_off,
+                    actual, cudaMemcpyHostToDevice);
+    munmap(m, (size_t)st.st_size);
+    if (ce != cudaSuccess) {
+        cudaFree(dev);
+        if (err) *err = "cudaMemcpy H2D failed";
+        return false;
+    }
+    *dev_out = dev;
+    return true;
+}
+#endif // __CUDACC__
 
 }  // namespace sf
 }  // namespace baloon

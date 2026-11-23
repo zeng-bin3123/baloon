@@ -28,8 +28,10 @@ link()  { local o="$1"; shift; echo "[link] $o"; "$CLANG" "$@" -o "$o" $LIBS; }
 hostexe() { local name="$1"; shift; echo "[host] $name"; "$CLANG" $HFLAGS "$@" -o "$OUT/$name"; }
 hostexe qsa_sublayer_parity $T/qsa_sublayer_parity.cpp
 hostexe loader_parity $T/loader_parity.cpp
+hostexe vit_parity $T/vit_parity.cpp
 hostexe qsa_sublayer_parity $T/qsa_sublayer_parity.cpp
 hostexe loader_parity $T/loader_parity.cpp
+hostexe vit_parity $T/vit_parity.cpp
 hostexe controller_test -Itests/unit9 $T/controller_test.cpp tests/unit9/test_spec_controller.cpp tests/unit9/test_spec_theory.cpp \
         tests/unit13/test_spec_pm.cpp tests/unit13/test_spec_port.cpp
 hostexe suffix_drafter_test -Itests/unit9 $T/suffix_drafter_test.cpp tests/unit9/test_suffix_drafter.cpp tests/unit9/test_spec_theory.cpp \
@@ -44,7 +46,7 @@ hostexe expert_parity $ISA512 $T/expert_parity.cpp src/cpu/expert_q2.cpp src/cpu
 # ---- src/kernels/gpu library (kg) and its parity executables -------------------------------------------------------------
 KG=""
 for f in src/kernels/gpu/*.cu; do o="$OBJ/kg__$(basename "$f").o"; cuobj "$f" "$o" -Isrc/kernels/gpu; KG="$KG $o"; done
-for n in bf16_gemv_parity elementwise_parity gdn_parity gdn_layer_parity gr_parity router_top10_parity s2_gemv_parity rope_parity s_gemv_q8k_parity; do
+for n in bf16_gemv_parity elementwise_parity gdn_parity gdn_layer_parity gr_parity router_top10_parity s2_gemv_parity rope_parity s_gemv_q8k_parity moe_parity; do
   cuobj $T/$n.cu "$OBJ/$n.o"; link "$OUT/$n" "$OBJ/$n.o" $KG
 done
 
@@ -192,6 +194,12 @@ for f in src/cu/*.cu; do o="$OBJ/piccu__$(basename "$f").o"; cuobj_pic "$f" "$o"
 echo "[host-isa-pic] src/cpu/expert_q2.cpp"
 "$CLANG" $HFLAGS $ISA512 -fPIC -c src/cpu/expert_q2.cpp -o "$OBJ/pic_eq2.o"
 
+# uintegration01529aaa82b9: GDN and QSA sub-layer parity tests for the .so
+# (the shim calls e2e_gdn_layer_main and e2e_qsa_layer_main as externs)
+PIC_KG=""
+for f in src/kernels/gpu/*.cu; do o="$OBJ/pickg__$(basename "$f").o"; cuobj_pic "$f" "$o" -Isrc/kernels/gpu; PIC_KG="$PIC_KG $o"; done
+cuobj_pic $T/gdn_layer_parity.cu "$OBJ/pic_e2e_gdn_layer.o" -Dmain=e2e_gdn_layer_main
+cuobj_pic $T/qsa_layer_parity.cu "$OBJ/pic_e2e_qsa_layer.o" -Dmain=e2e_qsa_layer_main
 cuobj_pic src/baloon_e2e_shim.cu "$OBJ/pic_shim.o"
 
 # Link PIC objects into the shared library (no $CUFLAGS — linking .o not compiling)
@@ -201,7 +209,8 @@ cuobj_pic src/baloon_e2e_shim.cu "$OBJ/pic_shim.o"
     "$OBJ/pic_e2e_kv.o" "$OBJ/pic_e2e_embed.o" "$OBJ/pic_prefill_kernels.o" $PIC_ILU \
     "$OBJ/pic_vk.o" "$OBJ/pic_qsadec.o" "$OBJ/pic_nfa.o" \
     "$OBJ/pic_dmlib.o" $PIC_RT \
-    "$OBJ/pic_eq2.o" $PIC_CU \
+    "$OBJ/pic_eq2.o" $PIC_CU $PIC_KG \
+    "$OBJ/pic_e2e_gdn_layer.o" "$OBJ/pic_e2e_qsa_layer.o" \
     $LIBS \
     -o "$OUT/libbaloon_e2e.so"
 

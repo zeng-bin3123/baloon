@@ -428,9 +428,10 @@ if __name__ == '__main__':
 
             _out = _out.unsqueeze(0)   # [1, L, LVH, LVD]
 
-            # L2-norm (sum-based, NOT mean) + ssm_norm scale (norm.weight)
+            # Sentence 4: per-head RMS norm + ssm_norm scale (norm.weight)
+            # gdn_ssm_norm kernel: inv = rsqrt(sum(o^2)/S + eps) = rsqrt(mean(o^2) + eps)
             _ssm = _W_[la + 'norm.weight']     # [LVD]
-            _on  = _out / (_out.pow(2).sum(-1, keepdim=True).sqrt() + _eps)
+            _on  = _out * torch.rsqrt(_out.pow(2).mean(-1, keepdim=True) + _eps)
             _on  = _on * _ssm
 
             # Sigmoid gate on z (NOT silu — from gdn_step_norm_kernel)

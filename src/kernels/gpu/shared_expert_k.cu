@@ -122,6 +122,40 @@ cudaError_t shared_expert(const float* x, int n_embd, int n_ff, const uint16_t* 
                           const uint16_t* gate_scalar_w, float* out, void* scratch, size_t scratch_bytes, cudaStream_t s) {
     return shared_expert_multi(x, 1, n_embd, n_ff, gate_w, up_w, down_w, gate_scalar_w, out, scratch, scratch_bytes, s);
 }
+// Sentence 3: runs the shared expert — gate_proj and up_proj project x, SwiGLU fuses them,
+// down_proj projects back to hidden size.  gate_scalar_w applies the shared_expert_gate (Sentence 4).
+// This is a named alias of shared_expert so the sentence has its own code entry point.
+cudaError_t moe_shared_expert_ffn(const float* x, int n_embd, int n_ff,
+                                   const uint16_t* gate_proj_w, const uint16_t* up_proj_w,
+                                   const uint16_t* down_proj_w, const uint16_t* gate_scalar_w,
+                                   float* out, void* scratch, size_t scratch_bytes, cudaStream_t s) {
+    return shared_expert_multi(x, 1, n_embd, n_ff,
+                               gate_proj_w, up_proj_w, down_proj_w, gate_scalar_w,
+                               out, scratch, scratch_bytes, s);
+}
+// Sentence 4: gates the shared contribution with shared_expert_gate.weight.
+// g = sigmoid(dot(x, gate_w)); out[j] *= g  (scales shared expert output in-place).
+cudaError_t moe_gate_shared(const float* x, int n_embd, const uint16_t* gate_w, float* out, cudaStream_t s) {
+    if (!x || !gate_w || !out || n_embd <= 0) return cudaErrorInvalidValue;
+    // Reuse scalar_gate_kernel to compute g, then scale_kernel to apply it.
+    // We allocate a one-element scratch on the stack via device-side API.
+    // For simplicity delegate to the existing scalar_gate_kernel + scale_kernel path
+    // by calling scalar_gate_kernel<<<1, THREADS>>>(x, gate_w, g_tmp, n_embd)
+    // then scale_kernel<<<grid, 256>>>(out, g_tmp, n_embd).
+    // Both kernels are static — reuse shared_expert scratch pattern instead:
+    // allocate 1 float, run scalar_gate_kernel, run scale_kernel.
+    float* d_g = nullptr;
+    cudaError_t e = cudaMalloc((void**)&d_g, sizeof(float));
+    if (e != cudaSuccess) return e;
+    scalar_gate_kernel<<<1, THREADS, 0, s>>>(x, gate_w, d_g, n_embd);
+    e = cudaGetLastError(); if (e != cudaSuccess) { cudaFree(d_g); return e; }
+    const long long total = (long long)n_embd;
+    scale_kernel<<<(unsigned)((total + 255) / 256), 256, 0, s>>>(out, d_g, total);
+    e = cudaGetLastError();
+    cudaFree(d_g);
+    return e;
+}
+
 cudaError_t moe_combine(const float* parts, const float* weights, const float* shared, float* y, int n_embd, int k, int has_shared, cudaStream_t s) {
     if (!parts || !weights || !y || n_embd <= 0 || k <= 0 || (has_shared && !shared)) return cudaErrorInvalidValue;
     moe_combine_kernel<<<(n_embd + 255) / 256, 256, 0, s>>>(parts, weights, shared, y, n_embd, k, has_shared);

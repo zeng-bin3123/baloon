@@ -27,6 +27,7 @@ run dequant_s2_parity "$B" ./dequant_s2_parity --selftest
 run elementwise_parity "$B" ./elementwise_parity --selftest
 run embed_parity "$B" ./embed_parity --selftest
 run gdn_layer_parity "$B" ./gdn_layer_parity --selftest
+run qsa_layer_parity "$B" ./qsa_layer_parity --selftest
 run expert_multi_test "$B" ./expert_multi_test
 run expert_parity "$SRC" "$B/expert_parity" --selftest
 run gdn_layer_parity "$B" ./gdn_layer_parity --selftest
@@ -55,6 +56,7 @@ run s_gemv_parity "$B" ./s_gemv_parity --selftest
 run s_gemv_q8k_parity "$B" ./s_gemv_q8k_parity --selftest
 run sampler_parity "$B" ./sampler_parity --selftest
 run shared_expert_parity "$B" ./shared_expert_parity --selftest
+run moe_parity "$B" ./moe_parity --selftest
 run suffix_drafter_test "$B" ./suffix_drafter_test
 echo "passed=$pass failed=$fail"
 [ $rc -eq 0 ] && echo "ALL INTEGRATION TESTS PASSED" || echo "INTEGRATION TESTS FAILED"
