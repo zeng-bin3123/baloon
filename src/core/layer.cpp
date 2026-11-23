@@ -287,6 +287,18 @@ bool embed_row(const float* table, int64_t vocab, int64_t n, int64_t token, floa
     std::memcpy(out, table + (size_t)(token * n), (size_t)n * sizeof(float));
     return true;
 }
+bool embed_row_bf16(const uint16_t* table, int64_t vocab, int64_t n, int64_t token, float* out) {
+    if (!table || !out || token < 0 || token >= vocab || n <= 0) return false;
+    const uint16_t* row = table + (size_t)(token * n);
+    for (int64_t i = 0; i < n; ++i) out[i] = f16::bf16_to_float(row[i]);
+    return true;
+}
+bool embed_row_bf16(const uint16_t* table, int64_t vocab, int64_t n, int64_t token, float* out) {
+    if (!table || !out || token < 0 || token >= vocab || n <= 0) return false;
+    const uint16_t* row = table + (size_t)(token * n);
+    for (int64_t i = 0; i < n; ++i) out[i] = f16::bf16_to_float(row[i]);
+    return true;
+}
 void project_bf16(const uint16_t* w, const float* x, int64_t rows, int64_t cols, float* out) {
     for (int64_t r = 0; r < rows; ++r) {
         double a = 0;

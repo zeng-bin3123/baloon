@@ -2,12 +2,15 @@
 // embed_tokens (BF16 [vocab, hidden_size]) via gather_rows16_kernel and verifies
 // the BF16 hidden-state vector is copied bit-exactly into the output buffer.
 // Tests gather_rows16 at width=2048 (Qwen3.5-MoE hidden_size for embed_tokens.weight).
-#include "../../src/prefill/kernels.cu"
+// gather_rows16 is declared in prefill_kernels_api.hpp and compiled from
+// src/prefill/kernels.cu as a separate object (linked in by build.sh).
+#include "baloon/prefill_kernels_api.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <cstdint>
 #include <vector>
+#include <cuda_runtime.h>
 
 #define EP_CK(x) do { cudaError_t _e = (x); if (_e != cudaSuccess) { \
     std::fprintf(stderr, "embed_parity cuda error '%s' at line %d\n", \
@@ -40,8 +43,7 @@ static uint16_t ep_rand16() {
 
 using namespace baloon::pk;
 
-int main(int argc, char** argv) {
-    (void)argc; (void)argv;
+int main() {
     int ndev = 0;
     if (cudaGetDeviceCount(&ndev) != cudaSuccess || ndev < 1) {
         std::fprintf(stderr, "embed_parity: no GPU device\n"); return 2;
@@ -125,4 +127,3 @@ int main(int argc, char** argv) {
     if (bad) { std::printf("embed_parity FAILED\n"); return 1; }
     std::printf("embed_parity PASSED\n"); return 0;
 }
-

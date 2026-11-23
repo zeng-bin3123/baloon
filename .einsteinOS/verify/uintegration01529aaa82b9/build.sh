@@ -26,6 +26,10 @@ link()  { local o="$1"; shift; echo "[link] $o"; "$CLANG" "$@" -o "$o" $LIBS; }
 
 # ---- host executables --------------------------------------------------------------------------------------------------------
 hostexe() { local name="$1"; shift; echo "[host] $name"; "$CLANG" $HFLAGS "$@" -o "$OUT/$name"; }
+hostexe qsa_sublayer_parity $T/qsa_sublayer_parity.cpp
+hostexe loader_parity $T/loader_parity.cpp
+hostexe qsa_sublayer_parity $T/qsa_sublayer_parity.cpp
+hostexe loader_parity $T/loader_parity.cpp
 hostexe controller_test -Itests/unit9 $T/controller_test.cpp tests/unit9/test_spec_controller.cpp tests/unit9/test_spec_theory.cpp \
         tests/unit13/test_spec_pm.cpp tests/unit13/test_spec_port.cpp
 hostexe suffix_drafter_test -Itests/unit9 $T/suffix_drafter_test.cpp tests/unit9/test_suffix_drafter.cpp tests/unit9/test_spec_theory.cpp \
@@ -40,7 +44,7 @@ hostexe expert_parity $ISA512 $T/expert_parity.cpp src/cpu/expert_q2.cpp src/cpu
 # ---- src/kernels/gpu library (kg) and its parity executables -------------------------------------------------------------
 KG=""
 for f in src/kernels/gpu/*.cu; do o="$OBJ/kg__$(basename "$f").o"; cuobj "$f" "$o" -Isrc/kernels/gpu; KG="$KG $o"; done
-for n in bf16_gemv_parity elementwise_parity gdn_parity gr_parity router_top10_parity s2_gemv_parity rope_parity s_gemv_q8k_parity; do
+for n in bf16_gemv_parity elementwise_parity gdn_parity gdn_layer_parity gr_parity router_top10_parity s2_gemv_parity rope_parity s_gemv_q8k_parity; do
   cuobj $T/$n.cu "$OBJ/$n.o"; link "$OUT/$n" "$OBJ/$n.o" $KG
 done
 
@@ -69,9 +73,13 @@ link "$OUT/kv_q8_parity" "$OBJ/kv_q8_parity.o" $ILU
 cuobj tests/test_shared_expert.cu "$OBJ/shared_expert_parity.o"
 link "$OUT/shared_expert_parity" "$OBJ/shared_expert_parity.o"
 
-# ---- embed_parity: gather_rows16_kernel BF16 reference (u7991572426) — includes prefill/kernels.cu ----
+# ---- embed_parity: gather_rows16_kernel BF16 reference (u7991572426) ----
+# src/prefill/kernels.cu is compiled as a separate object so embed_parity.cu
+# only needs the API header (prefill_kernels_api.hpp) rather than including
+# the kernel source directly (which caused compile errors on COREX clang++).
+cuobj src/prefill/kernels.cu "$OBJ/prefill_kernels.o"
 cuobj $T/embed_parity.cu "$OBJ/embed_parity.o"
-link "$OUT/embed_parity" "$OBJ/embed_parity.o"
+link "$OUT/embed_parity" "$OBJ/embed_parity.o" "$OBJ/prefill_kernels.o"
 
 # ---- verify_attn_gpu: attn_chunk_kernel + attn_merge_kernel (u52d156705c) -----------------------------------------------
 # src/qsa_decode_attn.cu contains attn_chunk_kernel<Q8> and attn_merge_kernel; must land in build/ for the kernel tracker.
@@ -118,6 +126,7 @@ cuobj tests/gpu_unit_verify_attn/test_verify_attn_gpu.cu \
 cuobj tests/gpu_unit_f16bits/test_unit7_gpu.cu \
                                            "$OBJ/e2e_kv.o"    -Dmain=e2e_kv_main
 # u7991572426: gather_rows16_kernel — stages BF16 hidden-state vector for the first layer
+# prefill_kernels.o already compiled above; e2e_embed.o links against it.
 cuobj $T/embed_parity.cu                   "$OBJ/e2e_embed.o" -Dmain=e2e_embed_main
 cuobj $T/e2e_all_check.cu                  "$OBJ/e2e_all_check.o"
 link "$OUT/e2e_all_check" \
@@ -127,12 +136,13 @@ link "$OUT/e2e_all_check" \
     "$OBJ/e2e_vattn.o" \
     "$OBJ/e2e_kv.o" \
     "$OBJ/e2e_embed.o" \
+    "$OBJ/prefill_kernels.o" \
     "$OBJ/verify_kernels.o" \
     "$OBJ/qsa_decode_attn.o" \
     "$OBJ/native_flash_attn.o" \
     "$OBJ/device_main_lib.o" \
     "$OBJ/expert_q2.o" \
-    $RT $CU $ILU
+    $KG $RT $CU $ILU
 
 # ---- libbaloon_e2e.so: shared library for e2e_weights.py ctypes use --------
 # e2e_weights.py reads model weights via Python safetensors (the only method
@@ -157,6 +167,10 @@ cuobj_pic tests/gpu_unit_verify_attn/test_verify_attn_gpu.cu \
 cuobj_pic tests/gpu_unit_f16bits/test_unit7_gpu.cu \
                                                "$OBJ/pic_e2e_kv.o"    -Dmain=e2e_kv_main
 # u7991572426: gather_rows16_kernel — stages BF16 hidden-state vector for the first layer
+# prefill_kernels.cu compiled PIC separately (same reason as the non-PIC case above).
+cuobj_pic src/prefill/kernels.cu               "$OBJ/pic_prefill_kernels.o"
+# u7991572426: gather_rows16_kernel — prefill_kernels.cu compiled PIC separately (fix for duplicate symbols)
+cuobj_pic src/prefill/kernels.cu               "$OBJ/pic_prefill_kernels.o" -DBALOON_PK_GEOMETRY_IN_TU
 cuobj_pic $T/embed_parity.cu                   "$OBJ/pic_e2e_embed.o" -Dmain=e2e_embed_main
 PIC_ILU=""
 for f in src/ilu_*.cu; do o="$OBJ/picilu__$(basename "$f").o"; cuobj_pic "$f" "$o"; PIC_ILU="$PIC_ILU $o"; done
@@ -184,7 +198,7 @@ cuobj_pic src/baloon_e2e_shim.cu "$OBJ/pic_shim.o"
 "$CLANG" --shared \
     "$OBJ/pic_shim.o" \
     "$OBJ/pic_e2e_se.o" "$OBJ/pic_e2e_sgemv.o" "$OBJ/pic_e2e_vattn.o" \
-    "$OBJ/pic_e2e_kv.o" "$OBJ/pic_e2e_embed.o" $PIC_ILU \
+    "$OBJ/pic_e2e_kv.o" "$OBJ/pic_e2e_embed.o" "$OBJ/pic_prefill_kernels.o" $PIC_ILU \
     "$OBJ/pic_vk.o" "$OBJ/pic_qsadec.o" "$OBJ/pic_nfa.o" \
     "$OBJ/pic_dmlib.o" $PIC_RT \
     "$OBJ/pic_eq2.o" $PIC_CU \

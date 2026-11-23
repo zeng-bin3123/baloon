@@ -106,7 +106,56 @@ private:
     int ord_ = 0;
 };
 
+// Per-layer weighted RMS-norm, resident on device.  One instance per layer norm weight
+// (input_layernorm.weight or post_attention_layernorm.weight for a given layer index).
+// apply_inplace overwrites the hidden-state buffer in place:
+//   d_x = d_x * rsqrt(mean(d_x^2) + eps) * w
+// using the rms_norm_one kernel (d_x serves as both input and output).
+class NativeLayerNorm {
+public:
+    NativeLayerNorm() = default;
+    ~NativeLayerNorm();
+    NativeLayerNorm(const NativeLayerNorm&) = delete;
+    NativeLayerNorm& operator=(const NativeLayerNorm&) = delete;
+    // Upload the BF16 weight (shape [n]) converted to f32 on device ordinal.
+    // Sets valid() to true on success; resets to empty on failure.
+    bool load(const uint16_t* host_w, int64_t n, int ordinal, std::string* err = nullptr);
+    bool valid() const { return dev_ != nullptr; }
+    int64_t width() const { return n_; }
+    // Apply weighted RMS-norm in-place (input_layernorm or post_attention_layernorm).
+    // d_x[n] is overwritten with rms_norm(d_x) * w.  Runs async on s. False on bad args.
+    bool apply_inplace(float* d_x, cudaStream_t s = nullptr) const;
+private:
+    DevicePtr dev_;
+    int64_t n_ = 0;
+    int ord_ = 0;
+};
 
+// Per-layer weighted RMS-norm weight uploaded once and applied in-place on the device.
+// Covers input_layernorm.weight and post_attention_layernorm.weight (one instance per layer).
+// (input_layernorm.weight or post_attention_layernorm.weight for a given layer index).
+// apply_inplace overwrites the hidden-state buffer in place:
+//   d_x = d_x * rsqrt(mean(d_x^2) + eps) * w
+// using the rms_norm_one kernel (d_x serves as both input and output).
+class NativeLayerNorm {
+public:
+    NativeLayerNorm() = default;
+    ~NativeLayerNorm();
+    NativeLayerNorm(const NativeLayerNorm&) = delete;
+    NativeLayerNorm& operator=(const NativeLayerNorm&) = delete;
+    // Upload the BF16 weight (shape [n]) converted to f32 on device ordinal.
+    // Sets valid() to true on success; resets to empty on failure.
+    bool load(const uint16_t* host_w, int64_t n, int ordinal, std::string* err = nullptr);
+    bool valid() const { return dev_ != nullptr; }
+    int64_t width() const { return n_; }
+    // Apply weighted RMS-norm in-place (input_layernorm or post_attention_layernorm).
+    // d_x[n] is overwritten with rms_norm(d_x) * w.  Runs async on s. False on bad args.
+    bool apply_inplace(float* d_x, cudaStream_t s = nullptr) const;
+private:
+    DevicePtr dev_;
+    int64_t n_ = 0;
+    int ord_ = 0;
+};
 
 // Process-wide embedding binding (not owned); nullptr clears it.
 const NativeEmbed* native_embed();

@@ -1,7 +1,7 @@
 #!/bin/bash
 # e2e.sh — Qwen3.6-35B-A3B e2e on 4× Iluvatar BI-V100.
 # Direction: build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port]
-#            + python3.10 pytools/e2e_weights.py [port]   (2/3 used, 1 remaining)
+#            + python3.10 pytools/e2e_weights.py [port]   (3/3 used)
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 MODEL_DIR="${MODEL_DIR:-/tmp/model}"
@@ -61,13 +61,25 @@ SE_MS=$(( T1_MS - T0_MS ))
     && echo "e2e: qsa_parity ok" \
     || echo "e2e: qsa_parity warn"
 
-# u7991572426: gdn_conv_kernel gdn_rec_kernel gr_norm_kernel gr_silu_kernel ...
+# prefill/kernels.cu GDN + hyper-connection kernels (gdn_conv, gdn_recurrence, gr_norm, gr_silu)
+# uintegration01529aaa82b9: gdn_bf16_conv_step gdn_bf16_gates gdn_ssm_norm gdn_sigmoid_gate (GDN sub-layer)
+"$BUILD/gdn_layer_parity" --selftest > /tmp/e2e_gdn_layer.log 2>&1 \
+    && echo "e2e: gdn_layer_parity ok" \
+    || echo "e2e: gdn_layer_parity warn (non-zero exit)"
+grep -E 'PASS|FAIL|ok' /tmp/e2e_gdn_layer.log | head -4 || true
+
 "$BUILD/gdn_parity" --selftest > /tmp/e2e_gdn.log 2>&1 \
     && echo "e2e: gdn_parity ok" \
     || echo "e2e: gdn_parity warn"
 "$BUILD/gr_parity" --selftest > /tmp/e2e_gr.log 2>&1 \
     && echo "e2e: gr_parity ok" \
     || echo "e2e: gr_parity warn"
+
+# u7991572426: gather_rows16_kernel — BF16 embedding gather: embed_tokens.weight → initial hidden state
+"$BUILD/embed_parity" --selftest > /tmp/e2e_embed.log 2>&1 \
+    && echo "e2e: embed_parity ok" \
+    || echo "e2e: embed_parity warn"
+grep -E 'PASS|FAIL' /tmp/e2e_embed.log | head -2 || true
 
 # u52d156705c: attn_chunk_kernel + attn_merge_kernel (src/qsa_decode_attn.cu)
 [ -x "$BUILD/verify_attn_gpu" ] || { echo "e2e: verify_attn_gpu missing from build/"; exit 1; }

@@ -268,6 +268,18 @@ static void test_route_and_moe() {
         CHECK(count_bad(o2, r2, 5e-4f) == 0);
         cudaFree(dg); cudaFree(du); cudaFree(dout); cudaFree(di); cudaFree(do2);
     }
+    {   // gather_rows16: width 2048 = Qwen3.5-MoE hidden_size (embed_tokens.weight), 256 uint4 per row, bit exact
+        const int src_rows = 40, rows = 11, width = 2048;
+        std::vector<uint16_t> src((size_t)src_rows * width); for (auto& v : src) v = (uint16_t)g_rng.below(65536);
+        std::vector<int32_t> idx(rows); for (auto& i : idx) i = (int32_t)g_rng.below(src_rows);
+        uint16_t *ds = upv(src), *dd = dal<uint16_t>((size_t)rows * width); int32_t* di = upv(idx);
+        CHECK(gather_rows16(ds, di, dd, rows, width) == 0);
+        auto o = dn(dd, (size_t)rows * width);
+        size_t bad = 0;
+        for (int r = 0; r < rows; ++r) bad += std::memcmp(&o[(size_t)r * width], &src[(size_t)idx[(size_t)r] * width], width * 2) != 0;
+        CHECK(bad == 0);
+        cudaFree(ds); cudaFree(dd); cudaFree(di);
+    }
     {   // gather_rows16: width 2560 -> 320 uint4 per row, bit exact
         const int src_rows = 40, rows = 11, width = 2560;
         std::vector<uint16_t> src((size_t)src_rows * width); for (auto& v : src) v = (uint16_t)g_rng.below(65536);

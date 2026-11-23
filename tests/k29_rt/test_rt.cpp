@@ -449,6 +449,46 @@ static void test_native() {
         cudaFree(d_x); cudaFree(d_lo);
         cudaGetLastError();
     }
+
+    // NativeLayerNorm: in-place weighted RMS-norm for input_layernorm / post_attention_layernorm.
+    // apply_inplace uses rms_norm_one with d_x as both x and y — overwrites the hidden state.
+    {
+        const int64_t ND = 48;
+        auto lnw_f32 = make_f32(rng, ND);
+        std::vector<uint16_t> lnw_bf16((size_t)ND);
+        for (int64_t i = 0; i < ND; ++i) {
+            uint32_t u; std::memcpy(&u, &lnw_f32[(size_t)i], 4);
+            lnw_bf16[(size_t)i] = (uint16_t)(u >> 16);
+        }
+        auto hx = make_f32(rng, ND);
+        NativeLayerNorm ln;
+        // bad args rejected before any device allocation
+        T29(!ln.valid() && !ln.apply_inplace(nullptr));
+        T29(!ln.load(nullptr, ND, 0, &err));
+        T29(!ln.load(lnw_bf16.data(), 0, 0, &err));
+        // valid load: BF16 weight uploaded as f32
+        T29(ln.load(lnw_bf16.data(), ND, 0, &err) && ln.valid() && ln.width() == ND);
+        // apply in-place on device: hidden state is overwritten
+        float* d_x = nullptr;
+        cudaMalloc((void**)&d_x, ND * 4);
+        cudaMemcpy(d_x, hx.data(), ND * 4, cudaMemcpyHostToDevice);
+        T29(ln.apply_inplace(d_x));
+        cudaDeviceSynchronize();
+        std::vector<float> got(ND);
+        cudaMemcpy(got.data(), d_x, ND * 4, cudaMemcpyDeviceToHost);
+        // reference: d_x = hx * rsqrt(mean(hx^2) + eps) * lnw_f32
+        const float eps = 1e-6f;
+        double ss = 0; for (float v : hx) ss += (double)v * v;
+        float inv = 1.0f / sqrtf((float)(ss / ND) + eps);
+        for (int64_t i = 0; i < ND; ++i) {
+            float ref = hx[(size_t)i] * inv * lnw_f32[(size_t)i];
+            T29(std::fabs((double)got[(size_t)i] - (double)ref) < 1e-5);
+        }
+        // null device pointer rejected
+        T29(!ln.apply_inplace(nullptr));
+        cudaFree(d_x);
+        cudaGetLastError();
+    }
 }
 
 int main() {

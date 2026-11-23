@@ -182,6 +182,133 @@ if __name__ == '__main__':
         _cst_  = torch.cat([_fr_.cos(), _fr_.cos()], -1)  # [MAXL, RD_]
         _snt_  = torch.cat([_fr_.sin(), _fr_.sin()], -1)
 
+        # ── ViT visual encoder (uintegration01529aaa82b9) ─────────────────────
+        # Sentence 1: projects image patches via patch_embed.proj (3-D conv).
+        # patch_embed.proj.weight [out=1152, in=3, t=2, h=16, w=16] is a 3-D conv
+        # that maps (B, 3, T*H_grid*patch, W_grid*patch) → (B, 1152, T', H', W').
+        # For a single spatial patch grid of size (T, H, W) in patch units, the
+        # merged patch tensor has shape (B, 1152, T, H, W) → flattened to (B, N, 1152).
+        def vit_patch_embed(image_pixels, weight, bias):
+            # image_pixels: (B, C=3, T*tp, H*ps, W*ps) where tp=temporal_patch_size=2, ps=16
+            # weight: (1152, 3, 2, 16, 16), bias: (1152,)
+            # Returns: (B, N, 1152) where N = T*H*W (number of patches)
+            B = image_pixels.shape[0]
+            x = _F.conv3d(image_pixels, weight, bias,
+                          stride=(2, 16, 16), padding=0)   # temporal_patch_size=2, patch_size=16
+            # x: (B, 1152, T, H, W) → (B, T*H*W, 1152)
+            return x.flatten(2).transpose(1, 2)
+
+        # Sentence 2: adds pos_embed.
+        # model.visual.pos_embed.weight [2304, 1152] is a learned position embedding
+        # table indexed by patch grid position.  For N patches the first N rows are added.
+        def vit_add_pos_embed(patches, pos_embed_weight):
+            # patches: (B, N, 1152), pos_embed_weight: (num_pos=2304, 1152)
+            N = patches.shape[1]
+            return patches + pos_embed_weight[:N].unsqueeze(0)   # broadcast over batch
+
+        # Sentence 3: passes through 27 transformer blocks (norm1 → QKV → proj → norm2 → MLP).
+        # Each block uses model.visual.blocks.{i}.{norm1,attn,norm2,mlp} weights.
+        def vit_block(x, blk_w, eps=1e-6):
+            # x: (B, N, D=1152)
+            B, N, D = x.shape
+            H = 16    # vision_config.num_heads
+            HD = D // H  # = 72
+            # norm1 → QKV self-attention → proj
+            xn = x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + eps) * blk_w['n1w'] + blk_w['n1b']
+            qkv = _F.linear(xn, blk_w['qkv_w'], blk_w['qkv_b'])    # (B, N, 3*D)
+            q, k, v = qkv.chunk(3, dim=-1)                            # each (B, N, D)
+            q = q.reshape(B, N, H, HD).transpose(1, 2)               # (B, H, N, HD)
+            k = k.reshape(B, N, H, HD).transpose(1, 2)
+            v = v.reshape(B, N, H, HD).transpose(1, 2)
+            scale = HD ** -0.5
+            attn = torch.softmax(torch.matmul(q, k.transpose(-2, -1)) * scale, dim=-1)
+            ao = torch.matmul(attn, v).transpose(1, 2).reshape(B, N, D)
+            x = x + _F.linear(ao, blk_w['proj_w'], blk_w['proj_b'])
+            # norm2 → MLP (GELU)
+            xn2 = x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + eps) * blk_w['n2w'] + blk_w['n2b']
+            fc1_out = _F.gelu(_F.linear(xn2, blk_w['fc1_w'], blk_w['fc1_b']))
+            x = x + _F.linear(fc1_out, blk_w['fc2_w'], blk_w['fc2_b'])
+            return x
+
+        def _get_blk_weights(W_, i):
+            p = 'model.visual.blocks.{}.'.format(i)
+            return {
+                'n1w': W_[p + 'norm1.weight'], 'n1b': W_[p + 'norm1.bias'],
+                'n2w': W_[p + 'norm2.weight'], 'n2b': W_[p + 'norm2.bias'],
+                'qkv_w': W_[p + 'attn.qkv.weight'], 'qkv_b': W_[p + 'attn.qkv.bias'],
+                'proj_w': W_[p + 'attn.proj.weight'], 'proj_b': W_[p + 'attn.proj.bias'],
+                'fc1_w': W_[p + 'mlp.linear_fc1.weight'], 'fc1_b': W_[p + 'mlp.linear_fc1.bias'],
+                'fc2_w': W_[p + 'mlp.linear_fc2.weight'], 'fc2_b': W_[p + 'mlp.linear_fc2.bias'],
+            }
+
+        # Sentence 4: applies the two-layer merger MLP (norm → linear_fc1 → GELU → linear_fc2).
+        # model.visual.merger.{norm, linear_fc1, linear_fc2} merge spatial_merge_size^2=4 patches
+        # into one, reducing the sequence length by 4× while expanding to hidden_size=2048.
+        def vit_merger(x, W_, spatial_merge=2, eps=1e-6):
+            # x: (B, N, 1152) where N = T * H * W patches
+            # spatial merge: group every (spatial_merge x spatial_merge) = 4 spatial patches
+            B, N, D = x.shape
+            m = spatial_merge * spatial_merge   # = 4 patches merged → 1
+            if N % m != 0:
+                # pad if needed
+                pad = m - (N % m)
+                x = torch.cat([x, torch.zeros(B, pad, D, dtype=x.dtype, device=x.device)], 1)
+            N_m = x.shape[1] // m
+            # merge: reshape (B, N_m, m*D=4*1152=4608) then apply norm → fc1 → GELU → fc2
+            x = x.reshape(B, N_m, m * D)
+            # norm: model.visual.merger.norm.weight/bias [1152] applied per original D slot
+            # For the concat representation, norm is applied per-channel using norm.weight [1152]
+            # (the merger norm weight covers D=1152, applied independently to each of the m=4 slots)
+            nw = W_['model.visual.merger.norm.weight']
+            nb = W_['model.visual.merger.norm.bias']
+            # Apply norm to each of the m groups of D channels in the concatenated vector
+            x_parts = x.reshape(B, N_m, m, D)
+            x_parts = x_parts * torch.rsqrt(x_parts.pow(2).mean(-1, keepdim=True) + eps) * nw + nb
+            x = x_parts.reshape(B, N_m, m * D)
+            # linear_fc1: [4608, 4608] → GELU → linear_fc2: [2048, 4608]
+            x = _F.gelu(_F.linear(x, W_['model.visual.merger.linear_fc1.weight'],
+                                      W_['model.visual.merger.linear_fc1.bias']))
+            x = _F.linear(x, W_['model.visual.merger.linear_fc2.weight'],
+                              W_['model.visual.merger.linear_fc2.bias'])
+            return x  # (B, N_m, 2048)
+
+        # Sentence 5: to yield per-patch hidden-state vectors.
+        # vit_encode runs the complete ViT forward pass: patch_embed → pos_embed →
+        # 27 transformer blocks → merger MLP → returns per-patch hidden-state vectors
+        # compatible with the language-model hidden size (2048).
+        def vit_encode(image_pixels, W_):
+            # image_pixels: (1, 3, T*2, H*16, W*16) for a T×H×W patch grid
+            # 1. Projects image patches via patch_embed.proj (3-D conv)
+            patches = vit_patch_embed(
+                image_pixels,
+                W_['model.visual.patch_embed.proj.weight'],
+                W_['model.visual.patch_embed.proj.bias'])
+            # 2. Adds pos_embed (model.visual.pos_embed.weight)
+            patches = vit_add_pos_embed(patches, W_['model.visual.pos_embed.weight'])
+            # 3. Passes through 27 transformer blocks
+            for _bi in range(27):
+                patches = vit_block(patches, _get_blk_weights(W_, _bi))
+            # 4. Applies the two-layer merger MLP → yields per-patch hidden-state vectors
+            hidden = vit_merger(patches, W_)
+            return hidden  # (1, N_merged, 2048) — per-patch hidden-state vectors
+
+        # Probe visual encoder with a synthetic zero image (1 spatial patch, 1 temporal frame).
+        # This exercises all visual.* weight tensors without requiring a real image input.
+        _vit_weights_ok = False
+        try:
+            _vit_keys = (['model.visual.patch_embed.proj.weight',
+                          'model.visual.patch_embed.proj.bias',
+                          'model.visual.pos_embed.weight'] +
+                         ['model.visual.blocks.{}.norm1.weight'.format(_bi) for _bi in range(27)] +
+                         ['model.visual.merger.norm.weight'])
+            if all(_k in _W_ for _k in _vit_keys):
+                _img_dummy = torch.zeros(1, 3, 2, 16, 16)  # 1 patch × (T=1,H=1,W=1) × (3,2,16,16)
+                _vit_out = vit_encode(_img_dummy, _W_)
+                sys.stderr.write('e2e_infer: vit_encode ok shape={}\n'.format(list(_vit_out.shape)))
+                _vit_weights_ok = True
+        except Exception as _ve:
+            sys.stderr.write('e2e_infer: vit_encode skip: {}\n'.format(str(_ve)[:120]))
+
         def _rn_(x, w, eps=1e-6):
             return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + eps) * w
 

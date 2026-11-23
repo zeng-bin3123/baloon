@@ -67,6 +67,38 @@ cudaError_t native_gdn_gate(const float* alpha, const float* dt_bias, const floa
 cudaError_t native_gdn_conv_silu(float* conv_state, const float* x, const float* kW, float* out, int C, int dc, cudaStream_t s = 0);
 cudaError_t native_gdn_l2_norm(float* x, int rows, int cols, float eps, cudaStream_t s = 0);
 cudaError_t native_gdn_out_norm(const float* o, const float* z, const float* norm_w, float* y, int h_v, float eps, cudaStream_t s = 0);
+// BF16-weight GDN kernels for Qwen3.5-MoE linear attention (gdn_qwen.cu):
+cudaError_t gdn_bf16_conv_step(const uint16_t* w, float* state, const float* x, float* out, int C, int dc, cudaStream_t s = 0);
+// gate = -exp(bf16(A_log)) * softplus(a + bf16(dt_bias));  beta = sigmoid(b).
+cudaError_t gdn_bf16_gates(const uint16_t* a_log_bf16, const uint16_t* dt_bias_bf16, const float* a, const float* b, float* gate_out, float* beta_out, int h_v, cudaStream_t s = 0);
+// Per-head L2 norm then scale by SSM norm weight (no sigmoid z-gate).
+cudaError_t gdn_ssm_norm(const float* o, const float* norm_w, float* y, int h_v, int S, float eps, cudaStream_t s = 0);
+// Element-wise: y[i] *= sigmoid(z[i]).
+cudaError_t gdn_sigmoid_gate(float* y, const float* z, int64_t n, cudaStream_t s = 0);
+
+// ---- Qwen3.5-MoE GDN sub-layer (gdn_qwen.cu) -------------------------------------------------------------------------
+// Sentence 2: BF16-weight causal depthwise conv1d, single token, no SiLU (Qwen3.5-MoE spec).
+// w[C,dc] BF16; state[C,dc-1] float updated in-place; out[C] = sum of history taps + current input tap.
+cudaError_t gdn_bf16_conv_step(const uint16_t* w, float* state, const float* x, float* out, int C, int dc, cudaStream_t s = 0);
+// Sentence 3: computes gate = -exp(a_log)*softplus(a+dt_bias) and beta = sigmoid(b) from BF16 A_log/dt_bias.
+cudaError_t gdn_bf16_gates(const uint16_t* a_log_bf16, const uint16_t* dt_bias_bf16, const float* a, const float* b, float* gate_out, float* beta_out, int h_v, cudaStream_t s = 0);
+// Sentence 4: per-head L2 norm then scale by norm.weight (float[S]); y[h,i] = (o[h,i]/||o[h]||)*norm_w[i].
+cudaError_t gdn_ssm_norm(const float* o, const float* norm_w, float* y, int h_v, int S, float eps, cudaStream_t s = 0);
+// Sentence 5: in-place sigmoid gate; y[i] *= sigmoid(z[i]).
+cudaError_t gdn_sigmoid_gate(float* y, const float* z, int64_t n, cudaStream_t s = 0);
+
+// ---- GDN sub-layer BF16-weight wrappers (uintegration01529aaa82b9) -----------------------------------------------
+// gdn_bf16_conv_step: depthwise conv1d step with BF16 weights (linear_attn.conv1d.weight [C, 1, dc]).
+// state[C*(dc-1)] is the causal ring buffer (oldest first); updated in place. out[C] receives the convolved output.
+cudaError_t gdn_bf16_conv_step(const uint16_t* w, float* state, const float* x, float* out, int C, int dc, cudaStream_t s = 0);
+// gdn_bf16_gates: computes gate=−exp(A_log)·softplus(a+dt_bias) and beta=sigmoid(b) from BF16 A_log/dt_bias.
+// a_log_bf16[h_v] and dt_bias_bf16[h_v] are model weights; a[h_v] and b[h_v] are f32 projections of the hidden state.
+cudaError_t gdn_bf16_gates(const uint16_t* a_log_bf16, const uint16_t* dt_bias_bf16, const float* a, const float* b, float* gate_out, float* beta_out, int h_v, cudaStream_t s = 0);
+// gdn_ssm_norm: per-head L2 normalisation of SSM output followed by scaling with norm_w.
+// o[h_v*S] → y[h_v*S]: y[h,s] = o[h,s] / norm(o[h,:]) * norm_w[s], where norm is over the S dimension.
+cudaError_t gdn_ssm_norm(const float* o, const float* norm_w, float* y, int h_v, int S, float eps, cudaStream_t s = 0);
+// gdn_sigmoid_gate: element-wise y[i] *= sigmoid(z[i]); applies the output gate from linear_attn.in_proj_z.
+cudaError_t gdn_sigmoid_gate(float* y, const float* z, int64_t n, cudaStream_t s = 0);
 
 // ---- gated residual --------------------------------------------------------------------------------------------------------------
 size_t gr_workspace_bytes(const GrDims& d);

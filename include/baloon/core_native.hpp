@@ -26,10 +26,24 @@ struct NativeDense {
 };
 
 struct NativeEmbed {
-    const float* table = nullptr;
+    const float*    table   = nullptr;  // float32 embedding table (legacy path; first three members kept for compat)
     int64_t vocab = 0, n = 0;
-    bool valid() const { return table && vocab > 0 && n > 0; }
-    bool row(int64_t token, float* out) const { return valid() && embed_row(table, vocab, n, token, out); }
+    const uint16_t* w_bf16 = nullptr;  // BF16 embedding table (engine_kind=1); set by bind(); preferred in row()
+    bool valid() const { return (w_bf16 || table) && vocab > 0 && n > 0; }
+    // Bind BF16 embedding weight (engine_kind==1) from the weight arena.
+    bool bind(const WeightTable& t, const std::string& name, const uint8_t* arena, int64_t v, int64_t hidden) {
+        *this = NativeEmbed{};
+        const WIndexRow* r = t.find(name);
+        if (!r || !r->placed || r->engine_kind != 1 || v <= 0 || hidden <= 0) return false;
+        if (r->dst_bytes != (uint64_t)v * (uint64_t)hidden * 2) return false;
+        w_bf16 = reinterpret_cast<const uint16_t*>(arena + r->arena_off);
+        vocab = v; n = hidden;
+        return true;
+    }
+    bool row(int64_t token, float* out) const {
+        if (w_bf16) return embed_row_bf16(w_bf16, vocab, n, token, out);
+        return table ? embed_row(table, vocab, n, token, out) : false;
+    }
 };
 
 // Process-wide embedding binding used by the token path; nullptr clears it.

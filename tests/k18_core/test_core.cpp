@@ -6,6 +6,7 @@
 #include "baloon/core_device.hpp"
 #include "baloon/core_graph.hpp"
 #include "baloon/core_hit_hook.hpp"
+#include "baloon/core_layer.hpp"
 #include "baloon/core_layout.hpp"
 #include "baloon/core_native.hpp"
 #include "baloon/core_pinned.hpp"
@@ -83,6 +84,16 @@ int main() {
     float tab[6] = {0, 1, 2, 10, 11, 12}; NativeEmbed ne{tab, 2, 3}; float r[3];
     CHECK(ne.row(1, r) && r[0] == 10 && r[2] == 12 && !ne.row(2, r) && !ne.row(-1, r));
     CHECK(native_embed() == nullptr); set_native_embed(&ne); CHECK(native_embed() == &ne); set_native_embed(nullptr); CHECK(native_embed() == nullptr);
+    NativeEmbed ne2; CHECK(!ne2.valid());
+    CHECK(ne2.bind(t, "wq", arena.data(), 2, 3) && ne2.valid());   // kind 4 BF16 → engine_kind 1
+    float r2[3];
+    CHECK(ne2.row(0, r2) && r2[0] == 1.f && r2[2] == 1.f);         // 0x3F80 = bf16 1.0 → float 1.0
+    CHECK(!ne2.bind(t, "wq", arena.data(), 2, 4));                  // size mismatch: 2*4*2=16 != 12
+    CHECK(!ne2.bind(t, "wk", arena.data(), 2, 3));                  // kind 3 (F16) != BF16
+    uint16_t tab16[6] = {0x3F80, 0x4000, 0x4040, 0x3F00, 0x3F80, 0x3FC0}; float r3[3];
+    CHECK(embed_row_bf16(tab16, 2, 3, 0, r3) && r3[0] == 1.f && r3[1] == 2.f && r3[2] == 3.f);
+    CHECK(embed_row_bf16(tab16, 2, 3, 1, r3) && r3[0] == 0.5f && r3[2] == 1.5f);
+    CHECK(!embed_row_bf16(nullptr, 2, 3, 0, r3) && !embed_row_bf16(tab16, 2, 3, 2, r3) && !embed_row_bf16(tab16, 2, 3, -1, r3));
 
     // pinned
     const uint64_t chunk = 7, blob = 5, bpl = 3, layers = 4, total = blob * bpl * layers;
