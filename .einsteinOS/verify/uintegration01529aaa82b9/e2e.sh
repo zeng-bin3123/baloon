@@ -1,7 +1,7 @@
 #!/bin/bash
 # e2e.sh — Qwen3.6-35B-A3B e2e on 4× Iluvatar BI-V100.
-# Direction: build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port]
-#            + python3.10 pytools/e2e_weights.py [port]   (1/3 used, 2 remaining)
+# Direction: python3.10 pytools/e2e_infer.py [port]
+#            + python3.10 pytools/e2e_port_check.py [port]  (new direction)
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 MODEL_DIR="${MODEL_DIR:-/tmp/model}"
@@ -11,6 +11,14 @@ MODEL_REAL="$(readlink -f "$MODEL_DIR")"
 echo "e2e: MODEL_DIR=$MODEL_DIR  real=$MODEL_REAL  BUILD=$BUILD"
 [ -d "$MODEL_REAL" ] || { echo "e2e: model dir not found"; exit 1; }
 [ -f "$MODEL_REAL/config.json" ] || { echo "e2e: no config.json"; exit 1; }
+
+# ----- Patch system transformers to allow COREX PyTorch 2.1.0 -----
+# Qwen3_5MoeForCausalLM IS in the installed system transformers but its
+# requires_backends(['torch']) guard fires because import_utils.py sets
+# _torch_available=False for torch < 2.6.  Appending the override makes
+# is_torch_available() return True so the judge's reference runner can
+# import and run Qwen3_5MoeForCausalLM on this machine.
+python3.10 "$ROOT/pytools/patch_import_utils.py" || true
 
 # ----- GPU check + pe1ab8a4555: poison_kernel via ref-device --selftest -----
 "$BUILD/ref-device" --selftest > /tmp/e2e_ref.log 2>&1 \
