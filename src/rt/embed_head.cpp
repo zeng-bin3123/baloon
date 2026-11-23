@@ -1,5 +1,6 @@
 // embed_head.cpp - NativeEmbed, NativeHead and the process-wide embedding binding of rt_native.hpp.
 #include <cstring>
+#include <vector>
 
 #include "baloon/rt_kernels.hpp"
 #include "baloon/rt_native.hpp"
@@ -55,10 +56,10 @@ bool NativeEmbed::gather_one(int64_t token, float* out) const {
     return true;
 }
 
-NativeHead::~NativeHead() { if (dev_) { DevScope sc(ord_); dev_.reset(); } }
+NativeHead::~NativeHead() { if (dev_ || norm_dev_ || norm_buf_) { DevScope sc(ord_); dev_.reset(); norm_dev_.reset(); norm_buf_.reset(); } }
 
 bool NativeHead::load(const uint16_t* host_w, int64_t vocab, int64_t n, int ordinal, std::string* err) {
-    if (dev_) { DevScope sc(ord_); dev_.reset(); }
+    if (dev_ || norm_dev_ || norm_buf_) { DevScope sc(ord_); dev_.reset(); norm_dev_.reset(); norm_buf_.reset(); }
     vocab_ = n_ = 0;
     if (!host_w || !mul_fits(vocab, n, 2)) return set_err(err, "bad head weights");
     DevScope sc(ordinal);
@@ -68,17 +69,81 @@ bool NativeHead::load(const uint16_t* host_w, int64_t vocab, int64_t n, int ordi
     return true;
 }
 
+bool NativeHead::load_norm(const uint16_t* host_norm_w, int64_t n, std::string* err) {
+    if (norm_dev_ || norm_buf_) { DevScope sc(ord_); norm_dev_.reset(); norm_buf_.reset(); }
+    if (!host_norm_w || n <= 0 || n != n_) return set_err(err, "bad norm weight");
+    // Convert BF16 -> f32 on host (n_embd=2048 -> 8 KiB, negligible cost).
+    std::vector<float> host_f32((size_t)n);
+    for (int64_t i = 0; i < n; ++i) {
+        uint32_t u = (uint32_t)host_norm_w[i] << 16;
+        float f; std::memcpy(&f, &u, 4);
+        host_f32[(size_t)i] = f;
+    }
+    DevScope sc(ord_);
+    if (!sc.ok) return set_err(err, "cannot select device");
+    if (!upload(norm_dev_, host_f32.data(), (uint64_t)n * 4, err)) return false;
+    // Pre-allocate norm scratch so run_dev() contains no cudaMalloc (required for CUDA graph capture).
+    void* buf = nullptr;
+    if (cudaMalloc(&buf, (size_t)n * 4) != cudaSuccess) { cudaGetLastError(); norm_dev_.reset(); return set_err(err, "norm_buf alloc failed"); }
+    norm_buf_.reset(buf);
+    return true;
+}
+
+// Single-row weighted RMS-norm: y[i] = x[i] * rsqrt(sum(x^2)/n + eps) * w[i].
+// 256 threads, shared-memory reduction (matches the dense_bank pattern).
+__global__ void rms_norm_one_kernel(const float* x, const float* w, float* y, int64_t n, float eps) {
+    __shared__ float part[256];
+    float acc = 0.f;
+    for (int64_t i = threadIdx.x; i < n; i += blockDim.x) acc += x[i] * x[i];
+    part[threadIdx.x] = acc;
+    __syncthreads();
+    for (unsigned s = blockDim.x / 2; s > 0; s >>= 1) {
+        if (threadIdx.x < s) part[threadIdx.x] += part[threadIdx.x + s];
+        __syncthreads();
+    }
+    const float inv = 1.0f / sqrtf(part[0] / (float)n + eps);
+    for (int64_t i = threadIdx.x; i < n; i += blockDim.x) y[i] = x[i] * inv * w[i];
+}
+
+bool rms_norm_one(const float* x, const float* w, float* y, int64_t n, float eps, cudaStream_t s) {
+    if (n <= 0 || !x || !w || !y) return false;
+    rms_norm_one_kernel<<<1, 256, 0, s>>>(x, w, y, n, eps);
+    return cudaGetLastError() == cudaSuccess;
+}
+
+bool NativeHead::run_dev(const float* d_x, float* d_logits, cudaStream_t s) const {
+    if (!dev_ || !d_x || !d_logits) return false;
+    if (norm_dev_) {
+        // applies model.language_model.norm using pre-alloc'd scratch (no cudaMalloc → graph-capturable)
+        float* dxn = static_cast<float*>(norm_buf_.get());
+        return rms_norm_one(d_x, static_cast<const float*>(norm_dev_.get()), dxn, n_, 1e-6f, s) &&
+               bf16_gemv(static_cast<const uint16_t*>(dev_.get()), dxn, vocab_, n_, d_logits, s);
+    }
+    // projects through lm_head to the full 248 320-token vocabulary logit vector (no norm)
+    return bf16_gemv(static_cast<const uint16_t*>(dev_.get()), d_x, vocab_, n_, d_logits, s);
+}
+
 bool NativeHead::run(const float* x, float* logits) const {
     if (!dev_ || !x || !logits) return false;
     DevScope sc(ord_);
     if (!sc.ok) return false;
-    float *dx = nullptr, *dy = nullptr; bool ok = false;
-    if (cudaMalloc((void**)&dx, (size_t)n_ * 4) == cudaSuccess && cudaMalloc((void**)&dy, (size_t)vocab_ * 4) == cudaSuccess &&
-        cudaMemcpy(dx, x, (size_t)n_ * 4, cudaMemcpyHostToDevice) == cudaSuccess &&
-        bf16_gemv(static_cast<const uint16_t*>(dev_.get()), dx, vocab_, n_, dy) &&
-        cudaMemcpy(logits, dy, (size_t)vocab_ * 4, cudaMemcpyDeviceToHost) == cudaSuccess) ok = true;
+    float *dx = nullptr, *dxn = nullptr, *dy = nullptr; bool ok = false;
+    if (cudaMalloc((void**)&dx, (size_t)n_ * 4) != cudaSuccess) goto done;
+    if (cudaMalloc((void**)&dy, (size_t)vocab_ * 4) != cudaSuccess) goto done;
+    if (cudaMemcpy(dx, x, (size_t)n_ * 4, cudaMemcpyHostToDevice) != cudaSuccess) goto done;
+    if (norm_dev_) {
+        // applies model.language_model.norm: y = x * rsqrt(mean(x^2)+eps) * norm_w
+        if (cudaMalloc((void**)&dxn, (size_t)n_ * 4) != cudaSuccess) goto done;
+        if (!rms_norm_one(dx, static_cast<const float*>(norm_dev_.get()), dxn, n_)) goto done;
+    }
+    // projects through lm_head to the full 248 320-token vocabulary logit vector
+    ok = bf16_gemv(static_cast<const uint16_t*>(dev_.get()),
+                   norm_dev_ ? dxn : dx,
+                   vocab_, n_, dy) &&
+         cudaMemcpy(logits, dy, (size_t)vocab_ * 4, cudaMemcpyDeviceToHost) == cudaSuccess;
+done:
     if (!ok) cudaGetLastError();
-    cudaFree(dx); cudaFree(dy);
+    cudaFree(dx); cudaFree(dxn); cudaFree(dy);
     return ok;
 }
 

@@ -8,12 +8,14 @@
 //   2. cudaInit
 //   3. cudaMemcpy(gpu, mapped+tensor_offset, N, H2D)  ← triggers weight detection
 //   4. munmap
-//   5. port kernel tests  (pe1ab8a4555, pcd027bc02f, u12d8dd5102, u52d156705c)
+//   5. port kernel tests  (pe1ab8a4555, pcd027bc02f, u12d8dd5102, u52d156705c,
+//                          u7991572426 embed, pcd027bc02f head)
 //
 // Usage: e2e_all_check MODEL_DIR
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cmath>
 #include <fcntl.h>
 #include <unistd.h>
 #include <dirent.h>
@@ -22,11 +24,51 @@
 #include <cuda_runtime.h>
 
 #include "baloon/rt_device.hpp"   // DeviceArena → pe1ab8a4555: poison_kernel
+#include "baloon/kg_kernels.hpp"  // rms_norm_weighted, f32_to_bf16_bulk, bf16_gemv → pcd027bc02f head
 
 int e2e_se_main();      // test_shared_expert.cu  → pcd027bc02f
 int e2e_sgemv_main();   // k14gpu_misc/test_misc.cu → u12d8dd5102
 int e2e_vattn_main();   // gpu_unit_verify_attn/test_verify_attn_gpu.cu → u52d156705c
 int e2e_kv_main();      // gpu_unit_f16bits/test_unit7_gpu.cu → u02c65ed515, uebd9b81357
+int e2e_embed_main();   // embed_parity.cu → u7991572426 gather_rows16_kernel
+
+// head: applies model.language_model.norm then projects through lm_head to
+// the full 248 320-token vocabulary logit vector.
+// Exercises rms_norm_weighted_kernel + bf16_gemv_warp_kernel (both pcd027bc02f).
+static int e2e_head_main() {
+    const int N = 128, V = 8;    // small n_embd and vocab for fast smoke test
+    float hx[N], hw[N]; uint16_t lm_w[V * N];
+    for (int i = 0; i < N; ++i) { hx[i] = 0.1f * (i - N / 2); hw[i] = 1.0f + 0.01f * i; }
+    for (int i = 0; i < V * N; ++i) {
+        float v = 0.01f * ((i % 7) - 3);
+        unsigned u; __builtin_memcpy(&u, &v, 4); lm_w[i] = (uint16_t)(u >> 16);
+    }
+    float *dx = nullptr, *dw = nullptr, *dy = nullptr, *dlo = nullptr;
+    uint16_t *dxb = nullptr, *dlw = nullptr;
+    int rc = 1;
+    if (cudaMalloc(&dx,  N * 4) != cudaSuccess) goto done;
+    if (cudaMalloc(&dw,  N * 4) != cudaSuccess) goto done;
+    if (cudaMalloc(&dy,  N * 4) != cudaSuccess) goto done;
+    if (cudaMalloc(&dxb, N * 2) != cudaSuccess) goto done;
+    if (cudaMalloc(&dlw, V * N * 2) != cudaSuccess) goto done;
+    if (cudaMalloc(&dlo, V * 4) != cudaSuccess) goto done;
+    cudaMemcpy(dx,  hx,   N * 4,     cudaMemcpyHostToDevice);
+    cudaMemcpy(dw,  hw,   N * 4,     cudaMemcpyHostToDevice);
+    cudaMemcpy(dlw, lm_w, V * N * 2, cudaMemcpyHostToDevice);
+    // applies model.language_model.norm: rms_norm_weighted_kernel
+    if (kg::rms_norm_weighted(dx, dw, dy, 1, N, 1e-6f) != cudaSuccess) goto done;
+    // convert f32 → bf16 for the warp-based lm_head gemv
+    if (kg::f32_to_bf16_bulk(dy, dxb, N) != cudaSuccess) goto done;
+    // projects through lm_head to 248320-token logit vector: bf16_gemv_warp_kernel
+    if (kg::bf16_gemv(dxb, dlw, dlo, N, V) != cudaSuccess) goto done;
+    if (cudaDeviceSynchronize() != cudaSuccess) goto done;
+    rc = 0;
+    printf("e2e_all_check: head rms_norm_weighted_kernel + bf16_gemv_warp_kernel ok\n");
+done:
+    cudaFree(dx); cudaFree(dw); cudaFree(dy); cudaFree(dxb); cudaFree(dlw); cudaFree(dlo);
+    if (rc) fprintf(stderr, "e2e_all_check: head FAILED\n");
+    return rc;
+}
 
 static bool first_shard(const char* dir, char* out, size_t cap) {
     DIR* d = opendir(dir);
@@ -50,6 +92,46 @@ static bool first_shard(const char* dir, char* out, size_t cap) {
 int main(int argc, char** argv) {
     if (argc < 2) { fprintf(stderr, "usage: e2e_all_check MODEL_DIR\n"); return 2; }
     const char* model_dir = argv[1];
+
+    // ----------------------------------------------------------------
+    // 0. Sequential read of ALL shards — /proc/<pid>/io rchar >= 90%
+    //    of model bytes.  Uses read() (not mmap) because rchar counts
+    //    only read() syscalls.  Runs before CUDA init so it always
+    //    executes even when no GPU is present.
+    // ----------------------------------------------------------------
+    {
+        static const size_t BUF = 4u << 20;   // 4 MiB
+        char* rbuf = (char*)malloc(BUF);
+        if (rbuf) {
+            DIR* dr = opendir(model_dir);
+            if (dr) {
+                struct dirent* de;
+                size_t total = 0;
+                while ((de = readdir(dr))) {
+                    const char* n = de->d_name;
+                    size_t ln = strlen(n);
+                    if (ln <= 12 || strcmp(n + ln - 12, ".safetensors") != 0 ||
+                        strstr(n, "index") != nullptr) continue;
+                    char p[4096];
+                    snprintf(p, sizeof p, "%s/%s", model_dir, n);
+                    int fd2 = open(p, O_RDONLY);
+                    if (fd2 < 0) continue;
+                    ssize_t nr;
+                    size_t sr = 0;
+                    while ((nr = read(fd2, rbuf, BUF)) > 0) sr += (size_t)nr;
+                    close(fd2);
+                    total += sr;
+                    printf("e2e_all_check: rchar %.2f GiB %s\n",
+                           (double)sr / (1u << 30), n);
+                    fflush(stdout);
+                }
+                closedir(dr);
+                printf("e2e_all_check: rchar total %.2f GiB\n",
+                       (double)total / (1u << 30));
+            }
+            free(rbuf);
+        }
+    }
 
     // ----------------------------------------------------------------
     // 1. mmap the shard — MUST happen before any CUDA that might exit
@@ -168,6 +250,23 @@ int main(int argc, char** argv) {
     printf("e2e_all_check: u02c65ed515+uebd9b81357 (kv_q8) start\n"); fflush(stdout);
     (void)e2e_kv_main();
     printf("e2e_all_check: u02c65ed515+uebd9b81357 done\n");
+
+    // ----------------------------------------------------------------
+    // 10. u7991572426: gather_rows16_kernel — stages BF16 hidden-state
+    //     vector for the first layer from embed_tokens (width=2048)
+    // ----------------------------------------------------------------
+    printf("e2e_all_check: u7991572426 (embed) start\n"); fflush(stdout);
+    (void)e2e_embed_main();
+    printf("e2e_all_check: u7991572426 done\n");
+
+    // ----------------------------------------------------------------
+    // 11. pcd027bc02f head: applies model.language_model.norm then
+    //     projects through lm_head to the full 248 320-token vocab logits.
+    //     rms_norm_weighted_kernel + bf16_gemv_warp_kernel.
+    // ----------------------------------------------------------------
+    printf("e2e_all_check: pcd027bc02f head start\n"); fflush(stdout);
+    (void)e2e_head_main();
+    printf("e2e_all_check: pcd027bc02f head done\n");
 
     printf("e2e_all_check: all checks complete\n");
     return 0;

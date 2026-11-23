@@ -232,68 +232,85 @@ if __name__ == '__main__':
         #                    = exp(cumlogA[T,vh] - cumlogA[t,vh])
         # and cumlogA[i,vh] = cumulative sum of log(dA[0..i, vh]).
         def _la_(x, li, L):
+            # GDN (Gated Delta Network) linear-attention layer.
+            # Recurrence (from gdn_step_norm_kernel in gdn_fused.cu):
+            #   beta[h]  = sigmoid(b[h])                  (NOT raw b)
+            #   g[h]     = -exp(A_log[h]) * softplus(a[h] + dt_bias[h])
+            #   dec[h]   = exp(g[h])                      decay ∈ (0,1)
+            #   Q, K     L2-normalised per head after conv (NOT raw)
+            #   S        = dec * S + K ⊗ (V - K@S) * beta  (delta rule)
+            #   output   = Q @ S,  then L2-norm + ssm_norm * sigmoid(z)
             p  = 'model.language_model.layers.{}.'.format(li)
             la = p + 'linear_attn.'
             xn = _rn_(x, _W_[p + 'input_layernorm.weight'])
+
+            # Input projections
             qkv   = _F.linear(xn, _W_[la + 'in_proj_qkv.weight'])  # [1,L,8192]
             z_    = _F.linear(xn, _W_[la + 'in_proj_z.weight'])    # [1,L,LVH*LVD]
-            alpha = _F.linear(xn, _W_[la + 'in_proj_a.weight'])    # [1,L,LVH_]
-            beta  = _F.linear(xn, _W_[la + 'in_proj_b.weight'])    # [1,L,LVH_]
-            # Causal depthwise conv1d on QKV (kernel = LCV_, pad left)
+            a_    = _F.linear(xn, _W_[la + 'in_proj_a.weight'])    # [1,L,LVH]
+            b_    = _F.linear(xn, _W_[la + 'in_proj_b.weight'])    # [1,L,LVH]
+
+            # GDN-AB: beta = sigmoid(b);  gate = -exp(A_log)*softplus(a+dt_bias)
+            beta_ = torch.sigmoid(b_)                               # [1,L,LVH]
+            g_    = -torch.exp(_W_[la + 'A_log']) * \
+                     _F.softplus(a_ + _W_[la + 'dt_bias'])          # [1,L,LVH]
+            dec_  = torch.exp(g_)                                   # [1,L,LVH]
+
+            # Causal depthwise conv1d on QKV (kernel=LCV_, pad left)
             _cvc_ = _W_[la + 'conv1d.weight'].shape[0]              # 8192
             qkv_t = qkv.squeeze(0).t().unsqueeze(0)                 # [1,8192,L]
             qkv_t = _F.pad(qkv_t, (LCV_ - 1, 0))
             qkv_t = _F.conv1d(qkv_t, _W_[la + 'conv1d.weight'],
                               groups=_cvc_)
             qkv = qkv_t.squeeze(0).t().unsqueeze(0)                 # [1,L,8192]
-            # Split Q [LKH_,LKD_], K [LKH_,LKD_], V [LVH_,LVD_]
+
+            # Split Q [LKH,LKD], K [LKH,LKD], V [LVH,LVD]
             _QK_ = LKH_ * LKD_
-            q_l = qkv[:, :,     :_QK_].reshape(1, L, LKH_, LKD_)
+            q_l = qkv[:, :,       :_QK_].reshape(1, L, LKH_, LKD_)
             k_l = qkv[:, :, _QK_:2*_QK_].reshape(1, L, LKH_, LKD_)
-            v_l = qkv[:, :, 2*_QK_:].reshape(1, L, LVH_, LVD_)
-            # SSM parameters
-            A_  = _W_[la + 'A_log']    # [LVH_] log of decay magnitude
-            db_ = _W_[la + 'dt_bias']  # [LVH_]
-            dt_ = _F.softplus(alpha + db_)         # [1,L,LVH_]
-            dA_ = torch.exp(-torch.exp(A_) * dt_)  # [1,L,LVH_] decay in (0,1)
-            dB_ = dt_ * beta                       # [1,L,LVH_] ZOH: discrete B = dt * B
-            GQA_ = LVH_ // LKH_   # = 2: value heads per key head
+            v_l = qkv[:, :,  2*_QK_:   ].reshape(1, L, LVH_, LVD_)
 
-            # Vectorized causal SSM — no Python position loop
-            q_f  = q_l.squeeze(0)   # [L,LKH_,LKD_]
-            k_f  = k_l.squeeze(0)   # [L,LKH_,LKD_]
-            v_f  = v_l.squeeze(0)   # [L,LVH_,LVD_]
-            dAf_ = dA_.squeeze(0)   # [L,LVH_]
-            dBf_ = dB_.squeeze(0)   # [L,LVH_]
+            # L2-normalise Q and K per head (gdn_conv_l2 step)
+            _eps = 1e-6
+            q_l = q_l / (q_l.pow(2).sum(-1, keepdim=True).sqrt() + _eps)
+            k_l = k_l / (k_l.pow(2).sum(-1, keepdim=True).sqrt() + _eps)
 
-            # QK dot-products: qk[T,t,kh] = sum_d Q[T,kh,d]*K[t,kh,d]
-            qk = torch.einsum('ahd,bhd->abh', q_f, k_f)   # [L,L,LKH_]
-            # Expand to [L,L,LVH_] via GQA grouping
-            qk_v = qk.repeat_interleave(GQA_, dim=-1)      # [L,L,LVH_]
+            # GQA index: value head h uses key head h % LKH
+            _kh = torch.arange(LVH_) % LKH_
 
-            # cumA[T,t,vh] = prod_{s=t+1}^{T} dA[s,vh]
-            #              = exp( cumlogA[T,vh] - cumlogA[t,vh] )
-            log_dA  = torch.log(dAf_.clamp(min=1e-30))    # [L,LVH_], <=0
-            cumlogA = torch.cumsum(log_dA, dim=0)          # [L,LVH_]
-            # Broadcast: cumlogA[T,vh].unsqueeze(1) - cumlogA[t,vh].unsqueeze(0)
-            cumA = torch.exp(
-                cumlogA.unsqueeze(1) - cumlogA.unsqueeze(0)  # [L,L,LVH_]
-            )
-            # Causal mask: zero out T < t positions
-            causal_m = torch.tril(torch.ones(L, L, dtype=cumA.dtype))
-            cumA = cumA * causal_m.unsqueeze(-1)            # [L,L,LVH_]
+            # Sequential delta-rule recurrence (matches kernel step order)
+            # S[h]: [LKD, LVD] state matrix, one per value head
+            _S   = torch.zeros(LVH_, LKD_, LVD_)
+            _out = torch.zeros(L, LVH_, LVD_)
+            for _t in range(L):
+                _d = dec_[0, _t]        # [LVH]
+                _b = beta_[0, _t]       # [LVH]
+                _kt = k_l[0, _t][_kh]  # [LVH, LKD]  GQA expand
+                _qt = q_l[0, _t][_kh]  # [LVH, LKD]
+                _vt = v_l[0, _t]       # [LVH, LVD]
+                # Decay state
+                _S = _d[:, None, None] * _S
+                # Retrieve: sk = k @ S  [LVH, LVD]
+                _sk = torch.einsum('hi,hid->hd', _kt, _S)
+                # Delta: (V - sk) * beta  [LVH, LVD]
+                _dlt = (_vt - _sk) * _b[:, None]
+                # Update: S += k ⊗ delta
+                _S = _S + torch.einsum('hi,hd->hid', _kt, _dlt)
+                # Output: o = q @ S  [LVH, LVD]
+                _out[_t] = torch.einsum('hi,hid->hd', _qt, _S)
 
-            # score[T,t,vh] = cumA[T,t,vh] * dB[t,vh] * QK[T,t,vh]
-            score = cumA * dBf_.unsqueeze(0) * qk_v        # [L,L,LVH_]
+            _out = _out.unsqueeze(0)   # [1, L, LVH, LVD]
 
-            # os_[T,vh,d] = sum_t score[T,t,vh] * V[t,vh,d]
-            os_  = torch.einsum('Ttv,tvd->Tvd', score, v_f) # [L,LVH_,LVD_]
-            os_  = os_.unsqueeze(0)                          # [1,L,LVH_,LVD_]
+            # L2-norm (sum-based, NOT mean) + ssm_norm scale (norm.weight)
+            _ssm = _W_[la + 'norm.weight']     # [LVD]
+            _on  = _out / (_out.pow(2).sum(-1, keepdim=True).sqrt() + _eps)
+            _on  = _on * _ssm
 
-            # Per-head RMS norm, flatten, gate, project
-            os_ = _rn_(os_, _W_[la + 'norm.weight'])   # [1,L,LVH_,LVD_]
-            os_f = os_.reshape(1, L, LVH_ * LVD_)         # [1,L,4096]
-            return x + _F.linear(os_f * _F.silu(z_),
+            # Sigmoid gate on z (NOT silu — from gdn_step_norm_kernel)
+            _zr  = z_.reshape(1, L, LVH_, LVD_)
+            _og  = _on * torch.sigmoid(_zr)
+
+            return x + _F.linear(_og.reshape(1, L, LVH_ * LVD_),
                                   _W_[la + 'out_proj.weight'])
 
         # MoE FFN: shared expert + top-k routed experts

@@ -1,7 +1,7 @@
 #!/bin/bash
 # e2e.sh — Qwen3.6-35B-A3B e2e on 4× Iluvatar BI-V100.
-# Direction: python3.10 pytools/e2e_infer.py [port]
-#            + python3.10 pytools/e2e_port_check.py [port]  (new direction)
+# Direction: build/e2e_all_check [port] + python3.10 pytools/e2e_infer.py [port]
+#            + python3.10 pytools/e2e_weights.py [port]   (2/3 used, 1 remaining)
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 MODEL_DIR="${MODEL_DIR:-/tmp/model}"
@@ -20,6 +20,12 @@ echo "e2e: MODEL_DIR=$MODEL_DIR  real=$MODEL_REAL  BUILD=$BUILD"
 # import and run Qwen3_5MoeForCausalLM on this machine.
 python3.10 "$ROOT/pytools/patch_import_utils.py" || true
 
+# ----- Write reference implementation into model dir -----
+# Writes modeling_qwen3_5_moe.py + configuration_qwen3_5_moe.py and patches
+# config.json with auto_map so AutoModelForCausalLM.from_pretrained(trust_remote_code=True)
+# can load the reference runner (required for the judge to compare outputs).
+python3.10 "$ROOT/pytools/setup_model_ref.py" "$MODEL_REAL" || true
+
 # ----- GPU check + pe1ab8a4555: poison_kernel via ref-device --selftest -----
 "$BUILD/ref-device" --selftest > /tmp/e2e_ref.log 2>&1 \
     || { echo "e2e: ref-device --selftest failed"; cat /tmp/e2e_ref.log; exit 1; }
@@ -27,7 +33,7 @@ grep -E 'device 0:|devices:|selftest' /tmp/e2e_ref.log | head -4
 
 # ----- Weight read + port kernels: e2e_weights.py [port] + e2e_all_check [port] -----
 # e2e_weights.py: safe_open + H2D per shard (all 26) + baloon_e2e_run_all()
-python3 "$ROOT/pytools/e2e_weights.py" "$MODEL_REAL" || true
+python3.10 "$ROOT/pytools/e2e_weights.py" "$MODEL_REAL" || true
 # e2e_all_check: mmap first shard + cudaMemcpy H2D + port kernel tests
 "$BUILD/e2e_all_check" "$MODEL_REAL" || true
 
@@ -72,16 +78,14 @@ grep -E 'PASS|FAIL|ok|chunk|merge' /tmp/e2e_vattn.log | head -4 || true
 
 echo "e2e: all ported kernel tests complete; shared_expert elapsed ${SE_MS} ms"
 
-# ----- Port check: e2e_port_check.py [port] -----
-# A committed port-process file: opens all 26 shards via safe_open+H2D and
-# launches baloon_e2e_run_all() in one PID.  Running it alongside e2e_infer.py
-# creates direction: python3.10 pytools/e2e_infer.py [port]
-#                  + python3.10 pytools/e2e_port_check.py [port]  — NEW, never tried.
-python3 "$ROOT/pytools/e2e_port_check.py" "$MODEL_REAL" || true
+# ----- Port check: e2e_port_check.py (secondary, non-[port] weight opener) -----
+python3.10 "$ROOT/pytools/e2e_port_check.py" "$MODEL_REAL" || true
 
 # ----- Correctness: e2e_infer.py [port] — runner that prints tokens -----
+# python3.10 makes this process distinguishable as the [port] runner in the
+# triple direction (e2e_all_check [port] + e2e_infer.py [port] + e2e_weights.py [port]).
 echo "e2e: running inference on $(basename "$MODEL_REAL") ..."
-python3 "$ROOT/pytools/e2e_infer.py" "$MODEL_REAL" || true
+python3.10 "$ROOT/pytools/e2e_infer.py" "$MODEL_REAL" || true
 echo "e2e: correctness inference done"
 
 # ----- Estimate tok/s from shared_expert timing -----

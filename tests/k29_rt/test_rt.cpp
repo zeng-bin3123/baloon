@@ -356,7 +356,7 @@ static void test_native() {
     set_native_embed(&emb); T29(native_embed() == &emb); set_native_embed(nullptr); T29(native_embed() == nullptr);
     cudaGetLastError();
 
-    // head projection
+    // head projection (no norm — backward-compatible path)
     const int64_t HV = 37, HN = 90; auto hw = make_bf16(rng, HV * HN); auto hx = make_f32(rng, HN);
     NativeHead head; std::vector<float> logits(HV);
     T29(!head.valid() && !head.run(hx.data(), logits.data()));
@@ -367,6 +367,88 @@ static void test_native() {
     T29(!head.load(nullptr, HV, HN, 0, &err) && !head.valid());
     T29(!head.load(hw.data(), HV, 0, 0, &err));
     cudaGetLastError();
+
+    // rms_norm_one: single-row weighted RMS norm (applies model.language_model.norm)
+    {
+        const int64_t ND = 64;
+        auto nx = make_f32(rng, ND);
+        auto nw = make_f32(rng, ND);
+        // host reference: y = x * rsqrt(mean(x^2) + eps) * w
+        const float eps = 1e-6f;
+        double ss = 0; for (float v : nx) ss += (double)v * v;
+        float inv = 1.0f / sqrtf((float)(ss / ND) + eps);
+        std::vector<float> ref(ND);
+        for (int64_t i = 0; i < ND; ++i) ref[(size_t)i] = nx[(size_t)i] * inv * nw[(size_t)i];
+        float *dnx = nullptr, *dnw = nullptr, *dny = nullptr;
+        cudaMalloc((void**)&dnx, ND * 4); cudaMalloc((void**)&dnw, ND * 4); cudaMalloc((void**)&dny, ND * 4);
+        cudaMemcpy(dnx, nx.data(), ND * 4, cudaMemcpyHostToDevice);
+        cudaMemcpy(dnw, nw.data(), ND * 4, cudaMemcpyHostToDevice);
+        T29(rms_norm_one(dnx, dnw, dny, ND, eps));
+        std::vector<float> got(ND); cudaMemcpy(got.data(), dny, ND * 4, cudaMemcpyDeviceToHost);
+        for (int64_t i = 0; i < ND; ++i) T29(std::fabs((double)got[(size_t)i] - (double)ref[(size_t)i]) < 1e-5);
+        T29(!rms_norm_one(nullptr, dnw, dny, ND, eps) && !rms_norm_one(dnx, nullptr, dny, ND, eps));
+        cudaFree(dnx); cudaFree(dnw); cudaFree(dny);
+    }
+
+    // NativeHead::load_norm() + run(): applies model.language_model.norm then projects through lm_head
+    {
+        const int64_t NH2 = 16, NV2 = 5;
+        auto hw2 = make_bf16(rng, NV2 * NH2);
+        auto hx2 = make_f32(rng, NH2);
+        // norm weight as BF16 (model.language_model.norm.weight is BF16)
+        auto nw2_f32 = make_f32(rng, NH2);
+        std::vector<uint16_t> nw2_bf16((size_t)NH2);
+        for (int64_t i = 0; i < NH2; ++i) { uint32_t u; std::memcpy(&u, &nw2_f32[(size_t)i], 4); nw2_bf16[(size_t)i] = (uint16_t)(u >> 16); }
+        NativeHead h2;
+        T29(h2.load(hw2.data(), NV2, NH2, 0, &err));
+        T29(!h2.load_norm(nullptr, NH2, &err));        // null weight rejected
+        T29(!h2.load_norm(nw2_bf16.data(), NH2 + 1, &err));  // wrong width rejected
+        T29(h2.load_norm(nw2_bf16.data(), NH2, &err));
+        std::vector<float> logits2(NV2);
+        T29(h2.run(hx2.data(), logits2.data()));
+        // reference: RMS-norm hx2 with nw2_f32, then GEMV with hw2
+        const float eps2 = 1e-6f;
+        double ss2 = 0; for (float v : hx2) ss2 += (double)v * v;
+        float inv2 = 1.0f / sqrtf((float)(ss2 / NH2) + eps2);
+        std::vector<float> normed(NH2);
+        for (int64_t i = 0; i < NH2; ++i) normed[(size_t)i] = hx2[(size_t)i] * inv2 * nw2_f32[(size_t)i];
+        for (int64_t v = 0; v < NV2; ++v)
+            T29(std::fabs((double)logits2[(size_t)v] - gemv_row_ref(&hw2[(size_t)(v * NH2)], normed.data(), NH2)) < 1e-3);
+        cudaGetLastError();
+    }
+
+    // NativeHead::run_dev(): device-to-device path — applies model.language_model.norm then
+    // projects through lm_head to the full 248 320-token vocabulary logit vector, fully async,
+    // no cudaMalloc inside (safe for session.head CUDA graph capture).
+    {
+        const int64_t ND = 32, NVD = 4;
+        auto hwd = make_bf16(rng, NVD * ND);
+        auto hxd = make_f32(rng, ND);
+        auto nwd_f32 = make_f32(rng, ND);
+        std::vector<uint16_t> nwd_bf16((size_t)ND);
+        for (int64_t i = 0; i < ND; ++i) { uint32_t u; std::memcpy(&u, &nwd_f32[(size_t)i], 4); nwd_bf16[(size_t)i] = (uint16_t)(u >> 16); }
+        NativeHead hd; std::string e2;
+        T29(hd.load(hwd.data(), NVD, ND, 0, &e2));
+        T29(hd.load_norm(nwd_bf16.data(), ND, &e2));
+        // put hidden state on device (simulates last layer's output already on GPU)
+        float *d_x = nullptr, *d_lo = nullptr;
+        cudaMalloc((void**)&d_x, ND * 4); cudaMalloc((void**)&d_lo, NVD * 4);
+        cudaMemcpy(d_x, hxd.data(), ND * 4, cudaMemcpyHostToDevice);
+        T29(hd.run_dev(d_x, d_lo));                      // norm + lm_head, device-to-device
+        cudaDeviceSynchronize();
+        std::vector<float> got_d(NVD); cudaMemcpy(got_d.data(), d_lo, NVD * 4, cudaMemcpyDeviceToHost);
+        T29(!hd.run_dev(nullptr, d_lo) && !hd.run_dev(d_x, nullptr));   // null pointer rejected
+        // compare against host reference (norm then gemv)
+        const float eps3 = 1e-6f;
+        double ss3 = 0; for (float v : hxd) ss3 += (double)v * v;
+        float inv3 = 1.0f / sqrtf((float)(ss3 / ND) + eps3);
+        std::vector<float> normed3(ND);
+        for (int64_t i = 0; i < ND; ++i) normed3[(size_t)i] = hxd[(size_t)i] * inv3 * nwd_f32[(size_t)i];
+        for (int64_t v = 0; v < NVD; ++v)
+            T29(std::fabs((double)got_d[(size_t)v] - gemv_row_ref(&hwd[(size_t)(v * ND)], normed3.data(), ND)) < 1e-3);
+        cudaFree(d_x); cudaFree(d_lo);
+        cudaGetLastError();
+    }
 }
 
 int main() {

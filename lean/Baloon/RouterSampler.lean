@@ -37,6 +37,12 @@ theorem comb_assoc (a b c : Int × Nat) : comb (comb a b) c = comb a (comb b c) 
       · exfalso; omega
       · rw [comb_neg a c h3]
 
+/-- The combine is commutative: reduction order within a warp does not matter. -/
+theorem comb_comm (a b : Int × Nat) : comb a b = comb b a := by
+  obtain ⟨a1, a2⟩ := a; obtain ⟨b1, b2⟩ := b
+  unfold comb
+  split <;> split <;> first | (exfalso; omega) | (apply Prod.ext <;> dsimp only <;> omega)
+
 /-- The greedy output is always a valid token id. -/
 def greedyOut (wi n : Nat) : Nat := (if wi < n then wi else 0)
 theorem greedyOut_lt (wi n : Nat) (hn : 0 < n) : greedyOut wi n < n := by
@@ -47,6 +53,37 @@ theorem philox_lt_one (c0 : Nat) (h : c0 < 4294967296) : c0 / 256 < 16777216 := 
 
 /-- The repeat penalty: multiply non-positive logits, divide positive ones. -/
 def repeatPen (l r : Int) : Int := (if l ≤ 0 then l * r else l / r)
+
+/-- A repeat penalty with factor at least one never raises a logit. -/
+theorem repeatPen_le (l r : Int) (hr : 1 ≤ r) : repeatPen l r ≤ l := by
+  unfold repeatPen
+  split
+  · rename_i h
+    have h0 : 0 ≤ (-l) * (r - 1) := Int.mul_nonneg (by omega) (by omega)
+    have h1 : (-l) * (r - 1) = -(l * r) + l := by ring
+    omega
+  · rename_i h
+    exact Int.ediv_le_self l (by omega)
+
+/-- The presence term is a boolean: at most one regardless of the count. -/
+theorem presence_bool (count : Nat) : (if count > 0 then 1 else 0 : Nat) ≤ 1 := by
+  split_ifs <;> omega
+
+/-- The history window is the tail: it starts inside the row and ends at its end. -/
+theorem window_tail (plen hist : Nat) :
+    let hlen := min plen hist
+    hist - hlen + hlen = hist ∧ hist - hlen ≤ hist := by
+  simp only; omega
+
+/-- Top-p cut adjustment: widen to min_keep when the top-p cut is too small. -/
+def cutAdj (cut minKeep nKeep : Nat) : Nat :=
+  if cut < minKeep then (if minKeep < nKeep then minKeep else nKeep) else cut
+
+/-- The adjusted cut keeps at least one survivor and never exceeds the survivors. -/
+theorem cutAdj_bounds (cut minKeep nKeep : Nat) (h1 : 1 ≤ cut) (h2 : cut ≤ nKeep)
+    (h3 : 1 ≤ minKeep) :
+    1 ≤ cutAdj cut minKeep nKeep ∧ cutAdj cut minKeep nKeep ≤ nKeep := by
+  simp only [cutAdj]; split_ifs <;> omega
 
 -- ── thread sizing, shared memory and selection order ─────────────────────────
 

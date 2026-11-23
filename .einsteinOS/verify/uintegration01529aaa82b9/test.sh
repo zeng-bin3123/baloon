@@ -21,6 +21,7 @@ run controller_test "$B" ./controller_test
 run cuda_device_selftest "$B" ./ref-device --selftest
 run dequant_s2_parity "$B" ./dequant_s2_parity --selftest
 run elementwise_parity "$B" ./elementwise_parity --selftest
+run embed_parity "$B" ./embed_parity --selftest
 run expert_multi_test "$B" ./expert_multi_test
 run expert_parity "$SRC" "$B/expert_parity" --selftest
 run gdn_parity "$B" ./gdn_parity --selftest

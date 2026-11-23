@@ -69,6 +69,10 @@ link "$OUT/kv_q8_parity" "$OBJ/kv_q8_parity.o" $ILU
 cuobj tests/test_shared_expert.cu "$OBJ/shared_expert_parity.o"
 link "$OUT/shared_expert_parity" "$OBJ/shared_expert_parity.o"
 
+# ---- embed_parity: gather_rows16_kernel BF16 reference (u7991572426) — includes prefill/kernels.cu ----
+cuobj $T/embed_parity.cu "$OBJ/embed_parity.o"
+link "$OUT/embed_parity" "$OBJ/embed_parity.o"
+
 # ---- verify_attn_gpu: attn_chunk_kernel + attn_merge_kernel (u52d156705c) -----------------------------------------------
 # src/qsa_decode_attn.cu contains attn_chunk_kernel<Q8> and attn_merge_kernel; must land in build/ for the kernel tracker.
 cuobj src/verify_kernels.cu "$OBJ/verify_kernels.o"
@@ -113,6 +117,8 @@ cuobj tests/gpu_unit_verify_attn/test_verify_attn_gpu.cu \
 # u02c65ed515 + uebd9b81357: kv_append/gather, qsa_attend, dequant_q8_* (from kv_q8_parity)
 cuobj tests/gpu_unit_f16bits/test_unit7_gpu.cu \
                                            "$OBJ/e2e_kv.o"    -Dmain=e2e_kv_main
+# u7991572426: gather_rows16_kernel — stages BF16 hidden-state vector for the first layer
+cuobj $T/embed_parity.cu                   "$OBJ/e2e_embed.o" -Dmain=e2e_embed_main
 cuobj $T/e2e_all_check.cu                  "$OBJ/e2e_all_check.o"
 link "$OUT/e2e_all_check" \
     "$OBJ/e2e_all_check.o" \
@@ -120,6 +126,7 @@ link "$OUT/e2e_all_check" \
     "$OBJ/e2e_sgemv.o" \
     "$OBJ/e2e_vattn.o" \
     "$OBJ/e2e_kv.o" \
+    "$OBJ/e2e_embed.o" \
     "$OBJ/verify_kernels.o" \
     "$OBJ/qsa_decode_attn.o" \
     "$OBJ/native_flash_attn.o" \
@@ -149,6 +156,8 @@ cuobj_pic tests/gpu_unit_verify_attn/test_verify_attn_gpu.cu \
 # u02c65ed515 + uebd9b81357: kv_append/gather, qsa_attend, dequant_q8_* (from kv_q8_parity)
 cuobj_pic tests/gpu_unit_f16bits/test_unit7_gpu.cu \
                                                "$OBJ/pic_e2e_kv.o"    -Dmain=e2e_kv_main
+# u7991572426: gather_rows16_kernel — stages BF16 hidden-state vector for the first layer
+cuobj_pic $T/embed_parity.cu                   "$OBJ/pic_e2e_embed.o" -Dmain=e2e_embed_main
 PIC_ILU=""
 for f in src/ilu_*.cu; do o="$OBJ/picilu__$(basename "$f").o"; cuobj_pic "$f" "$o"; PIC_ILU="$PIC_ILU $o"; done
 cuobj_pic src/verify_kernels.cu                "$OBJ/pic_vk.o"
@@ -175,7 +184,7 @@ cuobj_pic src/baloon_e2e_shim.cu "$OBJ/pic_shim.o"
 "$CLANG" --shared \
     "$OBJ/pic_shim.o" \
     "$OBJ/pic_e2e_se.o" "$OBJ/pic_e2e_sgemv.o" "$OBJ/pic_e2e_vattn.o" \
-    "$OBJ/pic_e2e_kv.o" $PIC_ILU \
+    "$OBJ/pic_e2e_kv.o" "$OBJ/pic_e2e_embed.o" $PIC_ILU \
     "$OBJ/pic_vk.o" "$OBJ/pic_qsadec.o" "$OBJ/pic_nfa.o" \
     "$OBJ/pic_dmlib.o" $PIC_RT \
     "$OBJ/pic_eq2.o" $PIC_CU \

@@ -75,6 +75,8 @@ private:
 };
 
 // Output projection logits = W x with W bf16 [vocab, n], resident on device.
+// Optional: load_norm() uploads the BF16 model.language_model.norm weight as f32;
+// run() will then apply rms_norm_one() before the bf16_gemv projection.
 class NativeHead {
 public:
     NativeHead() = default;
@@ -82,16 +84,29 @@ public:
     NativeHead(const NativeHead&) = delete;
     NativeHead& operator=(const NativeHead&) = delete;
     bool load(const uint16_t* host_w, int64_t vocab, int64_t n, int ordinal, std::string* err = nullptr);
+    // Upload the BF16 norm weight (shape [n]) converted to f32 on the device.
+    // Must be called after load() so ordinal and n_ are already set; n must equal width().
+    bool load_norm(const uint16_t* host_norm_w, int64_t n, std::string* err = nullptr);
     bool valid() const { return dev_ != nullptr; }
     // Host x[n] -> host logits[vocab] (copies in, runs, copies out, synchronizes).
+    // If a norm weight is loaded, applies rms_norm_one(x, norm_w, eps=1e-6) before projection.
     bool run(const float* x, float* logits) const;
+    // Device x[n] -> device logits[vocab], fully async on s — suitable for session.head CUDA graph capture.
+    // d_x is the f32 hidden state from the last layer (already on device); d_logits receives the
+    // 248 320-token vocabulary logit vector. Applies norm if loaded, then projects through lm_head.
+    bool run_dev(const float* d_x, float* d_logits, cudaStream_t s = nullptr) const;
     int64_t vocab() const { return vocab_; }
     int64_t width() const { return n_; }
 private:
     DevicePtr dev_;
+    DevicePtr norm_dev_;    // f32 [n_] RMS-norm weight, or null when not loaded
+    DevicePtr norm_buf_;    // f32 [n_] scratch for the normed hidden state (pre-alloc'd in load_norm()
+                            // so run_dev() contains no cudaMalloc and is CUDA-graph-capturable)
     int64_t vocab_ = 0, n_ = 0;
     int ord_ = 0;
 };
+
+
 
 // Process-wide embedding binding (not owned); nullptr clears it.
 const NativeEmbed* native_embed();

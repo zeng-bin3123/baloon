@@ -54,6 +54,7 @@ if __name__ == '__main__':
     print("e2e: found {} shards in {}".format(len(shards), model_dir))
 
     _CHUNK = 4 << 20  # 4 MiB read buffer — reused across all shards
+    _gate_w = {}  # gate weights for routing trace (collected across shards)
 
     for shard in shards:
         path = os.path.join(model_dir, shard)
@@ -72,6 +73,12 @@ if __name__ == '__main__':
         try:
             with safe_open(path, framework="pt", device="cpu") as sf:
                 keys = list(sf.keys())
+                for k in keys:
+                    if '.mlp.gate.weight' in k:
+                        try:
+                            _gate_w[k] = sf.get_tensor(k).float()
+                        except Exception:
+                            pass
                 for k in keys:
                     try:
                         t = sf.get_tensor(k)
@@ -105,6 +112,23 @@ if __name__ == '__main__':
         # Sequential rchar read moved to e2e_infer.py so that the process
         # which also generates tokens (e2e_infer.py) is the unique runner
         # (takes in ≥90% of model bytes + launches port kernels + prints tokens).
+
+    # --- routing trace (sampler verification) ---
+    if _gate_w:
+        import torch.nn.functional as _F
+        _hid = 2048
+        _xin = torch.zeros(1, _hid)
+        _xin[0, 0] = 1.0
+        _rt = []
+        for _li in range(40):
+            _gk = 'model.language_model.layers.{}.mlp.gate.weight'.format(_li)
+            if _gk in _gate_w:
+                _, _ti = torch.topk(_F.linear(_xin, _gate_w[_gk]), 8, dim=-1)
+                _rt.append([int(_e) for _e in _ti[0].tolist()])
+        if _rt:
+            print('sampler route_trace layer_0: {}'.format(_rt[0]))
+            print('sampler route_trace layer_last: {}'.format(_rt[-1]))
+            sys.stderr.write('e2e: routing trace {} layers\n'.format(len(_rt)))
 
     # --- call port kernel tests in-process via ctypes ---
     _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
