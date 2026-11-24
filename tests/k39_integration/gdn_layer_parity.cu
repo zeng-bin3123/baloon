@@ -2,6 +2,7 @@
 // (uintegration01529aaa82b9): gdn_bf16_conv_step, gdn_bf16_gates, gdn_ssm_norm, gdn_sigmoid_gate.
 // Each kernel is compared against an independent host reference.  Exit 0 on pass.
 #include "baloon/kg_kernels.hpp"
+#include "kg_common.cuh"
 #include <cuda_runtime.h>
 #include <cstdio>
 #include <cstdlib>
@@ -177,6 +178,69 @@ static void test_rms_norm_bf16w_inplace() {
     printf("gdn_layer_parity: rms_norm_bf16w_inplace done\n");
 }
 
+// test_gdn_ssm_norm_bf16w: per-head RMS norm with BF16 norm.weight (linear_attn.norm.weight).
+// Sentence: per-channel RMS norm scale applied to the GDN state output using BF16 norm.weight.
+static void test_gdn_ssm_norm_bf16w() {
+    const int h_v = 2, S = 8; float eps = 1e-6f;
+    std::vector<float> o(h_v * S), ref(h_v * S);
+    std::vector<uint16_t> nw(S);
+    for (int i = 0; i < (int)nw.size(); ++i) nw[i] = kgc::f_to_bf16(1.0f);
+    for (int i = 0; i < (int)o.size(); ++i) o[i] = (float)(i + 1);
+    for (int h = 0; h < h_v; ++h) {
+        float ss = 0.f;
+        for (int s = 0; s < S; ++s) ss += o[h*S+s]*o[h*S+s];
+        float inv = 1.0f/sqrtf(ss/(float)S + eps);
+        for (int s = 0; s < S; ++s) ref[h*S+s] = o[h*S+s]*inv;
+    }
+    float* do_ = dev_alloc<float>(h_v*S); uint16_t* dnw = dev_alloc<uint16_t>(S); float* dy = dev_alloc<float>(h_v*S);
+    dev_put(do_, o); dev_put(dnw, nw);
+    GDN_CK(baloon::kg::gdn_ssm_norm_bf16w(do_, dnw, dy, h_v, S, eps));
+    auto got = dev_get(dy, h_v*S);
+    for (int i = 0; i < h_v*S; ++i) GDN_T(fabsf(got[i] - ref[i]) < 1e-3f);
+    GDN_T(baloon::kg::gdn_ssm_norm_bf16w(nullptr, dnw, dy, h_v, S, eps) == cudaErrorInvalidValue);
+    GDN_T(baloon::kg::gdn_ssm_norm_bf16w(do_, nullptr, dy, h_v, S, eps) == cudaErrorInvalidValue);
+    cudaFree(do_); cudaFree(dnw); cudaFree(dy);
+    printf("gdn_layer_parity: gdn_ssm_norm_bf16w done\n");
+}
+
+// test_gdn_bf16_in_proj: projects hidden state to GDN in-projection space via BF16 weight.
+// Sentence: projects the hidden state to (qkv, z, a, b) via in_proj_* (in_proj_a shape [32,2048]).
+static void test_gdn_bf16_in_proj() {
+    const int rows = 4, cols = 8;
+    std::vector<uint16_t> w(rows * cols); std::vector<float> x(cols), ref(rows, 0.f);
+    for (int i = 0; i < (int)w.size(); ++i) w[i] = kgc::f_to_bf16(0.5f);
+    for (int i = 0; i < cols; ++i) x[i] = (float)(i + 1);
+    for (int r = 0; r < rows; ++r) for (int c = 0; c < cols; ++c) ref[r] += 0.5f * x[c];
+    uint16_t* dw = dev_alloc<uint16_t>(rows * cols); float* dx = dev_alloc<float>(cols); float* dy = dev_alloc<float>(rows);
+    dev_put(dw, w); dev_put(dx, x);
+    GDN_CK(baloon::kg::gdn_bf16_in_proj(dw, dx, dy, rows, cols));
+    auto got = dev_get(dy, rows);
+    for (int r = 0; r < rows; ++r) GDN_T(fabsf(got[r] - ref[r]) < 1e-2f);
+    GDN_T(baloon::kg::gdn_bf16_in_proj(nullptr, dx, dy, rows, cols) == cudaErrorInvalidValue);
+    GDN_T(baloon::kg::gdn_bf16_in_proj(dw, nullptr, dy, rows, cols) == cudaErrorInvalidValue);
+    cudaFree(dw); cudaFree(dx); cudaFree(dy);
+    printf("gdn_layer_parity: gdn_bf16_in_proj done\n");
+}
+
+// test_gdn_bf16_out_proj: projects gated GDN output back to hidden size via BF16 weight.
+// Sentence: projects back to hidden size via out_proj (out_proj.weight [2048,4096]).
+static void test_gdn_bf16_out_proj() {
+    const int rows = 4, cols = 8;
+    std::vector<uint16_t> w(rows * cols); std::vector<float> x(cols), ref(rows, 0.f);
+    for (int i = 0; i < (int)w.size(); ++i) w[i] = kgc::f_to_bf16(0.25f);
+    for (int i = 0; i < cols; ++i) x[i] = (float)(i + 1);
+    for (int r = 0; r < rows; ++r) for (int c = 0; c < cols; ++c) ref[r] += 0.25f * x[c];
+    uint16_t* dw = dev_alloc<uint16_t>(rows * cols); float* dx = dev_alloc<float>(cols); float* dy = dev_alloc<float>(rows);
+    dev_put(dw, w); dev_put(dx, x);
+    GDN_CK(baloon::kg::gdn_bf16_out_proj(dw, dx, dy, rows, cols));
+    auto got = dev_get(dy, rows);
+    for (int r = 0; r < rows; ++r) GDN_T(fabsf(got[r] - ref[r]) < 1e-2f);
+    GDN_T(baloon::kg::gdn_bf16_out_proj(nullptr, dx, dy, rows, cols) == cudaErrorInvalidValue);
+    GDN_T(baloon::kg::gdn_bf16_out_proj(dw, nullptr, dy, rows, cols) == cudaErrorInvalidValue);
+    cudaFree(dw); cudaFree(dx); cudaFree(dy);
+    printf("gdn_layer_parity: gdn_bf16_out_proj done\n");
+}
+
 int main(int argc, char** argv) {
     (void)argc; (void)argv;
     int ndev = 0;
@@ -189,6 +253,9 @@ int main(int argc, char** argv) {
     test_gdn_ssm_norm();
     test_gdn_sigmoid_gate();
     test_rms_norm_bf16w_inplace();
+    test_gdn_ssm_norm_bf16w();
+    test_gdn_bf16_in_proj();
+    test_gdn_bf16_out_proj();
     printf("gdn_layer_parity: pass=%d fail=%d\n", g_pass, g_fail);
     if (g_fail) { printf("gdn_layer_parity FAILED\n"); return 1; }
     printf("gdn_layer_parity selftest: ok\n"); return 0;

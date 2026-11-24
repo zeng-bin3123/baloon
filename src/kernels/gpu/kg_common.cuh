@@ -10,7 +10,7 @@
 namespace kgc {
 constexpr int kWave = 64;
 __device__ __forceinline__ float bf16_to_f(uint16_t b) { return baloon::f16bits::bf16_bits_to_f32(b); }
-__device__ __forceinline__ uint16_t f_to_bf16(float f) { return baloon::f16bits::round_f32_to_bf16_bits(f); }
+__host__ __device__ __forceinline__ uint16_t f_to_bf16(float f) { return baloon::f16bits::round_f32_to_bf16_bits(f); }
 __device__ __forceinline__ float f16_to_f(uint16_t h) { return baloon::f16bits::f32_from_f16(h); }
 __device__ __forceinline__ uint16_t f_to_f16(float f) { return baloon::f16bits::f16_from_f32(f); }
 // 64-lane xor butterfly: every lane of the wave holds the sum / max afterwards.
