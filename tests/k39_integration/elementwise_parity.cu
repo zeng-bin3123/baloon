@@ -5,8 +5,6 @@
 
 // test_rms_norm_bf16w_inplace: applies a weighted RMS normalization in-place to the hidden state using one
 // input_layernorm or post_attention_layernorm weight vector (BF16, cols=hidden_size=2048 for this model).
-// Sentence: applies a weighted RMS normalization in-place to the hidden state using one
-// input_layernorm or post_attention_layernorm weight vector.
 static void test_rms_norm_bf16w_inplace() {
     const float eps = 1e-6f;
     // Case 1: single row at model hidden_size (2048) — input_layernorm / post_attention_layernorm shape.

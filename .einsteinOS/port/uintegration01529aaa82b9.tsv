@@ -166,10 +166,10 @@ src/spec/suffix_drafter_test.cpp	main	src/spec/suffix_drafter_test.cpp	main
 src/spec/suffix_drafter_test.cpp	read_ids	src/spec/suffix_drafter_test.cpp	read_ids
 src/spec/suffix_drafter_test.cpp	simulate	src/spec/suffix_drafter_test.cpp	simulate
 src/spec/suffix_drafter_test.cpp	unit_tests	src/spec/suffix_drafter_test.cpp	unit_tests
-missing:model.language_model.layers.{i}.input_layernorm.weight	rms_norm_bf16w_inplace_kernel	src/kernels/gpu/ew_ops.cu	rms_norm_bf16w_inplace_kernel
-missing:model.language_model.layers.{i}.linear_attn.conv1d.weight	gdn_bf16_conv_step_kernel	src/kernels/gpu/gdn_bf16_layer.cu	gdn_bf16_conv_step_kernel
-missing:model.language_model.layers.{i}.linear_attn.A_log	gdn_bf16_conv_step_kernel	src/kernels/gpu/gdn_layer.cu	gdn_bf16_conv_step_kernel
-missing:model.language_model.layers.{i}.mlp.gate.weight	moe_router_logits_kernel	src/kernels/gpu/moe_native.cu	moe_router_logits_kernel
-missing:model.language_model.layers.{i}.self_attn.q_norm.weight	qsa_bf16_qk_norm_kernel	src/kernels/gpu/qsa_bf16_layer.cu	qsa_bf16_qk_norm_kernel
-missing:model.language_model.layers.{i}.mlp.shared_expert.gate_proj.weight	swiglu_kernel	src/kernels/gpu/shared_expert_k.cu	swiglu_kernel
-missing:model.language_model.layers.{i}.mlp.shared_expert.down_proj.weight	swiglu_kernel	src/ix_shared_expert.cu	swiglu_kernel
+tests/k39_integration/elementwise_parity.cu	test_rms_norm_bf16w_inplace	src/kernels/gpu/ew_ops.cu	rms_norm_bf16w_inplace_kernel
+tests/k39_integration/gdn_layer_parity.cu	test_gdn_bf16_conv_step	src/kernels/gpu/gdn_bf16_layer.cu	gdn_bf16_conv_step_kernel
+tests/k39_integration/gdn_layer_parity.cu	test_gdn_bf16_gates	src/kernels/gpu/gdn_layer.cu	gdn_bf16_gates_kernel
+tests/k39_integration/moe_parity.cu	test_moe_router_logits	src/kernels/gpu/moe_native.cu	moe_router_logits_kernel
+tests/k39_integration/qsa_layer_parity.cu	test_qsa_bf16_qk_norm	src/kernels/gpu/qsa_bf16_layer.cu	qsa_bf16_qk_norm_kernel
+tests/k39_integration/moe_parity.cu	test_moe_shared_expert	src/kernels/gpu/shared_expert_k.cu	swiglu_kernel
+tests/k39_integration/moe_parity.cu	test_ix_swiglu	src/ix_shared_expert.cu	swiglu_kernel
