@@ -72,6 +72,12 @@ cudaError_t native_gdn_out_norm(const float* o, const float* z, const float* nor
 // BF16-weight GDN kernels for the Qwen3.5-MoE linear-attention sub-layer (gdn_layer.cu):
 // gdn_bf16_conv_step: single-token depthwise conv1d; w[C,dc] BF16; state[C,dc-1] float updated in-place; out[C] = conv output.
 cudaError_t gdn_bf16_conv_step(const uint16_t* w, float* state, const float* x, float* out, int C, int dc, cudaStream_t s = 0);
+// gdn_ssm_norm_bf16w: per-head RMS norm with BF16 norm weights; y[h,s] = o[h,s]/rms(o[h])*bf16(norm_w[s]).
+cudaError_t gdn_ssm_norm_bf16w(const float* o, const uint16_t* norm_w_bf16, float* y, int h_v, int S, float eps, cudaStream_t s = 0);
+// gdn_bf16_in_proj: projects hidden state via BF16 in_proj weight; delegates to bf16_gemv_fp32_mmvf.
+cudaError_t gdn_bf16_in_proj(const uint16_t* w, const float* x, float* y, int rows, int cols, cudaStream_t s = 0);
+// gdn_bf16_out_proj: projects gated GDN output back to hidden size via BF16 out_proj weight.
+cudaError_t gdn_bf16_out_proj(const uint16_t* w, const float* x, float* y, int rows, int cols, cudaStream_t s = 0);
 // gdn_bf16_gates: gate = -exp(bf16(A_log)) * softplus(a + bf16(dt_bias));  beta = sigmoid(b).
 cudaError_t gdn_bf16_gates(const uint16_t* a_log_bf16, const uint16_t* dt_bias_bf16, const float* a, const float* b, float* gate_out, float* beta_out, int h_v, cudaStream_t s = 0);
 // gdn_ssm_norm: per-head RMS norm then scale by norm_w; y[h,s] = o[h,s]/rms(o[h])*norm_w[s].
@@ -113,8 +119,7 @@ cudaError_t moe_combine(const float* parts, const float* weights, const float* s
 bool native_moe_combine_enabled();
 void native_moe_combine_set_enabled(bool on);
 cudaError_t native_moe_combine(const float* parts, const float* weights, const float* shared, float* y, int n_embd, int k, int has_shared, cudaStream_t s = 0);
-// moe_router_logits: multiplies hidden state by mlp.gate.weight (BF16) to get per-expert logits.
-cudaError_t moe_router_logits(const uint16_t* gate_w, const float* x, float* logits, int n_expert, int n_embd, cudaStream_t s = 0);
+
 
 // ---- QSA sub-layer BF16-weight kernels (uintegration01529aaa82b9) -------------------------------------------------------
 // qsa_bf16_kv_proj: BF16-weight GEMV for k_proj / v_proj; w[rows,cols] BF16; x[cols] f32; y[rows] f32.
@@ -124,7 +129,7 @@ cudaError_t qsa_bf16_qk_norm(float* x, const uint16_t* w_bf16, int n_heads, int 
 // qsa_mrope_step: applies partial 3-axis mRoPE to x[n_heads*head_dim] for one decode token.
 cudaError_t qsa_mrope_step(float* x, const int* pos3, int n_heads, int head_dim, int rot, float theta, cudaStream_t s = 0);
 // qsa_kv_cache_step: appends k and v float vectors to the paged BF16 KV pool.
-cudaError_t qsa_kv_cache_step(const float* k, const float* v, uint16_t* pool, const int32_t* table, int64_t table_len, int pos, int n_kv_heads, int head_dim, int page_size, cudaStream_t s = 0);
+cudaError_t qsa_kv_cache_step(const float* k, const float* v, uint16_t* pool, const int32_t* table, int64_t table_len, int pos, int n_kv_heads, int head_dim, int page_size, int64_t pool_rows, cudaStream_t s = 0);
 // qsa_bf16_o_proj: BF16-weight GEMV for o_proj; w[rows,cols] BF16; x[cols] f32; y[rows] f32.
 cudaError_t qsa_bf16_o_proj(const uint16_t* w, const float* x, float* y, int rows, int cols, cudaStream_t s = 0);
 

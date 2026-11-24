@@ -17,7 +17,7 @@ rm -rf "$OUT"; mkdir -p "$OUT"
 OBJ="$OUT/.obj"; mkdir -p "$OBJ"
 HFLAGS="-std=c++17 -O2 -Wall -Wextra -ffp-contract=off -pthread -Iinclude -Itests/k39_integration"
 ISA512="-mavx512bw -mavx512dq -mavx512f -mavx512vbmi -mavx512vl -mavx512vnni -mf16c -mfma"
-CUFLAGS="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Isrc -Isrc/cu -Itests -Itests/pk_unit3 -Iinclude -Itests/k39_integration -O2"
+CUFLAGS="-x cuda --cuda-gpu-arch=ivcore10 --cuda-path=$COREX -std=c++17 -D__ILUVATAR__ -I$COREX/include -Isrc -Isrc/cu -Isrc/kernels/gpu -Itests -Itests/pk_unit3 -Iinclude -Itests/k39_integration -O2"
 LIBS="-L$COREX/lib64 -lcudart -lpthread"
 T=tests/k39_integration
 

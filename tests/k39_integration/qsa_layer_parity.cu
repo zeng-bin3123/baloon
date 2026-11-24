@@ -2,6 +2,7 @@
 // (uintegration01529aaa82b9).  Each test function covers one sentence of the QSA scope.
 // Every kernel is compared against an independent host reference.  Exit 0 on pass.
 #include "baloon/kg_kernels.hpp"
+#include "baloon/f16_bits.hpp"
 #include <cuda_runtime.h>
 #include <cstdio>
 #include <cstdlib>
@@ -186,47 +187,6 @@ static void test_qsa_bf16_o_proj() {
     auto got = dev_get(dy, rows);
     for (int r = 0; r < rows; ++r) QSA_T(fabsf(got[r] - ref[r]) < 1e-2f);
     QSA_T(baloon::kg::qsa_bf16_o_proj(nullptr, dx, dy, rows, cols) == cudaErrorInvalidValue);
-    cudaFree(dw); cudaFree(dx); cudaFree(dy);
-    printf("qsa_layer_parity: qsa_bf16_o_proj done\n");
-}
-
-// Sentence 3: qsa_mrope_step — partial 3-axis mRoPE rotation for one decode token.
-static void test_qsa_mrope_step() {
-    const int n_heads = 2, head_dim = 16, rot = 4;
-    float theta = 10000000.0f;
-    std::vector<float> x(n_heads * head_dim, 1.0f);
-    int pos3[3] = {0, 0, 0};
-    float* dx = dev_alloc<float>(n_heads * head_dim);
-    int* dp = dev_alloc<int>(3);
-    dev_put(dx, x); dev_put_raw(dp, pos3, 3);
-    QSA_CK(baloon::kg::qsa_mrope_step(dx, dp, n_heads, head_dim, rot, theta));
-    QSA_T(baloon::kg::qsa_mrope_step(nullptr, dp, n_heads, head_dim, rot, theta) == cudaErrorInvalidValue);
-    QSA_T(baloon::kg::qsa_mrope_step(dx, nullptr, n_heads, head_dim, rot, theta) == cudaErrorInvalidValue);
-    cudaFree(dx); cudaFree(dp);
-    printf("qsa_layer_parity: qsa_mrope_step done\n");
-}
-
-// Sentence 4: qsa_kv_cache_step — appends k and v to the paged fp16 KV pool.
-static void test_qsa_kv_cache_step() {
-    QSA_T(baloon::kg::qsa_kv_cache_step(nullptr, nullptr, nullptr, nullptr, 0, 0, 0, 0, 0, 0) == cudaErrorInvalidValue);
-    printf("qsa_layer_parity: qsa_kv_cache_step done\n");
-}
-
-// Sentence 5: qsa_bf16_o_proj — BF16-weight GEMV for o_proj.weight [2048, 4096].
-static void test_qsa_bf16_o_proj() {
-    const int rows = 4, cols = 8;
-    std::vector<uint16_t> w(rows * cols);
-    std::vector<float> x(cols), ref(rows, 0.f);
-    for (int i = 0; i < (int)w.size(); ++i) w[i] = kgc::f_to_bf16(0.5f);
-    for (int i = 0; i < cols; ++i) x[i] = (float)(i + 1);
-    for (int r = 0; r < rows; ++r) for (int c = 0; c < cols; ++c) ref[r] += 0.5f * x[c];
-    uint16_t* dw = dev_alloc<uint16_t>(rows * cols); float* dx = dev_alloc<float>(cols); float* dy = dev_alloc<float>(rows);
-    dev_put(dw, w); dev_put(dx, x);
-    QSA_CK(baloon::kg::qsa_bf16_o_proj(dw, dx, dy, rows, cols));
-    auto got = dev_get(dy, rows);
-    for (int r = 0; r < rows; ++r) QSA_T(fabsf(got[r] - ref[r]) < 1e-2f);
-    QSA_T(baloon::kg::qsa_bf16_o_proj(nullptr, dx, dy, rows, cols) == cudaErrorInvalidValue);
-    QSA_T(baloon::kg::qsa_bf16_o_proj(dw, nullptr, dy, rows, cols) == cudaErrorInvalidValue);
     cudaFree(dw); cudaFree(dx); cudaFree(dy);
     printf("qsa_layer_parity: qsa_bf16_o_proj done\n");
 }

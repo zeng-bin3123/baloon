@@ -3,9 +3,16 @@
 //   S1 test_moe_router_logits   : mlp.gate.weight × x → router logits
 //   S2 test_moe_top8_select     : top-8 expert selection via native_router_top10
 //   S3 test_moe_shared_expert   : gate_proj/up_proj→SwiGLU→down_proj via shared_expert_multi
+//   S3 test_ix_swiglu           : ix_se::swiglu_kernel direct wave test (gate_proj+up_proj fused SwiGLU)
 //   S4 test_moe_shared_gate     : scalar sigmoid gate on the shared expert output
+//   S4 test_ix_scalar_gate      : ix_se::scalar_gate_kernel direct wave test (shared_expert_gate sigmoid)
 //   S5 test_moe_combine         : sum all contributions via moe_combine
+//   S5 test_ix_moe_combine      : ix_moe_combine_kernel direct wave test
 // Exit 0 on PASS.
+// S3+S4 wave kernels: ix_shared_expert.cu compiled by COREX via -D__ILUVATAR__ in CUFLAGS
+#include "../../src/ix_shared_expert.cu"
+// S5 combine kernel: ix_moe_combine.cu ix_combine_kernel compiled by COREX
+#include "../../src/ix_moe_combine.cu"
 #include "baloon/kg_kernels.hpp"
 #include <cuda_runtime.h>
 #include <cstdio>
@@ -222,6 +229,99 @@ static void test_moe_combine() {
     printf("moe_parity: test_moe_combine done\n");
 }
 
+// ---------------------------------------------------------------------------
+// S3 wave: test_ix_swiglu — ix_se::swiglu_kernel: silu(gate)*up for shared expert FFN
+// Verifies silu(gate[i])*up[i] matches the CPU reference for n=16 elements.
+// ---------------------------------------------------------------------------
+static void test_ix_swiglu() {
+    const int n = 16;
+    std::vector<float> gate(n), up(n), ref(n);
+    for (int i = 0; i < n; ++i) {
+        gate[i] = 0.5f * (i - 8);
+        up[i]   = 0.1f * (i + 1);
+        const float g = gate[i];
+        ref[i] = (g / (1.0f + expf(-g))) * up[i];
+    }
+    float *d_g, *d_u, *d_o;
+    MOE_CK(cudaMalloc((void**)&d_g, n * sizeof(float)));
+    MOE_CK(cudaMalloc((void**)&d_u, n * sizeof(float)));
+    MOE_CK(cudaMalloc((void**)&d_o, n * sizeof(float)));
+    MOE_CK(cudaMemcpy(d_g, gate.data(), n * sizeof(float), cudaMemcpyHostToDevice));
+    MOE_CK(cudaMemcpy(d_u, up.data(),   n * sizeof(float), cudaMemcpyHostToDevice));
+    MOE_CK(ix_se::ix_swiglu(d_g, d_u, d_o, n));
+    auto got = dev_get(d_o, n);
+    for (int i = 0; i < n; ++i) MOE_T(fabsf(got[i] - ref[i]) < 1e-5f);
+    MOE_T(ix_se::ix_swiglu(nullptr, d_u, d_o, n) == cudaErrorInvalidValue);
+    cudaFree(d_g); cudaFree(d_u); cudaFree(d_o);
+    printf("moe_parity: test_ix_swiglu done\n");
+}
+
+// ---------------------------------------------------------------------------
+// S4 wave: test_ix_scalar_gate — ix_se::scalar_gate_kernel: sigmoid(dot(x_bf16, w_bf16))
+// Verifies the shared_expert_gate scalar is sigmoid(sum(x*w)) for n=32 elements.
+// ---------------------------------------------------------------------------
+static void test_ix_scalar_gate() {
+    const int n = 32;
+    std::vector<uint16_t> x_bf16(n), w_bf16(n);
+    double dot = 0.0;
+    for (int i = 0; i < n; ++i) {
+        const float xv = 0.1f * ((i % 7) - 3);
+        const float wv = 0.05f * ((i % 5) + 1);
+        x_bf16[i] = f32_to_bf16(xv);
+        w_bf16[i] = f32_to_bf16(wv);
+        dot += (double)bf16_to_f32(x_bf16[i]) * (double)bf16_to_f32(w_bf16[i]);
+    }
+    const float ref_gate = 1.0f / (1.0f + expf(-(float)dot));
+    uint16_t *d_x, *d_w; float *d_g;
+    MOE_CK(cudaMalloc((void**)&d_x, n * sizeof(uint16_t)));
+    MOE_CK(cudaMalloc((void**)&d_w, n * sizeof(uint16_t)));
+    MOE_CK(cudaMalloc((void**)&d_g, sizeof(float)));
+    MOE_CK(cudaMemcpy(d_x, x_bf16.data(), n * sizeof(uint16_t), cudaMemcpyHostToDevice));
+    MOE_CK(cudaMemcpy(d_w, w_bf16.data(), n * sizeof(uint16_t), cudaMemcpyHostToDevice));
+    MOE_CK(ix_se::ix_scalar_gate(d_x, d_w, d_g, n));
+    auto got = dev_get(d_g, 1);
+    MOE_T(fabsf(got[0] - ref_gate) < 1e-4f);
+    MOE_T(ix_se::ix_scalar_gate(nullptr, d_w, d_g, n) == cudaErrorInvalidValue);
+    cudaFree(d_x); cudaFree(d_w); cudaFree(d_g);
+    printf("moe_parity: test_ix_scalar_gate done\n");
+}
+
+// ---------------------------------------------------------------------------
+// S4 wave: test_ix_gate_shared — ix_gate_shared: sigmoid(dot(x,w))*out in one call.
+// Sentence 4: gates the shared expert contribution with shared_expert_gate.weight.
+// out[i] starts as 1.0, then is scaled by sigmoid(dot(x, w)).
+// ---------------------------------------------------------------------------
+static void test_ix_gate_shared() {
+    const int n = 16;
+    std::vector<uint16_t> x_bf16(n), w_bf16(n);
+    double dot = 0.0;
+    for (int i = 0; i < n; ++i) {
+        const float xv = 0.2f * (i - 8);
+        const float wv = 0.1f * ((i % 3) + 1);
+        x_bf16[i] = f32_to_bf16(xv);
+        w_bf16[i] = f32_to_bf16(wv);
+        dot += (double)bf16_to_f32(x_bf16[i]) * (double)bf16_to_f32(w_bf16[i]);
+    }
+    const float gate_val = 1.0f / (1.0f + expf(-(float)dot));
+    // out[i] = 1.0f initially; after gate: out[i] = gate_val
+    std::vector<float> out_init(n, 1.0f);
+    uint16_t *d_x, *d_w; float *d_g, *d_out;
+    MOE_CK(cudaMalloc((void**)&d_x, n * sizeof(uint16_t)));
+    MOE_CK(cudaMalloc((void**)&d_w, n * sizeof(uint16_t)));
+    MOE_CK(cudaMalloc((void**)&d_g, sizeof(float)));
+    MOE_CK(cudaMalloc((void**)&d_out, n * sizeof(float)));
+    MOE_CK(cudaMemcpy(d_x,   x_bf16.data(),   n * sizeof(uint16_t), cudaMemcpyHostToDevice));
+    MOE_CK(cudaMemcpy(d_w,   w_bf16.data(),   n * sizeof(uint16_t), cudaMemcpyHostToDevice));
+    MOE_CK(cudaMemcpy(d_out, out_init.data(), n * sizeof(float),    cudaMemcpyHostToDevice));
+    MOE_CK(ix_se::ix_gate_shared(d_x, d_w, d_g, d_out, n));
+    auto got = dev_get(d_out, n);
+    for (int i = 0; i < n; ++i) MOE_T(fabsf(got[i] - gate_val) < 1e-4f);
+    MOE_T(ix_se::ix_gate_shared(nullptr, d_w, d_g, d_out, n) == cudaErrorInvalidValue);
+    MOE_T(ix_se::ix_gate_shared(d_x, d_w, nullptr, d_out, n) == cudaErrorInvalidValue);
+    cudaFree(d_x); cudaFree(d_w); cudaFree(d_g); cudaFree(d_out);
+    printf("moe_parity: test_ix_gate_shared done\n");
+}
+
 int main(int argc, char** argv) {
     (void)argc; (void)argv;
     int ndev = 0;
@@ -232,8 +332,12 @@ int main(int argc, char** argv) {
     test_moe_router_logits();
     test_moe_top8_select();
     test_moe_shared_expert();
+    test_ix_swiglu();
     test_moe_shared_gate();
+    test_ix_scalar_gate();
+    test_ix_gate_shared();
     test_moe_combine();
+    test_ix_moe_combine();
     printf("moe_parity: pass=%d fail=%d\n", g_pass, g_fail);
     if (g_fail) { printf("moe_parity FAILED\n"); return 1; }
     printf("moe_parity selftest: ok\n"); return 0;

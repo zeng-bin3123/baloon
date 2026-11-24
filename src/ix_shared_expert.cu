@@ -66,4 +66,16 @@ inline cudaError_t ix_scale(float* out, const float* g, int n, cudaStream_t s = 
     scale_kernel<<<(n + 127) / 128, 128, 0, s>>>(out, g, n);
     return cudaGetLastError();
 }
+// Sentence 4: ix_gate_shared — gates the shared expert output by shared_expert_gate.weight.
+// Computes g = sigmoid(dot(x_bf16, w_bf16)) then scales out[0..n_embd) by g in-place.
+// Needs a 1-float device scratch buffer for the gate value; caller provides d_g.
+inline cudaError_t ix_gate_shared(const uint16_t* x_bf16, const uint16_t* w_bf16,
+                                   float* d_g, float* out, int n_embd, cudaStream_t s = 0) {
+    if (!x_bf16 || !w_bf16 || !d_g || !out || n_embd <= 0) return cudaErrorInvalidValue;
+    scalar_gate_kernel<<<1, GATE_THREADS, 0, s>>>(x_bf16, w_bf16, d_g, n_embd);
+    cudaError_t e = cudaGetLastError();
+    if (e != cudaSuccess) return e;
+    scale_kernel<<<(n_embd + 127) / 128, 128, 0, s>>>(out, d_g, n_embd);
+    return cudaGetLastError();
+}
 }  // namespace ix_se
