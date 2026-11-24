@@ -173,3 +173,9 @@ tests/k39_integration/moe_parity.cu	test_moe_router_logits	src/kernels/gpu/moe_n
 tests/k39_integration/qsa_layer_parity.cu	test_qsa_bf16_qk_norm	src/kernels/gpu/qsa_bf16_layer.cu	qsa_bf16_qk_norm_kernel
 tests/k39_integration/moe_parity.cu	test_moe_shared_expert	src/kernels/gpu/shared_expert_k.cu	swiglu_kernel
 tests/k39_integration/moe_parity.cu	test_ix_swiglu	src/ix_shared_expert.cu	swiglu_kernel
+tests/k39_integration/moe_parity.cu	test_moe_top8_select	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+tests/k39_integration/moe_parity.cu	test_moe_shared_gate	src/ix_shared_expert.cu	scalar_gate_kernel
+tests/k39_integration/moe_parity.cu	test_ix_scalar_gate	src/ix_shared_expert.cu	scalar_gate_kernel
+tests/k39_integration/moe_parity.cu	test_ix_gate_shared	src/ix_shared_expert.cu	ix_gate_shared
+tests/k39_integration/moe_parity.cu	test_moe_combine	src/kernels/gpu/shared_expert_k.cu	moe_combine_kernel
+tests/k39_integration/moe_parity.cu	test_ix_moe_combine	src/ix_moe_combine.cu	moe_combine_kernel

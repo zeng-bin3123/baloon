@@ -322,6 +322,69 @@ static void test_ix_gate_shared() {
     printf("moe_parity: test_ix_gate_shared done\n");
 }
 
+// ---------------------------------------------------------------------------
+// S5 wave: test_ix_moe_combine — ix_moe_combine: y[j] = sum_e w[e]*parts[e][j] + shared[j].
+// Verifies combine output matches a CPU reference for k=4 experts, n_embd=8.
+// ---------------------------------------------------------------------------
+static void test_ix_moe_combine() {
+    const int NE = 4, NH = 8;
+    std::vector<float> parts(NE * NH), weights(NE), shared(NH), ref(NH, 0.f);
+    for (int e = 0; e < NE; ++e) weights[e] = 1.f / NE;
+    for (int i = 0; i < NE * NH; ++i) parts[i] = (float)(i + 1) * 0.1f;
+    for (int j = 0; j < NH; ++j)      shared[j] = (float)(j + 1) * 0.5f;
+    for (int j = 0; j < NH; ++j) {
+        for (int e = 0; e < NE; ++e) ref[j] += weights[e] * parts[e * NH + j];
+        ref[j] += shared[j];
+    }
+    float *d_parts=dev_alloc<float>(NE*NH), *d_wt=dev_alloc<float>(NE);
+    float *d_sh=dev_alloc<float>(NH), *d_y=dev_alloc<float>(NH);
+    dev_put(d_parts, parts); dev_put(d_wt, weights); dev_put(d_sh, shared);
+    MOE_CK(ix_moe_combine(d_parts, d_wt, d_sh, d_y, NH, NE, 1));
+    auto got = dev_get(d_y, NH);
+    for (int j = 0; j < NH; ++j) MOE_T(fabsf(got[j] - ref[j]) < 1e-4f);
+    // without shared: y[j] = sum_e(w[e]*parts[e][j])
+    std::fill(ref.begin(), ref.end(), 0.f);
+    for (int j = 0; j < NH; ++j)
+        for (int e = 0; e < NE; ++e) ref[j] += weights[e] * parts[e * NH + j];
+    MOE_CK(ix_moe_combine(d_parts, d_wt, nullptr, d_y, NH, NE, 0));
+    got = dev_get(d_y, NH);
+    for (int j = 0; j < NH; ++j) MOE_T(fabsf(got[j] - ref[j]) < 1e-4f);
+    // bad-arg guard: n_embd=0 returns cudaErrorInvalidValue
+    MOE_T(ix_moe_combine(d_parts, d_wt, d_sh, d_y, 0, NE, 1) == cudaErrorInvalidValue);
+    cudaFree(d_parts); cudaFree(d_wt); cudaFree(d_sh); cudaFree(d_y);
+    printf("moe_parity: test_ix_moe_combine done\n");
+}
+
+// ---------------------------------------------------------------------------
+// S5 wave: test_ix_moe_combine — ix_moe_combine: sum k expert parts weighted + shared plain.
+// Verifies output[j] = sum_e(weights[e]*parts[e][j]) + shared[j] against CPU reference.
+// ---------------------------------------------------------------------------
+static void test_ix_moe_combine() {
+    const int NE = 4, NH = 8;
+    std::vector<float> parts(NE * NH), weights(NE), shared(NH);
+    for (int i = 0; i < NE * NH; ++i) parts[i]   = 0.1f * ((i % 7) - 3);
+    for (int i = 0; i < NE;      ++i) weights[i]  = 0.25f;
+    for (int i = 0; i < NH;      ++i) shared[i]   = 0.05f * (i + 1);
+    std::vector<float> ref(NH, 0.f);
+    for (int e = 0; e < NE; ++e)
+        for (int j = 0; j < NH; ++j) ref[j] += weights[e] * parts[(size_t)e * NH + j];
+    for (int j = 0; j < NH; ++j) ref[j] += shared[j];
+    float *d_parts, *d_wt, *d_sh, *d_y;
+    MOE_CK(cudaMalloc((void**)&d_parts, NE * NH * sizeof(float)));
+    MOE_CK(cudaMalloc((void**)&d_wt,    NE * sizeof(float)));
+    MOE_CK(cudaMalloc((void**)&d_sh,    NH * sizeof(float)));
+    MOE_CK(cudaMalloc((void**)&d_y,     NH * sizeof(float)));
+    MOE_CK(cudaMemcpy(d_parts, parts.data(),   NE * NH * sizeof(float), cudaMemcpyHostToDevice));
+    MOE_CK(cudaMemcpy(d_wt,    weights.data(), NE * sizeof(float),      cudaMemcpyHostToDevice));
+    MOE_CK(cudaMemcpy(d_sh,    shared.data(),  NH * sizeof(float),      cudaMemcpyHostToDevice));
+    MOE_CK(ix_moe_combine(d_parts, d_wt, d_sh, d_y, NH, NE, 1));
+    auto got = dev_get(d_y, NH);
+    for (int j = 0; j < NH; ++j) MOE_T(fabsf(got[j] - ref[j]) < 1e-4f);
+    MOE_T(ix_moe_combine(nullptr, d_wt, d_sh, d_y, NH, NE, 1) == cudaErrorInvalidValue);
+    cudaFree(d_parts); cudaFree(d_wt); cudaFree(d_sh); cudaFree(d_y);
+    printf("moe_parity: test_ix_moe_combine done\n");
+}
+
 int main(int argc, char** argv) {
     (void)argc; (void)argv;
     int ndev = 0;

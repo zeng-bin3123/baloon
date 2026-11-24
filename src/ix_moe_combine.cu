@@ -23,7 +23,7 @@ __global__ void moe_combine_kernel(const float* __restrict__ parts, const float*
 // Single token: parts [k, n_embd], weights [k], shared [n_embd] (ignored if has_shared==0), y [n_embd].
 inline cudaError_t ix_moe_combine(const float* parts, const float* weights, const float* shared, float* y,
                                   int n_embd, int k, int has_shared, cudaStream_t s = 0) {
-    if (n_embd <= 0 || k <= 0) return cudaErrorInvalidValue;
+    if (!parts || !weights || !y || n_embd <= 0 || k <= 0) return cudaErrorInvalidValue;
     const int TH = 256;
     moe_combine_kernel<<<(n_embd + TH - 1) / TH, TH, 0, s>>>(parts, weights, shared, y, n_embd, k, has_shared);
     return cudaGetLastError();
