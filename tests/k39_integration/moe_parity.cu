@@ -20,7 +20,7 @@
 #include "../../src/ix_moe_combine.cu"
 // S2 wave kernel: ix_router_top10_wave.cu; native_router_top10 uses __shfl_xor(int) which
 // causes GPU hardware fault and machine reboot on the BI-V100 (ivcore10, measured twice).
-#include "../../src/ix_router_top10_wave.cu"
+#include "ix_router_top10_wave.cu"
 #include "baloon/kg_kernels.hpp"
 #include <cuda_runtime.h>
 #include <cstdio>

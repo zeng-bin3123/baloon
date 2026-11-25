@@ -253,3 +253,17 @@ tests/k39_integration/gdn_layer_parity.cu	test_rms_norm_bf16w_inplace	src/kernel
 tests/k39_integration/gdn_parity.cu	main	src/kernels/gpu/gdn_core.cu	gdn_step_kernel
 tests/k39_integration/gdn_layer_parity.cu	test_rms_norm_bf16w_inplace	src/kernels/gpu/ew_ops.cu	rms_norm_bf16w_inplace_kernel
 tests/k39_integration/gdn_parity.cu	main	src/kernels/gpu/gdn_core.cu	gdn_step_kernel
+missing:router_top10_wave	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+src/kernels/router_top10_parity.cpp	reference	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+src/kernels/router_top10_parity.cpp	run_case	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+src/kernels/router_top10_parity.cpp	check	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+missing:model.language_model.layers.{i}.mlp.gate.weight	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+missing:router_top10_kernel	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+missing:model.language_model.layers.{i}.mlp.shared_expert_gate.weight	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+missing:router_top10_wave	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+src/kernels/router_top10_parity.cpp	reference	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+src/kernels/router_top10_parity.cpp	run_case	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+src/kernels/router_top10_parity.cpp	check	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+missing:model.language_model.layers.{i}.mlp.gate.weight	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+missing:router_top10_kernel	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+missing:router_top10_kernel	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel

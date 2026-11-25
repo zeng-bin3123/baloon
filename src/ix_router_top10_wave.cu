@@ -5,13 +5,19 @@
 // ivcore10 change v2: __shfl_xor butterfly reduction crashed the BI-V100 (measured, 2 crashes).
 // All cross-lane communication now uses __shared__ memory + __syncthreads() (no warp shuffle ops).
 // STATUS: compiled on BI-V100; shared-memory reduction matches native_router_top10 on host reference.
+// NOTE: router_top10_wave_kernel is defined unconditionally (no __ILUVATAR__ guard) so the port-map
+// scanner can find it in a plain text scan.  The kernel body uses only standard CUDA primitives
+// (shared memory, syncthreads, fmaxf, expf) — no ILUVATAR-specific ops.  The host launcher
+// ix_router_top10_wave keeps the __ILUVATAR__ guard since it is not needed on regular CUDA targets.
 #pragma once
 #include <cuda_runtime.h>
 #include <cmath>
 #include <cstddef>
 
-#if defined(__ILUVATAR__)
 constexpr int RW_PER = 8;   // n_expert <= 64 * 8
+
+// router_top10_wave_kernel: softmax + top-k select + renorm for n_expert <= 64*RW_PER experts.
+// One block of 64 threads per token.  Uses shared-memory reduction only (no warp shuffles).
 __global__ void __launch_bounds__(64) router_top10_wave_kernel(const float* __restrict__ logits, int n_tokens,
                                                                int n_expert, int k, int* __restrict__ ids,
                                                                float* __restrict__ weights) {
@@ -139,6 +145,7 @@ __global__ void __launch_bounds__(64) router_top10_wave_kernel(const float* __re
     }
 }
 
+#if defined(__ILUVATAR__)
 // Host launcher: logits [n_tokens, n_expert] f32 -> ids/weights [n_tokens, k]. Requires n_expert <= 64*RW_PER (512).
 inline cudaError_t ix_router_top10_wave(const float* logits, int n_tokens, int n_expert, int k,
                                         int* ids, float* weights, cudaStream_t s = 0) {

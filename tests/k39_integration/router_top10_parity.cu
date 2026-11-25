@@ -5,7 +5,7 @@
 #undef main
 
 // Sentence 1 & 2: wave-kernel port compiled on ILUVATAR ivcore10 via CUFLAGS -D__ILUVATAR__
-#include "../../src/ix_router_top10_wave.cu"
+#include "ix_router_top10_wave.cu"
 
 #ifdef __ILUVATAR__
 // test_wave_router: verifies ix_router_top10_wave against a CPU softmax reference for 256 experts, k=8.

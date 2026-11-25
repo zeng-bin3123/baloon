@@ -24,8 +24,10 @@ static void test_rms_norm_bf16w_inplace() {
         near_vec(kdx.get(), kref, 1e-6, 1e-6,
                  "rms_norm_bf16w_inplace: all-ones hidden state with unit weight gives 1/sqrt(1+eps)");
     }
-    // Random cases at model hidden_size (2048) and smaller sizes.
-    for (int cols : {8, 517, 2048}) {
+    // Random cases: cols=256 is THREADS (each thread handles exactly one element, boundary);
+    // cols=517 is non-power-of-two; cols=2048 is hidden_size for input_layernorm.weight /
+    // post_attention_layernorm.weight of model.language_model.layers.{i} and mtp.layers.{i}.
+    for (int cols : {8, 256, 517, 2048}) {
         const int rows = (cols == 2048 ? 3 : 2);
         auto xf = vf((size_t)rows * cols, -2.f, 2.f);
         auto wbf = vbf((size_t)cols, 1.5f);
