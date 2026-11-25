@@ -185,3 +185,5 @@ tests/k39_integration/gdn_layer_parity.cu	test_gdn_sigmoid_gate	src/kernels/gpu/
 tests/k39_integration/gdn_layer_parity.cu	test_gdn_ssm_norm_bf16w	src/kernels/gpu/gdn_bf16_layer.cu	gdn_ssm_norm_bf16w_kernel
 tests/k39_integration/gdn_layer_parity.cu	test_gdn_bf16_in_proj	src/kernels/gpu/bf16_native.cu	bf16_f32_mmvf_kernel
 tests/k39_integration/gdn_layer_parity.cu	test_gdn_bf16_out_proj	src/kernels/gpu/bf16_native.cu	bf16_f32_mmvf_kernel
+tests/k39_integration/embed_parity.cu	test_embed_gather16	src/prefill/kernels.cu	gather_rows16_kernel
+tests/k39_integration/sampler_parity.cu	test_sampler	src/cu/sampler.cu	sampler_kernel

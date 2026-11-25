@@ -72,9 +72,62 @@ static void test_parse_header() {
     LP(sf_parse_header(bad.data(), bad.size(), out) == 0);
 }
 
+static void test_validate_shape() {
+    using namespace baloon::sf;
+    SfTensorInfo ti; std::memset(&ti, 0, sizeof(ti));
+    std::string err;
+
+    // group 0: lm_head.weight [248320,2048] BF16 → 248320*2048*2 bytes
+    std::strncpy(ti.dtype, "BF16", sizeof(ti.dtype));
+    ti.nbytes = 248320ULL * 2048 * 2;
+    LP(sf_validate_bf16_shape("lm_head.weight", ti, 0, &err));
+
+    // wrong dtype → false
+    std::strncpy(ti.dtype, "F32", sizeof(ti.dtype));
+    LP(!sf_validate_bf16_shape("lm_head.weight", ti, 0, &err));
+
+    // correct dtype, wrong nbytes → false
+    std::strncpy(ti.dtype, "BF16", sizeof(ti.dtype));
+    ti.nbytes = 42;
+    LP(!sf_validate_bf16_shape("lm_head.weight", ti, 0, &err));
+
+    // group 1: mlp.experts.down_proj [256,2048,512] BF16
+    ti.nbytes = 256ULL * 2048 * 512 * 2;
+    LP(sf_validate_bf16_shape("model.language_model.layers.0.mlp.experts.down_proj", ti, 1, &err));
+
+    // group 2: mlp.experts.gate_up_proj [256,1024,2048] BF16
+    ti.nbytes = 256ULL * 1024 * 2048 * 2;
+    LP(sf_validate_bf16_shape("model.language_model.layers.0.mlp.experts.gate_up_proj", ti, 2, &err));
+
+    // group 3: self_attn.q_proj.weight [8192,2048] BF16
+    ti.nbytes = 8192ULL * 2048 * 2;
+    LP(sf_validate_bf16_shape("model.language_model.layers.5.self_attn.q_proj.weight", ti, 3, &err));
+
+    // group 4: model.language_model.norm.weight [2048] BF16
+    ti.nbytes = 2048ULL * 2;
+    LP(sf_validate_bf16_shape("model.language_model.norm.weight", ti, 4, &err));
+
+    // group 8: input_layernorm.weight [2048] BF16
+    LP(sf_validate_bf16_shape("model.language_model.layers.0.input_layernorm.weight", ti, 8, &err));
+
+    // group 9: post_attention_layernorm.weight [2048] BF16
+    LP(sf_validate_bf16_shape("model.language_model.layers.0.post_attention_layernorm.weight", ti, 9, &err));
+
+    // group 10: mtp input_layernorm.weight [2048] BF16
+    LP(sf_validate_bf16_shape("mtp.layers.0.input_layernorm.weight", ti, 10, &err));
+
+    // group 11: mtp post_attention_layernorm.weight [2048] BF16
+    LP(sf_validate_bf16_shape("mtp.layers.0.post_attention_layernorm.weight", ti, 11, &err));
+
+    // out-of-range gid → false
+    LP(!sf_validate_bf16_shape("lm_head.weight", ti, -1, &err));
+    LP(!sf_validate_bf16_shape("lm_head.weight", ti, 12, &err));
+}
+
 int main() {
     test_group_id();
     test_parse_header();
+    test_validate_shape();
     std::printf("loader_parity: checks=%ld failures=%ld\n", g_checks, g_fail);
     if (g_fail) { std::printf("loader_parity FAILED\n"); return 1; }
     std::printf("loader_parity PASSED\n"); return 0;

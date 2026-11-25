@@ -29,13 +29,18 @@ static void test_rms_norm_bf16w_inplace() {
            "rms_norm_bf16w_inplace launch");
         near_vec(dx.get(), ref, 1e-4, 1e-5, "rms_norm_bf16w_inplace: in-place weighted RMS norm matches host reference");
     }
-    // bad-arg guards: null x or null w must return cudaErrorInvalidValue.
+    // bad-arg guards: null x, null w, rows<=0, or cols<=0 must return cudaErrorInvalidValue.
     {
         Dev<float>    dx(2048); Dev<uint16_t> dw(2048);
         ok(rms_norm_bf16w_inplace(nullptr, dw, 1, 2048, eps) == cudaErrorInvalidValue,
            "rms_norm_bf16w_inplace rejects null x");
         ok(rms_norm_bf16w_inplace(dx, nullptr, 1, 2048, eps) == cudaErrorInvalidValue,
            "rms_norm_bf16w_inplace rejects null w");
+        // The hidden state must have a positive row count and a positive column count.
+        ok(rms_norm_bf16w_inplace(dx, dw, 0, 2048, eps) == cudaErrorInvalidValue,
+           "rms_norm_bf16w_inplace rejects rows=0");
+        ok(rms_norm_bf16w_inplace(dx, dw, 1, 0, eps) == cudaErrorInvalidValue,
+           "rms_norm_bf16w_inplace rejects cols=0");
     }
 }
 

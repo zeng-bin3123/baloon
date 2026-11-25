@@ -43,13 +43,10 @@ static uint16_t ep_rand16() {
 
 using namespace baloon::pk;
 
-int main() {
-    int ndev = 0;
-    if (cudaGetDeviceCount(&ndev) != cudaSuccess || ndev < 1) {
-        std::fprintf(stderr, "embed_parity: no GPU device\n"); return 2;
-    }
-    EP_CK(cudaSetDevice(0));
-
+// test_embed_gather16 — gathers BF16 embedding rows by token ID from embed_tokens.weight
+// into the initial hidden-state buffer for each position in the batch.
+// Sentence: each output row is a bit-exact copy of the indexed table row (gather_rows16_kernel).
+static int test_embed_gather16(int* checks_out, int* bad_out) {
     int bad = 0, checks = 0;
 
     // looks up each input token in embed_tokens (BF16 table, width=2048 = hidden_size)
@@ -122,6 +119,21 @@ int main() {
         }
         cudaFree(ds); cudaFree(dd); cudaFree(di);
     }
+
+    *checks_out = checks;
+    *bad_out    = bad;
+    return bad;
+}
+
+int main() {
+    int ndev = 0;
+    if (cudaGetDeviceCount(&ndev) != cudaSuccess || ndev < 1) {
+        std::fprintf(stderr, "embed_parity: no GPU device\n"); return 2;
+    }
+    EP_CK(cudaSetDevice(0));
+
+    int checks = 0, bad = 0;
+    test_embed_gather16(&checks, &bad);
 
     std::printf("embed_parity: checks=%d failures=%d\n", checks, bad);
     if (bad) { std::printf("embed_parity FAILED\n"); return 1; }
