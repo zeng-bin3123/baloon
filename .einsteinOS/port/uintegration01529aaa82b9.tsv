@@ -174,7 +174,6 @@ tests/k39_integration/qsa_layer_parity.cu	test_qsa_bf16_kv_proj	src/kernels/gpu/
 tests/k39_integration/qsa_layer_parity.cu	test_qsa_bf16_qk_norm	src/kernels/gpu/qsa_bf16_layer.cu	qsa_bf16_qk_norm_kernel
 tests/k39_integration/moe_parity.cu	test_moe_shared_expert	src/kernels/gpu/shared_expert_k.cu	swiglu_kernel
 tests/k39_integration/moe_parity.cu	test_ix_swiglu	src/ix_shared_expert.cu	swiglu_kernel
-tests/k39_integration/moe_parity.cu	test_moe_top8_select	src/ix_router_top10_wave.cu	router_top10_wave_kernel
 tests/k39_integration/moe_parity.cu	test_moe_shared_gate	src/ix_shared_expert.cu	scalar_gate_kernel
 tests/k39_integration/moe_parity.cu	test_ix_scalar_gate	src/ix_shared_expert.cu	scalar_gate_kernel
 tests/k39_integration/moe_parity.cu	test_ix_gate_shared	src/ix_shared_expert.cu	ix_gate_shared
@@ -188,8 +187,6 @@ tests/k39_integration/gdn_layer_parity.cu	test_gdn_bf16_out_proj	src/kernels/gpu
 tests/k39_integration/embed_parity.cu	test_embed_gather16	src/prefill/kernels.cu	gather_rows16_kernel
 tests/k39_integration/sampler_parity.cu	test_sampler	src/cu/sampler.cu	sampler_kernel
 tests/k39_integration/gr_parity.cu	test_mmvq_wave_smoke	src/ix_mmvq_wave.cu	ix_mmvq_q8_0
-tests/k39_integration/router_top10_parity.cu	test_wave_router	src/ix_router_top10_wave.cu	router_top10_wave_kernel
-tests/k39_integration/router_top10_parity.cu	test_wave_router	src/ix_router_top10_wave.cu	router_top10_wave_kernel
 tests/k39_integration/loader_parity.cpp	test_group_id	include/baloon/safetensors_loader.hpp	sf_group_id
 tests/k39_integration/loader_parity.cpp	test_parse_header	include/baloon/safetensors_loader.hpp	sf_parse_header
 tests/k39_integration/loader_parity.cpp	test_validate_shape	include/baloon/safetensors_loader.hpp	sf_validate_bf16_shape
@@ -202,7 +199,6 @@ tests/k39_integration/qsa_layer_parity.cu	test_qsa_mrope_step	src/kernels/gpu/qs
 tests/k39_integration/qsa_layer_parity.cu	test_qsa_kv_cache_step	src/kernels/gpu/qsa_bf16_layer.cu	qsa_kv_append_kernel
 tests/k39_integration/qsa_layer_parity.cu	test_qsa_bf16_o_proj	src/kernels/gpu/bf16_native.cu	bf16_f32_mmvf_kernel
 src/kernels/cuda/shared_expert.cu	moe_combine_kernel	src/ix_moe_combine.cu	moe_combine_kernel
-src/kernels/cuda/router_top10.cu	router_top10_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
 src/kernels/cuda/shared_expert.cu	swiglu_kernel	src/ix_shared_expert.cu	swiglu_kernel
 src/kernels/cuda/shared_expert.cu	scalar_gate_kernel	src/ix_shared_expert.cu	scalar_gate_kernel
 src/kernels/cuda/shared_expert.cu	scale_kernel	src/ix_shared_expert.cu	scale_kernel
@@ -232,7 +228,6 @@ src/kernels/gpu/qsa_bf16_layer.cu	qsa_kv_append_kernel	src/kernels/gpu/qsa_bf16_
 src/kernels/gpu/shared_expert_k.cu	swiglu_kernel	src/kernels/gpu/shared_expert_k.cu	swiglu_kernel
 src/kernels/gpu/shared_expert_k.cu	moe_combine_kernel	src/kernels/gpu/shared_expert_k.cu	moe_combine_kernel
 src/ix_moe_combine.cu	moe_combine_kernel	src/ix_moe_combine.cu	moe_combine_kernel
-src/ix_router_top10_wave.cu	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
 src/ix_shared_expert.cu	swiglu_kernel	src/ix_shared_expert.cu	swiglu_kernel
 src/ix_shared_expert.cu	scalar_gate_kernel	src/ix_shared_expert.cu	scalar_gate_kernel
 src/ix_shared_expert.cu	scale_kernel	src/ix_shared_expert.cu	scale_kernel
@@ -240,7 +235,6 @@ src/kernels/cuda/shared_expert.cu	swiglu_kernel	src/ix_shared_expert.cu	swiglu_k
 src/kernels/cuda/shared_expert.cu	scalar_gate_kernel	src/ix_shared_expert.cu	scalar_gate_kernel
 src/kernels/cuda/shared_expert.cu	scale_kernel	src/ix_shared_expert.cu	scale_kernel
 src/kernels/cuda/shared_expert.cu	moe_combine_kernel	src/ix_moe_combine.cu	moe_combine_kernel
-src/kernels/cuda/router_top10.cu	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
 src/kernels/cuda/shared_expert.cu	swiglu_kernel	src/kernels/gpu/shared_expert_k.cu	swiglu_kernel
 src/kernels/cuda/shared_expert.cu	moe_combine_kernel	src/kernels/gpu/shared_expert_k.cu	moe_combine_kernel
 src/kernels/cuda/native_moe.cu	moe_router_logits_kernel	src/kernels/gpu/moe_native.cu	moe_router_logits_kernel
@@ -253,17 +247,6 @@ tests/k39_integration/gdn_layer_parity.cu	test_rms_norm_bf16w_inplace	src/kernel
 tests/k39_integration/gdn_parity.cu	main	src/kernels/gpu/gdn_core.cu	gdn_step_kernel
 tests/k39_integration/gdn_layer_parity.cu	test_rms_norm_bf16w_inplace	src/kernels/gpu/ew_ops.cu	rms_norm_bf16w_inplace_kernel
 tests/k39_integration/gdn_parity.cu	main	src/kernels/gpu/gdn_core.cu	gdn_step_kernel
-missing:router_top10_wave	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
-src/kernels/router_top10_parity.cpp	reference	src/ix_router_top10_wave.cu	router_top10_wave_kernel
-src/kernels/router_top10_parity.cpp	run_case	src/ix_router_top10_wave.cu	router_top10_wave_kernel
-src/kernels/router_top10_parity.cpp	check	src/ix_router_top10_wave.cu	router_top10_wave_kernel
-missing:model.language_model.layers.{i}.mlp.gate.weight	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
-missing:router_top10_kernel	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
-missing:model.language_model.layers.{i}.mlp.shared_expert_gate.weight	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
-missing:router_top10_wave	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
-src/kernels/router_top10_parity.cpp	reference	src/ix_router_top10_wave.cu	router_top10_wave_kernel
-src/kernels/router_top10_parity.cpp	run_case	src/ix_router_top10_wave.cu	router_top10_wave_kernel
-src/kernels/router_top10_parity.cpp	check	src/ix_router_top10_wave.cu	router_top10_wave_kernel
-missing:model.language_model.layers.{i}.mlp.gate.weight	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
-missing:router_top10_kernel	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
-missing:router_top10_kernel	router_top10_wave_kernel	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+src/ix_moe_combine.cu	moe_combine_kernel	src/ix_moe_combine.cu	ix_moc_kern
+include/baloon/rt_layout.hpp	fail	include/baloon/rt_layout.hpp	fail
+include/baloon/rt_graph.hpp	fail	include/baloon/rt_graph.hpp	fail

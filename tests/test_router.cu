@@ -1,5 +1,5 @@
 // GPU vs host reference for ix_router_top10_wave (Phase 1 #3 accept: same top-8 ids and weights, 256 experts, k=8).
-#include "../src/ix_router_top10_wave.cu"
+#include "k39_integration/ix_router_top10_wave.cu"
 #include "router_ref.h"
 #include <cstdio>
 #include <random>

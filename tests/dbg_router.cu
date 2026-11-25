@@ -1,4 +1,4 @@
-#include "../src/ix_router_top10_wave.cu"
+#include "k39_integration/ix_router_top10_wave.cu"
 #include "router_ref.h"
 #include <cstdio>
 #include <vector>
