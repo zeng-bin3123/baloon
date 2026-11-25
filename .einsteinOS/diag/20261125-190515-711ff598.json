@@ -1,0 +1,18 @@
+{
+ "time": "2026-11-25T19:05:15Z",
+ "conv": "711ff598-ce40-48ad-8189-9190e8720059",
+ "role": "spawn_work",
+ "exit": "error",
+ "rounds": 4,
+ "tools": 114,
+ "continues": 1,
+ "text": "[Error] {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"此对话的代码执行环境中已有另一个回复正在运行。请等待其完成后再重试。\",\"details\":{\"error_visibility\":\"user_facing\",\"error_code\":\"wiggle_container_in_use\",\"in_use_by_human_message_uuid\":\"01a21417-297b-743e-8c30-0c513fbf1e3c\",\"in_use_by_assistant_message_uuid\":\"01a21417-297b-7453-ba31-17bb3de65d7b\"}},\"request_id\":\"req_011ChQAhoZG6f7a3WMqTM96B\"       }",
+ "request": {
+  "model": "claude-sonnet-4-6",
+  "effort": "medium",
+  "kind": "continue",
+  "prompt_bytes": 599,
+  "prompt_sha256": "9ee95b14873f47252e66802135f24967867127e49fe66bbccd7507cc56b2f8f9",
+  "prompt": "这些问题的每一句话都要有代码对应的commit解决，\n既然这样，就没必要扣剩下的小警告。现在主要是：注意，你可以看看这台机器上执行的工具调用，上一轮的流在结束之前断了，这一轮没有工具调用，但是，内容如下评价：每一句话，都要有对应的功能代码，建议一句话一个commit, 这次估计要开1个commit推到这台机器, prompt工程是不被允许的，实在需要的话最多做.format(arg) 这种插入式\n。工具调用次数满了就跟我说，我会帮你重置，一直满就一直重置"
+ }
+}
