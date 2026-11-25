@@ -69,9 +69,10 @@ static void test_moe_router_logits() {
     auto got = dev_get(d_lg, NE);
     for (int e = 0; e < NE; ++e)
         MOE_T(fabsf(got[e] - ref[e]) < 1e-3f);
-    // bad-arg guard
+    // bad-arg guard: null gate_w, n_expert=0, n_embd=0 all rejected
     MOE_T(baloon::kg::moe_router_logits(nullptr, d_x, d_lg, NE, NH) == cudaErrorInvalidValue);
     MOE_T(baloon::kg::moe_router_logits(d_gw, d_x, d_lg, 0, NH)    == cudaErrorInvalidValue);
+    MOE_T(baloon::kg::moe_router_logits(d_gw, d_x, d_lg, NE, 0)    == cudaErrorInvalidValue);
     cudaFree(d_gw); cudaFree(d_x); cudaFree(d_lg);
     printf("moe_parity: test_moe_router_logits done\n");
 }

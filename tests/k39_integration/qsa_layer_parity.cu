@@ -152,10 +152,11 @@ static void test_qsa_kv_cache_step() {
     QSA_CK(baloon::kg::qsa_kv_cache_step(dk, dv, dp, dt, 1, 0, n_kv, hd, ps, pool_rows));
     auto pool = dev_get(dp, pool_rows * hd);
     // k → row 0;  v → row 2 (pool_rows/2 = 2)
+    // The kernel stores IEEE FP16 (kgc::f_to_f16 = f16bits::f16_from_f32), not BF16 truncation.
     for (int d = 0; d < hd; ++d) {
-        const auto bf16_k = [](float f){ uint32_t u; memcpy(&u,&f,4); return (uint16_t)(u>>16); };
-        QSA_T(pool[0 * hd + d] == bf16_k(k[d]));
-        QSA_T(pool[2 * hd + d] == bf16_k(v[d]));
+        const auto f16_k = [](float f){ return baloon::f16bits::f16_from_f32(f); };
+        QSA_T(pool[0 * hd + d] == f16_k(k[d]));
+        QSA_T(pool[2 * hd + d] == f16_k(v[d]));
     }
     QSA_T(baloon::kg::qsa_kv_cache_step(nullptr, dv, dp, dt, 1, 0, n_kv, hd, ps, pool_rows) == cudaErrorInvalidValue);
     cudaFree(dk); cudaFree(dv); cudaFree(dp); cudaFree(dt);

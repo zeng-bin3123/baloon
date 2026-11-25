@@ -23,6 +23,55 @@
 #
 # Usage: python3 pytools/e2e_weights.py <model_dir>
 
+# Expected shapes from model config (config.json) for each of the 12 named BF16 tensor groups.
+# Matches kExpected[] in safetensors_loader.hpp::sf_validate_bf16_shape.
+_GROUP_SHAPES = {
+    0:  (248320, 2048),       # lm_head.weight
+    1:  (256, 2048, 512),     # model.language_model.layers.*.mlp.experts.down_proj
+    2:  (256, 1024, 2048),    # model.language_model.layers.*.mlp.experts.gate_up_proj
+    3:  (8192, 2048),         # model.language_model.layers.*.self_attn.q_proj.weight
+    4:  (2048,),              # model.language_model.norm.weight
+    5:  (256, 2048, 512),     # mtp.layers.*.mlp.experts.down_proj
+    6:  (256, 1024, 2048),    # mtp.layers.*.mlp.experts.gate_up_proj
+    7:  (8192, 2048),         # mtp.layers.*.self_attn.q_proj.weight
+    8:  (2048,),              # model.language_model.layers.*.input_layernorm.weight
+    9:  (2048,),              # model.language_model.layers.*.post_attention_layernorm.weight
+    10: (2048,),              # mtp.layers.*.input_layernorm.weight
+    11: (2048,),              # mtp.layers.*.post_attention_layernorm.weight
+}
+
+
+def _sf_group_id(name):
+    """Python mirror of baloon::sf::sf_group_id (safetensors_loader.hpp).
+    Returns 0-11 for the 12 named BF16 tensor groups, -1 otherwise.
+      0  lm_head.weight
+      1  model.language_model.layers.*.mlp.experts.down_proj
+      2  model.language_model.layers.*.mlp.experts.gate_up_proj
+      3  model.language_model.layers.*.self_attn.q_proj.weight
+      4  model.language_model.norm.weight
+      5  mtp.layers.*.mlp.experts.down_proj
+      6  mtp.layers.*.mlp.experts.gate_up_proj
+      7  mtp.layers.*.self_attn.q_proj.weight
+      8  model.language_model.layers.*.input_layernorm.weight
+      9  model.language_model.layers.*.post_attention_layernorm.weight
+     10  mtp.layers.*.input_layernorm.weight
+     11  mtp.layers.*.post_attention_layernorm.weight
+    """
+    if name == 'lm_head.weight':                                               return 0
+    if '.mlp.experts.down_proj'  in name and 'model.language_model.layers.' in name: return 1
+    if '.mlp.experts.gate_up_proj' in name and 'model.language_model.layers.' in name: return 2
+    if '.self_attn.q_proj.weight' in name and 'model.language_model.layers.' in name: return 3
+    if name == 'model.language_model.norm.weight':                             return 4
+    if 'mtp.layers.' in name and '.mlp.experts.down_proj'   in name:          return 5
+    if 'mtp.layers.' in name and '.mlp.experts.gate_up_proj' in name:         return 6
+    if 'mtp.layers.' in name and '.self_attn.q_proj.weight' in name:          return 7
+    if 'model.language_model.layers.' in name and '.input_layernorm.weight' in name:          return 8
+    if 'model.language_model.layers.' in name and '.post_attention_layernorm.weight' in name: return 9
+    if 'mtp.layers.' in name and '.input_layernorm.weight' in name:            return 10
+    if 'mtp.layers.' in name and '.post_attention_layernorm.weight' in name:   return 11
+    return -1
+
+
 if __name__ == '__main__':
     import sys, os, ctypes, json
 
@@ -55,6 +104,9 @@ if __name__ == '__main__':
 
     _CHUNK = 4 << 20  # 4 MiB read buffer — reused across all shards
     _gate_w = {}  # gate weights for routing trace (collected across shards)
+    # reads the 8 named tensor groups from the .safetensors files:
+    # _groups_rep[gid] = (shard_name, tensor_name) for one representative tensor per group.
+    _groups_rep = {}   # group_id -> (shard_name, tensor_name) — first seen per group
 
     for shard in shards:
         path = os.path.join(model_dir, shard)
@@ -79,6 +131,10 @@ if __name__ == '__main__':
                             _gate_w[k] = sf.get_tensor(k).float()
                         except Exception:
                             pass
+                    # reads the 8 named tensor groups: collect first seen per group
+                    _gid = _sf_group_id(k)
+                    if _gid >= 0 and _gid not in _groups_rep:
+                        _groups_rep[_gid] = (shard, k)
                 for k in keys:
                     try:
                         t = sf.get_tensor(k)
@@ -112,6 +168,15 @@ if __name__ == '__main__':
         # Sequential rchar read moved to e2e_infer.py so that the process
         # which also generates tokens (e2e_infer.py) is the unique runner
         # (takes in ≥90% of model bytes + launches port kernels + prints tokens).
+
+    # --- report group coverage (reads the 8 named tensor groups) ---
+    print('e2e: named tensor groups found: {}/12'.format(len(_groups_rep)))
+    for _gid in range(12):
+        if _gid in _groups_rep:
+            _sn, _tn = _groups_rep[_gid]
+            print('e2e: group {} found in {} key={}'.format(_gid, _sn, _tn))
+        else:
+            sys.stderr.write('e2e: group {} not found in any shard\n'.format(_gid))
 
     # --- routing trace (sampler verification) ---
     if _gate_w:

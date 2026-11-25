@@ -51,13 +51,13 @@ __global__ void scale_kernel(float* __restrict__ out, const float* __restrict__ 
 }
 
 inline cudaError_t ix_swiglu(const float* gate, const float* up, float* out, int n, cudaStream_t s = 0) {
-    if (n <= 0) return cudaErrorInvalidValue;
+    if (!gate || !up || !out || n <= 0) return cudaErrorInvalidValue;
     swiglu_kernel<<<(n + 127) / 128, 128, 0, s>>>(gate, up, out, n);
     return cudaGetLastError();
 }
 inline cudaError_t ix_scalar_gate(const uint16_t* x_bf16, const uint16_t* w_bf16, float* out, int n_embd,
                                   cudaStream_t s = 0) {
-    if (n_embd <= 0) return cudaErrorInvalidValue;
+    if (!x_bf16 || !w_bf16 || !out || n_embd <= 0) return cudaErrorInvalidValue;
     scalar_gate_kernel<<<1, GATE_THREADS, 0, s>>>(x_bf16, w_bf16, out, n_embd);
     return cudaGetLastError();
 }

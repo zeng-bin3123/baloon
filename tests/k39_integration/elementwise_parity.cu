@@ -9,7 +9,22 @@
 // input_layernorm or post_attention_layernorm weight vector.
 static void test_rms_norm_bf16w_inplace() {
     const float eps = 1e-6f;
-    // Case 1: single row at model hidden_size (2048) — input_layernorm / post_attention_layernorm shape.
+    // Known-value case: all-ones hidden state with unit BF16 weights verifies the formula directly.
+    // mean(1^2) = 1, inv = 1/sqrt(1+eps); bf16(1.0) = 0x3F80 (exact); output = 1/sqrt(1+eps) per element.
+    {
+        const int krows = 2, kcols = 2048;
+        std::vector<float>    kx(krows * kcols, 1.0f);
+        std::vector<uint16_t> kw(kcols, fb::round_f32_to_bf16_bits(1.0f));
+        Dev<float>    kdx(kx);
+        Dev<uint16_t> kdw(kw);
+        ok(rms_norm_bf16w_inplace(kdx, kdw, krows, kcols, eps) == cudaSuccess && sync_ok(),
+           "rms_norm_bf16w_inplace known-value launch");
+        const double kinv = 1.0 / std::sqrt(1.0 + (double)eps);
+        std::vector<double> kref(krows * kcols, kinv);
+        near_vec(kdx.get(), kref, 1e-6, 1e-6,
+                 "rms_norm_bf16w_inplace: all-ones hidden state with unit weight gives 1/sqrt(1+eps)");
+    }
+    // Random cases at model hidden_size (2048) and smaller sizes.
     for (int cols : {8, 517, 2048}) {
         const int rows = (cols == 2048 ? 3 : 2);
         auto xf = vf((size_t)rows * cols, -2.f, 2.f);

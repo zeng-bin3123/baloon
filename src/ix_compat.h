@@ -11,6 +11,17 @@
 
 #define IX_WARP_SIZE 64
 
+// ========== Bit-cast helpers (int<->float, for safe shuffles on ivcore10) ==========
+// ivcore10 does NOT support integer shuffles (__shfl_xor(int,int,int)): calling one
+// causes a GPU hardware fault and machine reboot (measured, twice, on BI-V100).
+// Always shuffle only floats; use these to bit-cast an int through a float shuffle.
+__device__ __forceinline__ float ix_int_as_float(int v) {
+    float r; __builtin_memcpy(&r, &v, sizeof(r)); return r;
+}
+__device__ __forceinline__ int ix_float_as_int(float v) {
+    int r; __builtin_memcpy(&r, &v, sizeof(r)); return r;
+}
+
 // ========== Warp-level shuffles (width=64, no _sync needed) ==========
 #define ix_shfl_xor(v, off)       __shfl_xor(v, off, 64)
 #define ix_shfl_down(v, delta)    __shfl_down(v, delta, 64)

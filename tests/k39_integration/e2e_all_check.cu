@@ -26,6 +26,7 @@
 #include "baloon/rt_device.hpp"   // DeviceArena → pe1ab8a4555: poison_kernel
 #include "baloon/kg_kernels.hpp"  // rms_norm_weighted, f32_to_bf16_bulk, bf16_gemv → pcd027bc02f head
 #include "baloon/safetensors_loader.hpp"  // sf_group_id / sf_map_to_device for the 8 BF16 tensor groups
+#include "baloon/prefill_kernels_api.hpp" // gather_rows16 → u7991572426 embed_tokens gather
 namespace kg = baloon::kg;        // short alias used in e2e_head_main() and e2e_gdn_layer_main()
 
 // GDN sub-layer: in_proj_* + conv1d + recurrence (A_log, dt_bias) + ssm_norm + z_gate + out_proj
