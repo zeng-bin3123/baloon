@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 28915,
     "started": "2026-11-25T01:13:08.360763742Z",
-    "renewed": "2026-11-25T01:30:39.996663525Z"
+    "renewed": "2026-11-25T01:39:23.20141257Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -1043,7 +1043,7 @@
       "kind": "machine_down_during_test",
       "text": "",
       "base_ref": "einsteinOS/dev-c880662efd-wip-uintegration01529aaa82b9-cont",
-      "base_sha": "35a8470d3d9033fd5af8ed452f2bd644d8707e69"
+      "base_sha": "dd7bb5a35e286e7af12a8a7d33028f69e2b1bb2c"
     }
   },
   "infra_fails": 0,
