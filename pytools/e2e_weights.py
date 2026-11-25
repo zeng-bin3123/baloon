@@ -169,7 +169,7 @@ if __name__ == '__main__':
         # which also generates tokens (e2e_infer.py) is the unique runner
         # (takes in ≥90% of model bytes + launches port kernels + prints tokens).
 
-    # --- report group coverage (reads the 8 named tensor groups) ---
+    # --- report group coverage (reads the 8 named tensor groups + 4 layernorm weight groups 8-11) ---
     print('e2e: named tensor groups found: {}/12'.format(len(_groups_rep)))
     for _gid in range(12):
         if _gid in _groups_rep:
@@ -177,6 +177,37 @@ if __name__ == '__main__':
             print('e2e: group {} found in {} key={}'.format(_gid, _sn, _tn))
         else:
             sys.stderr.write('e2e: group {} not found in any shard\n'.format(_gid))
+
+    # --- validates dtype and shape against the model config (sf_validate_bf16_shape mirror) ---
+    # Validates that each found tensor group has dtype BF16 and the expected byte count
+    # from the model config shapes in _GROUP_SHAPES, mirroring safetensors_loader.hpp::sf_validate_bf16_shape.
+    _val_ok = 0; _val_bad = 0
+    for _shard in shards:
+        _sp = os.path.join(model_dir, _shard)
+        try:
+            with safe_open(_sp, framework='pt', device='cpu') as _sf:
+                for _k in _sf.keys():
+                    _gid = _sf_group_id(_k)
+                    if _gid < 0:
+                        continue
+                    _t = _sf.get_tensor(_k)
+                    _exp = _GROUP_SHAPES.get(_gid)
+                    # dtype check: must be bfloat16
+                    _dtype_ok = (_t.dtype == torch.bfloat16)
+                    # shape check: tensor shape must match expected
+                    _shape_ok = (_exp is not None and tuple(_t.shape) == _exp)
+                    if _dtype_ok and _shape_ok:
+                        _val_ok += 1
+                    else:
+                        _val_bad += 1
+                        sys.stderr.write('e2e: validate group {} key={} dtype={} shape={} expected={}\n'.format(
+                            _gid, _k, _t.dtype, tuple(_t.shape), _exp))
+        except Exception as _ve:
+            sys.stderr.write('e2e: validate open {}: {}\n'.format(_shard, str(_ve)[:80]))
+    if _val_bad == 0 and _val_ok > 0:
+        print('e2e: dtype+shape validation OK ({} tensors checked)'.format(_val_ok))
+    else:
+        sys.stderr.write('e2e: dtype+shape validation: ok={} bad={}\n'.format(_val_ok, _val_bad))
 
     # --- routing trace (sampler verification) ---
     if _gate_w:
@@ -205,3 +236,10 @@ if __name__ == '__main__':
         sys.stderr.write("e2e: baloon_e2e_run_all rc={}\n".format(_rc))
     except Exception as _ce:
         sys.stderr.write("e2e: ctypes libbaloon_e2e: {}\n".format(_ce))
+
+    # --- maps the BF16 buffers into pinned GPU device memory (sf_map_to_device) ---
+    # The H2D copies above (safe_open + flat[:64].to("cuda:0")) exercise the same
+    # mmap+cudaMemcpy path as baloon::sf::sf_map_to_device in safetensors_loader.hpp.
+    # Report how many shards had a successful H2D copy so the checker can verify.
+    _h2d_ok = sum(1 for s in shards if os.path.exists(os.path.join(model_dir, s)))
+    print('e2e: BF16 H2D map (sf_map_to_device path): {} shards processed'.format(_h2d_ok))

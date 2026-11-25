@@ -1,5 +1,5 @@
 // graph.cpp - implementation of rt_graph.hpp.
-// fail is declared in rt_graph.hpp (baloon::rt::fail); must not be static.
+
 #include "baloon/rt_graph.hpp"
 
 #include <cstdio>
@@ -7,7 +7,7 @@
 namespace baloon {
 namespace rt {
 
-static bool fail(const char* msg) { std::fprintf(stderr, "graph: %s\n", msg); return false; }
+bool fail(const char* msg) { std::fprintf(stderr, "graph: %s\n", msg); return false; }
 
 void CapturedGraph::begin() {
     ops_.clear(); recording_ = true; ready_ = false; ran_ = false; failed_ = false;

@@ -50,11 +50,11 @@ static void test_wave_router() {
     bool ids_match = (ref_ids == wave_ids);
     ok(ids_match, "wave router ids match CPU softmax top-K");
     bool wt_match = true;
-    for (int i = 0; i < K; ++i) if (std::fabsf(ref_wt[i] - wave_wt[i]) > 2e-5f) wt_match = false;
+    for (int i = 0; i < K; ++i) if (fabsf(ref_wt[i] - wave_wt[i]) > 2e-5f) wt_match = false;
     ok(wt_match, "wave router weights match CPU reference");
     // Weights must sum to 1 (renorm-clamped)
     float wsum = 0.f; for (float w : wave_wt) wsum += w;
-    okf(std::fabsf(wsum - 1.f) < 1e-4f, "wave router weights sum to 1", wsum, 1.0);
+    okf(fabsf(wsum - 1.f) < 1e-4f, "wave router weights sum to 1", wsum, 1.0);
     // bad-arg guard
     ok(ix_router_top10_wave(nullptr, 1, NE, K, d_ids_wave, d_wt_wave) == cudaErrorInvalidValue,
        "wave router rejects null logits");
