@@ -9,8 +9,13 @@
 //   S5 test_moe_combine         : sum all contributions via moe_combine
 //   S5 test_ix_moe_combine      : ix_moe_combine_kernel direct wave test
 // Exit 0 on PASS.
-// S3+S4 wave kernels: ix_shared_expert.cu compiled by COREX via -D__ILUVATAR__ in CUFLAGS
+// S3+S4 wave kernels: ix_shared_expert.cu compiled by COREX via -D__ILUVATAR__ in CUFLAGS.
+// IXSE_EXTERN_ONLY: when building pic_e2e_moe.o for libbaloon_e2e.so, this macro omits the
+// ix_shared_expert.cu include to prevent duplicate ix_se kernel symbols with pic_e2e_se.o
+// (tests/test_shared_expert.cu also includes ix_shared_expert.cu; both would land in the .so).
+#ifndef IXSE_EXTERN_ONLY
 #include "../../src/ix_shared_expert.cu"
+#endif
 // S5 combine kernel: ix_moe_combine.cu ix_combine_kernel compiled by COREX
 #include "../../src/ix_moe_combine.cu"
 // S2 wave kernel: ix_router_top10_wave.cu; native_router_top10 uses __shfl_xor(int) which
@@ -238,7 +243,10 @@ static void test_moe_combine() {
 // ---------------------------------------------------------------------------
 // S3 wave: test_ix_swiglu — ix_se::swiglu_kernel: silu(gate)*up for shared expert FFN
 // Verifies silu(gate[i])*up[i] matches the CPU reference for n=16 elements.
+// S4 wave: test_ix_scalar_gate, test_ix_gate_shared — direct ix_se wave kernel tests.
+// These three functions require ix_shared_expert.cu to be compiled in this TU (not IXSE_EXTERN_ONLY).
 // ---------------------------------------------------------------------------
+#ifndef IXSE_EXTERN_ONLY
 static void test_ix_swiglu() {
     const int n = 16;
     std::vector<float> gate(n), up(n), ref(n);
@@ -327,6 +335,7 @@ static void test_ix_gate_shared() {
     cudaFree(d_x); cudaFree(d_w); cudaFree(d_g); cudaFree(d_out);
     printf("moe_parity: test_ix_gate_shared done\n");
 }
+#endif  // !IXSE_EXTERN_ONLY
 
 // ---------------------------------------------------------------------------
 // S5 wave: test_ix_moe_combine — ix_moe_combine: y[j] = sum_e w[e]*parts[e][j] + shared[j].
@@ -373,10 +382,14 @@ int main(int argc, char** argv) {
     test_moe_router_logits();
     test_moe_top8_select();
     test_moe_shared_expert();
+#ifndef IXSE_EXTERN_ONLY
     test_ix_swiglu();
+#endif
     test_moe_shared_gate();
+#ifndef IXSE_EXTERN_ONLY
     test_ix_scalar_gate();
     test_ix_gate_shared();
+#endif
     test_moe_combine();
     test_ix_moe_combine();
     printf("moe_parity: pass=%d fail=%d\n", g_pass, g_fail);

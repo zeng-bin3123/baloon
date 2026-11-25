@@ -490,6 +490,7 @@ if __name__ == '__main__':
                 sys.stderr.write('e2e_infer: layer {}/{}\n'.format(li_+1, NL_))
                 sys.stderr.flush()
             x = _rn_(x, _W_['model.language_model.norm.weight'])
+            # Sentence: projects the final norm-ed hidden state to vocabulary logits via lm_head.weight.
             return _F.linear(x[:, -1, :], _W_['lm_head.weight'])
 
         cur_ = list(ids); gt_ = []

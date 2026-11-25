@@ -125,16 +125,33 @@ static int test_embed_gather16(int* checks_out, int* bad_out) {
     return bad;
 }
 
+// e2e_embed_main: strong symbol exported for baloon_e2e_run_all() (baloon_e2e_shim.cu / e2e_all_check.cu).
+// kg_kernels.hpp carries an inline stub { return 0; } so the shared library links even when
+// embed_parity.cu is absent; this strong definition overrides it and runs the real gather_rows16 test.
+// Sentence: embed_parity.cu exports e2e_embed_main as a strong symbol so the shared library
+// can call it without relying on -Dmain=e2e_embed_main renaming (unreliable on COREX clang-16).
+int e2e_embed_main() {
+    int ndev = 0;
+    if (cudaGetDeviceCount(&ndev) != cudaSuccess || ndev < 1) {
+        std::fprintf(stderr, "embed_parity: no GPU device\n"); return 2;
+    }
+    if (cudaSetDevice(0) != cudaSuccess) {
+        std::fprintf(stderr, "embed_parity: cannot open GPU 0\n"); return 2;
+    }
+    int checks = 0, bad = 0;
+    test_embed_gather16(&checks, &bad);
+    std::fprintf(stderr, "embed_parity: checks=%d failures=%d\n", checks, bad);
+    return bad ? 1 : 0;
+}
+
 int main() {
     int ndev = 0;
     if (cudaGetDeviceCount(&ndev) != cudaSuccess || ndev < 1) {
         std::fprintf(stderr, "embed_parity: no GPU device\n"); return 2;
     }
     EP_CK(cudaSetDevice(0));
-
     int checks = 0, bad = 0;
     test_embed_gather16(&checks, &bad);
-
     std::printf("embed_parity: checks=%d failures=%d\n", checks, bad);
     if (bad) { std::printf("embed_parity FAILED\n"); return 1; }
     std::printf("embed_parity PASSED\n"); return 0;

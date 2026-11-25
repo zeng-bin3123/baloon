@@ -170,6 +170,11 @@ link "$OUT/e2e_all_check" \
 cuobj_pic() { local f="$1" o="$2"; shift 2; echo "[cuda-pic] $f"; "$CLANG" $CUFLAGS -fPIC "$@" -c "$f" -o "$o"; }
 
 cuobj_pic tests/test_shared_expert.cu          "$OBJ/pic_e2e_se.o"    -Dmain=e2e_se_main
+# scale_kernel in ix_se has external linkage; recompile pic_e2e_se.o with a rename so
+# it does not conflict with the same symbol in pic_e2e_moe.o (moe_parity.cu also includes
+# ix_shared_expert.cu). swiglu_kernel / scalar_gate_kernel are already static there.
+cuobj_pic tests/test_shared_expert.cu          "$OBJ/pic_e2e_se.o"    -Dmain=e2e_se_main \
+    -Dscale_kernel=ix_se_scale_kernel_pic
 cuobj_pic tests/k14gpu_misc/test_misc.cu       "$OBJ/pic_e2e_sgemv.o" -Dmain=e2e_sgemv_main
 cuobj_pic tests/gpu_unit_verify_attn/test_verify_attn_gpu.cu \
                                                "$OBJ/pic_e2e_vattn.o" -Dmain=e2e_vattn_main

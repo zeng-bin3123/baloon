@@ -10,9 +10,21 @@
 #include "ix_compat.h"
 
 namespace ix_se {
+// Anonymous namespace: ix_shared_expert.cu is #included by two PIC translation units
+// (tests/test_shared_expert.cu → pic_e2e_se.o  and  tests/k39_integration/moe_parity.cu → pic_e2e_moe.o),
+// both of which are linked into build/libbaloon_e2e.so.
+// static __global__ does NOT suppress the host device-stub in COREX clang-16: the stub
+// ix_se::__device_stub__<kernel> remains externally visible regardless (measured: duplicate
+// symbol error persists with static).
+// Anonymous namespace (C++ ABI): each TU that includes this file gets a UNIQUE internal
+// namespace identifier, so stubs become (anon_A)::__device_stub__scale_kernel in one TU and
+// (anon_B)::__device_stub__scale_kernel in the other — different mangled names, no ODR conflict.
+// The inline host launchers below are in ix_se scope and reach these kernels via unqualified
+// lookup (anonymous namespace is accessible from the directly enclosing named namespace).
 constexpr int GATE_THREADS = 256;                       // 4 wavefronts of 64
 constexpr int GATE_WAVES   = GATE_THREADS / IX_WARP_SIZE;
 
+namespace {
 // silu(g) * up, silu evaluated in DOUBLE then cast (reference is float64), multiply in float - Ref L55-61.
 __global__ void swiglu_kernel(const float* __restrict__ gate, const float* __restrict__ up,
                               float* __restrict__ out, int n) {
@@ -49,6 +61,7 @@ __global__ void scale_kernel(float* __restrict__ out, const float* __restrict__ 
     const int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < n) out[i] *= g[0];
 }
+}  // anonymous namespace
 
 inline cudaError_t ix_swiglu(const float* gate, const float* up, float* out, int n, cudaStream_t s = 0) {
     if (!gate || !up || !out || n <= 0) return cudaErrorInvalidValue;
