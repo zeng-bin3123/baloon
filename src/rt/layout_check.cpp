@@ -6,7 +6,7 @@ namespace rt {
 
 std::string LayerView::name(const char* suffix) const { return "blk." + std::to_string(layer) + "." + suffix; }
 
-bool fail(std::string* why, const std::string& msg) { if (why) *why = msg; return false; }
+static bool fail(std::string* why, const std::string& msg) { if (why) *why = msg; return false; }
 
 bool check_one(const LayoutIndex& idx, const LayerView& v, const Want1& w, std::string* why) {
     const std::string n = v.name(w.suffix);

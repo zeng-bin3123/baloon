@@ -475,6 +475,8 @@ if __name__ == '__main__':
         # Greedy decode: re-run full forward each time (simple, correct)
         def _fwd_(cur):
             L_ = len(cur)
+            # Sentence: gathers BF16 embedding rows by token ID from embed_tokens.weight
+            # into the initial hidden-state buffer for each position in the batch.
             x  = _F.embedding(
                 torch.tensor([cur]),
                 _W_['model.language_model.embed_tokens.weight'])

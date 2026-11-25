@@ -209,6 +209,10 @@ PIC_KG=""
 for f in src/kernels/gpu/*.cu; do [ "$(basename "$f")" = "qsa_layer.cu" ] && continue; o="$OBJ/pickg__$(basename "$f").o"; cuobj_pic "$f" "$o" -Isrc/kernels/gpu; PIC_KG="$PIC_KG $o"; done
 cuobj_pic $T/gdn_layer_parity.cu "$OBJ/pic_e2e_gdn_layer.o" -Dmain=e2e_gdn_layer_main
 cuobj_pic $T/qsa_layer_parity.cu "$OBJ/pic_e2e_qsa_layer.o" -Dmain=e2e_qsa_layer_main
+# uintegration01529aaa82b9 MoE ix_ kernels: ix_se::swiglu_kernel, ix_se::scalar_gate_kernel,
+# ix_se::ix_gate_shared, ix_moe_combine::moe_combine_kernel, moe_router_logits_kernel.
+# moe_parity.cu includes ix_shared_expert.cu and ix_moe_combine.cu directly (via #include).
+cuobj_pic $T/moe_parity.cu     "$OBJ/pic_e2e_moe.o"       -Dmain=e2e_moe_main
 cuobj_pic src/baloon_e2e_shim.cu "$OBJ/pic_shim.o"
 
 # Link PIC objects into the shared library (no $CUFLAGS — linking .o not compiling)
@@ -219,7 +223,7 @@ cuobj_pic src/baloon_e2e_shim.cu "$OBJ/pic_shim.o"
     "$OBJ/pic_vk.o" "$OBJ/pic_qsadec.o" "$OBJ/pic_nfa.o" \
     "$OBJ/pic_dmlib.o" $PIC_RT \
     "$OBJ/pic_eq2.o" $PIC_CU $PIC_KG \
-    "$OBJ/pic_e2e_gdn_layer.o" "$OBJ/pic_e2e_qsa_layer.o" \
+    "$OBJ/pic_e2e_gdn_layer.o" "$OBJ/pic_e2e_qsa_layer.o" "$OBJ/pic_e2e_moe.o" \
     $LIBS \
     -o "$OUT/libbaloon_e2e.so"
 

@@ -19,6 +19,7 @@ int e2e_kv_main();      // gpu_unit_f16bits/test_unit7_gpu.cu → u02c65ed515, u
 int e2e_embed_main();   // embed_parity.cu                → u7991572426 gather_rows16_kernel
 int e2e_gdn_layer_main();  // gdn_layer_parity.cu → uintegration01529aaa82b9 (GDN sub-layer)
 int e2e_qsa_layer_main();  // qsa_layer_parity.cu → uintegration01529aaa82b9 (QSA sub-layer)
+int e2e_moe_main();        // moe_parity.cu → uintegration01529aaa82b9 (ix_ MoE: swiglu/scalar_gate/moe_combine)
 
 extern "C" {
 int baloon_e2e_run_all(void) {
@@ -57,6 +58,9 @@ int baloon_e2e_run_all(void) {
     // uintegration01529aaa82b9: QSA sub-layer — qsa_bf16_kv_proj qsa_bf16_qk_norm qsa_mrope_step qsa_kv_cache_step qsa_bf16_o_proj
     fprintf(stderr, "baloon_e2e_run_all: uintegration01529aaa82b9 (qsa_layer) start\n");
     e2e_qsa_layer_main();
+    // uintegration01529aaa82b9: MoE ix_ kernels — ix_se::swiglu_kernel ix_se::scalar_gate_kernel ix_moe_combine moe_router_logits
+    fprintf(stderr, "baloon_e2e_run_all: uintegration01529aaa82b9 (moe) start\n");
+    e2e_moe_main();
 
     fprintf(stderr, "baloon_e2e_run_all: done\n");
     return 0;

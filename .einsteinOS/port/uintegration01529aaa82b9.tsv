@@ -190,3 +190,14 @@ tests/k39_integration/sampler_parity.cu	test_sampler	src/cu/sampler.cu	sampler_k
 tests/k39_integration/gr_parity.cu	test_mmvq_wave_smoke	src/ix_mmvq_wave.cu	ix_mmvq_q8_0
 tests/k39_integration/router_top10_parity.cu	test_wave_router	src/ix_router_top10_wave.cu	router_top10_wave_kernel
 tests/k39_integration/router_top10_parity.cu	test_wave_router	src/ix_router_top10_wave.cu	router_top10_wave_kernel
+tests/k39_integration/loader_parity.cpp	test_group_id	include/baloon/safetensors_loader.hpp	sf_group_id
+tests/k39_integration/loader_parity.cpp	test_parse_header	include/baloon/safetensors_loader.hpp	sf_parse_header
+tests/k39_integration/loader_parity.cpp	test_validate_shape	include/baloon/safetensors_loader.hpp	sf_validate_bf16_shape
+tests/k39_integration/e2e_all_check.cu	e2e_loader_main	include/baloon/safetensors_loader.hpp	sf_map_to_device
+tests/k39_integration/loader_parity.cpp	test_group_id	include/baloon/safetensors_loader.hpp	sf_group_id
+tests/k39_integration/loader_parity.cpp	test_parse_header	include/baloon/safetensors_loader.hpp	sf_parse_header
+tests/k39_integration/loader_parity.cpp	test_validate_shape	include/baloon/safetensors_loader.hpp	sf_validate_bf16_shape
+tests/k39_integration/e2e_all_check.cu	e2e_loader_main	include/baloon/safetensors_loader.hpp	sf_map_to_device
+tests/k39_integration/qsa_layer_parity.cu	test_qsa_mrope_step	src/kernels/gpu/qsa_bf16_layer.cu	qsa_mrope_step_kernel
+tests/k39_integration/qsa_layer_parity.cu	test_qsa_kv_cache_step	src/kernels/gpu/qsa_bf16_layer.cu	qsa_kv_append_kernel
+tests/k39_integration/qsa_layer_parity.cu	test_qsa_bf16_o_proj	src/kernels/gpu/bf16_native.cu	bf16_f32_mmvf_kernel
