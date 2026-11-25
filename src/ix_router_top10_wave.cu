@@ -1,7 +1,9 @@
 // ix_router_top10_wave.cu - MoE router (softmax / top-k / renormalise), one wavefront (64 lanes) per token.
 // Port of Ref src/kernels/cuda/router_top10.cu router_top10_wave_kernel (HEAD 46c152a1, L190-263).
-// ivcore10 change: guard REF_HIP_GFX906 -> __ILUVATAR__. Kernel body is verbatim (already wave64).
-// STATUS: NOT yet compiled or run on BI-V100 (no corex toolchain on the dev box).
+// ivcore10 change: guard REF_HIP_GFX906 -> __ILUVATAR__. Float throughout: BI-V100 device double arithmetic
+// gives wrong results and hangs the GPU (measured; same fix as ix_shared_expert.cu). Matches native
+// router_top10_kernel which also uses expf + float shared memory throughout.
+// STATUS: compiled and run on BI-V100 (float path, matches native_router_top10).
 #pragma once
 #include <cuda_runtime.h>
 #include <cmath>
@@ -18,8 +20,8 @@ constexpr int RW_PER = 8;   // n_expert <= 64 * 8
 __global__ void __launch_bounds__(64) router_top10_wave_kernel(const float* __restrict__ logits, int n_tokens,
                                                                int n_expert, int k, int* __restrict__ ids,
                                                                float* __restrict__ weights) {
-    __shared__ double s_ex[64 * RW_PER];
-    __shared__ double s_sum;
+    __shared__ float s_ex[64 * RW_PER];
+    __shared__ float s_sum;
     const int t = blockIdx.x;
     if (t >= n_tokens) return;
     const int lane = threadIdx.x;
@@ -37,21 +39,21 @@ __global__ void __launch_bounds__(64) router_top10_wave_kernel(const float* __re
 #pragma unroll
     for (int j = 0; j < RW_PER; ++j) {
         const int e = lane + 64 * j;
-        if (e < n_expert) s_ex[e] = exp((double) lv[j] - (double) mx);
+        if (e < n_expert) s_ex[e] = expf(lv[j] - mx);
     }
     __syncthreads();
     if (lane == 0) {
-        double sum = 0.0;
+        float sum = 0.0f;
         for (int e = 0; e < n_expert; ++e) sum += s_ex[e];
         s_sum = sum;
     }
     __syncthreads();
-    const float inv = (float) (1.0 / s_sum);
+    const float inv = 1.0f / s_sum;
     float p[RW_PER];
 #pragma unroll
     for (int j = 0; j < RW_PER; ++j) {
         const int e = lane + 64 * j;
-        p[j] = e < n_expert ? (float) (s_ex[e] * inv) : -INFINITY;
+        p[j] = e < n_expert ? s_ex[e] * inv : -INFINITY;
     }
     unsigned taken = 0;
     for (int i = 0; i < k; ++i) {
@@ -74,11 +76,11 @@ __global__ void __launch_bounds__(64) router_top10_wave_kernel(const float* __re
         if (lane == 0) { ids[(size_t) t * k + i] = bi; weights[(size_t) t * k + i] = bv; }
     }
     if (lane == 0) {
-        double s = 0.0;
-        for (int i = 0; i < k; ++i) s += (double) weights[(size_t) t * k + i];
-        const double sc = fmax(s, 6.103515625e-05);       // 2**-14
+        float s = 0.0f;
+        for (int i = 0; i < k; ++i) s += weights[(size_t) t * k + i];
+        const float sc = fmaxf(s, 6.103515625e-05f);      // 2**-14
         for (int i = 0; i < k; ++i)
-            weights[(size_t) t * k + i] = (float) ((double) weights[(size_t) t * k + i] / sc);
+            weights[(size_t) t * k + i] = weights[(size_t) t * k + i] / sc;
     }
 }
 
