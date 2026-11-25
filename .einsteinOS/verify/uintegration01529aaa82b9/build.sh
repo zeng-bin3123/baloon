@@ -23,6 +23,13 @@ T=tests/k39_integration
 
 cuobj() { local f="$1" o="$2"; shift 2; echo "[cuda] $f"; "$CLANG" $CUFLAGS "$@" -c "$f" -o "$o"; }
 link()  { local o="$1"; shift; echo "[link] $o"; "$CLANG" "$@" -o "$o" $LIBS; }
+# embed_parity.cu already defines int e2e_embed_main(); compiling it with -Dmain=e2e_embed_main
+# renames main() to e2e_embed_main too, causing a redefinition.  Inject
+# -De2e_embed_main=e2e_embed_main_ to rename the existing strong symbol so only main() bears
+# the e2e_embed_main name after the -Dmain= rename.  All other files compile unchanged.
+cuobj() { local f="$1" o="$2"; shift 2; echo "[cuda] $f";
+  case "$f" in *embed_parity*) "$CLANG" $CUFLAGS -De2e_embed_main=e2e_embed_main_ "$@" -c "$f" -o "$o" ;;
+  *) "$CLANG" $CUFLAGS "$@" -c "$f" -o "$o" ;; esac; }
 
 # ---- host executables --------------------------------------------------------------------------------------------------------
 hostexe() { local name="$1"; shift; echo "[host] $name"; "$CLANG" $HFLAGS "$@" -o "$OUT/$name"; }
@@ -168,13 +175,12 @@ link "$OUT/e2e_all_check" \
 # that go into libbaloon_e2e.so must be recompiled with -fPIC; we use distinct
 # "pic_" prefixed output names so the non-PIC executables are unaffected.
 cuobj_pic() { local f="$1" o="$2"; shift 2; echo "[cuda-pic] $f"; "$CLANG" $CUFLAGS -fPIC "$@" -c "$f" -o "$o"; }
+# Same embed_parity.cu fix for PIC objects: inject -De2e_embed_main=e2e_embed_main_.
+cuobj_pic() { local f="$1" o="$2"; shift 2; echo "[cuda-pic] $f";
+  case "$f" in *embed_parity*) "$CLANG" $CUFLAGS -fPIC -De2e_embed_main=e2e_embed_main_ "$@" -c "$f" -o "$o" ;;
+  *) "$CLANG" $CUFLAGS -fPIC "$@" -c "$f" -o "$o" ;; esac; }
 
 cuobj_pic tests/test_shared_expert.cu          "$OBJ/pic_e2e_se.o"    -Dmain=e2e_se_main
-# scale_kernel in ix_se has external linkage; recompile pic_e2e_se.o with a rename so
-# it does not conflict with the same symbol in pic_e2e_moe.o (moe_parity.cu also includes
-# ix_shared_expert.cu). swiglu_kernel / scalar_gate_kernel are already static there.
-cuobj_pic tests/test_shared_expert.cu          "$OBJ/pic_e2e_se.o"    -Dmain=e2e_se_main \
-    -Dscale_kernel=ix_se_scale_kernel_pic
 cuobj_pic tests/k14gpu_misc/test_misc.cu       "$OBJ/pic_e2e_sgemv.o" -Dmain=e2e_sgemv_main
 cuobj_pic tests/gpu_unit_verify_attn/test_verify_attn_gpu.cu \
                                                "$OBJ/pic_e2e_vattn.o" -Dmain=e2e_vattn_main
@@ -217,7 +223,13 @@ cuobj_pic $T/qsa_layer_parity.cu "$OBJ/pic_e2e_qsa_layer.o" -Dmain=e2e_qsa_layer
 # uintegration01529aaa82b9 MoE ix_ kernels: ix_se::swiglu_kernel, ix_se::scalar_gate_kernel,
 # ix_se::ix_gate_shared, ix_moe_combine::moe_combine_kernel, moe_router_logits_kernel.
 # moe_parity.cu includes ix_shared_expert.cu and ix_moe_combine.cu directly (via #include).
-cuobj_pic $T/moe_parity.cu     "$OBJ/pic_e2e_moe.o"       -Dmain=e2e_moe_main
+# -DIXSE_EXTERN_ONLY: moe_parity.cu includes ix_shared_expert.cu only when this macro
+# is NOT defined.  For the .so, pic_e2e_se.o (from test_shared_expert.cu) already
+# carries those kernels; compiling them again in pic_e2e_moe.o would produce duplicate
+# device stubs (the anonymous-namespace trick in ix_shared_expert.cu does not reliably
+# suppress host-side stubs in COREX clang-16, as measured).  IXSE_EXTERN_ONLY omits
+# the include, keeping ix_shared_expert.cu in exactly one TU of the .so.
+cuobj_pic $T/moe_parity.cu     "$OBJ/pic_e2e_moe.o"       -Dmain=e2e_moe_main -DIXSE_EXTERN_ONLY
 cuobj_pic src/baloon_e2e_shim.cu "$OBJ/pic_shim.o"
 
 # Link PIC objects into the shared library (no $CUFLAGS — linking .o not compiling)

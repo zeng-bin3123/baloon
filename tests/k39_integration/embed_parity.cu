@@ -130,6 +130,10 @@ static int test_embed_gather16(int* checks_out, int* bad_out) {
 // embed_parity.cu is absent; this strong definition overrides it and runs the real gather_rows16 test.
 // Sentence: embed_parity.cu exports e2e_embed_main as a strong symbol so the shared library
 // can call it without relying on -Dmain=e2e_embed_main renaming (unreliable on COREX clang-16).
+// Guard: when compiled with -Dmain=e2e_embed_main, 'main' is a preprocessor macro, and int main()
+// below is already renamed to int e2e_embed_main() by the preprocessor — skip this explicit
+// definition to avoid a duplicate-symbol ODR error in the same translation unit.
+#ifndef main
 int e2e_embed_main() {
     int ndev = 0;
     if (cudaGetDeviceCount(&ndev) != cudaSuccess || ndev < 1) {
@@ -143,6 +147,7 @@ int e2e_embed_main() {
     std::fprintf(stderr, "embed_parity: checks=%d failures=%d\n", checks, bad);
     return bad ? 1 : 0;
 }
+#endif  // !main
 
 int main() {
     int ndev = 0;

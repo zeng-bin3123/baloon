@@ -17,9 +17,14 @@ int e2e_sgemv_main();   // k14gpu_misc/test_misc.cu        → u12d8dd5102
 int e2e_vattn_main();   // gpu_unit_verify_attn/…          → u52d156705c
 int e2e_kv_main();      // gpu_unit_f16bits/test_unit7_gpu.cu → u02c65ed515, uebd9b81357
 int e2e_embed_main();   // embed_parity.cu                → u7991572426 gather_rows16_kernel
-int e2e_gdn_layer_main();  // gdn_layer_parity.cu → uintegration01529aaa82b9 (GDN sub-layer)
-int e2e_qsa_layer_main();  // qsa_layer_parity.cu → uintegration01529aaa82b9 (QSA sub-layer)
-int e2e_moe_main();        // moe_parity.cu → uintegration01529aaa82b9 (ix_ MoE: swiglu/scalar_gate/moe_combine)
+// gdn_layer_parity.cu / qsa_layer_parity.cu / moe_parity.cu each have
+// int main(int argc, char** argv). build.sh renames main via -Dmain=e2e_X_main,
+// producing int e2e_X_main(int argc, char** argv).  In C++ int foo() and
+// int foo(int, char**) have different mangled names; a no-arg declaration
+// would cause "undefined reference" at link time.  Declare with (int, char**).
+int e2e_gdn_layer_main(int, char**);  // gdn_layer_parity.cu → uintegration01529aaa82b9 (GDN sub-layer)
+int e2e_qsa_layer_main(int, char**);  // qsa_layer_parity.cu → uintegration01529aaa82b9 (QSA sub-layer)
+int e2e_moe_main(int, char**);        // moe_parity.cu → uintegration01529aaa82b9 (ix_ MoE: swiglu/scalar_gate/moe_combine)
 
 extern "C" {
 int baloon_e2e_run_all(void) {
@@ -54,13 +59,13 @@ int baloon_e2e_run_all(void) {
     e2e_embed_main();
     // uintegration01529aaa82b9: GDN sub-layer — gdn_bf16_conv_step gdn_bf16_gates gdn_ssm_norm gdn_sigmoid_gate
     fprintf(stderr, "baloon_e2e_run_all: uintegration01529aaa82b9 (gdn_layer) start\n");
-    e2e_gdn_layer_main();
+    e2e_gdn_layer_main(0, nullptr);
     // uintegration01529aaa82b9: QSA sub-layer — qsa_bf16_kv_proj qsa_bf16_qk_norm qsa_mrope_step qsa_kv_cache_step qsa_bf16_o_proj
     fprintf(stderr, "baloon_e2e_run_all: uintegration01529aaa82b9 (qsa_layer) start\n");
-    e2e_qsa_layer_main();
+    e2e_qsa_layer_main(0, nullptr);
     // uintegration01529aaa82b9: MoE ix_ kernels — ix_se::swiglu_kernel ix_se::scalar_gate_kernel ix_moe_combine moe_router_logits
     fprintf(stderr, "baloon_e2e_run_all: uintegration01529aaa82b9 (moe) start\n");
-    e2e_moe_main();
+    e2e_moe_main(0, nullptr);
 
     fprintf(stderr, "baloon_e2e_run_all: done\n");
     return 0;

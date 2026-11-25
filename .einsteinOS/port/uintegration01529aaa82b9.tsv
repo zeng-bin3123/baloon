@@ -249,3 +249,7 @@ src/kernels/cuda/shared_expert.cu	scale_kernel	src/kernels/gpu/ew_ops.cu	scale_k
 src/kernels/cuda/native_gdn.cu	gdn_bf16_conv_step_kernel	src/kernels/gpu/gdn_bf16_layer.cu	gdn_bf16_conv_step_kernel
 src/kernels/cuda/native_gdn.cu	gdn_bf16_gates_kernel	src/kernels/gpu/gdn_layer.cu	gdn_bf16_gates_kernel
 src/kernels/cuda/qsa.cu	qsa_bf16_qk_norm_kernel	src/kernels/gpu/qsa_bf16_layer.cu	qsa_bf16_qk_norm_kernel
+tests/k39_integration/gdn_layer_parity.cu	test_rms_norm_bf16w_inplace	src/kernels/gpu/ew_ops.cu	rms_norm_bf16w_inplace_kernel
+tests/k39_integration/gdn_parity.cu	main	src/kernels/gpu/gdn_core.cu	gdn_step_kernel
+tests/k39_integration/gdn_layer_parity.cu	test_rms_norm_bf16w_inplace	src/kernels/gpu/ew_ops.cu	rms_norm_bf16w_inplace_kernel
+tests/k39_integration/gdn_parity.cu	main	src/kernels/gpu/gdn_core.cu	gdn_step_kernel
