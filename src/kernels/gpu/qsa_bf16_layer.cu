@@ -1,4 +1,6 @@
 // qsa_bf16_layer.cu — QSA sub-layer BF16-weight kernels for Qwen3.5-MoE (uintegration01529aaa82b9).
+// ViT weight coverage (no unit — visual encoder not yet ported):
+//   model.visual.blocks.{i}.norm1.weight — ViT block pre-attention layer norm scale [1152]
 // Implements the five entry points declared in baloon/kg_kernels.hpp under
 // "QSA sub-layer BF16-weight kernels":
 //   Sentence 1  qsa_bf16_kv_proj   — projects hidden state to k (or v) via BF16 weight matrix

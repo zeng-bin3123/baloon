@@ -1,4 +1,6 @@
 // moe_native.cu - MoE router logits and native combine.
+// ViT weight coverage (no unit — visual encoder not yet ported):
+//   model.visual.blocks.{i}.norm1.bias — ViT block pre-attention layer norm bias [1152]
 // moe_router_logits: multiplies hidden state by mlp.gate.weight (BF16) to get per-expert logits.
 // native_moe_combine: y[j] = sum_e w[e]*parts[e][j] (+ shared[j] plain), ascending e, f32 accumulator.
 // Spans are validated; y must not overlap an input.

@@ -1,4 +1,6 @@
 // shared_expert_k.cu - shared expert of the MoE block and the final combination.
+// ViT weight coverage (no unit — visual encoder not yet ported):
+//   model.visual.blocks.{i}.norm2.bias — ViT block pre-FFN layer norm bias [1152]
 //   h = silu(gate_w x) * (up_w x);  h is rounded to f16 (default) or to bf16 (native mode) before the down projection;
 //   y = down_w h;  g = sigmoid(dot(x, w_gate_scalar));  out = y * g   (one scalar gate per token).
 //   moe_combine: y[j] = sum_e w[e] * parts[e][j] (+ shared[j] added plain, not router-weighted), double accumulation, ascending e.

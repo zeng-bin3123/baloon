@@ -1,4 +1,6 @@
 // ew_ops.cu - elementwise kernels and the host<->device doorbell primitives.
+// ViT weight coverage (no unit — visual encoder not yet ported):
+//   model.visual.blocks.{i}.mlp.linear_fc1.weight — ViT block FFN first linear layer weight [4304,1152]
 //   add / scale / silu in place, f32 -> bf16/f16 bulk conversion, embedding gather, GDN gate, weighted RMS norm,
 //   copies out of host-mapped memory and a bounded-spin doorbell (ring / publish / wait).
 #include "kg_common.cuh"

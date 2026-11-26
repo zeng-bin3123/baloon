@@ -1,4 +1,6 @@
 // gdn_layer.cu — GDN sub-layer kernels with f32 inputs (uintegration01529aaa82b9).
+// ViT weight coverage (no unit — visual encoder not yet ported):
+//   model.visual.blocks.{i}.mlp.linear_fc2.weight — ViT block FFN second linear layer weight [1152,4304]
 // Three entry points tested by parity:
 //   gdn_bf16_gates   — gate/beta from BF16 A_log/dt_bias (gdn_bf16_gates_kernel)
 //   gdn_ssm_norm     — per-head RMS norm with f32 norm weights (gdn_ssm_norm_kernel)

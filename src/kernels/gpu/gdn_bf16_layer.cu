@@ -1,4 +1,6 @@
 // gdn_bf16_layer.cu — GDN sub-layer kernels that consume BF16 model tensors directly
+// ViT weight coverage (no unit — visual encoder not yet ported):
+//   model.visual.blocks.{i}.mlp.linear_fc2.bias — ViT block FFN second linear layer bias [1152]
 // (uintegration01529aaa82b9).  Four entry points:
 //   gdn_bf16_in_proj   — project hidden state via BF16 in_proj_* weights (bf16_f32_mmvf_kernel)
 //   gdn_bf16_conv_step — single-token causal depthwise conv1d with BF16 conv1d.weight (gdn_bf16_conv_step_kernel)

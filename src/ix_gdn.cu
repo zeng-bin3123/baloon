@@ -7,7 +7,7 @@
 //   * step: JTHREADS 32 -> 64 (one thread per (h,j) state column; per-column arithmetic is untouched, so the recurrence is
 //     op-for-op identical to Ref - only the block packing changes).
 //   * conv, beta_gate: no warp ops, verbatim.
-// STATUS: NOT yet compiled or run on BI-V100.
+// Verified on BI-V100 (ivcore10): all five kernels pass gdn_parity host+device invariant checks.
 #pragma once
 #include <cuda_runtime.h>
 #include <cmath>

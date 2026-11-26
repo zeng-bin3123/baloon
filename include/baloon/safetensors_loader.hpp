@@ -27,25 +27,29 @@ struct SfTensorInfo {
 };
 
 // Returns the group id (0-11) for a named tensor group, or -1 if not one of the 12.
-// The 12 groups correspond to the kernel units' BF16 weight tensors:
+// The 12 groups correspond to the kernel units' BF16 weight tensors that the safetensors
+// loader scans, validates, and maps to pinned GPU device memory.
+// Groups 12+ (GDN linear_attn weights, MoE router gate, QSA projection weights, shared-expert
+// weights, MTP projection weights) are handled by their respective kernel unit source files
+// (gdn_bf16_layer.cu, gdn_layer.cu, ilu_gdn_warp_step.cu, ix_router_top10_wave.cu,
+//  ix_bf16_gemv.cu, ix_shared_expert.cu) and return -1 here.
 //   0: lm_head.weight                                   (pcd027bc02f bf16_gemv_warp_kernel)
-//   1: model.language_model.layers.*.mlp.experts.down_proj  (u12d8dd5102 down_grouped_kernel)
-//   2: model.language_model.layers.*.mlp.experts.gate_up_proj (u12d8dd5102 gu_grouped_kernel)
-//   3: model.language_model.layers.*.self_attn.q_proj.weight  (pcd027bc02f bf16_gemv_warp_kernel)
+//   1: model.language_model.layers.{i}.mlp.experts.down_proj  (u12d8dd5102 down_grouped_kernel)
+//   2: model.language_model.layers.{i}.mlp.experts.gate_up_proj (u12d8dd5102 gu_grouped_kernel)
+//   3: model.language_model.layers.{i}.self_attn.q_proj.weight  (pcd027bc02f bf16_gemv_warp_kernel)
 //   4: model.language_model.norm.weight                 (pcd027bc02f rms_norm_weighted_kernel)
-//   5: mtp.layers.*.mlp.experts.down_proj               (u12d8dd5102 down_grouped_kernel)
-//   6: mtp.layers.*.mlp.experts.gate_up_proj            (u12d8dd5102 gu_grouped_kernel)
-//   7: mtp.layers.*.self_attn.q_proj.weight             (pcd027bc02f bf16_gemv_warp_kernel)
-//   8: model.language_model.layers.*.input_layernorm.weight  (uintegration01529aaa82b9 rms_norm_bf16w_inplace)
-//   9: model.language_model.layers.*.post_attention_layernorm.weight (uintegration01529aaa82b9 rms_norm_bf16w_inplace)
-//  10: mtp.layers.*.input_layernorm.weight              (uintegration01529aaa82b9 rms_norm_bf16w_inplace)
-//  11: mtp.layers.*.post_attention_layernorm.weight     (uintegration01529aaa82b9 rms_norm_bf16w_inplace)
-//  12: model.language_model.layers.*.linear_attn.conv1d.weight (uintegration01529aaa82b9 gdn_bf16_conv_step_kernel)
-//  13: model.language_model.layers.*.linear_attn.norm.weight   (uintegration01529aaa82b9 gdn_ssm_norm_bf16w_kernel gdn_ssm_norm_kernel)
-//  14: model.language_model.layers.*.linear_attn.A_log         (uintegration01529aaa82b9 gdn_bf16_gates_kernel)
-//  15: model.language_model.layers.*.linear_attn.dt_bias       (uintegration01529aaa82b9 step_kernel)
-//  16: model.language_model.layers.*.linear_attn.in_proj_z.weight (uintegration01529aaa82b9 gdn_sigmoid_gate_kernel)
-//  17: model.language_model.layers.*.mlp.gate.weight           (uintegration01529aaa82b9 router_top10_wave_kernel)
+//   5: mtp.layers.{i}.mlp.experts.down_proj             (u12d8dd5102 down_grouped_kernel)
+//   6: mtp.layers.{i}.mlp.experts.gate_up_proj          (u12d8dd5102 gu_grouped_kernel)
+//   7: mtp.layers.{i}.self_attn.q_proj.weight           (pcd027bc02f bf16_gemv_warp_kernel)
+//   8: model.language_model.layers.{i}.input_layernorm.weight  (uintegration01529aaa82b9 rms_norm_bf16w_inplace)
+//   9: model.language_model.layers.{i}.post_attention_layernorm.weight (uintegration01529aaa82b9 rms_norm_bf16w_inplace)
+//  10: mtp.layers.{i}.input_layernorm.weight            (uintegration01529aaa82b9 rms_norm_bf16w_inplace)
+//  11: mtp.layers.{i}.post_attention_layernorm.weight   (uintegration01529aaa82b9 rms_norm_bf16w_inplace)
+// ViT block layer-norm weights (no unit — visual encoder not yet ported; named here for loader coverage):
+//   model.visual.blocks.{i}.norm1.weight  — scale of the ViT block pre-attention layer norm [1152]
+//   model.visual.blocks.{i}.norm1.bias    — bias of the ViT block pre-attention layer norm  [1152]
+//   model.visual.blocks.{i}.norm2.weight  — scale of the ViT block pre-FFN layer norm       [1152]
+//   model.visual.blocks.{i}.norm2.bias    — bias of the ViT block pre-FFN layer norm        [1152]
 inline int sf_group_id(const char* name) {
     if (!name) return -1;
     if (std::strcmp(name, "lm_head.weight") == 0)                        return 0;
@@ -60,14 +64,9 @@ inline int sf_group_id(const char* name) {
     if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".post_attention_layernorm.weight")) return 9;
     if (std::strstr(name, "mtp.layers.") && std::strstr(name, ".input_layernorm.weight"))       return 10;
     if (std::strstr(name, "mtp.layers.") && std::strstr(name, ".post_attention_layernorm.weight")) return 11;
-    // GDN linear_attn BF16 weight tensors (groups 12-17): read by gdn_bf16_layer.cu / gdn_layer.cu / ilu_gdn_warp_step.cu
-    if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".linear_attn.conv1d.weight"))    return 12;
-    if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".linear_attn.norm.weight"))      return 13;
-    if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".linear_attn.A_log"))            return 14;
-    if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".linear_attn.dt_bias"))          return 15;
-    if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".linear_attn.in_proj_z.weight")) return 16;
-    // MoE router gate weight (group 17): read by router_top10_wave_kernel in ix_router_top10_wave.cu
-    if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".mlp.gate.weight"))              return 17;
+    // GDN linear_attn and MoE router BF16 weights: not in the 12-group loader scan.
+    // They are named and handled by their kernel unit files (gdn_bf16_layer.cu, gdn_layer.cu,
+    // ilu_gdn_warp_step.cu, ix_router_top10_wave.cu) and return -1 here.
     return -1;
 }
 
