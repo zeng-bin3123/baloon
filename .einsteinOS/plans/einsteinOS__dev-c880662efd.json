@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 14783,
     "started": "2026-11-26T17:22:58.164744714Z",
-    "renewed": "2026-11-26T17:44:45.266404094Z"
+    "renewed": "2026-11-26T17:57:06.552554229Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -1042,10 +1042,10 @@
   },
   "in_progress": {
     "uintegration01529aaa82b9": {
-      "kind": "",
+      "kind": "kernel_unported",
       "text": "",
       "base_ref": "einsteinOS/dev-c880662efd-wip-uintegration01529aaa82b9-cont",
-      "base_sha": "d39422577705598799c9055ef217c417d00958fe"
+      "base_sha": "b7a4193c3ef689d3489025c8509e6b668434ff9f"
     }
   },
   "infra_fails": 0,
