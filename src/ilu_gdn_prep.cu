@@ -1,6 +1,12 @@
 // ilu_gdn_prep.cu - GDN preprocessing kernels for BI-V100: conv+SiLU with 3-deep history, 128-wide row norms,
 // beta sigmoid, gate softplus and output RMSNorm with sigmoid gate. Norm kernels use 256 threads per row;
 // threads 128..255 contribute zero to the block sum.
+// S2 (applies the depthwise conv1d): conv_silu_kernel implements the causal depthwise 1-D convolution
+// (conv1d.weight [C,1,dc] BF16 → see gdn_bf16_conv_step in gdn_bf16_layer.cu) followed by SiLU activation
+// and in-place ring-buffer history update (3-deep for dc=4, mapping to ix_gdn::gdn_conv_kernel).
+// S4 (applies the sub-layer norm): row_norm_kernel applies per-row L2 or RMS normalisation to the
+// conv/qk outputs (256 threads, 128 active lanes); out_norm_kernel applies per-head weighted RMS norm
+// to the SSM output o[h,s] using linear_attn.norm.weight (mapping to gdn_ssm_norm / gdn_ssm_norm_bf16w).
 #include <cuda_runtime.h>
 #include "baloon/ilu_gdn_kernels.hpp"
 #include "ilu_gdn_shfl.cuh"

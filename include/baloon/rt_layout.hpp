@@ -30,10 +30,6 @@ struct Want1 { const char* suffix; uint64_t len; };           // vector of exact
 struct Want2 { const char* suffix; uint64_t rows, cols; };    // matrix; a 0 dimension accepts any positive value
 
 bool fail(std::string* why, const std::string& msg);   // stores msg, returns false
-// inline redecl: once declared inline the checker treats layout_check.cpp's definition as
-// an out-of-line definition of an inline function, eliminating the duplicate-name report for
-// baloon::rt::fail (which also appears in graph.cpp with a different signature).
-inline bool fail(std::string* why, const std::string& msg);
 bool check_one(const LayoutIndex& idx, const LayerView& v, const Want1& w, std::string* why = nullptr);
 bool check_one(const LayoutIndex& idx, const LayerView& v, const Want2& w, std::string* why = nullptr);
 bool check_layer(const LayoutIndex& idx, const LayoutGeometry& g, int layer, std::string* why = nullptr);

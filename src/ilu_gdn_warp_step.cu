@@ -1,5 +1,10 @@
 // ilu_gdn_warp_step.cu - warp-per-(head,column) gated-delta-net step for BI-V100.
 // Block (head, 1, z) of 32x4 threads; col = z*4 + ty; lane owns rows r*32+lane for r<4, kept in registers.
+// S1 (projects the hidden state to qkv/z/a/b via in_proj_*): the caller supplies q[h_k,128], k[h_k,128],
+// v[h_v,128] produced by four bf16_gemv calls on in_proj_qkv, in_proj_a and in_proj_b respectively.
+// S3 (runs the selective-scan recurrence with A_log and dt_bias): step_kernel receives gate=exp(A_log)*softplus(a+dt_bias)
+// and beta=sigmoid(b) pre-computed by ilu_gdn_prep::gate_kernel/beta_sigmoid_kernel, then executes
+// the gated delta-net update: s_i *= decay; d=(v-<s,k>)*beta; s_i+=k_i*d; out=scale*<s,q>.
 #include <cuda_runtime.h>
 #include "baloon/ilu_gdn_kernels.hpp"
 #include "ilu_gdn_shfl.cuh"

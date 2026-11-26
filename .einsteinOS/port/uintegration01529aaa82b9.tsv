@@ -247,6 +247,19 @@ tests/k39_integration/gdn_layer_parity.cu	test_rms_norm_bf16w_inplace	src/kernel
 tests/k39_integration/gdn_parity.cu	main	src/kernels/gpu/gdn_core.cu	gdn_step_kernel
 tests/k39_integration/gdn_layer_parity.cu	test_rms_norm_bf16w_inplace	src/kernels/gpu/ew_ops.cu	rms_norm_bf16w_inplace_kernel
 tests/k39_integration/gdn_parity.cu	main	src/kernels/gpu/gdn_core.cu	gdn_step_kernel
-src/ix_moe_combine.cu	moe_combine_kernel	src/ix_moe_combine.cu	ix_moc_kern
-include/baloon/rt_layout.hpp	fail	include/baloon/rt_layout.hpp	fail
-include/baloon/rt_graph.hpp	fail	include/baloon/rt_graph.hpp	fail
+
+tests/k39_integration/gdn_layer_parity.cu	test_gdn_bf16_in_proj	src/kernels/gpu/gdn_bf16_layer.cu	gdn_bf16_in_proj
+src/kernels/cuda/gdn.cu	gdn_conv_kernel	src/ilu_gdn_prep.cu	conv_silu_kernel
+src/kernels/cuda/gdn.cu	gdn_conv_kernel	src/ix_gdn.cu	gdn_conv_kernel
+src/kernels/cuda/gdn.cu	gdn_step_kernel	src/ilu_gdn_warp_step.cu	step_kernel
+src/kernels/cuda/gdn.cu	gdn_step_kernel	src/ix_gdn.cu	gdn_step_kernel
+src/kernels/cuda/fused_gdn.cu	gdn_ab_kernel	src/ilu_gdn_prep.cu	gate_kernel
+src/kernels/cuda/gdn.cu	gdn_beta_gate_kernel	src/ilu_gdn_prep.cu	beta_sigmoid_kernel
+src/kernels/cuda/gdn.cu	gdn_beta_gate_kernel	src/ix_gdn.cu	gdn_beta_gate_kernel
+src/kernels/cuda/gdn.cu	gdn_l2_kernel	src/ilu_gdn_prep.cu	row_norm_kernel
+src/kernels/cuda/gdn.cu	gdn_out_norm_kernel	src/ilu_gdn_prep.cu	out_norm_kernel
+src/kernels/cuda/gdn.cu	gdn_l2_kernel	src/ix_gdn.cu	gdn_l2_kernel
+src/kernels/cuda/gdn.cu	gdn_out_norm_kernel	src/ix_gdn.cu	gdn_out_norm_kernel
+src/kernels/cuda/gdn.cu	gdn_out_norm_kernel	src/ix_gdn.cu	gdn_out_norm_kernel
+tests/k39_integration/gdn_layer_parity.cu	test_gdn_sigmoid_gate	src/ix_gdn.cu	gdn_out_norm_kernel
+tests/k39_integration/gdn_layer_parity.cu	test_gdn_bf16_out_proj	src/kernels/gpu/gdn_bf16_layer.cu	gdn_bf16_out_proj

@@ -83,6 +83,8 @@ __global__ void gdn_l2_kernel(float* __restrict__ x, int cols, float eps) {
     for (int i = threadIdx.x; i < cols; i += blockDim.x) p[i] *= inv;
 }
 
+// S5 (gates by z): y[h,i] = rms_norm(o[h], eps) * ssm_norm[i] * sigmoid(z[h,i]) per head.
+// The sigmoid(z) factor is the z-gate from in_proj_z applied element-wise to the normed SSM output.
 // y = rms_norm(o, eps) * ssm_norm * sigmoid(z), one wave per head; launch <<<h_v, 64>>>.
 __global__ void gdn_out_norm_kernel(const float* __restrict__ o, const float* __restrict__ z,
                                     const float* __restrict__ ssm_norm, float* __restrict__ y, int S, float eps) {

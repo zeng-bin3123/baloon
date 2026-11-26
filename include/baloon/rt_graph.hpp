@@ -54,9 +54,6 @@ private:
 
 // Prints "graph: <msg>" to stderr and returns false (so callers can `return fail(...)`).
 bool fail(const char* msg);
-// inline redecl: once declared inline the checker treats graph.cpp's definition as
-// an out-of-line definition of an inline function, eliminating the duplicate-name report.
-inline bool fail(const char* msg);
 
 }  // namespace rt
 }  // namespace baloon

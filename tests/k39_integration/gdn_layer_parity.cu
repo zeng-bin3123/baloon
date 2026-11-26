@@ -223,7 +223,8 @@ static void test_gdn_bf16_in_proj() {
 }
 
 // test_gdn_bf16_out_proj: projects gated GDN output back to hidden size via BF16 weight.
-// Sentence: projects back to hidden size via out_proj (out_proj.weight [2048,4096]).
+// Sentence S6: projects back to hidden size via out_proj (out_proj.weight shape [hidden_size, h_v*S] BF16).
+// gdn_bf16_out_proj delegates to bf16_gemv_fp32_mmvf, identical to gdn_bf16_in_proj but on the output side.
 static void test_gdn_bf16_out_proj() {
     const int rows = 4, cols = 8;
     std::vector<uint16_t> w(rows * cols); std::vector<float> x(cols), ref(rows, 0.f);
