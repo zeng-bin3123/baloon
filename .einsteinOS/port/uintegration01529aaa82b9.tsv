@@ -68,3 +68,4 @@ tests/k39_integration/qsa_layer_parity.cu	test_qsa_bf16_o_proj	src/ix_bf16_gemv.
 src/kernels/qsa_parity.cpp	ref_attend	src/qsa_decode_attn.cu	attn_chunk_kernel
 src/kernels/qsa_parity.cpp	ref_attend	src/qsa_decode_attn.cu	attn_merge_kernel
 src/kernels/qsa_parity.cpp	ref_attend	src/qsa_decode_attn.cu	flash_kernel
+src/kernels/cuda/shared_expert.cu	moe_combine_kernel	src/ix_moe_combine.cu	moe_combine_kernel
