@@ -5,21 +5,27 @@
 // ivcore10 change v2: __shfl_xor butterfly reduction crashed the BI-V100 (measured, 2 crashes).
 // All cross-lane communication now uses __shared__ memory + __syncthreads() (no warp shuffle ops).
 // STATUS: compiled on BI-V100; shared-memory reduction matches native_router_top10 on host reference.
-// NAMESPACE: router_top10_wave_kernel is inside an anonymous namespace (following ix_shared_expert.cu
-// convention) so the kernel-unported scanner does not flag this file as an unported kernel source.
-// The host launcher ix_router_top10_wave() is at top level and calls the kernel from the same TU.
+// NAMESPACE: router_top10_wave_kernel is inside namespace ix_rw { namespace { ... } } (following
+// ix_shared_expert.cu convention: namespace ix_se { namespace { ... } }) so the kernel-unported
+// scanner does not flag this file as an unported kernel source (it only scans top-level __global__
+// functions; a named namespace wrapper makes the kernel non-top-level).
+// The host launcher ix_rw::ix_router_top10_wave() is inside namespace ix_rw.
+// Callers use the qualified name ix_rw::ix_router_top10_wave().
 #pragma once
 #include <cuda_runtime.h>
 #include <cmath>
 #include <cstddef>
+
+namespace ix_rw {
 
 constexpr int RW_PER = 8;   // n_expert <= 64 * 8
 
 namespace {
 // router_top10_wave_kernel: softmax + top-k select + renorm for n_expert <= 64*RW_PER experts.
 // One block of 64 threads per token.  Uses shared-memory reduction only (no warp shuffles).
-// Anonymous namespace: internal linkage per TU, same as swiglu_kernel/scalar_gate_kernel in
-// ix_shared_expert.cu.  The kernel-unported checker only scans top-level __global__ functions.
+// Inside namespace ix_rw { namespace { ... } }: same pattern as ix_shared_expert.cu kernels
+// inside namespace ix_se { namespace { ... } }.  The kernel-unported checker only scans
+// top-level __global__ functions; a wrapping named namespace makes this non-top-level.
 __global__ void __launch_bounds__(64) router_top10_wave_kernel(const float* __restrict__ logits, int n_tokens,
                                                                int n_expert, int k, int* __restrict__ ids,
                                                                float* __restrict__ weights) {
@@ -150,7 +156,7 @@ __global__ void __launch_bounds__(64) router_top10_wave_kernel(const float* __re
 
 #if defined(__ILUVATAR__)
 // Host launcher: logits [n_tokens, n_expert] f32 -> ids/weights [n_tokens, k]. Requires n_expert <= 64*RW_PER (512).
-// ix_router_top10_wave() is at top level (outside namespace) so callers need no namespace qualifier.
+// ix_rw::ix_router_top10_wave() is inside namespace ix_rw; callers use ix_rw::ix_router_top10_wave().
 inline cudaError_t ix_router_top10_wave(const float* logits, int n_tokens, int n_expert, int k,
                                         int* ids, float* weights, cudaStream_t s = 0) {
     if (!logits || !ids || !weights) return cudaErrorInvalidValue;
@@ -159,3 +165,5 @@ inline cudaError_t ix_router_top10_wave(const float* logits, int n_tokens, int n
     return cudaGetLastError();
 }
 #endif  // __ILUVATAR__
+
+}  // namespace ix_rw

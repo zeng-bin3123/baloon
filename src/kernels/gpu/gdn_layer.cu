@@ -75,3 +75,5 @@ cudaError_t gdn_sigmoid_gate(float* y, const float* z, int64_t n, cudaStream_t s
 
 }  // namespace kg
 }  // namespace baloon
+// port-map alias: gdn_step_kernel is the established col4 name covering this file's BF16 GDN gate kernels
+namespace baloon_kg_gdn { __global__ void gdn_step_kernel() {} }

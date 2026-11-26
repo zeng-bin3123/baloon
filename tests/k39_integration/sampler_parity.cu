@@ -170,6 +170,18 @@ static void test_sampler_bad_args() {
     cudaFree(a); cudaFree(o);
 }
 
+// test_sampler: top-level entry point exercising sample_tokens / sampler_kernel
+// (src/cu/sampler.cu). Runs all sentence sub-tests (greedy, penalties, stochastic,
+// bad_args) so the port-map entry
+//   tests/k39_integration/sampler_parity.cu  test_sampler  src/cu/sampler.cu  sampler_kernel
+// resolves to a named symbol in this translation unit.
+static void test_sampler() {
+    test_sampler_greedy();
+    test_sampler_penalties();
+    test_sampler_stochastic();
+    test_sampler_bad_args();
+}
+
 int main() {
     int ndev = 0;
     if (cudaGetDeviceCount(&ndev) != cudaSuccess || ndev < 1) {
@@ -178,10 +190,7 @@ int main() {
     if (cudaSetDevice(0) != cudaSuccess) {
         std::printf("sampler_parity: cannot open GPU 0\n"); return 2;
     }
-    test_sampler_greedy();
-    test_sampler_penalties();
-    test_sampler_stochastic();
-    test_sampler_bad_args();
+    test_sampler();
     std::printf("sampler_parity: checks=%ld failures=%ld\n", (long)g_checks, (long)g_fail);
     if (g_checks == 0 || g_fail != 0) { std::printf("sampler_parity FAILED\n"); return 1; }
     std::printf("sampler_parity PASSED\n");

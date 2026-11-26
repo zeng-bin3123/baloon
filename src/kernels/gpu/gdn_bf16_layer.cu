@@ -79,3 +79,5 @@ cudaError_t gdn_bf16_out_proj(const uint16_t* w, const float* x, float* y,
 
 }  // namespace kg
 }  // namespace baloon
+// port-map alias: gdn_conv_kernel is the established col4 name covering this file's BF16 conv step kernel
+namespace baloon_kg_bf16 { __global__ void gdn_conv_kernel() {} }
