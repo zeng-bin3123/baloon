@@ -18,9 +18,10 @@
 #endif
 // S5 combine kernel: ix_moe_combine.cu ix_combine_kernel compiled by COREX
 #include "../../src/ix_moe_combine.cu"
-// S2 wave kernel: ix_router_top10_wave.cu; native_router_top10 uses __shfl_xor(int) which
+// S2 wave kernel: src/ix_router_top10_wave.cu; native_router_top10 uses __shfl_xor(int) which
 // causes GPU hardware fault and machine reboot on the BI-V100 (ivcore10, measured twice).
-#include "ix_router_top10_wave.cu"
+// Kernel lives in namespace ix_rw inside src/; callers use ix_rw::ix_router_top10_wave().
+#include "../../src/ix_router_top10_wave.cu"
 #include "baloon/kg_kernels.hpp"
 #include <cuda_runtime.h>
 #include <cstdio>
@@ -98,8 +99,8 @@ static void test_moe_top8_select() {
     int32_t* d_ids = dev_alloc<int32_t>(K);
     float* d_wt = dev_alloc<float>(K);
     dev_put(d_lg, logits);
-    // S2 ivcore10: ix_router_top10_wave uses shared-memory reduction, not __shfl_xor(int).
-    MOE_CK(ix_router_top10_wave(d_lg, 1, NE, K, d_ids, d_wt));
+    // S2 ivcore10: ix_rw::ix_router_top10_wave uses shared-memory reduction, not __shfl_xor(int).
+    MOE_CK(ix_rw::ix_router_top10_wave(d_lg, 1, NE, K, d_ids, d_wt));
     auto ids = dev_get(d_ids, K);
     auto wts = dev_get(d_wt, K);
     // All ids must be in [0, NE) and unique
@@ -111,7 +112,7 @@ static void test_moe_top8_select() {
     float wsum = 0.f; for (float w : wts) wsum += w;
     MOE_T(fabsf(wsum - 1.f) < 1e-4f);
     // bad-arg guard
-    MOE_T(ix_router_top10_wave(nullptr, 1, NE, K, d_ids, d_wt) == cudaErrorInvalidValue);
+    MOE_T(ix_rw::ix_router_top10_wave(nullptr, 1, NE, K, d_ids, d_wt) == cudaErrorInvalidValue);
     cudaFree(d_lg); cudaFree(d_ids); cudaFree(d_wt);
     printf("moe_parity: test_moe_top8_select done\n");
 }

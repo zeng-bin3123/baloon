@@ -191,13 +191,4 @@ cudaError_t native_expert_grouped(Fmt f, const uint8_t* blob, const float* x, in
 }  // namespace kg
 }  // namespace baloon
 
-// Sentence: provides e2e_embed_main for e2e_all_check so the combined e2e run
-// can invoke the gather_rows16_kernel BF16 embedding-gather test.
-// e2e_all_check.cu includes kg_kernels.hpp (line 27), so this inline definition
-// satisfies (void)e2e_embed_main() without requiring an external symbol from
-// embed_parity.cu — COREX clang-16 does not reliably export main() renamed via
-// -Dmain=e2e_embed_main as a linkable C++ symbol.  When embed_parity.cu is later
-// fixed to export a strong e2e_embed_main, the linker picks the strong one.
-#ifndef main  // skip when compiled with -Dmain=e2e_embed_main: main is a macro there, so this TU already defines e2e_embed_main
-inline int e2e_embed_main() { return 0; }
-#endif
+

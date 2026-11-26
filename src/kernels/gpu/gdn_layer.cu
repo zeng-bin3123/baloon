@@ -5,6 +5,10 @@
 //   gdn_sigmoid_gate — element-wise y[i] *= sigmoid(z[i]) (gdn_sigmoid_gate_kernel)
 // gdn_bf16_in_proj, gdn_bf16_conv_step, gdn_ssm_norm_bf16w, gdn_bf16_out_proj in gdn_bf16_layer.cu.
 // Declared in baloon/kg_kernels.hpp.
+// Tensor groups consumed by this file (sf_group_id 13, 14, 16 — see safetensors_loader.hpp):
+//   model.language_model.layers.{i}.linear_attn.A_log             → gdn_bf16_gates_kernel    (group 14)
+//   model.language_model.layers.{i}.linear_attn.in_proj_z.weight  → gdn_sigmoid_gate_kernel  (group 16)
+//   model.language_model.layers.{i}.linear_attn.norm.weight       → gdn_ssm_norm_kernel       (group 13)
 #include "kg_common.cuh"
 #include "baloon/kg_kernels.hpp"
 
@@ -75,5 +79,3 @@ cudaError_t gdn_sigmoid_gate(float* y, const float* z, int64_t n, cudaStream_t s
 
 }  // namespace kg
 }  // namespace baloon
-// port-map alias: gdn_step_kernel is the established col4 name covering this file's BF16 GDN gate kernels
-namespace baloon_kg_gdn { __global__ void gdn_step_kernel() {} }

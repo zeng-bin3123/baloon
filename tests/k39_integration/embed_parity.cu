@@ -128,12 +128,19 @@ static int test_embed_gather16(int* checks_out, int* bad_out) {
 // e2e_embed_main: strong symbol exported for baloon_e2e_run_all() (baloon_e2e_shim.cu / e2e_all_check.cu).
 // kg_kernels.hpp carries an inline stub { return 0; } so the shared library links even when
 // embed_parity.cu is absent; this strong definition overrides it and runs the real gather_rows16 test.
-// Sentence: embed_parity.cu exports e2e_embed_main as a strong symbol so the shared library
-// can call it without relying on -Dmain=e2e_embed_main renaming (unreliable on COREX clang-16).
-// Guard: when compiled with -Dmain=e2e_embed_main, 'main' is a preprocessor macro, and int main()
-// below is already renamed to int e2e_embed_main() by the preprocessor — skip this explicit
-// definition to avoid a duplicate-symbol ODR error in the same translation unit.
-#ifndef main
+//
+// Sentence: embed_parity.cu exports e2e_embed_main via #pragma push_macro / #undef so the symbol
+// survives build.sh's -Dmain=e2e_embed_main -De2e_embed_main=e2e_embed_main_ double-rename.
+// Without this, C preprocessor macro chaining causes int main() → int e2e_embed_main_() (not
+// e2e_embed_main), leaving no strong e2e_embed_main in the object file — the inline stub in
+// kg_kernels.hpp would then be used, returning 0 without exercising any GPU kernel (entry_stubbed).
+// push_macro / #undef temporarily suspends both macros so the token 'e2e_embed_main' in the
+// function definition is NOT subject to macro expansion; pop_macro restores them afterwards.
+// This is a standard GCC/Clang extension and is reliable on COREX clang-16.
+#pragma push_macro("e2e_embed_main")
+#pragma push_macro("main")
+#undef e2e_embed_main
+#undef main
 int e2e_embed_main() {
     int ndev = 0;
     if (cudaGetDeviceCount(&ndev) != cudaSuccess || ndev < 1) {
@@ -147,7 +154,8 @@ int e2e_embed_main() {
     std::fprintf(stderr, "embed_parity: checks=%d failures=%d\n", checks, bad);
     return bad ? 1 : 0;
 }
-#endif  // !main
+#pragma pop_macro("main")
+#pragma pop_macro("e2e_embed_main")
 
 int main() {
     int ndev = 0;

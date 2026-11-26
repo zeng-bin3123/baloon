@@ -6,6 +6,9 @@
 //   gdn_bf16_out_proj  — project gated output via BF16 out_proj.weight (bf16_f32_mmvf_kernel)
 // gdn_bf16_gates, gdn_ssm_norm (f32), gdn_sigmoid_gate are in gdn_layer.cu.
 // Declared in baloon/kg_kernels.hpp.
+// Tensor groups consumed by this file (sf_group_id 12, 13 — see safetensors_loader.hpp):
+//   model.language_model.layers.{i}.linear_attn.conv1d.weight  → gdn_bf16_conv_step_kernel  (group 12)
+//   model.language_model.layers.{i}.linear_attn.norm.weight    → gdn_ssm_norm_bf16w_kernel  (group 13)
 #include "kg_common.cuh"
 #include "baloon/kg_kernels.hpp"
 
@@ -79,5 +82,3 @@ cudaError_t gdn_bf16_out_proj(const uint16_t* w, const float* x, float* y,
 
 }  // namespace kg
 }  // namespace baloon
-// port-map alias: gdn_conv_kernel is the established col4 name covering this file's BF16 conv step kernel
-namespace baloon_kg_bf16 { __global__ void gdn_conv_kernel() {} }

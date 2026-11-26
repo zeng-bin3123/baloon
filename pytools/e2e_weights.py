@@ -23,8 +23,8 @@
 #
 # Usage: python3 pytools/e2e_weights.py <model_dir>
 
-# Expected shapes from model config (config.json) for each of the 12 named BF16 tensor groups.
-# Matches kExpected[] in safetensors_loader.hpp::sf_validate_bf16_shape.
+# Expected shapes from model config (config.json) for each named BF16 tensor group.
+# Matches sf_group_id() in safetensors_loader.hpp (groups 0-17).
 _GROUP_SHAPES = {
     0:  (248320, 2048),       # lm_head.weight
     1:  (256, 2048, 512),     # model.language_model.layers.*.mlp.experts.down_proj
@@ -38,12 +38,20 @@ _GROUP_SHAPES = {
     9:  (2048,),              # model.language_model.layers.*.post_attention_layernorm.weight
     10: (2048,),              # mtp.layers.*.input_layernorm.weight
     11: (2048,),              # mtp.layers.*.post_attention_layernorm.weight
+    # GDN linear_attn BF16 weight tensors (groups 12-16) — gdn_bf16_layer.cu / gdn_layer.cu / ilu_gdn_warp_step.cu
+    12: (8192, 1, 4),         # model.language_model.layers.*.linear_attn.conv1d.weight [C,1,dc] C=8192 dc=4 → gdn_bf16_conv_step_kernel
+    13: (128,),               # model.language_model.layers.*.linear_attn.norm.weight → gdn_ssm_norm_bf16w_kernel / gdn_ssm_norm_kernel
+    14: (32,),                # model.language_model.layers.*.linear_attn.A_log → gdn_bf16_gates_kernel
+    15: (32,),                # model.language_model.layers.*.linear_attn.dt_bias → step_kernel
+    16: (4096, 2048),         # model.language_model.layers.*.linear_attn.in_proj_z.weight → gdn_sigmoid_gate_kernel
+    # MoE router gate weight (group 17) — router_top10_wave_kernel in ix_router_top10_wave.cu
+    17: (256, 2048),          # model.language_model.layers.*.mlp.gate.weight → router_top10_wave_kernel
 }
 
 
 def _sf_group_id(name):
     """Python mirror of baloon::sf::sf_group_id (safetensors_loader.hpp).
-    Returns 0-11 for the 12 named BF16 tensor groups, -1 otherwise.
+    Returns 0-17 for the 18 named BF16 tensor groups, -1 otherwise.
       0  lm_head.weight
       1  model.language_model.layers.*.mlp.experts.down_proj
       2  model.language_model.layers.*.mlp.experts.gate_up_proj
@@ -56,6 +64,12 @@ def _sf_group_id(name):
       9  model.language_model.layers.*.post_attention_layernorm.weight
      10  mtp.layers.*.input_layernorm.weight
      11  mtp.layers.*.post_attention_layernorm.weight
+     12  model.language_model.layers.*.linear_attn.conv1d.weight  → gdn_bf16_conv_step_kernel
+     13  model.language_model.layers.*.linear_attn.norm.weight    → gdn_ssm_norm_bf16w_kernel / gdn_ssm_norm_kernel
+     14  model.language_model.layers.*.linear_attn.A_log          → gdn_bf16_gates_kernel
+     15  model.language_model.layers.*.linear_attn.dt_bias        → step_kernel
+     16  model.language_model.layers.*.linear_attn.in_proj_z.weight → gdn_sigmoid_gate_kernel
+     17  model.language_model.layers.*.mlp.gate.weight            → router_top10_wave_kernel
     """
     if name == 'lm_head.weight':                                               return 0
     if '.mlp.experts.down_proj'  in name and 'model.language_model.layers.' in name: return 1
@@ -69,6 +83,14 @@ def _sf_group_id(name):
     if 'model.language_model.layers.' in name and '.post_attention_layernorm.weight' in name: return 9
     if 'mtp.layers.' in name and '.input_layernorm.weight' in name:            return 10
     if 'mtp.layers.' in name and '.post_attention_layernorm.weight' in name:   return 11
+    # GDN linear_attn BF16 weight tensors (groups 12-16) — matches sf_group_id groups 12-16
+    if 'model.language_model.layers.' in name and '.linear_attn.conv1d.weight' in name:    return 12
+    if 'model.language_model.layers.' in name and '.linear_attn.norm.weight' in name:      return 13
+    if 'model.language_model.layers.' in name and '.linear_attn.A_log' in name:            return 14
+    if 'model.language_model.layers.' in name and '.linear_attn.dt_bias' in name:          return 15
+    if 'model.language_model.layers.' in name and '.linear_attn.in_proj_z.weight' in name: return 16
+    # MoE router gate weight (group 17) — matches sf_group_id group 17
+    if 'model.language_model.layers.' in name and '.mlp.gate.weight' in name:              return 17
     return -1
 
 

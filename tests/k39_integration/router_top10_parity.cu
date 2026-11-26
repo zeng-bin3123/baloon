@@ -5,7 +5,8 @@
 #undef main
 
 // Sentence 1 & 2: wave-kernel port compiled on ILUVATAR ivcore10 via CUFLAGS -D__ILUVATAR__
-#include "ix_router_top10_wave.cu"
+// Kernel lives in namespace ix_rw inside src/; callers use ix_rw::ix_router_top10_wave().
+#include "../../src/ix_router_top10_wave.cu"
 
 #ifdef __ILUVATAR__
 // test_wave_router: verifies ix_router_top10_wave against a CPU softmax reference for 256 experts, k=8.
@@ -41,7 +42,8 @@ static void test_wave_router() {
     cudaMalloc((void**)&d_ids_wave, K * sizeof(int32_t));
     cudaMalloc((void**)&d_wt_wave,  K * sizeof(float));
     // Wave kernel: one 64-lane wavefront per token, shared-memory reduction (safe on ivcore10)
-    ok(ix_router_top10_wave(d_lg, 1, NE, K, d_ids_wave, d_wt_wave) == cudaSuccess && sync_ok(),
+    // Launcher is ix_rw::ix_router_top10_wave() (namespace ix_rw in src/ix_router_top10_wave.cu).
+    ok(ix_rw::ix_router_top10_wave(d_lg, 1, NE, K, d_ids_wave, d_wt_wave) == cudaSuccess && sync_ok(),
        "ix_router_top10_wave launch");
     std::vector<int32_t> wave_ids(K);
     std::vector<float>   wave_wt(K);
@@ -56,7 +58,7 @@ static void test_wave_router() {
     float wsum = 0.f; for (float w : wave_wt) wsum += w;
     okf(fabsf(wsum - 1.f) < 1e-4f, "wave router weights sum to 1", wsum, 1.0);
     // bad-arg guard
-    ok(ix_router_top10_wave(nullptr, 1, NE, K, d_ids_wave, d_wt_wave) == cudaErrorInvalidValue,
+    ok(ix_rw::ix_router_top10_wave(nullptr, 1, NE, K, d_ids_wave, d_wt_wave) == cudaErrorInvalidValue,
        "wave router rejects null logits");
     cudaFree(d_lg); cudaFree(d_ids_wave); cudaFree(d_wt_wave);
 }

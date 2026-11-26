@@ -40,6 +40,12 @@ struct SfTensorInfo {
 //   9: model.language_model.layers.*.post_attention_layernorm.weight (uintegration01529aaa82b9 rms_norm_bf16w_inplace)
 //  10: mtp.layers.*.input_layernorm.weight              (uintegration01529aaa82b9 rms_norm_bf16w_inplace)
 //  11: mtp.layers.*.post_attention_layernorm.weight     (uintegration01529aaa82b9 rms_norm_bf16w_inplace)
+//  12: model.language_model.layers.*.linear_attn.conv1d.weight (uintegration01529aaa82b9 gdn_bf16_conv_step_kernel)
+//  13: model.language_model.layers.*.linear_attn.norm.weight   (uintegration01529aaa82b9 gdn_ssm_norm_bf16w_kernel gdn_ssm_norm_kernel)
+//  14: model.language_model.layers.*.linear_attn.A_log         (uintegration01529aaa82b9 gdn_bf16_gates_kernel)
+//  15: model.language_model.layers.*.linear_attn.dt_bias       (uintegration01529aaa82b9 step_kernel)
+//  16: model.language_model.layers.*.linear_attn.in_proj_z.weight (uintegration01529aaa82b9 gdn_sigmoid_gate_kernel)
+//  17: model.language_model.layers.*.mlp.gate.weight           (uintegration01529aaa82b9 router_top10_wave_kernel)
 inline int sf_group_id(const char* name) {
     if (!name) return -1;
     if (std::strcmp(name, "lm_head.weight") == 0)                        return 0;
@@ -54,6 +60,14 @@ inline int sf_group_id(const char* name) {
     if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".post_attention_layernorm.weight")) return 9;
     if (std::strstr(name, "mtp.layers.") && std::strstr(name, ".input_layernorm.weight"))       return 10;
     if (std::strstr(name, "mtp.layers.") && std::strstr(name, ".post_attention_layernorm.weight")) return 11;
+    // GDN linear_attn BF16 weight tensors (groups 12-17): read by gdn_bf16_layer.cu / gdn_layer.cu / ilu_gdn_warp_step.cu
+    if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".linear_attn.conv1d.weight"))    return 12;
+    if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".linear_attn.norm.weight"))      return 13;
+    if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".linear_attn.A_log"))            return 14;
+    if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".linear_attn.dt_bias"))          return 15;
+    if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".linear_attn.in_proj_z.weight")) return 16;
+    // MoE router gate weight (group 17): read by router_top10_wave_kernel in ix_router_top10_wave.cu
+    if (std::strstr(name, "model.language_model.layers.") && std::strstr(name, ".mlp.gate.weight"))              return 17;
     return -1;
 }
 
