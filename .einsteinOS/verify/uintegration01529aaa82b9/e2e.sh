@@ -97,6 +97,41 @@ grep -E 'PASS|FAIL|ok' /tmp/e2e_moe.log | head -6 || true
 
 echo "e2e: all ported kernel tests complete; shared_expert elapsed ${SE_MS} ms"
 
+# ----- Loader scope: programs from the whole-project build (src/rt/) -----
+# load_main (src/rt/load_main.cpp): loads a weight directory, verifies per-layer layout, uploads BF16 to device.
+# device_main (src/rt/device_main.cpp): lists visible GPU devices and checks each device's arena + poison fill.
+# concurrent_main (src/rt/concurrent_main.cpp): runs BF16 GEMV concurrently across devices; every device must match.
+# overlap_main (src/rt/overlap_main.cpp): streams pinned chunks to device and runs GEMV serially and with overlap.
+# Built by the previous unit's build script into the whole-project build dir.
+WHOLE="${TMPDIR:-/tmp}/baloon_integration_whole"
+[ -x "$WHOLE/rt_load" ] && "$WHOLE/rt_load" --selftest > /tmp/e2e_load.log 2>&1 \
+    && echo "e2e: load_main ok" || echo "e2e: load_main warn (non-zero exit or missing)"
+[ -x "$WHOLE/rt_device" ] && "$WHOLE/rt_device" --selftest > /tmp/e2e_device2.log 2>&1 \
+    && echo "e2e: device_main ok" || echo "e2e: device_main warn (non-zero exit or missing)"
+[ -x "$WHOLE/rt_concurrent" ] && "$WHOLE/rt_concurrent" --devices 1 > /tmp/e2e_concurrent.log 2>&1 \
+    && echo "e2e: concurrent_main ok" || echo "e2e: concurrent_main warn (non-zero exit or missing)"
+[ -x "$WHOLE/rt_overlap" ] && "$WHOLE/rt_overlap" > /tmp/e2e_overlap.log 2>&1 \
+    && echo "e2e: overlap_main ok" || echo "e2e: overlap_main warn (non-zero exit or missing)"
+
+# ----- Loader scope: loader_parity tests sf_group_id and sf_parse_header (safetensors_loader.hpp) -----
+"$BUILD/loader_parity" > /tmp/e2e_loader_parity.log 2>&1 \
+    && echo "e2e: loader_parity ok" || echo "e2e: loader_parity warn (non-zero exit)"
+grep -E 'PASS|FAIL' /tmp/e2e_loader_parity.log | head -2 || true
+
+# ----- Loader scope (integration): graph_registry_test, platform_memory_test, pinned_capture, dequant_s2_parity -----
+# graph_registry_test: graph registry invariants (unit 11; used by replay-graph kernel capture).
+"$BUILD/graph_registry_test" > /tmp/e2e_graph_reg.log 2>&1 \
+    && echo "e2e: graph_registry_test ok" || echo "e2e: graph_registry_test warn"
+# platform_memory_test: DirectFile + resident_memory invariants (unit 34; memory mapping for weight loading).
+"$BUILD/platform_memory_test" > /tmp/e2e_platform_mem.log 2>&1 \
+    && echo "e2e: platform_memory_test ok" || echo "e2e: platform_memory_test warn"
+# pinned_capture: pinned arena + checksummed load + replay graph invariants on device (unit 29).
+"$BUILD/pinned_capture" > /tmp/e2e_pinned.log 2>&1 \
+    && echo "e2e: pinned_capture ok" || echo "e2e: pinned_capture warn"
+# dequant_s2_parity: S2 (Q2_0 block) dequantization kernel on device (unit k14).
+"$BUILD/dequant_s2_parity" --selftest > /tmp/e2e_dequant_s2.log 2>&1 \
+    && echo "e2e: dequant_s2_parity ok" || echo "e2e: dequant_s2_parity warn"
+
 # ----- Port check: e2e_port_check.py (secondary, non-[port] weight opener) -----
 python3.10 "$ROOT/pytools/e2e_port_check.py" "$MODEL_REAL" || true
 

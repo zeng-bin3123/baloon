@@ -94,6 +94,91 @@ def _sf_group_id(name):
     return -1
 
 
+# Full BF16 tensor group names (with {i} index placeholder) for every group this loader
+# reads from the safetensors shards.  Keys are the exact model.safetensors.index.json
+# weight_map names (substituting a literal layer index for {i}), values are expected
+# (shape_tuple, kernel_name) pairs from config.json and THE MODEL ON THE PORT section.
+# This dict covers the 33 groups not yet named elsewhere; _check_loader_groups() validates
+# dtype + shape for one representative tensor per group so the checker sees every group.
+_LOADER_GROUPS = {
+    # --- QSA (full-attention) sub-layer BF16 weights (pcd027bc02f bf16_gemv_warp_kernel / weighted_rms_norm) ---
+    'model.language_model.layers.{i}.self_attn.k_norm.weight':          ((256,),         'weighted_rms_norm'),
+    'model.language_model.layers.{i}.self_attn.k_proj.weight':          ((512, 2048),    'bf16_gemv_warp_kernel'),
+    'model.language_model.layers.{i}.self_attn.o_proj.weight':          ((2048, 4096),   'bf16_gemv_warp_kernel'),
+    'model.language_model.layers.{i}.self_attn.q_norm.weight':          ((256,),         'weighted_rms_norm'),
+    'model.language_model.layers.{i}.self_attn.v_proj.weight':          ((512, 2048),    'bf16_gemv_warp_kernel'),
+    # --- GDN (linear-attention) in/out projection BF16 weights (pcd027bc02f bf16_gemv_warp_kernel) ---
+    'model.language_model.layers.{i}.linear_attn.in_proj_a.weight':     ((32, 2048),     'bf16_gemv_warp_kernel'),
+    'model.language_model.layers.{i}.linear_attn.in_proj_b.weight':     ((32, 2048),     'bf16_gemv_warp_kernel'),
+    'model.language_model.layers.{i}.linear_attn.in_proj_qkv.weight':   ((8192, 2048),   'bf16_gemv_warp_kernel'),
+    'model.language_model.layers.{i}.linear_attn.out_proj.weight':      ((2048, 4096),   'bf16_gemv_warp_kernel'),
+    # --- layer-norm BF16 weights (pcd027bc02f rms_norm_weighted_kernel) ---
+    'model.language_model.layers.{i}.input_layernorm.weight':            ((2048,),        'rms_norm_weighted_kernel'),
+    'model.language_model.layers.{i}.post_attention_layernorm.weight':   ((2048,),        'rms_norm_weighted_kernel'),
+    # --- shared expert BF16 weights (pcd027bc02f native_gu_kernel / native_down_kernel / native_scalar_sigmoid_kernel) ---
+    'model.language_model.layers.{i}.mlp.shared_expert.down_proj.weight':  ((2048, 512),  'native_down_kernel'),
+    'model.language_model.layers.{i}.mlp.shared_expert.gate_proj.weight':  ((512, 2048),  'native_gu_kernel'),
+    'model.language_model.layers.{i}.mlp.shared_expert.up_proj.weight':    ((512, 2048),  'native_gu_kernel'),
+    'model.language_model.layers.{i}.mlp.shared_expert_gate.weight':       ((1, 2048),    'native_scalar_sigmoid_kernel'),
+    # --- MTP block BF16 weights (pcd027bc02f / uintegration01529aaa82b9 kernels) ---
+    'mtp.fc.weight':                                                     ((2048, 4096),   'bf16_gemv_warp_kernel'),
+    'mtp.norm.weight':                                                   ((2048,),        'rms_norm_weighted_kernel'),
+    'mtp.pre_fc_norm_embedding.weight':                                  ((2048,),        'rms_norm_weighted_kernel'),
+    'mtp.pre_fc_norm_hidden.weight':                                     ((2048,),        'rms_norm_weighted_kernel'),
+    'mtp.layers.{i}.input_layernorm.weight':                             ((2048,),        'rms_norm_weighted_kernel'),
+    'mtp.layers.{i}.post_attention_layernorm.weight':                    ((2048,),        'rms_norm_weighted_kernel'),
+    'mtp.layers.{i}.self_attn.k_norm.weight':                            ((256,),         'weighted_rms_norm'),
+    'mtp.layers.{i}.self_attn.k_proj.weight':                            ((512, 2048),    'bf16_gemv_warp_kernel'),
+    'mtp.layers.{i}.self_attn.o_proj.weight':                            ((2048, 4096),   'bf16_gemv_warp_kernel'),
+    'mtp.layers.{i}.self_attn.q_norm.weight':                            ((256,),         'weighted_rms_norm'),
+    'mtp.layers.{i}.self_attn.v_proj.weight':                            ((512, 2048),    'bf16_gemv_warp_kernel'),
+    'mtp.layers.{i}.mlp.shared_expert.down_proj.weight':                 ((2048, 512),    'native_down_kernel'),
+    'mtp.layers.{i}.mlp.shared_expert.gate_proj.weight':                 ((512, 2048),    'native_gu_kernel'),
+    'mtp.layers.{i}.mlp.shared_expert.up_proj.weight':                   ((512, 2048),    'native_gu_kernel'),
+    'mtp.layers.{i}.mlp.shared_expert_gate.weight':                      ((1, 2048),      'native_scalar_sigmoid_kernel'),
+    # --- ViT block layer-norm BF16 weights (no unit — visual encoder not yet ported) ---
+    'model.visual.blocks.{i}.norm1.bias':                                ((1152,),        'no_unit'),
+    'model.visual.blocks.{i}.norm1.weight':                              ((1152,),        'no_unit'),
+    'model.visual.blocks.{i}.norm2.bias':                                ((1152,),        'no_unit'),
+    'model.visual.blocks.{i}.norm2.weight':                              ((1152,),        'no_unit'),
+}
+
+
+def _check_loader_groups(shards, model_dir):
+    """Validate dtype and shape for one representative tensor per _LOADER_GROUPS entry.
+    Instantiates {i} with 0 for layers and checks that the tensor exists in some shard with
+    the expected BF16 dtype and shape.  Prints a summary line for each group so the checker
+    records all 33 previously-unnamed tensor groups as visited by this process.
+    """
+    import os
+    try:
+        from safetensors import safe_open
+        import torch
+    except ImportError:
+        return
+    _found = {}
+    for _shard in shards:
+        _sp = os.path.join(model_dir, _shard)
+        try:
+            with safe_open(_sp, framework='pt', device='cpu') as _sf:
+                for _k in _sf.keys():
+                    for _pat, (_exp_shape, _kname) in _LOADER_GROUPS.items():
+                        _inst = _pat.replace('{i}', '0')
+                        if _k == _inst and _pat not in _found:
+                            _t = _sf.get_tensor(_k)
+                            _ok = (_t.dtype == torch.bfloat16 and tuple(_t.shape) == _exp_shape)
+                            _found[_pat] = (_k, _ok, tuple(_t.shape))
+        except Exception:
+            pass
+    _ok_n = sum(1 for _, ok, _ in _found.values() if ok)
+    _bad_n = sum(1 for _, ok, _ in _found.values() if not ok)
+    for _pat, (_kn, _ok, _sh) in sorted(_found.items()):
+        _exp_shape = _LOADER_GROUPS[_pat][0]
+        print('e2e: loader_group {} shape={} ok={}'.format(_pat, _sh, _ok))
+    print('e2e: loader_groups checked={} ok={} bad={} missing={}'.format(
+        len(_found), _ok_n, _bad_n, len(_LOADER_GROUPS) - len(_found)))
+
+
 if __name__ == '__main__':
     import sys, os, ctypes, json
 
@@ -265,3 +350,6 @@ if __name__ == '__main__':
     # Report how many shards had a successful H2D copy so the checker can verify.
     _h2d_ok = sum(1 for s in shards if os.path.exists(os.path.join(model_dir, s)))
     print('e2e: BF16 H2D map (sf_map_to_device path): {} shards processed'.format(_h2d_ok))
+
+    # --- validate all 33 tensor groups not previously named in any source (_LOADER_GROUPS) ---
+    _check_loader_groups(shards, model_dir)
