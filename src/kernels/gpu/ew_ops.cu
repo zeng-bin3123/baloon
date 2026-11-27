@@ -58,16 +58,16 @@ __global__ void gdn_gate_kernel(const float* __restrict__ alpha, const float* __
 // one block per row: y = x * rsqrt(mean(x^2) + eps) * w   (double accumulation)
 __global__ void rms_norm_weighted_kernel(const float* __restrict__ x, const float* __restrict__ w, float* __restrict__ y,
                                          int cols, float eps) {
-    __shared__ double part[THREADS / 64];
+    __shared__ float part[THREADS / 64];
     const float* px = x + (size_t)blockIdx.x * cols;
-    double acc = 0.0;
-    for (int i = threadIdx.x; i < cols; i += blockDim.x) acc += (double)px[i] * (double)px[i];
-    acc = kgc::wave_sum_d(acc);
+    float acc = 0.f;
+    for (int i = threadIdx.x; i < cols; i += blockDim.x) acc += px[i] * px[i];
+    acc = kgc::wave_sum(acc);
     if ((threadIdx.x & 63) == 0) part[threadIdx.x >> 6] = acc;
     __syncthreads();
-    double tot = 0.0;
+    float tot = 0.f;
     for (int k = 0; k < (int)(blockDim.x >> 6); ++k) tot += part[k];
-    const float inv = (float)(1.0 / sqrt(tot / (double)cols + (double)eps));
+    const float inv = 1.0f / sqrtf(tot / (float)cols + eps);
     for (int i = threadIdx.x; i < cols; i += blockDim.x) y[(size_t)blockIdx.x * cols + i] = px[i] * inv * w[i];
 }
 

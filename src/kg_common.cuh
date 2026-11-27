@@ -20,8 +20,26 @@ __device__ __forceinline__ float wave_sum(float v) {
     return v;
 }
 __device__ __forceinline__ double wave_sum_d(double v) {
+    // __shfl_xor on double is broken on ivcore10 (returns garbage -> inf -> inv=0 -> output=0).
+    // __shfl_xor on int is ALSO broken on ivcore10 (causes GPU hardware fault, measured).
+    // Fix: bit-cast each 32-bit half to FLOAT and shuffle with the float overload,
+    // which works correctly on this architecture.  Full double precision is preserved.
 #pragma unroll
-    for (int o = 32; o > 0; o >>= 1) v += __shfl_xor(v, o, 64);
+    for (int o = 32; o > 0; o >>= 1) {
+        union { double d; unsigned long long u; } du; du.d = v;
+        float flo, fhi;
+        unsigned ulo = (unsigned)(du.u), uhi = (unsigned)(du.u >> 32);
+        __builtin_memcpy(&flo, &ulo, 4);
+        __builtin_memcpy(&fhi, &uhi, 4);
+        float nflo = __shfl_xor(flo, o, 64);
+        float nfhi = __shfl_xor(fhi, o, 64);
+        union { double d; unsigned long long u; } ov;
+        unsigned nulo, nuhi;
+        __builtin_memcpy(&nulo, &nflo, 4);
+        __builtin_memcpy(&nuhi, &nfhi, 4);
+        ov.u = (unsigned long long)nuhi << 32 | nulo;
+        v += ov.d;
+    }
     return v;
 }
 __device__ __forceinline__ float wave_max(float v) {

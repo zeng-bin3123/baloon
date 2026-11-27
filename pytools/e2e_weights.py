@@ -199,6 +199,7 @@ if __name__ == '__main__':
     # reads the 8 named tensor groups from the .safetensors files:
     # _groups_rep[gid] = (shard_name, tensor_name) for one representative tensor per group.
     _groups_rep = {}   # group_id -> (shard_name, tensor_name) — first seen per group
+    _h2d_ok = 0  # maps the BF16 buffers into pinned GPU device memory: count of shards with successful H2D copy
 
     for shard in shards:
         path = os.path.join(model_dir, shard)
