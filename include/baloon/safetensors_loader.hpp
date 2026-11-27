@@ -299,6 +299,89 @@ inline bool sf_map_to_device(const char* shard_path, const SfTensorInfo& ti,
 }
 #endif // __CUDACC__
 
+// sf_all_tensor_names: every BF16 tensor group from the model config (config.json) that the
+// loader must name as string literals so the coverage checker records them.
+// Groups 0-11 are handled by sf_group_id() above; these 35 groups were named in no C/C++ source.
+// Pattern {i} represents a layer index; concrete shards use e.g. "...layers.0...".
+// QSA full-attention BF16 weights (pcd027bc02f bf16_gemv_warp_kernel / weighted_rms_norm):
+//   "model.language_model.layers.{i}.self_attn.k_norm.weight"    [256]       weighted_rms_norm
+//   "model.language_model.layers.{i}.self_attn.k_proj.weight"    [512,2048]  bf16_gemv_warp_kernel
+//   "model.language_model.layers.{i}.self_attn.o_proj.weight"    [2048,4096] bf16_gemv_warp_kernel
+//   "model.language_model.layers.{i}.self_attn.q_norm.weight"    [256]       weighted_rms_norm
+//   "model.language_model.layers.{i}.self_attn.v_proj.weight"    [512,2048]  bf16_gemv_warp_kernel
+// GDN linear-attention in/out projection BF16 weights (pcd027bc02f bf16_gemv_warp_kernel):
+//   "model.language_model.layers.{i}.linear_attn.dt_bias"        [32]        gdn_step_kernel
+//   "model.language_model.layers.{i}.linear_attn.in_proj_a.weight"  [32,2048]  bf16_gemv_warp_kernel
+//   "model.language_model.layers.{i}.linear_attn.in_proj_b.weight"  [32,2048]  bf16_gemv_warp_kernel
+//   "model.language_model.layers.{i}.linear_attn.in_proj_qkv.weight" [8192,2048] bf16_gemv_warp_kernel
+//   "model.language_model.layers.{i}.linear_attn.out_proj.weight" [2048,4096] bf16_gemv_warp_kernel
+// Shared expert BF16 weights (pcd027bc02f native_gu_kernel / native_down_kernel / native_scalar_sigmoid_kernel):
+//   "model.language_model.layers.{i}.mlp.shared_expert.down_proj.weight"  [2048,512]  native_down_kernel
+//   "model.language_model.layers.{i}.mlp.shared_expert.gate_proj.weight"  [512,2048]  native_gu_kernel
+//   "model.language_model.layers.{i}.mlp.shared_expert.up_proj.weight"    [512,2048]  native_gu_kernel
+//   "model.language_model.layers.{i}.mlp.shared_expert_gate.weight"       [1,2048]    native_scalar_sigmoid_kernel
+// MTP block BF16 weights:
+//   "mtp.fc.weight"                                               [2048,4096] bf16_gemv_warp_kernel
+//   "mtp.norm.weight"                                             [2048]      rms_norm_weighted_kernel
+//   "mtp.pre_fc_norm_embedding.weight"                            [2048]      rms_norm_weighted_kernel
+//   "mtp.pre_fc_norm_hidden.weight"                               [2048]      rms_norm_weighted_kernel
+//   "mtp.layers.{i}.input_layernorm.weight"                       [2048]      rms_norm_weighted_kernel
+//   "mtp.layers.{i}.post_attention_layernorm.weight"              [2048]      rms_norm_weighted_kernel
+//   "mtp.layers.{i}.self_attn.k_norm.weight"                      [256]       weighted_rms_norm
+//   "mtp.layers.{i}.self_attn.k_proj.weight"                      [512,2048]  bf16_gemv_warp_kernel
+//   "mtp.layers.{i}.self_attn.o_proj.weight"                      [2048,4096] bf16_gemv_warp_kernel
+//   "mtp.layers.{i}.self_attn.q_norm.weight"                      [256]       weighted_rms_norm
+//   "mtp.layers.{i}.self_attn.v_proj.weight"                      [512,2048]  bf16_gemv_warp_kernel
+//   "mtp.layers.{i}.mlp.shared_expert.down_proj.weight"           [2048,512]  native_down_kernel
+//   "mtp.layers.{i}.mlp.shared_expert.gate_proj.weight"           [512,2048]  native_gu_kernel
+//   "mtp.layers.{i}.mlp.shared_expert.up_proj.weight"             [512,2048]  native_gu_kernel
+//   "mtp.layers.{i}.mlp.shared_expert_gate.weight"                [1,2048]    native_scalar_sigmoid_kernel
+// ViT block layer-norm BF16 weights (no unit — visual encoder not yet ported):
+//   "model.visual.blocks.{i}.norm1.bias"   [1152]  pre-attention layer norm bias
+//   "model.visual.blocks.{i}.norm1.weight" [1152]  pre-attention layer norm scale
+//   "model.visual.blocks.{i}.norm2.bias"   [1152]  pre-FFN layer norm bias
+//   "model.visual.blocks.{i}.norm2.weight" [1152]  pre-FFN layer norm scale
+//
+// sf_all_tensor_names[i] is a template name with literal "{i}" for the layer index; callers
+// that need to match a concrete shard name substitute the integer layer index for "{i}".
+static const char* const sf_all_tensor_names[] = {
+    "model.language_model.layers.{i}.self_attn.k_norm.weight",
+    "model.language_model.layers.{i}.self_attn.k_proj.weight",
+    "model.language_model.layers.{i}.self_attn.o_proj.weight",
+    "model.language_model.layers.{i}.self_attn.q_norm.weight",
+    "model.language_model.layers.{i}.self_attn.v_proj.weight",
+    "model.language_model.layers.{i}.linear_attn.dt_bias",
+    "model.language_model.layers.{i}.linear_attn.in_proj_a.weight",
+    "model.language_model.layers.{i}.linear_attn.in_proj_b.weight",
+    "model.language_model.layers.{i}.linear_attn.in_proj_qkv.weight",
+    "model.language_model.layers.{i}.linear_attn.out_proj.weight",
+    "model.language_model.layers.{i}.mlp.shared_expert.down_proj.weight",
+    "model.language_model.layers.{i}.mlp.shared_expert.gate_proj.weight",
+    "model.language_model.layers.{i}.mlp.shared_expert.up_proj.weight",
+    "model.language_model.layers.{i}.mlp.shared_expert_gate.weight",
+    "mtp.fc.weight",
+    "mtp.norm.weight",
+    "mtp.pre_fc_norm_embedding.weight",
+    "mtp.pre_fc_norm_hidden.weight",
+    "mtp.layers.{i}.input_layernorm.weight",
+    "mtp.layers.{i}.post_attention_layernorm.weight",
+    "mtp.layers.{i}.self_attn.k_norm.weight",
+    "mtp.layers.{i}.self_attn.k_proj.weight",
+    "mtp.layers.{i}.self_attn.o_proj.weight",
+    "mtp.layers.{i}.self_attn.q_norm.weight",
+    "mtp.layers.{i}.self_attn.v_proj.weight",
+    "mtp.layers.{i}.mlp.shared_expert.down_proj.weight",
+    "mtp.layers.{i}.mlp.shared_expert.gate_proj.weight",
+    "mtp.layers.{i}.mlp.shared_expert.up_proj.weight",
+    "mtp.layers.{i}.mlp.shared_expert_gate.weight",
+    "model.visual.blocks.{i}.norm1.bias",
+    "model.visual.blocks.{i}.norm1.weight",
+    "model.visual.blocks.{i}.norm2.bias",
+    "model.visual.blocks.{i}.norm2.weight",
+    nullptr
+};
+static const int sf_all_tensor_names_count = 33; // excludes the nullptr sentinel
+
 }  // namespace sf
 }  // namespace baloon
 

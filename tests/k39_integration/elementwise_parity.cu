@@ -27,7 +27,7 @@ static void test_rms_norm_bf16w_inplace() {
     // Random cases: cols=256 is THREADS (each thread handles exactly one element, boundary);
     // cols=517 is non-power-of-two; cols=2048 is hidden_size for input_layernorm.weight /
     // post_attention_layernorm.weight of model.language_model.layers.{i} and mtp.layers.{i}.
-    for (int cols : {8}) {  // cols=8: acc=0 for threads 8+, so wave_sum gives the same result for any warp width
+    for (int cols : {8, 256, 517, 2048}) {  // cols=2048: hidden_size for input_layernorm/post_attention_layernorm of model.language_model.layers.{i} and mtp.layers.{i}
         const int rows = (cols == 2048 ? 3 : 2);
         auto xf = vf((size_t)rows * cols, -2.f, 2.f);
         auto wbf = vbf((size_t)cols, 1.5f);
