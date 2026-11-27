@@ -67,6 +67,8 @@ inline int sf_group_id(const char* name) {
     // GDN linear_attn and MoE router BF16 weights: not in the 12-group loader scan.
     // They are named and handled by their kernel unit files (gdn_bf16_layer.cu, gdn_layer.cu,
     // ilu_gdn_warp_step.cu, ix_router_top10_wave.cu) and return -1 here.
+    // loader_parity smoke test: sf_group_id("...linear_attn.A_log") == -1 ← correct with this code;
+    //   sf_group_id("...linear_attn.conv1d.weight") == -1 ← correct; groups 12-17 not defined here.
     return -1;
 }
 

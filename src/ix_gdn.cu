@@ -136,3 +136,45 @@ inline cudaError_t ix_gdn_out_norm(const float* o, const float* z, const float* 
     ix_gdn::gdn_out_norm_kernel<<<h_v, 64, 0, s>>>(o, z, ssm_norm, y, S, eps);
     return cudaGetLastError();
 }
+// Wave-safe variants of gdn_l2_kernel and gdn_out_norm_kernel for BI-V100 (ivcore10).
+// The original kernels use __shfl_down for the double reduction; __shfl_down is not
+// reliable for 64-bit values on ivcore10.  kgc::wave_sum_d uses __shfl_xor instead,
+// which is verified to work correctly on this architecture.
+#include "kg_common.cuh"
+namespace ix_gdn {
+__global__ void gdn_l2_kernel_ws(float* __restrict__ x, int cols, float eps) {
+    float* p = x + (size_t)blockIdx.x * cols;
+    double acc = 0.0;
+    for (int i = threadIdx.x; i < cols; i += blockDim.x) acc += (double)p[i] * (double)p[i];
+    acc = kgc::wave_sum_d(acc);
+    __shared__ double ssum; if (threadIdx.x == 0) ssum = acc; __syncthreads();
+    const float inv = (float)(1.0 / sqrt(ssum + (double)eps));
+    for (int i = threadIdx.x; i < cols; i += blockDim.x) p[i] *= inv;
+}
+__global__ void gdn_out_norm_kernel_ws(const float* __restrict__ o, const float* __restrict__ z,
+                                        const float* __restrict__ ssm_norm, float* __restrict__ y,
+                                        int S, float eps) {
+    const int h = blockIdx.x;
+    const float* po = o + (size_t)h * S;
+    const float* pz = z + (size_t)h * S;
+    float* py = y + (size_t)h * S;
+    double acc = 0.0;
+    for (int i = threadIdx.x; i < S; i += blockDim.x) acc += (double)po[i] * (double)po[i];
+    acc = kgc::wave_sum_d(acc);
+    __shared__ double ssum; if (threadIdx.x == 0) ssum = acc; __syncthreads();
+    const float inv = (float)(1.0 / sqrt(ssum / (double)S + (double)eps));
+    for (int i = threadIdx.x; i < S; i += blockDim.x)
+        py[i] = po[i] * inv * ssm_norm[i] * sigmoid_f(pz[i]);
+}
+}  // namespace ix_gdn
+inline cudaError_t ix_gdn_l2_norm_ws(float* x, int rows, int cols, float eps, cudaStream_t s = 0) {
+    if (!x || rows <= 0 || cols <= 0 || cols > 1024) return cudaErrorInvalidValue;
+    ix_gdn::gdn_l2_kernel_ws<<<rows, 64, 0, s>>>(x, cols, eps);
+    return cudaGetLastError();
+}
+inline cudaError_t ix_gdn_out_norm_ws(const float* o, const float* z, const float* ssm_norm,
+                                       float* y, int h_v, int S, float eps, cudaStream_t s = 0) {
+    if (!o || !z || !ssm_norm || !y || h_v <= 0 || S <= 0) return cudaErrorInvalidValue;
+    ix_gdn::gdn_out_norm_kernel_ws<<<h_v, 64, 0, s>>>(o, z, ssm_norm, y, S, eps);
+    return cudaGetLastError();
+}
