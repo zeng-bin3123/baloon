@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 41671,
     "started": "2026-11-27T10:40:53.786337345Z",
-    "renewed": "2026-11-27T21:56:47.566892785Z"
+    "renewed": "2026-11-27T22:04:29.773686335Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -789,7 +789,7 @@
     "pe1ab8a4555": 1,
     "pe1f7ca5c00": 1,
     "pfcccb31b26": 1,
-    "uintegration01529aaa82b9": 10
+    "uintegration01529aaa82b9": 11
   },
   "fail_history": {
     "p17652417b0": [
@@ -923,7 +923,8 @@
       "integration_reference_impl_missing",
       "kernel_unported",
       "kernel_unported",
-      "smoke_fail"
+      "smoke_fail",
+      "lean_unproved"
     ]
   },
   "last_failure": {
@@ -1035,18 +1036,10 @@
       "base_ref": ""
     },
     "uintegration01529aaa82b9": {
-      "kind": "smoke_fail",
-      "text": "test.sh exit=1: …= pool_test: pool_test --selftest WORKING_DIRECTORY \nchecks: 3106, failures: 0\nCPU KERNEL TESTS PASSED\npool_test: PASSED\n== qsa_parity: qsa_parity --selftest\ndevice 0: Iluvatar BI-V100 (warpSize 64)\n[decode attention]\n  decode[fp16 1 kv, 40 cells] max_abs_err=2.451e-07 (scale 1.288, attended heads 12)\n  decode[fp16 2 kv, 256+130 cells] max_abs_err=1.653e-07 (scale 0.636, attended heads 48)\n  decode[q8 2 kv, 256+65 cells] max_abs_err=4.310e-07 (scale 1.102, attended heads 48)\n  decode[q8 chunk edge 64*2+1] max_abs_err=1.391e-07 (scale 0.673, attended heads 12)\n  decode[fp16 empty / single / full] max_abs_err=2.175e-07 (scale 2.777, attended heads 24)\n  decode[fp16 invalid ids masked] max_abs_err=1.766e-07 (scale 0.518, attended heads 24)\n  decode[q8 invalid ids masked] max_abs_err=2.039e-07 (scale 1.072, attended heads 12)\n[block score / tile score]\n[block select]\n[pooled append]\n  append max_abs_err=7.871e-06\nchecks=2741 failures=0\nUNIT7 GPU TESTS PASSED\n== quantize_act_parity: quantize_act_parity --selftest\nquantize_act_parity: checks=8 failures=0\nquantize_act_parity PASSED\n== rope_parity: rope_parity --selftest\nrope_parity: checks=45 failures=0\nrope_parity PASSED\n== router_top10_parity: router_top10_parity --selftest\nrouter_top10_parity: checks=5 failures=0\nrouter_top10_parity PASSED\n== s2_gemv_parity: s2_gemv_parity --selftest\ns2_gemv_parity: checks=8 failures=0\ns2_gemv_parity PASSED\n== s2_gemv_q8_parity: s2_gemv_q8_parity --selftest\ns2_gemv_q8_parity: checks=28 failures=0\ns2_gemv_q8_parity PASSED\n== s_gemv_parity: s_gemv_parity --selftest\ns_gemv_parity: checks=2032 failures=0\ns_gemv_parity PASSED\n== s_gemv_q8k_parity: s_gemv_q8k_parity --selftest\ns_gemv_q8k_parity: checks=157 failures=0\ns_gemv_q8k_parity PASSED\n== sampler_parity: sampler_parity --selftest\n  flat counts 295 314 294 297, top5 distinct 5\nsampler_parity: checks=1863 failures=0\nsampler_parity PASSED\n== shared_expert_parity: shared_expert_parity --selftest\ngate N=2560 gpu=0.501163125 ref=0.501163125 |d|=0 ok\ngate N=5120 gpu=0.00159045355 ref=0.00159045425 |d|=6.98e-10 ok\ngate N=100 gpu=0.403317064 ref=0.403317094 |d|=2.98e-08 ok\ngate N=63 gpu=0.446835637 ref=0.446835577 |d|=5.96e-08 ok\ngate N=64 gpu=0.695515454 ref=0.695515454 |d|=0 ok\ngate N=65 gpu=0.451865286 ref=0.451865256 |d|=2.98e-08 ok\ngate N=257 gpu=0.429767966 ref=0.429767936 |d|=2.98e-08 ok\nswiglu: 0 beyond 1e-6 rel, max|d|=1.91e-06 (exp() device vs host may differ in last ulp; bit-exact not required)\nscale: 0 mismatches\nshared_expert: PASS\n== suffix_drafter_test: suffix_drafter_test\n[ ok ] test_sd_basic\n[ ok ] test_sd_random\n[ ok ] test_sd_table\n[ ok ] test_sd_theory_table\n[ ok ] test_sd_theory_match_and_propose\n[ ok ] test_sd_theory_ways\n[ ok ] test_sd_ways_and_keys\n[ ok ] test_sd_probe_mask\n[ ok ] test_sd_match_loop\n[ ok ] test_sd_clamps\n[ ok ] test_sd_continuation\n[ ok ] test_sd_end_to_end\n[ ok ] test_port_mix\n[ ok ] test_port_find_slot_and_reset\nsuffix_drafter_test: checks=875420 failures=0\nsuffix_drafter_test PASSED",
-      "base_ref": "einsteinOS/dev-c880662efd-wip-uintegration01529aaa82b9",
-      "base_sha": "24d9c3b4bdadea8878c2affb0cfb882292d03774"
-    }
-  },
-  "in_progress": {
-    "uintegration01529aaa82b9": {
       "kind": "lean_unproved",
-      "text": "",
+      "text": "lean_unproved: lean/Baloon/RouterSampler.lean does not check in Lean (Axle, lean-4.35.0): -:69:33-69:38: error: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  c ≤ -1\n  b ≥ 1\n  a ≥ 1\nwhere\n a := r\n b := l\n c := ?m.76",
       "base_ref": "einsteinOS/dev-c880662efd-wip-uintegration01529aaa82b9",
-      "base_sha": "29cdd56ba96f06df09f2e05ff4dc792a6bebb7e6"
+      "base_sha": "ea1f82cb4d41c07b1108c5c10230f8896aa660a8"
     }
   },
   "infra_fails": 0,
