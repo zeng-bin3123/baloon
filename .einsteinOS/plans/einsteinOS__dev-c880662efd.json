@@ -3,7 +3,7 @@
     "host": "cc-1c97a71e-b215-41d6-a746-95e635571fb5-0",
     "pid": 41671,
     "started": "2026-11-27T10:40:53.786337345Z",
-    "renewed": "2026-11-27T22:04:29.773686335Z"
+    "renewed": "2026-11-27T22:21:57.738806579Z"
   },
   "version": 1,
   "ref": "Niko1221/Strata",
@@ -1040,6 +1040,14 @@
       "text": "lean_unproved: lean/Baloon/RouterSampler.lean does not check in Lean (Axle, lean-4.35.0): -:69:33-69:38: error: omega could not prove the goal:\na possible counterexample may satisfy the constraints\n  c ≤ -1\n  b ≥ 1\n  a ≥ 1\nwhere\n a := r\n b := l\n c := ?m.76",
       "base_ref": "einsteinOS/dev-c880662efd-wip-uintegration01529aaa82b9",
       "base_sha": "ea1f82cb4d41c07b1108c5c10230f8896aa660a8"
+    }
+  },
+  "in_progress": {
+    "uintegration01529aaa82b9": {
+      "kind": "lean_unproved",
+      "text": "",
+      "base_ref": "einsteinOS/dev-c880662efd-wip-uintegration01529aaa82b9-cont",
+      "base_sha": "f8fa3940edc8c0e0cf6a026efcf79f2be9048632"
     }
   },
   "infra_fails": 0,
