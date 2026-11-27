@@ -14,7 +14,9 @@ def threadIndex (t b k : Nat) : Nat := t + k * b
 /-- Every global index i is owned by exactly thread (i % b) at step (i / b). -/
 theorem full_coverage (i b : Nat) (hb : 0 < b) :
     threadIndex (i % b) b (i / b) = i := by
-  unfold threadIndex; omega
+  unfold threadIndex
+  rw [mul_comm, Nat.add_comm]
+  exact Nat.div_add_mod i b
 
 /-- With block size 256 and hidden-state width 2048 (the model dimension),
     every thread t < 256 visits exactly 8 elements: indices t, t+256, …, t+1792,

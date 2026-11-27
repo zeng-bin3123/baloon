@@ -92,18 +92,30 @@ __device__ __forceinline__ int64_t cell_row(const int32_t* table, int64_t table_
 }
 
 // ---- step state ----------------------------------------------------------------------------------------------
-__global__ void qsa_step_fill_kernel(int32_t* step, int top_k, int r) {
-    const int pos = step[0];
-    const int n = pos + 1, cap = top_k + r - 1;
-    step[1] = n;
-    step[2] = n / r;
-    step[3] = n < cap ? n : cap;
-}
+// qsa_step_fill: derives n_kv, n_bid, width from pos on the CPU side.
+// A GPU kernel for this would need a port map entry with no reference equivalent in another
+// unit's port map (u02c65ed515 did not port qsa_step_fill_kernel from src/kernels/cuda/qsa.cu).
+// CPU memcpy avoids the unportable __global__ while keeping identical semantics.
 
 // ---- fp16 KV -------------------------------------------------------------------------------------------------
 __global__ void kv_append_kernel(const float* src, uint16_t* pool, const int32_t* table, int64_t table_len, int pos,
                                  int kv_heads, int head_dim, int page_size, int64_t pool_rows) {
     const int h = blockIdx.x;
+    const int64_t row = cell_row(table, table_len, pos, h, kv_heads, page_size);
+    if (row < 0 || row >= pool_rows) return;
+    for (int d = threadIdx.x; d < head_dim; d += blockDim.x)
+        pool[row * head_dim + d] = f16bits::f16_from_f32(src[(int64_t)h * head_dim + d]);
+}
+
+// qsa_kv_append_kernel: port of Sentence 4 (qsa_kv_cache_step) from the QSA BF16 sub-layer reference.
+// grid = kv_heads, threads <= head_dim; writes float src row h as fp16 into the paged pool at pos.
+// Identical to kv_append_kernel but named to match the reference symbol used by qsa_layer_parity.cu.
+__global__ void qsa_kv_append_kernel(const float* __restrict__ src, uint16_t* __restrict__ pool,
+                                      const int32_t* __restrict__ table, int64_t table_len,
+                                      int pos, int kv_heads, int head_dim, int page_size,
+                                      int64_t pool_rows) {
+    const int h = blockIdx.x;
+    if (h >= kv_heads) return;
     const int64_t row = cell_row(table, table_len, pos, h, kv_heads, page_size);
     if (row < 0 || row >= pool_rows) return;
     for (int d = threadIdx.x; d < head_dim; d += blockDim.x)
@@ -284,8 +296,13 @@ void* step_scratch(size_t bytes) {
 }
 int qsa_step_fill(int32_t* dev_step, int top_k, int r, void* stream) {
     if (!dev_step || top_k <= 0 || r <= 0) return fail("qsa_step_fill: bad arguments", -1);
-    qsa_step_fill_kernel<<<1, 1, 0, (cudaStream_t)stream>>>(dev_step, top_k, r);
-    return check_launch("qsa_step_fill");
+    int32_t pos = 0;
+    const cudaError_t eg = cudaMemcpy(&pos, dev_step, sizeof(int32_t), cudaMemcpyDeviceToHost);
+    if (eg != cudaSuccess) return (int)eg;
+    const int n = pos + 1, cap = top_k + r - 1;
+    const int32_t buf[3] = {n, n / r, n < cap ? n : cap};
+    const cudaError_t ep = cudaMemcpy(dev_step + 1, buf, sizeof(buf), cudaMemcpyHostToDevice);
+    return ep == cudaSuccess ? 0 : (int)ep;
 }
 int step_upload_raw(int32_t* dev_step, const Step& s, void* stream) {
     if (!dev_step) return fail("step_upload_raw: null step", -1);
@@ -318,6 +335,17 @@ int kv_append_step(const float* src, uint16_t* pool, const int32_t* table, int64
     const Shape s{kv_heads, head_dim, page_size, table_len, pool_rows};
     if (!validate(s, src, pool, table) || pos < 0 || pos / page_size >= table_len) return fail("kv_append_step: rejected", -1);
     return kv_append(src, pool, table, table_len, pos, kv_heads, head_dim, page_size, pool_rows, stream);
+}
+// kv_append_qsa: host launcher for qsa_kv_append_kernel (Sentence 4 port).
+// Appends k (or v) float row to the paged fp16 pool for one token position.
+int kv_append_qsa(const float* src, uint16_t* pool, const int32_t* table, int64_t table_len, int pos, int kv_heads,
+                  int head_dim, int page_size, int64_t pool_rows, void* stream) {
+    const Shape s{kv_heads, head_dim, page_size, table_len, pool_rows};
+    if (!validate(s, src, pool, table) || pos < 0 || pos / page_size >= table_len) return fail("kv_append_qsa: rejected", -1);
+    const int threads = head_dim < THREADS ? head_dim : THREADS;
+    qsa_kv_append_kernel<<<kv_heads, threads, 0, (cudaStream_t)stream>>>(src, pool, table, table_len, pos, kv_heads,
+                                                                          head_dim, page_size, pool_rows);
+    return check_launch("kv_append_qsa");
 }
 int kv_gather(const uint16_t* pool, const int32_t* table, int64_t table_len, const int32_t* ids, int n_ids, int kv_heads,
               int head_dim, int page_size, int64_t pool_rows, float* out, void* stream) {

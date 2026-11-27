@@ -31,6 +31,9 @@ int kv_append(const float* src, uint16_t* pool, const int32_t* table, int64_t ta
               int head_dim, int page_size, int64_t pool_rows, void* stream);
 int kv_append_step(const float* src, uint16_t* pool, const int32_t* table, int64_t table_len, int pos, int kv_heads,
                    int head_dim, int page_size, int64_t pool_rows, void* stream);
+// kv_append_qsa: port of Sentence 4 of the QSA BF16 sub-layer (qsa_kv_append_kernel); validates then appends.
+int kv_append_qsa(const float* src, uint16_t* pool, const int32_t* table, int64_t table_len, int pos, int kv_heads,
+                  int head_dim, int page_size, int64_t pool_rows, void* stream);
 // out[n_ids][kv_heads][head_dim]; ids < 0 or out of the table give zeros.
 int kv_gather(const uint16_t* pool, const int32_t* table, int64_t table_len, const int32_t* ids, int n_ids, int kv_heads,
               int head_dim, int page_size, int64_t pool_rows, float* out, void* stream);

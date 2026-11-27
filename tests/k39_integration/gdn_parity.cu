@@ -59,6 +59,44 @@ static void test_ix_gdn_conv() {
     near_vec(dout.get(), ro, 1e-5, 1e-5, "ix_gdn_conv_step output = causal dot product");
 }
 
+// test_ix_gdn_l2: gdn_l2_kernel — per-row L2 normalisation; cols ∈ {64, 65, 100, 128}.
+// Reference uses float accumulation to match the fixed kernel (float __shfl_xor, not double __shfl_down).
+static void test_ix_gdn_l2() {
+    for (int cols : {128, 100, 65, 64}) {
+        const int rows = 16; const float eps = 1e-6f;
+        auto x = vf((size_t)rows * cols, -2.f, 2.f);
+        Dev<float> dx(x);
+        std::vector<double> r(x.size());
+        for (int i = 0; i < rows; ++i) {
+            float s = 0.f;
+            for (int c = 0; c < cols; ++c) s += x[(size_t)i * cols + c] * x[(size_t)i * cols + c];
+            const float inv = 1.f / sqrtf(s + eps);
+            for (int c = 0; c < cols; ++c) r[(size_t)i * cols + c] = x[(size_t)i * cols + c] * inv;
+        }
+        char nm[64]; std::snprintf(nm, sizeof(nm), "ix_gdn_l2_norm cols=%d rows normalised", cols);
+        ok(ix_gdn_l2_norm(dx, rows, cols, eps) == cudaSuccess && sync_ok(), nm);
+        near_vec(dx.get(), r, 1e-4, 1e-4, nm);
+    }
+}
+
+// test_ix_gdn_out_norm: gdn_out_norm_kernel — y = rms_norm(o) * ssm_norm * sigmoid(z), one wave per head.
+// Reference uses float accumulation to match the fixed kernel (float __shfl_xor, not double __shfl_down).
+static void test_ix_gdn_out_norm() {
+    const int S = 128, hv = 16; const float eps = 1e-6f;
+    auto ov = vf((size_t)hv * S, -2.f, 2.f), zv = vf((size_t)hv * S, -2.f, 2.f), nw = vf(S, 0.5f, 1.5f);
+    Dev<float> dov(ov), dzv(zv), dnw(nw), dy((size_t)hv * S);
+    std::vector<double> r((size_t)hv * S);
+    for (int h = 0; h < hv; ++h) {
+        float s = 0.f;
+        for (int i = 0; i < S; ++i) s += ov[h * S + i] * ov[h * S + i];
+        const float inv = 1.f / sqrtf(s / (float)S + eps);
+        for (int i = 0; i < S; ++i)
+            r[h * S + i] = (double)(ov[h * S + i] * inv * nw[i]) / (1.0 + std::exp(-(double)zv[h * S + i]));
+    }
+    ok(ix_gdn_out_norm(dov, dzv, dnw, dy, hv, S, eps) == cudaSuccess && sync_ok(), "ix_gdn_out_norm launch");
+    near_vec(dy.get(), r, 1e-4, 1e-4, "ix_gdn_out_norm = rms_norm(o)*nw*sigmoid(z)");
+}
+
 // test_ix_gdn_beta_gate: gdn_beta_gate_kernel — in-place beta[i] = sigmoid(beta[i]) (float, no shuffle).
 static void test_ix_gdn_beta_gate() {
     const int n = 48;
@@ -78,6 +116,8 @@ int main(int argc, char** argv) {
     test_gdn();
     test_ix_gdn_step();
     test_ix_gdn_conv();
+    test_ix_gdn_l2();
+    test_ix_gdn_out_norm();
     test_ix_gdn_beta_gate();
     std::printf("gdn_parity: checks=%ld failures=%ld\n", (long)g_checks, (long)g_fail);
     if (g_checks == 0 || g_fail != 0) { std::printf("gdn_parity FAILED\n"); return 1; }

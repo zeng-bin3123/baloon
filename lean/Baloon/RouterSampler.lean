@@ -59,9 +59,14 @@ theorem repeatPen_le (l r : Int) (hr : 1 ≤ r) : repeatPen l r ≤ l := by
   unfold repeatPen
   split
   · rename_i h
-    have h0 : 0 ≤ (-l) * (r - 1) := Int.mul_nonneg (by omega) (by omega)
-    have h1 : (-l) * (r - 1) = -(l * r) + l := by ring
-    omega
+    -- h : l ≤ 0, hr : 1 ≤ r, goal: l * r ≤ l
+    -- Use mul_nonpos (nonpos × nonneg ≤ 0) instead of mul_nonneg (avoids ▸ on Int products).
+    -- l * (r - 1) ≤ 0  because l ≤ 0 and 0 ≤ r - 1 (sub_nonneg.mpr hr, pure iff app).
+    -- Ring identity: l * r - l = l * (r - 1).
+    -- linarith combines: l*(r-1) ≤ 0 and l*r - l = l*(r-1) → l*r - l ≤ 0 → l*r ≤ l.
+    have key : l * (r - 1) ≤ 0 :=
+      mul_nonpos_of_nonpos_of_nonneg h (sub_nonneg.mpr hr)
+    linarith [show l * r - l = l * (r - 1) from by ring]
   · rename_i h
     exact Int.ediv_le_self l (by omega)
 

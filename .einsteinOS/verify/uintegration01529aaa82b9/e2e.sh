@@ -71,6 +71,14 @@ grep -E 'PASS|FAIL|ok' /tmp/e2e_gdn_layer.log | head -4 || true
 "$BUILD/gdn_parity" --selftest > /tmp/e2e_gdn.log 2>&1 \
     && echo "e2e: gdn_parity ok" \
     || echo "e2e: gdn_parity warn"
+
+# layer_norm: rms_norm_bf16w_inplace_kernel — in-place weighted RMS norm with BF16 weights
+# (input_layernorm / post_attention_layernorm of model.language_model.layers.{i} and mtp.layers.{i})
+"$BUILD/elementwise_parity" --selftest > /tmp/e2e_ew.log 2>&1 \
+    && echo "e2e: elementwise_parity ok (rms_norm_bf16w_inplace_kernel)" \
+    || echo "e2e: elementwise_parity warn (non-zero exit)"
+grep -E 'PASS|FAIL|ok' /tmp/e2e_ew.log | head -2 || true
+
 "$BUILD/gr_parity" --selftest > /tmp/e2e_gr.log 2>&1 \
     && echo "e2e: gr_parity ok" \
     || echo "e2e: gr_parity warn"
