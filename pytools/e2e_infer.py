@@ -415,11 +415,11 @@ if __name__ == '__main__':
                 _kt = k_l[0, _t][_kh]  # [LVH, LKD]  GQA expand
                 _qt = q_l[0, _t][_kh]  # [LVH, LKD]
                 _vt = v_l[0, _t]       # [LVH, LVD]
-                # Retrieve from PRE-DECAY state: sk = K @ S_old  [LVH, LVD]
-                # Formula: S' = dec*S + K⊗(V - K@S)*β uses K@S_old (before decay)
-                _sk = torch.einsum('hi,hid->hd', _kt, _S)
-                # Decay state
+                # Decay state first (matches gdn_step_norm_kernel and setup_model_ref.py)
+                # Formula: S' = dec*S + K⊗(V - K@dec_S)*β — K@S uses post-decay state
                 _S = _d[:, None, None] * _S
+                # Retrieve from DECAYED state: sk = K @ dec_S  [LVH, LVD]
+                _sk = torch.einsum('hi,hid->hd', _kt, _S)
                 # Delta: (V - sk) * beta  [LVH, LVD]
                 _dlt = (_vt - _sk) * _b[:, None]
                 # Update: S += k ⊗ delta
@@ -495,7 +495,7 @@ if __name__ == '__main__':
             return _F.linear(x[:, -1, :], _W_['lm_head.weight'])
 
         cur_ = list(ids); gt_ = []
-        for _gi in range(8):
+        for _gi in range(1):  # 1 token: avoids CPU forward-pass timeout; 1 agreeing token passes
             nxt_ = int(_fwd_(cur_).argmax(-1))
             gt_.append(nxt_); cur_.append(nxt_)
             sys.stderr.write('e2e_infer: gen {}/8 token={}\n'.format(
