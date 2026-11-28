@@ -124,14 +124,14 @@
     "python3.10 pytools/e2e_port_check.py [port]": {
       "key": "python3.10 pytools/e2e_port_check.py [port]",
       "first_at": "2026-11-28T02:37:27.835440388Z",
-      "last_at": "2026-11-28T03:49:48.025203421Z",
-      "verifications": 2,
+      "last_at": "2026-11-28T04:10:39.157512979Z",
+      "verifications": 3,
       "last_gate": "integration_e2e_loader_not_port",
       "budget": 3,
       "best_took_permille": 1000,
       "best_units": 6,
       "best_tokens": 0,
-      "closed_at": "0001-01-01T00:00:00Z"
+      "closed_at": "2026-11-28T04:10:39.157512979Z"
     },
     "python3.10 pytools/e2e_weights.py [port]": {
       "key": "python3.10 pytools/e2e_weights.py [port]",
