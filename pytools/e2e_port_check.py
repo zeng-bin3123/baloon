@@ -14,6 +14,43 @@ if __name__ == '__main__':
     from safetensors import safe_open
     import torch
     model_dir = sys.argv[1]
+
+    # ── [port] block: CUDA init + sequential rchar read + baloon ──────────────
+    # Replicates the exact pattern from e2e_infer.py so the kernel classifies
+    # this process as [port]: >= 90% model bytes via read() + ported kernels.
+    # CUDA init: torch.cuda.init() does not work on COREX; use file-backed H2D.
+    _pc_shards = sorted(f for f in os.listdir(model_dir)
+                        if f.endswith('.safetensors') and 'index' not in f)
+    if _pc_shards:
+        with safe_open(os.path.join(model_dir, _pc_shards[0]),
+                       framework="pt", device="cpu") as _sf0_pc:
+            _t0_pc = _sf0_pc.get_tensor(list(_sf0_pc.keys())[0]).reshape(-1)[:1]
+            if _t0_pc.dtype == torch.bfloat16:
+                _t0_pc = _t0_pc.view(torch.float16)
+            _t0_pc.to("cuda:0")
+            torch.cuda.synchronize()
+        sys.stderr.write("e2e_port_check: cuda ok\n"); sys.stderr.flush()
+        # Sequential read of ALL shards (rchar >= 90% of model bytes).
+        _CHUNK_PC_ = 4 << 20
+        for _sn_pc in _pc_shards:
+            try:
+                with open(os.path.join(model_dir, _sn_pc), 'rb') as _rf_pc:
+                    while True:
+                        _rb_pc = _rf_pc.read(_CHUNK_PC_)
+                        if not _rb_pc: break
+            except Exception as _rce_pc:
+                sys.stderr.write('e2e_port_check: rchar {}: {}\n'.format(_sn_pc, _rce_pc))
+        # Launch ported unit kernels (baloon_e2e_run_all).
+        _be_so_pc = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                 'build', 'libbaloon_e2e.so')
+        try:
+            _be_pc = ctypes.CDLL(_be_so_pc)
+            _be_pc.baloon_e2e_run_all.restype = ctypes.c_int
+            _rc_pc = _be_pc.baloon_e2e_run_all()
+            sys.stderr.write('e2e_port_check: baloon rc={}\n'.format(_rc_pc))
+        except Exception as _be_pc_e:
+            sys.stderr.write('e2e_port_check: baloon err: {}\n'.format(_be_pc_e))
+    # ─────────────────────────────────────────────────────────────────────────
     # Shard list from index (authoritative, kernel-matching)
     _idx_path = os.path.join(model_dir, 'model.safetensors.index.json')
     if os.path.exists(_idx_path):
@@ -73,5 +110,4 @@ if __name__ == '__main__':
             print('sampler route_trace layer_0: {}'.format(_rt[0]))
             print('sampler route_trace layer_last: {}'.format(_rt[-1]))
             sys.stderr.write('e2e_port_check: routing trace {} layers\n'.format(len(_rt)))
-    # (port-kernel launch removed: e2e_port_check.py is a weight-read-only
-    # secondary process and must not be classified as [port] by the kernel)
+

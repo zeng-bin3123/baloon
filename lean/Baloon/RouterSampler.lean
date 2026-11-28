@@ -57,18 +57,32 @@ def repeatPen (l r : Int) : Int := (if l ≤ 0 then l * r else l / r)
 /-- A repeat penalty with factor at least one never raises a logit. -/
 theorem repeatPen_le (l r : Int) (hr : 1 ≤ r) : repeatPen l r ≤ l := by
   unfold repeatPen
-  split
-  · rename_i h
-    -- h : l ≤ 0, hr : 1 ≤ r, goal: l * r ≤ l
-    -- Use mul_nonpos (nonpos × nonneg ≤ 0) instead of mul_nonneg (avoids ▸ on Int products).
-    -- l * (r - 1) ≤ 0  because l ≤ 0 and 0 ≤ r - 1 (sub_nonneg.mpr hr, pure iff app).
-    -- Ring identity: l * r - l = l * (r - 1).
-    -- linarith combines: l*(r-1) ≤ 0 and l*r - l = l*(r-1) → l*r - l ≤ 0 → l*r ≤ l.
-    have key : l * (r - 1) ≤ 0 :=
-      mul_nonpos_of_nonpos_of_nonneg h (sub_nonneg.mpr hr)
-    linarith [show l * r - l = l * (r - 1) from by ring]
-  · rename_i h
-    exact Int.ediv_le_self l (by omega)
+  by_cases h : l ≤ 0
+  · rw [if_pos h]
+    -- h : l ≤ 0, hr : 1 ≤ r; goal: l * r ≤ l
+    have h1 : 0 ≤ -l     := Int.neg_nonneg.mpr h
+    have h2 : 0 ≤ r - 1  := by linarith
+    -- (-l)*(r-1) ≥ 0: lift both factors to ℕ, use Nat.zero_le, cast back.
+    -- Avoids every Int mul-ordering lemma (all call omega on l*r in Lean 4.35.0).
+    have h3 : (0 : Int) ≤ (-l) * (r - 1) := by
+      have hm : ((-l).toNat : Int) = -l       := Int.toNat_of_nonneg h1
+      have hk : ((r - 1).toNat : Int) = r - 1 := Int.toNat_of_nonneg h2
+      have hnn : (0 : Int) ≤ ↑(-l).toNat * ↑(r - 1).toNat :=
+        by exact_mod_cast Nat.zero_le ((-l).toNat * (r - 1).toNat)
+      rwa [hm, hk] at hnn
+    linarith [show (-l) * (r - 1) + l * r = l from by ring]
+  · rw [if_neg h]
+    -- h : ¬(l ≤ 0) so l > 0; hr : 1 ≤ r; goal: l / r ≤ l
+    -- Int.ediv_le_self in Lean 4.35.0 has type a/a ≤ a (divisor = dividend), not a/b.
+    -- Prove via Nat: Int.ediv (ofNat m) (ofNat k) = ofNat (m/k) definitionally,
+    -- and Nat.div_le_self is a structural fact (no omega on multiplication).
+    have hl  : 0 ≤ l := by omega
+    have hr0 : 0 ≤ r := by linarith
+    rw [(Int.toNat_of_nonneg hl).symm, (Int.toNat_of_nonneg hr0).symm]
+    -- Goal: ↑l.toNat / ↑r.toNat ≤ ↑l.toNat
+    -- Definitionally equals ↑(l.toNat / r.toNat) ≤ ↑l.toNat (Int.ediv for ofNat).
+    change (↑(l.toNat / r.toNat) : Int) ≤ ↑l.toNat
+    exact_mod_cast Nat.div_le_self l.toNat r.toNat
 
 /-- The presence term is a boolean: at most one regardless of the count. -/
 theorem presence_bool (count : Nat) : (if count > 0 then 1 else 0 : Nat) ≤ 1 := by

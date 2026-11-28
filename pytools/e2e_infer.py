@@ -415,10 +415,11 @@ if __name__ == '__main__':
                 _kt = k_l[0, _t][_kh]  # [LVH, LKD]  GQA expand
                 _qt = q_l[0, _t][_kh]  # [LVH, LKD]
                 _vt = v_l[0, _t]       # [LVH, LVD]
+                # Retrieve from PRE-DECAY state: sk = K @ S_old  [LVH, LVD]
+                # Formula: S' = dec*S + K⊗(V - K@S)*β uses K@S_old (before decay)
+                _sk = torch.einsum('hi,hid->hd', _kt, _S)
                 # Decay state
                 _S = _d[:, None, None] * _S
-                # Retrieve: sk = k @ S  [LVH, LVD]
-                _sk = torch.einsum('hi,hid->hd', _kt, _S)
                 # Delta: (V - sk) * beta  [LVH, LVD]
                 _dlt = (_vt - _sk) * _b[:, None]
                 # Update: S += k ⊗ delta
