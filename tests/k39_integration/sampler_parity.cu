@@ -24,6 +24,15 @@
 
 using namespace baloon::kern;
 
+// check() — named function form of the CHECK macro; records a boolean assertion in the
+// global g_checks / g_fail counters (from k14gpu_common.h), matching the reference's check()
+// that the parity tests call directly instead of the macro form.
+// Sentence: check() verifies a boolean condition and records it in the global check/fail counters.
+static void check(bool cond, const char* file, int line, const char* expr) {
+    ++g_checks;
+    if (!cond) { ++g_fail; if (g_fail < 80) std::printf("FAIL %s:%d  %s\n", file, line, expr); }
+}
+
 // Sentence 3: hist_len() extracts the valid history length for a given row from the hlen vector.
 static int32_t hist_len(const std::vector<int32_t>& hlen, int row) {
     return (row < (int)hlen.size()) ? hlen[row] : 0;
@@ -53,6 +62,30 @@ static std::vector<int32_t> run(
 
 // Sentence 2: reference_pick() is the CPU argmax reference for the greedy (temperature <= 0)
 // path: ties are broken by lowest index, matching the kernel's behaviour.
+// reference_cut() is the CPU reference for top-p cut adjustment: finds the fewest top tokens
+// whose cumulative probability reaches top_p, then widens to min_keep when the cut is too tight
+// (cutAdj theorem in RouterSampler.lean: 1 ≤ cutAdj cut minKeep nKeep ∧ result ≤ nKeep).
+
+// Sentence 6: reference_cut() computes the top-p adjusted cut with min_keep widening.
+// sorted_probs: probabilities in descending order (un-normalised; function normalises internally).
+// Returns the number of tokens to keep after top-p trimming and min_keep widening.
+static int reference_cut(const std::vector<float>& sorted_probs, float top_p, int min_keep) {
+    int n = (int)sorted_probs.size();
+    int cut = n;
+    if (top_p < 1.0f) {
+        float z = 0.0f; for (float p : sorted_probs) z += p;
+        float cum = 0.0f; cut = n;
+        for (int j = 0; j < n; ++j) {
+            cum += sorted_probs[j] / (z > 0.f ? z : 1.f);
+            if (cum >= top_p) { cut = j + 1; break; }
+        }
+    }
+    // cutAdj: widen to min_keep when top-p cut is too aggressive (RouterSampler.lean cutAdj_bounds)
+    if (cut < min_keep) cut = (min_keep < n ? min_keep : n);
+    if (cut < 1) cut = 1;
+    return cut;
+}
+
 static int reference_pick(const std::vector<float>& logits, int n) {
     int best = 0;
     for (int i = 1; i < n; ++i)

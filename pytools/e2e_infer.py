@@ -448,8 +448,11 @@ if __name__ == '__main__':
             mp = p + 'mlp.'
             xn = _rn_(x, _W_[p + 'post_attention_layernorm.weight'])
             rl = _F.linear(xn, _W_[mp + 'gate.weight'])          # [1,L,NE_]
-            _, ti_ = torch.topk(rl, TK_, dim=-1)                 # [1,L,TK_]
-            tw_ = torch.softmax(torch.gather(rl, -1, ti_), -1)   # [1,L,TK_]
+            # Routing: softmax over all experts, top-k by score, renorm selected.
+            # Matches router_top10_parity.cpp reference (softmax+renorm+clamp).
+            rw_ = torch.softmax(rl, dim=-1)                      # [1,L,NE_]
+            tw_, ti_ = torch.topk(rw_, TK_, dim=-1)              # [1,L,TK_]
+            tw_ = tw_ / tw_.sum(dim=-1, keepdim=True).clamp(min=1e-9)  # renorm
             mo_ = torch.zeros_like(xn)
             gu_all = _W_[mp + 'experts.gate_up_proj']  # [NE_,2*MI_,H_]
             dw_all = _W_[mp + 'experts.down_proj']     # [NE_,H_,MI_]

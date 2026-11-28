@@ -193,8 +193,11 @@ class Qwen3_5MoeForCausalLM:
         mp = p + 'mlp.'
         xn = self._rn(x, W[p + 'post_attention_layernorm.weight'])
         rl = F.linear(xn, W[mp + 'gate.weight'])
-        _, ti = torch.topk(rl, c.TK, dim=-1)
-        tw = torch.softmax(torch.gather(rl, -1, ti), -1)
+        # Routing: softmax over all experts, top-k by score, renorm — matches
+        # router_top10_parity.cpp reference (softmax+renorm+clamp).
+        rw = torch.softmax(rl, dim=-1)
+        tw, ti = torch.topk(rw, c.TK, dim=-1)
+        tw = tw / tw.sum(dim=-1, keepdim=True).clamp(min=1e-9)
         mo = torch.zeros_like(xn)
         gu = W[mp + 'experts.gate_up_proj']; dw = W[mp + 'experts.down_proj']
         for t in range(L):

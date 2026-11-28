@@ -107,7 +107,20 @@ static void test_validate_shape() {
     ti.nbytes = 2048ULL * 2;
     LP(sf_validate_bf16_shape("model.language_model.norm.weight", ti, 4, &err));
 
+    // group 5: mtp.layers.{i}.mlp.experts.down_proj [256,2048,512] BF16 — mtp mirror of group 1
+    ti.nbytes = 256ULL * 2048 * 512 * 2;
+    LP(sf_validate_bf16_shape("mtp.layers.0.mlp.experts.down_proj", ti, 5, &err));
+
+    // group 6: mtp.layers.{i}.mlp.experts.gate_up_proj [256,1024,2048] BF16 — mtp mirror of group 2
+    ti.nbytes = 256ULL * 1024 * 2048 * 2;
+    LP(sf_validate_bf16_shape("mtp.layers.0.mlp.experts.gate_up_proj", ti, 6, &err));
+
+    // group 7: mtp.layers.{i}.self_attn.q_proj.weight [8192,2048] BF16 — mtp mirror of group 3
+    ti.nbytes = 8192ULL * 2048 * 2;
+    LP(sf_validate_bf16_shape("mtp.layers.0.self_attn.q_proj.weight", ti, 7, &err));
+
     // group 8: input_layernorm.weight [2048] BF16
+    ti.nbytes = 2048ULL * 2;
     LP(sf_validate_bf16_shape("model.language_model.layers.0.input_layernorm.weight", ti, 8, &err));
 
     // group 9: post_attention_layernorm.weight [2048] BF16

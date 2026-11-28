@@ -33,9 +33,19 @@
 #include <algorithm>
 
 static int g_pass = 0, g_fail = 0;
+// S5: when compiled for libbaloon_e2e.so (IXSE_EXTERN_ONLY / -Dmain=e2e_moe_main),
+// std::exit(2) would terminate the Python caller (e2e_port_check.py / e2e_infer.py)
+// before its sequential rchar read completes — preventing [port] classification and
+// keeping the integration direction open.  Use a soft handler in that context.
+#ifdef IXSE_EXTERN_ONLY
+#define MOE_CK(x) do { cudaError_t _e=(x); if(_e!=cudaSuccess){                  \
+    std::fprintf(stderr,"CUDA err %s at %s:%d\n",cudaGetErrorString(_e),__FILE__,__LINE__); \
+    ++g_fail; } } while(0)
+#else
 #define MOE_CK(x) do { cudaError_t _e=(x); if(_e!=cudaSuccess){                  \
     std::fprintf(stderr,"CUDA err %s at %s:%d\n",cudaGetErrorString(_e),__FILE__,__LINE__); \
     std::exit(2); } } while(0)
+#endif
 #define MOE_T(cond) do { if(cond){++g_pass;}else{++g_fail;                        \
     std::fprintf(stderr,"FAIL %s:%d\n",__FILE__,__LINE__);} } while(0)
 

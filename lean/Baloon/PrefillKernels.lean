@@ -99,6 +99,10 @@ theorem swigluIlIdx (k : Nat) (hk : k < 640) : 2 * k + 1 < 1280 := by omega
 /-- gather_rows16 moves width/8 uint4 per row; for width=2560 that is 320. -/
 theorem gatherPerRow : 2560 / 8 = 320 := by decide
 
+/-- gather_rows16 at width=2048 (Qwen3.5-MoE hidden_size for embed_tokens.weight):
+    each row is exactly 2048/8 = 256 uint4 elements (the model's exact geometry). -/
+theorem gatherPerRow2048 : 2048 / 8 = 256 := by decide
+
 -- ── § router lane layout (route_kernel, 32 lanes × 16 regs = 512 experts) ────
 
 /-- Expert lane+i*32 is recovered as (lane+i*32) % 32 = lane. -/

@@ -5,14 +5,18 @@
 
 // test_rms_norm_bf16w_inplace: applies a weighted RMS normalization in-place to the hidden state using one
 // input_layernorm or post_attention_layernorm weight vector (BF16, cols=hidden_size=2048 for this model).
+// Tensor groups exercised: model.language_model.layers.{i}.input_layernorm.weight BF16 [2048],
+//   model.language_model.layers.{i}.post_attention_layernorm.weight BF16 [2048],
+//   mtp.layers.{i}.input_layernorm.weight BF16 [2048], mtp.layers.{i}.post_attention_layernorm.weight BF16 [2048].
 // Sentence: applies a weighted RMS normalization in-place to the hidden state using one
 // input_layernorm or post_attention_layernorm weight vector.
 static void test_rms_norm_bf16w_inplace() {
     const float eps = 1e-6f;
     // Known-value case: all-ones hidden state with unit BF16 weights verifies the formula directly.
-    // mean(1^2) = 1, inv = 1/sqrt(1+eps); bf16(1.0) = 0x3F80 (exact); output = 1/sqrt(1+eps) per element.
+    // cols=2048: the actual hidden_size for input_layernorm/post_attention_layernorm weight vectors in this model.
+    // mean(1^2)=1, inv=1/sqrt(1+eps); bf16(1.0)=0x3F80 (exact); each output element equals 1/sqrt(1+eps).
     {
-        const int krows = 2, kcols = 8;    // cols=8: threads 8-63 have acc=0 so wave_sum is correct on any warp width
+        const int krows = 2, kcols = 2048;  // 2048 = hidden_size of input_layernorm.weight / post_attention_layernorm.weight
         std::vector<float>    kx(krows * kcols, 1.0f);
         std::vector<uint16_t> kw(kcols, fb::round_f32_to_bf16_bits(1.0f));
         Dev<float>    kdx(kx);
